@@ -1,6 +1,7 @@
 name = "aired"
 main = "src/index.ts"
 compatibility_date = "2025-04-01"
+workers_dev = true
 
 [assets]
 directory = "../web"
@@ -11,5 +12,13 @@ bucket_name = "aired-pages"
 
 [[kv_namespaces]]
 binding = "PAGES_KV"
-id = "placeholder"
-preview_id = "placeholder"
+id = "6388d6b3b6c04fe5ad8529ae029e723e"
+
+# Custom domain
+[[routes]]
+pattern = "aired.sh/*"
+zone_name = "aired.sh"
+
+[[routes]]
+pattern = "aired.sh"
+zone_name = "aired.sh"
