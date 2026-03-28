@@ -275,6 +275,19 @@
   resultCard.style.transform = "translateY(8px)";
   resultCard.style.transition = "opacity 0.25s ease, transform 0.25s ease";
 
+  // ── Live stats ──
+  (function () {
+    fetch("/api/stats")
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.publishes > 0) {
+          document.getElementById("stat-count").textContent = data.publishes.toLocaleString();
+          document.getElementById("live-stat").classList.remove("hidden");
+        }
+      })
+      .catch(function () {});
+  })();
+
   // ── Install section copy buttons ──
   document.querySelectorAll(".copy-snippet").forEach(function (btn) {
     btn.addEventListener("click", function () {

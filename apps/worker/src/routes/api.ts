@@ -134,6 +134,14 @@ api.post("/publish", rateLimitMiddleware, async (c) => {
   }
   await c.env.PAGES_KV.put(`page:${id}`, serializeMetadata(metadata), kvOptions);
 
+  // Increment publish counter (fire-and-forget)
+  c.executionCtx.waitUntil(
+    (async () => {
+      const count = parseInt(await c.env.PAGES_KV.get("stats:publishes") ?? "0", 10);
+      await c.env.PAGES_KV.put("stats:publishes", String(count + 1));
+    })().catch(() => {}),
+  );
+
   return c.json({
     id,
     url: `${origin}/p/${id}`,
@@ -278,6 +286,12 @@ api.get("/pages/:id", async (c) => {
     readCount: metadata.readCount,
     expiresAt: metadata.expiresAt,
   });
+});
+
+// GET /api/stats — public stats
+api.get("/stats", async (c) => {
+  const publishes = parseInt(await c.env.PAGES_KV.get("stats:publishes") ?? "0", 10);
+  return c.json({ publishes });
 });
 
 export { api };
