@@ -274,4 +274,20 @@
   resultCard.style.opacity = "0";
   resultCard.style.transform = "translateY(8px)";
   resultCard.style.transition = "opacity 0.25s ease, transform 0.25s ease";
+
+  // ── Install section copy buttons ──
+  document.querySelectorAll(".copy-snippet").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var text = btn.getAttribute("data-copy");
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(function () {
+        btn.textContent = "Copied!";
+        btn.classList.add("copied");
+        setTimeout(function () {
+          btn.textContent = "Copy";
+          btn.classList.remove("copied");
+        }, 2000);
+      });
+    });
+  });
 })();

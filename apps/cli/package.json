@@ -1,28 +1,52 @@
 {
   "name": "aired",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Publish HTML artifacts to shareable URLs instantly",
-  "type": "commonjs",
+  "type": "module",
   "bin": {
-    "aired": "./dist/index.js"
+    "aired": "./dist/cli.cjs"
   },
-  "main": "./dist/index.js",
   "files": [
-    "dist"
+    "dist/cli.cjs",
+    "SKILL.md"
   ],
   "scripts": {
-    "build": "tsup",
-    "typecheck": "tsc --noEmit",
-    "dev": "tsup --watch"
+    "build": "node build.mjs",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "html",
+    "artifact",
+    "publish",
+    "share",
+    "cli",
+    "mcp",
+    "claude",
+    "ai"
+  ],
+  "license": "MIT",
+  "author": "Abdul Moiz",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/progrmoiz/aired.git",
+    "directory": "apps/cli"
   },
   "dependencies": {
     "@aired/core": "workspace:*",
-    "commander": "^12.0.0",
+    "commander": "^14.0.0",
+    "@commander-js/extra-typings": "^14.0.0",
+    "@clack/prompts": "^0.9.0",
+    "picocolors": "^1.1.0",
     "conf": "^13.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "tsup": "^8.0.0",
-    "typescript": "^5.7.0"
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "tsx": "^4.19.0",
+    "esbuild": "^0.25.0"
   }
 }

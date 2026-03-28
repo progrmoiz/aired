@@ -1,32 +1,38 @@
-import { deletePage } from "../api-client.js";
-import { getToken, removeToken } from "../store.js";
+import { Command } from 'commander'
+import pc from 'picocolors'
+import type { GlobalOpts } from '../lib/config.js'
+import { resolveApiUrl } from '../lib/config.js'
+import { shouldOutputJson, outputError, ExitCode } from '../lib/output.js'
+import { withSpinner } from '../lib/spinner.js'
+import { deletePage } from '../core/client.js'
+import { getToken, removeToken } from '../core/store.js'
 
-interface DeleteCommandOptions {
-  json?: boolean;
-  apiUrl?: string;
-}
+export function makeDeleteCommand(globalOpts: () => GlobalOpts): Command {
+  return new Command('delete')
+    .description('Delete a page using the stored token')
+    .argument('<id>', 'Page ID')
+    .action(async (id) => {
+      const opts = globalOpts()
+      const baseUrl = resolveApiUrl(opts)
 
-export async function runDelete(id: string, opts: DeleteCommandOptions): Promise<void> {
-  const token = getToken(id);
-  if (token === null) {
-    process.stderr.write(
-      `Error: no token found for page '${id}'. Run 'aired tokens' to list stored tokens.\n`,
-    );
-    process.exit(1);
-  }
+      const token = getToken(id)
+      if (token === null) {
+        outputError({ code: 'VALIDATION', message: `No token found for page '${id}'. Run 'aired tokens' to list stored tokens.` }, opts)
+        process.exit(ExitCode.VALIDATION_ERROR)
+      }
 
-  try {
-    await deletePage(id, token, { apiUrl: opts.apiUrl });
+      try {
+        await withSpinner('Deleting...', () => deletePage(baseUrl, id, token), opts)
+        removeToken(id)
 
-    removeToken(id);
-
-    if (opts.json === true) {
-      process.stdout.write(JSON.stringify({ ok: true, id }) + "\n");
-    } else {
-      process.stdout.write(`Deleted page ${id}\n`);
-    }
-  } catch (err) {
-    process.stderr.write(`Error: ${(err as Error).message}\n`);
-    process.exit(1);
-  }
+        if (shouldOutputJson(opts)) {
+          process.stdout.write(JSON.stringify({ ok: true, id }, null, 2) + '\n')
+        } else {
+          process.stdout.write(pc.green('Deleted') + ` page ${pc.bold(id)}\n`)
+        }
+      } catch (err) {
+        outputError({ code: 'API', message: (err as Error).message }, opts)
+        process.exit(ExitCode.API_ERROR)
+      }
+    })
 }

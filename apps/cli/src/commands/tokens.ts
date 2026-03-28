@@ -1,72 +1,84 @@
-import { listTokens, pruneExpired } from "../store.js";
+import { Command } from 'commander'
+import pc from 'picocolors'
+import type { GlobalOpts } from '../lib/config.js'
+import { resolveApiUrl } from '../lib/config.js'
+import { shouldOutputJson, outputError, ExitCode } from '../lib/output.js'
+import { withSpinner } from '../lib/spinner.js'
+import { renderTable } from '../lib/table.js'
+import { listTokens, pruneExpired } from '../core/store.js'
 
-interface TokensCommandOptions {
-  json?: boolean;
-  apiUrl?: string;
-}
+export function makeTokensCommand(globalOpts: () => GlobalOpts): Command {
+  const cmd = new Command('tokens')
+    .description('List stored tokens')
+    .action(async () => {
+      const opts = globalOpts()
+      const tokens = listTokens()
 
-export async function runTokensList(opts: TokensCommandOptions): Promise<void> {
-  const tokens = listTokens();
+      if (tokens.length === 0) {
+        if (shouldOutputJson(opts)) {
+          process.stdout.write('[]\n')
+        } else {
+          process.stdout.write('No tokens stored. Publish a page first.\n')
+        }
+        return
+      }
 
-  if (tokens.length === 0) {
-    if (opts.json === true) {
-      process.stdout.write(JSON.stringify([]) + "\n");
-    } else {
-      process.stdout.write("No tokens stored. Publish a page first.\n");
-    }
-    return;
-  }
+      if (shouldOutputJson(opts)) {
+        const output = tokens.map((t) => ({
+          id: t.id,
+          title: t.title,
+          url: t.url,
+          created: t.created,
+        }))
+        process.stdout.write(JSON.stringify(output, null, 2) + '\n')
+        return
+      }
 
-  if (opts.json === true) {
-    const output = tokens.map((t) => ({
-      id: t.id,
-      title: t.title,
-      url: t.url,
-      created: t.created,
-    }));
-    process.stdout.write(JSON.stringify(output) + "\n");
-    return;
-  }
+      const rows = tokens.map((t) => ({
+        id: t.id,
+        title: t.title ?? pc.dim('(untitled)'),
+        url: t.url,
+        created: new Date(t.created).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        }),
+      }))
 
-  // Human-readable table
-  const idWidth = Math.max(10, ...tokens.map((t) => t.id.length));
-  const titleWidth = Math.max(20, ...tokens.map((t) => (t.title ?? "(untitled)").length));
-  const urlWidth = Math.max(30, ...tokens.map((t) => t.url.length));
+      process.stdout.write(
+        renderTable(rows, [
+          { key: 'id', header: 'ID' },
+          { key: 'title', header: 'Title' },
+          { key: 'url', header: 'URL' },
+          { key: 'created', header: 'Created' },
+        ]) + '\n',
+      )
+    })
 
-  const pad = (s: string, w: number) => s.padEnd(w);
+  cmd
+    .command('prune')
+    .description('Remove tokens for pages that no longer exist')
+    .action(async () => {
+      const opts = globalOpts()
+      const baseUrl = resolveApiUrl(opts)
 
-  process.stdout.write(
-    `${pad("ID", idWidth)}  ${pad("TITLE", titleWidth)}  ${pad("URL", urlWidth)}  CREATED\n`,
-  );
-  process.stdout.write(
-    `${"-".repeat(idWidth)}  ${"-".repeat(titleWidth)}  ${"-".repeat(urlWidth)}  ${"-".repeat(24)}\n`,
-  );
+      try {
+        const pruned = await withSpinner('Checking pages...', () => pruneExpired(baseUrl), opts)
 
-  for (const t of tokens) {
-    const title = t.title ?? "(untitled)";
-    const created = new Date(t.created).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-    process.stdout.write(
-      `${pad(t.id, idWidth)}  ${pad(title, titleWidth)}  ${pad(t.url, urlWidth)}  ${created}\n`,
-    );
-  }
-}
+        if (shouldOutputJson(opts)) {
+          process.stdout.write(JSON.stringify({ pruned }, null, 2) + '\n')
+        } else {
+          if (pruned === 0) {
+            process.stdout.write('Nothing to prune. All pages are still alive.\n')
+          } else {
+            process.stdout.write(pc.green(`Pruned ${pruned} expired token${pruned === 1 ? '' : 's'}.\n`))
+          }
+        }
+      } catch (err) {
+        outputError({ code: 'API', message: (err as Error).message }, opts)
+        process.exit(ExitCode.API_ERROR)
+      }
+    })
 
-export async function runTokensPrune(opts: TokensCommandOptions): Promise<void> {
-  process.stderr.write("Checking pages...\n");
-
-  const pruned = await pruneExpired({ apiUrl: opts.apiUrl });
-
-  if (opts.json === true) {
-    process.stdout.write(JSON.stringify({ pruned }) + "\n");
-  } else {
-    if (pruned === 0) {
-      process.stdout.write("Nothing to prune. All pages are still alive.\n");
-    } else {
-      process.stdout.write(`Pruned ${pruned} expired token${pruned === 1 ? "" : "s"}.\n`);
-    }
-  }
+  return cmd
 }

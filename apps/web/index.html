@@ -86,22 +86,6 @@
       display: flex;
     }
 
-    /* Code editor line numbers */
-    .line-numbers {
-      counter-reset: line;
-      user-select: none;
-      -webkit-user-select: none;
-    }
-    .line-numbers span {
-      counter-increment: line;
-      display: block;
-    }
-    .line-numbers span::before {
-      content: counter(line, decimal-leading-zero);
-      color: #56565a;
-      font-size: 0.75rem;
-    }
-
     /* Subtle glow on form focus */
     .form-container:focus-within {
       box-shadow: 0 0 0 1px #3b3b40, 0 0 40px -12px rgba(124, 106, 239, 0.08);
@@ -197,24 +181,22 @@
 
           <!-- Editor area -->
           <div class="paste-area">
-            <div class="flex">
-              <!-- Line numbers -->
-              <div id="line-numbers" aria-hidden="true"
-                   class="line-numbers w-10 flex-shrink-0 pt-3 pb-3 text-right pr-3 border-r border-aired-border bg-aired-bg/50 select-none font-mono">
-                <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
-              </div>
-              <!-- Textarea -->
-              <textarea
-                id="html-input"
-                name="html"
-                placeholder="<html>&#10;  <body>&#10;    <h1>Hello World</h1>&#10;  </body>&#10;</html>"
-                spellcheck="false"
-                autocomplete="off"
-                rows="10"
-                class="flex-1 w-full bg-transparent p-3 pl-4 font-mono text-sm text-aired-text-primary placeholder:text-aired-text-tertiary leading-relaxed focus:outline-none"
-                aria-label="HTML content"
-              ></textarea>
+            <!-- Empty state hint (shown when textarea is empty) -->
+            <div id="empty-hint" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-[1] transition-opacity duration-150">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-aired-text-tertiary mb-2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+              <span class="text-sm text-aired-text-tertiary">Paste HTML or drop a file</span>
+              <span class="text-2xs text-aired-text-tertiary mt-1">⌘V to paste · 2 MB max</span>
             </div>
+            <!-- Textarea -->
+            <textarea
+              id="html-input"
+              name="html"
+              spellcheck="false"
+              autocomplete="off"
+              rows="8"
+              class="relative z-[2] w-full bg-transparent p-4 font-mono text-sm text-aired-text-primary leading-relaxed focus:outline-none"
+              aria-label="HTML content"
+            ></textarea>
             <!-- Drag overlay -->
             <div class="drag-hint absolute inset-0 items-center justify-center bg-aired-bg/90 border-2 border-dashed border-aired-accent/30 rounded-lg z-10">
               <span class="text-sm text-aired-text-secondary">Drop .html file</span>
@@ -346,55 +328,132 @@
 
     <!-- ─── Install Section ─── -->
     <section id="install" class="mt-20 sm:mt-28 mb-20">
-      <div class="flex items-center gap-3 mb-8">
-        <div class="h-px flex-1 bg-aired-border"></div>
-        <h2 class="text-sm font-medium text-aired-text-tertiary uppercase tracking-wider">Install</h2>
-        <div class="h-px flex-1 bg-aired-border"></div>
+      <div class="mb-8">
+        <h2 class="text-lg font-semibold tracking-tight text-aired-text-primary">Built for agents.</h2>
+        <p class="mt-1 text-sm text-aired-text-secondary">Install as a skill, MCP server, CLI, or raw API. Works with any AI tool.</p>
       </div>
 
-      <div class="space-y-6">
-        <!-- CLI -->
-        <div class="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-4">
-          <h3 class="text-sm font-medium text-aired-text-tertiary w-10 shrink-0">CLI</h3>
-          <div class="flex-1 min-w-0">
-            <code class="font-mono text-sm text-aired-accent select-all">npx aired file.html</code>
-            <span class="text-2xs text-aired-text-tertiary ml-3">
-              <span class="text-aired-text-secondary">--pin</span>
-              <span class="mx-1">/</span>
-              <span class="text-aired-text-secondary">--ttl</span>
-              <span class="mx-1">/</span>
-              <span class="text-aired-text-secondary">--json</span>
-              <span class="mx-1">/</span>
-              stdin
-            </span>
+      <div class="space-y-4">
+
+        <!-- Skills -->
+        <div class="border border-aired-border rounded-lg bg-aired-surface overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-aired-border">
+            <div class="flex items-center gap-2.5">
+              <span class="flex items-center justify-center w-6 h-6 rounded bg-aired-accent/10 text-aired-accent">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+              </span>
+              <h3 class="text-sm font-medium text-aired-text-primary">Skills</h3>
+            </div>
+            <a href="https://skills.sh" target="_blank" rel="noopener" class="text-2xs text-aired-text-tertiary hover:text-aired-text-secondary transition-colors duration-150">skills.sh</a>
           </div>
-        </div>
-
-        <div class="h-px bg-aired-border/50"></div>
-
-        <!-- MCP -->
-        <div class="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-4">
-          <h3 class="text-sm font-medium text-aired-text-tertiary w-10 shrink-0">MCP</h3>
-          <div class="flex-1 min-w-0">
-            <code class="font-mono text-2xs text-aired-accent select-all">claude mcp add aired -- npx aired --mcp</code>
-            <p class="mt-1 text-2xs text-aired-text-tertiary">
-              Claude Code, Cursor, Windsurf, any MCP client.
+          <div class="p-4 space-y-3">
+            <div class="flex items-center justify-between bg-aired-bg rounded-sm px-3 py-2.5">
+              <code class="font-mono text-sm text-aired-accent select-all">npx skills add progrmoiz/aired</code>
+              <button type="button" class="copy-snippet copy-btn flex-shrink-0 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy="npx skills add progrmoiz/aired">Copy</button>
+            </div>
+            <p class="text-2xs text-aired-text-tertiary">
+              Adds a <code class="text-aired-text-secondary">SKILL.md</code> to your project. Any AI agent (Claude Code, Cursor, Windsurf) discovers and uses <code class="text-aired-text-secondary">aired</code> automatically.
             </p>
           </div>
         </div>
 
-        <div class="h-px bg-aired-border/50"></div>
-
-        <!-- API -->
-        <div class="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-4">
-          <h3 class="text-sm font-medium text-aired-text-tertiary w-10 shrink-0">API</h3>
-          <div class="flex-1 min-w-0">
-            <code class="font-mono text-sm text-aired-accent select-all">POST /api/publish</code>
-            <span class="text-2xs text-aired-text-tertiary ml-3">
-              Returns <span class="text-aired-text-secondary">{ url, update_token }</span>. Docs on GitHub.
-            </span>
+        <!-- CLI -->
+        <div class="border border-aired-border rounded-lg bg-aired-surface overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-aired-border">
+            <div class="flex items-center gap-2.5">
+              <span class="flex items-center justify-center w-6 h-6 rounded bg-aired-accent/10 text-aired-accent">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+              </span>
+              <h3 class="text-sm font-medium text-aired-text-primary">Command Line</h3>
+            </div>
+            <span class="text-2xs text-aired-text-tertiary">Agent-ready</span>
+          </div>
+          <div class="p-4 space-y-3">
+            <div class="flex items-center justify-between bg-aired-bg rounded-sm px-3 py-2.5">
+              <code class="font-mono text-sm text-aired-accent select-all">npx aired dashboard.html</code>
+              <button type="button" class="copy-snippet copy-btn flex-shrink-0 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy="npx aired dashboard.html">Copy</button>
+            </div>
+            <div class="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-aired-text-tertiary">
+              <span><code class="text-aired-text-secondary">--json</code> Structured output</span>
+              <span><code class="text-aired-text-secondary">--pin secret</code> PIN-protect</span>
+              <span><code class="text-aired-text-secondary">--ttl 24h</code> Custom expiry</span>
+              <span><code class="text-aired-text-secondary">cat file | aired</code> Stdin</span>
+            </div>
+            <p class="text-2xs text-aired-text-tertiary">
+              JSON output when piped. Consistent exit codes. Built for humans and agents.
+            </p>
           </div>
         </div>
+
+        <!-- MCP Server -->
+        <div class="border border-aired-border rounded-lg bg-aired-surface overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-aired-border">
+            <div class="flex items-center gap-2.5">
+              <span class="flex items-center justify-center w-6 h-6 rounded bg-aired-accent/10 text-aired-accent">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+              </span>
+              <h3 class="text-sm font-medium text-aired-text-primary">MCP Server</h3>
+            </div>
+            <span class="text-2xs text-aired-text-tertiary">For AI tools</span>
+          </div>
+          <div class="p-4 space-y-3">
+            <!-- Claude Code -->
+            <div>
+              <div class="flex items-center gap-1.5 mb-1.5">
+                <span class="text-2xs font-medium text-aired-text-secondary">Claude Code</span>
+              </div>
+              <div class="flex items-center justify-between bg-aired-bg rounded-sm px-3 py-2.5">
+                <code class="font-mono text-sm text-aired-accent select-all truncate">claude mcp add aired -- npx aired --mcp</code>
+                <button type="button" class="copy-snippet copy-btn flex-shrink-0 ml-2 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy="claude mcp add aired -- npx aired --mcp">Copy</button>
+              </div>
+            </div>
+            <!-- Cursor / Windsurf -->
+            <div>
+              <div class="flex items-center gap-1.5 mb-1.5">
+                <span class="text-2xs font-medium text-aired-text-secondary">Cursor / Windsurf / ChatGPT</span>
+              </div>
+              <div class="bg-aired-bg rounded-sm px-3 py-2.5">
+                <code class="font-mono text-2xs text-aired-text-secondary block whitespace-pre select-all">{
+  "mcpServers": {
+    "aired": {
+      "command": "npx",
+      "args": ["aired", "--mcp"]
+    }
+  }
+}</code>
+              </div>
+            </div>
+            <p class="text-2xs text-aired-text-tertiary">
+              Exposes a <code class="text-aired-text-secondary">publish_html</code> tool. Your AI can publish artifacts directly.
+            </p>
+          </div>
+        </div>
+
+        <!-- API -->
+        <div class="border border-aired-border rounded-lg bg-aired-surface overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-aired-border">
+            <div class="flex items-center gap-2.5">
+              <span class="flex items-center justify-center w-6 h-6 rounded bg-aired-accent/10 text-aired-accent">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+              </span>
+              <h3 class="text-sm font-medium text-aired-text-primary">HTTP API</h3>
+            </div>
+            <span class="text-2xs text-aired-text-tertiary">No auth required</span>
+          </div>
+          <div class="p-4 space-y-3">
+            <div class="bg-aired-bg rounded-sm px-3 py-2.5">
+              <code class="font-mono text-sm text-aired-text-secondary block whitespace-pre select-all">curl -X POST https://aired.sh/api/publish \
+  -H "Content-Type: application/json" \
+  -d '{"html": "&lt;h1&gt;Hello&lt;/h1&gt;"}'</code>
+            </div>
+            <div class="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-aired-text-tertiary">
+              <span>Returns <code class="text-aired-text-secondary">{ url, update_token, expiresAt }</code></span>
+              <span>2 MB max</span>
+              <span>5 uploads/hour</span>
+            </div>
+          </div>
+        </div>
+
       </div>
     </section>
 
@@ -414,27 +473,23 @@
 
   <script src="/app.js"></script>
   <script>
-    // ── Line numbers sync ──
+    // ── Empty state hint ──
     (function() {
       var textarea = document.getElementById('html-input');
-      var lineNums = document.getElementById('line-numbers');
+      var hint = document.getElementById('empty-hint');
 
-      function updateLines() {
-        var count = Math.max(textarea.value.split('\n').length, 8);
-        var spans = '';
-        for (var i = 0; i < count; i++) {
-          spans += '<span></span>';
-        }
-        lineNums.innerHTML = spans;
+      function toggleHint() {
+        hint.style.opacity = textarea.value.length === 0 ? '1' : '0';
       }
 
-      textarea.addEventListener('input', updateLines);
-      updateLines();
-
-      // Sync scroll
-      textarea.addEventListener('scroll', function() {
-        lineNums.style.transform = 'translateY(-' + textarea.scrollTop + 'px)';
+      textarea.addEventListener('input', toggleHint);
+      textarea.addEventListener('focus', function() {
+        if (textarea.value.length === 0) hint.style.opacity = '0.5';
       });
+      textarea.addEventListener('blur', function() {
+        toggleHint();
+      });
+      toggleHint();
     })();
   </script>
 </body>
