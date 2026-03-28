@@ -32,7 +32,10 @@ cat page.html | npx aired --title "My Page"
 npx aired file.html --json
 
 # Update same URL
-npx aired new-version.html --token at_xK9mN2pQr7...
+npx aired update <id> new-version.html
+
+# Page info
+npx aired info <id>
 
 # Manage stored tokens
 npx aired tokens
@@ -40,6 +43,9 @@ npx aired tokens prune
 
 # Delete a page
 npx aired delete <id>
+
+# Diagnostics
+npx aired doctor
 ```
 
 ### MCP (Claude and other AI tools)
