@@ -1,132 +1,56 @@
 ---
 name: aired
-description: Publish HTML artifacts to shareable URLs. CLI + MCP server for AI agents.
+description: Publishes HTML files or strings to shareable live URLs via aired.sh. Use when the user wants to share, deploy, or publish an HTML artifact, dashboard, visualization, report, or any generated HTML — or when an agent needs to make HTML viewable in a browser. Supports PIN protection, custom expiry, and stdin piping. No auth required.
 ---
 
-# aired — CLI for publishing HTML artifacts
+# aired
 
-Publish HTML files to shareable URLs. Works with any AI tool (Claude Code, Cursor, ChatGPT).
+Publish HTML artifacts to shareable URLs. No signup, no auth, no deploy pipeline.
 
-## Setup
-
-No auth required. Anonymous by default.
+## Quick Start
 
 ```bash
-# Install globally
-npm install -g aired
+# Publish a file → get a live URL
+npx aired dashboard.html
 
-# Or use directly
-npx aired file.html
+# Pipe HTML from another command
+echo "<h1>Hello</h1>" | npx aired --json | jq .url
+
+# PIN-protected, expires in 24h
+npx aired report.html --ttl 24h --pin secret123
 ```
-
-Optional: set `AIRED_API_URL` env var for custom API endpoint.
 
 ## Commands
 
-### publish (default)
+| Command | Description |
+|---------|-------------|
+| `aired [file]` | Publish HTML file or stdin (default command) |
+| `aired update <id> <file>` | Update an existing page |
+| `aired delete <id>` | Delete a page |
+| `aired info <id>` | Show page metadata |
+| `aired tokens` | List stored update tokens |
+| `aired tokens prune` | Remove tokens for expired pages |
+| `aired doctor` | Diagnostics (Node.js, API, token store) |
 
-Publish an HTML file to a shareable URL.
+## Publish Flags
 
-```bash
-aired file.html
-aired file.html --json
-cat file.html | aired
-aired file.html --ttl 24h --pin secret123
-aired file.html --permanent
-```
-
-**Flags:** `--title`, `--pin`, `--ttl <1h|24h|7d|30d>`, `--permanent`, `--reads <n>`
-
-**JSON output:**
-```json
-{
-  "id": "abc123",
-  "url": "https://aired.sh/p/abc123",
-  "update_token": "at_...",
-  "expiresAt": "2026-04-04T12:00:00.000Z"
-}
-```
-
-### update
-
-Update an existing page.
-
-```bash
-aired update <id> new-file.html
-aired update <id> new-file.html --json
-```
-
-### delete
-
-Delete a page.
-
-```bash
-aired delete <id>
-aired delete <id> --json
-```
-
-### info
-
-Show page metadata.
-
-```bash
-aired info <id>
-aired info <id> --json
-```
-
-**JSON output:**
-```json
-{
-  "id": "abc123",
-  "title": "My Dashboard",
-  "size": 4096,
-  "readCount": 5,
-  "expiresAt": "2026-04-04T12:00:00.000Z"
-}
-```
-
-### tokens
-
-List stored tokens.
-
-```bash
-aired tokens
-aired tokens --json
-aired tokens prune
-```
-
-### doctor
-
-Run diagnostic checks.
-
-```bash
-aired doctor
-aired doctor --json
-```
-
-**JSON output:**
-```json
-{
-  "ok": true,
-  "checks": [
-    { "name": "CLI Version", "status": "pass", "message": "v0.1.0" },
-    { "name": "Node.js", "status": "pass", "message": "v22.19.0" },
-    { "name": "Token Store", "status": "pass", "message": "2 tokens at ~/.config/aired/tokens.json" },
-    { "name": "API", "status": "pass", "message": "https://aired.sh" }
-  ]
-}
-```
+| Flag | Effect |
+|------|--------|
+| `-t, --title <title>` | Custom page title |
+| `-p, --pin <pin>` | PIN-protect the page |
+| `--ttl <duration>` | Expiry: `1h`, `24h`, `7d`, `30d` |
+| `--permanent` | No expiry |
+| `--reads <n>` | Auto-delete after N views |
 
 ## Global Flags
 
 | Flag | Effect |
 |------|--------|
-| `--json` | Force JSON output |
+| `--json` | Structured JSON to stdout |
 | `--quiet` | Suppress stderr, implies --json |
-| `--verbose` | Extended output |
 | `--api-url <url>` | Custom API endpoint |
 
-When stdout is piped, JSON is automatic.
+JSON output is automatic when stdout is piped — no flag needed.
 
 ## Exit Codes
 
@@ -134,44 +58,39 @@ When stdout is piped, JSON is automatic.
 |------|---------|
 | 0 | Success |
 | 1 | API error |
-| 2 | Validation error |
-| 3 | Rate limited |
+| 2 | Validation error (bad input, missing file, no token) |
+| 3 | Rate limited (5 uploads/hour) |
+
+## Update Flow
+
+The first publish returns an `update_token` (saved to `~/.config/aired/tokens.json`). To update the same URL:
+
+```bash
+aired dashboard.html          # → publishes, saves token
+aired update abc123 v2.html   # → updates same URL using stored token
+```
+
+Tokens are stored per page ID. `aired tokens` lists them. `aired tokens prune` removes expired ones.
 
 ## MCP Server
-
-Spawn the MCP stdio server:
 
 ```bash
 aired --mcp
 ```
 
-This starts the `@aired/mcp` package as a stdio MCP server with a `publish_html` tool.
+Starts a stdio MCP server with a `publish_html` tool. Configure in Claude Code:
 
-## Common Workflows
-
-### Publish and share
 ```bash
-aired dashboard.html
-# → https://aired.sh/p/abc123
+claude mcp add aired -- npx aired --mcp
 ```
 
-### Update same URL
-```bash
-aired dashboard.html        # first publish
-aired update abc123 v2.html  # update same URL
-```
+The MCP tool accepts `html` (string), `file_path`, `title`, `pin`, `ttl_seconds`, `permanent`, `update_token`, and `id`.
 
-### Temporary with PIN
-```bash
-aired report.html --ttl 24h --pin secret
-```
+## Gotchas
 
-### Pipe from stdin
-```bash
-echo "<h1>Hello</h1>" | aired --json | jq .url
-```
-
-### Clean up expired tokens
-```bash
-aired tokens prune
-```
+- **Rate limit is 5 uploads/hour per IP.** The API returns 429 and the CLI exits with code 3. Wait an hour or use a different network.
+- **Update requires both ID and token.** The token alone can't find the page (KV has no reverse lookup). Always use `aired update <id> <file>`, not the raw API with just a token.
+- **Tokens are local-only.** Stored in `~/.config/aired/tokens.json`. If you lose them, you can't update or delete the page. The `--json` output includes the token — pipe it somewhere safe.
+- **Max file size is 2 MB.** The API rejects anything larger. For bigger artifacts, host them elsewhere.
+- **PIN is not encryption.** Content is stored in plaintext on R2. PIN just gates browser access. Don't use aired for sensitive data.
+- **Default expiry is 7 days.** Pages auto-delete unless `--permanent` is set. The TTL resets on update.
