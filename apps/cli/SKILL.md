@@ -1,3 +1,8 @@
+---
+name: aired
+description: Publish HTML artifacts to shareable URLs. CLI + MCP server for AI agents.
+---
+
 # aired — CLI for publishing HTML artifacts
 
 Publish HTML files to shareable URLs. Works with any AI tool (Claude Code, Cursor, ChatGPT).
