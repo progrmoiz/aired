@@ -3,10 +3,12 @@
   "private": true,
   "scripts": {
     "dev": "pnpm --filter @aired/worker dev",
-    "build": "pnpm -r build",
+    "build": "pnpm run build:css && pnpm -r build",
+    "build:css": "npx tailwindcss -c apps/web/tailwind.config.js -i apps/web/src/input.css -o apps/web/style.css --minify",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
+    "tailwindcss": "3",
     "typescript": "^5.7.0"
   }
 }
