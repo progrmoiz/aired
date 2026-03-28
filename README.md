@@ -48,10 +48,18 @@ npx aired delete <id>
 npx aired doctor
 ```
 
-### MCP (Claude and other AI tools)
+### Skills (AI agents)
 
 ```bash
-claude mcp add aired npx aired --mcp
+npx skills add progrmoiz/aired
+```
+
+Adds a `SKILL.md` to your project. Any AI agent discovers and uses `aired` automatically.
+
+### MCP (Claude Code, Cursor, Windsurf)
+
+```bash
+claude mcp add aired -- npx aired --mcp
 ```
 
 Then in Claude: "Publish this HTML artifact" → get a live URL.
