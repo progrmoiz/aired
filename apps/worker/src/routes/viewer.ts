@@ -131,16 +131,16 @@ viewer.post("/p/:id/verify-pin", async (c) => {
     return c.json({ error: "Incorrect PIN" }, 403);
   }
 
-  // Set a cookie and redirect to the page
+  // Set a cookie and return success — client handles redirect
   const headers = new Headers();
+  headers.set("Content-Type", "application/json");
   // HttpOnly so JS can't read it; SameSite=Strict for security
   headers.set(
     "Set-Cookie",
     `pin_${id}=${metadata.pin}; Path=/p/${id}; HttpOnly; SameSite=Strict; Max-Age=3600`,
   );
-  headers.set("Location", `/p/${id}`);
 
-  return new Response(null, { status: 302, headers });
+  return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
 });
 
 // --- Helpers ---
@@ -341,10 +341,11 @@ function renderPinPage(id: string): string {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pin }),
+        credentials: 'same-origin',
       });
 
-      if (res.ok || res.redirected) {
-        window.location.href = '/p/${id}';
+      if (res.ok) {
+        window.location.reload();
       } else {
         errorMsg.style.display = 'block';
         input.value = '';
