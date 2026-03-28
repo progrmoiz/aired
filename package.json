@@ -1,0 +1,12 @@
+{
+  "name": "aired",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @aired/worker dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

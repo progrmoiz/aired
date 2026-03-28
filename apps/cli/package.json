@@ -1,0 +1,28 @@
+{
+  "name": "aired",
+  "version": "0.0.1",
+  "description": "Publish HTML artifacts to shareable URLs instantly",
+  "type": "commonjs",
+  "bin": {
+    "aired": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "dev": "tsup --watch"
+  },
+  "dependencies": {
+    "@aired/core": "workspace:*",
+    "commander": "^12.0.0",
+    "conf": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,15 @@
+name = "aired"
+main = "src/index.ts"
+compatibility_date = "2025-04-01"
+
+[assets]
+directory = "../web"
+
+[[r2_buckets]]
+binding = "PAGES_BUCKET"
+bucket_name = "aired-pages"
+
+[[kv_namespaces]]
+binding = "PAGES_KV"
+id = "placeholder"
+preview_id = "placeholder"

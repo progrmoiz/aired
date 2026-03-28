@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>aired — publish HTML artifacts instantly</title>
+  <meta name="description" content="Paste or upload HTML. Get a shareable URL in seconds. No signup. Works from the CLI, MCP, or right here." />
+
+  <!-- OG -->
+  <meta property="og:title" content="aired — publish HTML artifacts instantly" />
+  <meta property="og:description" content="Paste or upload HTML. Get a shareable URL in seconds. No signup. Works from the CLI, MCP, or right here." />
+  <meta property="og:type" content="website" />
+
+  <!-- Favicon (inline SVG data URL) -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📡</text></svg>" />
+
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+  <!-- ── Header ── -->
+  <header class="site-header">
+    <span class="logo">aired</span>
+    <nav class="header-links">
+      <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/progrmoiz/aired#api" target="_blank" rel="noopener">API</a>
+    </nav>
+  </header>
+
+  <!-- ── Main ── -->
+  <main>
+
+    <!-- Hero -->
+    <section class="hero">
+      <h1>Air your artifacts.</h1>
+      <p>
+        Paste or upload HTML — get a live shareable URL in seconds.
+        No signup. Works from the CLI, MCP, or right here.
+      </p>
+      <div class="install-cmds">
+        <code class="cmd">npx aired file.html</code>
+        <code class="cmd">claude mcp add aired npx aired --mcp</code>
+      </div>
+    </section>
+
+    <!-- Paste form -->
+    <div class="form-card">
+      <form id="air-form">
+        <div class="paste-area" id="paste-area">
+          <textarea
+            id="html-input"
+            name="html"
+            placeholder="Paste HTML here — or drop a file…"
+            spellcheck="false"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            aria-label="HTML content"
+          ></textarea>
+          <div class="drag-hint" aria-hidden="true">Drop file here</div>
+        </div>
+
+        <!-- Options -->
+        <div class="form-options">
+          <!-- Upload -->
+          <div class="option-group">
+            <button type="button" class="upload-btn" id="upload-btn" aria-label="Upload HTML file">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              Upload file
+            </button>
+            <input type="file" id="file-input" accept=".html,.htm,text/html" />
+          </div>
+
+          <div class="sep"></div>
+
+          <!-- TTL -->
+          <div class="option-group">
+            <label class="option-label" for="ttl-select">Expires</label>
+            <select id="ttl-select" name="ttl" aria-label="Expiry">
+              <option value="3600">1 hour</option>
+              <option value="86400">24 hours</option>
+              <option value="604800" selected>7 days</option>
+              <option value="2592000">30 days</option>
+              <option value="permanent">Never</option>
+            </select>
+          </div>
+
+          <!-- PIN -->
+          <div class="option-group">
+            <label class="option-label" for="pin-input">PIN</label>
+            <input
+              type="password"
+              id="pin-input"
+              name="pin"
+              placeholder="optional"
+              maxlength="20"
+              inputmode="numeric"
+              autocomplete="new-password"
+              aria-label="Optional PIN protection"
+            />
+          </div>
+        </div>
+
+        <!-- Submit row -->
+        <div class="form-submit">
+          <span class="char-count" id="char-count" aria-live="polite"></span>
+          <button type="submit" class="btn-air" id="submit-btn" disabled>Air it</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Error -->
+    <div class="error-msg" id="error-msg" role="alert" aria-live="assertive"></div>
+
+    <!-- Result card (hidden until publish) -->
+    <div class="result-card" id="result-card" aria-live="polite">
+      <div>
+        <div class="result-label">Your URL</div>
+        <div class="result-url-row">
+          <a class="result-url" id="result-url" href="#" target="_blank" rel="noopener"></a>
+          <button type="button" class="copy-btn" id="copy-url-btn" aria-label="Copy URL">Copy</button>
+        </div>
+      </div>
+
+      <div>
+        <div class="result-label">Update token</div>
+        <div class="result-url-row">
+          <span class="token-value" id="result-token"></span>
+          <button type="button" class="copy-btn" id="copy-token-btn" aria-label="Copy update token">Copy</button>
+        </div>
+      </div>
+
+      <div class="result-expiry" id="result-expiry"></div>
+
+      <div class="result-notice">
+        <strong>Save your update token.</strong> You'll need it to update or delete this page.
+        Pass it back via <code>--token</code> in the CLI, or include it in the <code>update_token</code> field in a new API call to update the same URL.
+      </div>
+
+      <button type="button" class="btn-new" id="new-btn">Publish another</button>
+    </div>
+
+    <!-- Install section -->
+    <section class="install-section" id="install">
+      <h2>Three ways to use it</h2>
+      <div class="install-cards">
+        <div class="install-card">
+          <h3>CLI</h3>
+          <code class="cmd">npx aired file.html</code>
+          <code class="cmd" style="margin-top: 0.5rem;">npx aired file.html --ttl 1h --pin 1234</code>
+          <p>Reads from stdin too: <code style="font-size: 0.75rem;">cat page.html | npx aired</code></p>
+        </div>
+        <div class="install-card">
+          <h3>MCP (Claude &amp; other AI tools)</h3>
+          <code class="cmd">claude mcp add aired npx aired --mcp</code>
+          <p>Gives Claude a <code style="font-size: 0.75rem;">publish_html</code> tool. Say "publish this as HTML" and get a live URL.</p>
+        </div>
+        <div class="install-card">
+          <h3>API</h3>
+          <code class="cmd">POST /api/publish</code>
+          <p>
+            Send <code style="font-size: 0.75rem;">{ html, ttl?, pin?, permanent? }</code>.
+            Get back <code style="font-size: 0.75rem;">{ id, url, update_token, expiresAt }</code>.
+          </p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── Footer ── -->
+  <footer class="site-footer">
+    <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a>
+    <span>MIT license</span>
+    <span>Built on Cloudflare Workers</span>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>

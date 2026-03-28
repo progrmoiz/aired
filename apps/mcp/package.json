@@ -1,0 +1,25 @@
+{
+  "name": "@aired/mcp",
+  "version": "0.0.1",
+  "description": "MCP stdio server for Aired — publish HTML artifacts from AI tools",
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "dev": "tsup --watch"
+  },
+  "dependencies": {
+    "@aired/core": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.28.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.7.0"
+  }
+}
