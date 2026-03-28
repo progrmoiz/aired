@@ -4,182 +4,438 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>aired — publish HTML artifacts instantly</title>
-  <meta name="description" content="Paste or upload HTML. Get a shareable URL in seconds. No signup. Works from the CLI, MCP, or right here." />
-
-  <!-- OG -->
+  <meta name="description" content="Paste or upload HTML. Get a shareable URL in seconds. No signup required." />
   <meta property="og:title" content="aired — publish HTML artifacts instantly" />
-  <meta property="og:description" content="Paste or upload HTML. Get a shareable URL in seconds. No signup. Works from the CLI, MCP, or right here." />
+  <meta property="og:description" content="Paste or upload HTML. Get a shareable URL in seconds. No signup required." />
   <meta property="og:type" content="website" />
-
-  <!-- Favicon (inline SVG data URL) -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📡</text></svg>" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            mono: ['JetBrains Mono', 'SF Mono', 'Fira Code', 'monospace'],
+          },
+          colors: {
+            aired: {
+              bg: '#0a0a0b',
+              surface: '#111113',
+              'surface-hover': '#18181b',
+              border: '#222225',
+              'border-focus': '#3b3b40',
+              'text-primary': '#ededef',
+              'text-secondary': '#8a8a8e',
+              'text-tertiary': '#56565a',
+              accent: '#7c6aef',
+              'accent-hover': '#8b7bf2',
+            },
+          },
+          fontSize: {
+            '2xs': ['0.6875rem', { lineHeight: '1rem' }],
+            xs: ['0.75rem', { lineHeight: '1rem' }],
+            sm: ['0.8125rem', { lineHeight: '1.25rem' }],
+            base: ['0.875rem', { lineHeight: '1.5rem' }],
+            lg: ['1.125rem', { lineHeight: '1.75rem' }],
+            xl: ['1.5rem', { lineHeight: '2rem' }],
+          },
+          borderRadius: {
+            sm: '6px',
+            DEFAULT: '8px',
+            lg: '12px',
+          },
+          transitionTimingFunction: {
+            'out-expo': 'cubic-bezier(0.16, 1, 0.3, 1)',
+          },
+        },
+      },
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #0a0a0b;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
 
-  <link rel="stylesheet" href="/style.css" />
+    /* Textarea */
+    textarea { resize: none; }
+    textarea:focus { outline: none; }
+    textarea::placeholder { color: #56565a; }
+
+    /* Number input spinners */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type="number"] { -moz-appearance: textfield; }
+
+    /* Select arrow override */
+    select { background-image: none; }
+
+    /* Hidden file input */
+    #file-input { display: none; }
+
+    /* Drag state */
+    .paste-area { position: relative; }
+    .drag-hint { display: none; }
+    .paste-area.drag-over .drag-hint {
+      display: flex;
+    }
+
+    /* Code editor line numbers */
+    .line-numbers {
+      counter-reset: line;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .line-numbers span {
+      counter-increment: line;
+      display: block;
+    }
+    .line-numbers span::before {
+      content: counter(line, decimal-leading-zero);
+      color: #56565a;
+      font-size: 0.75rem;
+    }
+
+    /* Subtle glow on form focus */
+    .form-container:focus-within {
+      box-shadow: 0 0 0 1px #3b3b40, 0 0 40px -12px rgba(124, 106, 239, 0.08);
+    }
+
+    /* Smooth transitions */
+    .btn-primary {
+      transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .btn-primary:not(:disabled):hover {
+      background-color: #8b7bf2;
+    }
+    .btn-primary:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    /* Copy button states */
+    .copy-btn {
+      transition: all 120ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .copy-btn:hover {
+      background-color: #18181b;
+      border-color: #3b3b40;
+    }
+    .copy-btn.copied {
+      color: #34d399;
+      border-color: rgba(52, 211, 153, 0.3);
+    }
+
+    /* Result card animation */
+    .result-card {
+      transition: opacity 200ms cubic-bezier(0.16, 1, 0.3, 1),
+                  transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* Install card hover */
+    .install-card {
+      transition: border-color 150ms ease, background-color 150ms ease;
+    }
+    .install-card:hover {
+      border-color: #3b3b40;
+      background-color: rgba(17, 17, 19, 0.5);
+    }
+
+    /* Keyboard shortcut badge */
+    kbd {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.6875rem;
+      padding: 1px 5px;
+      border-radius: 4px;
+      border: 1px solid #222225;
+      background: #111113;
+      color: #56565a;
+    }
+
+    /* Focus ring utility */
+    .focus-ring:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px #0a0a0b, 0 0 0 4px rgba(124, 106, 239, 0.4);
+    }
+  </style>
 </head>
-<body>
+<body class="min-h-screen flex flex-col text-aired-text-primary">
 
-  <!-- ── Header ── -->
-  <header class="site-header">
-    <span class="logo">aired</span>
-    <nav class="header-links">
-      <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a>
-      <a href="#install">Install</a>
-      <a href="https://github.com/progrmoiz/aired#api" target="_blank" rel="noopener">API</a>
-    </nav>
+  <!-- ─── Header ─── -->
+  <header class="w-full px-6 h-14 flex items-center justify-between max-w-2xl mx-auto">
+    <a href="/" class="text-base font-semibold tracking-tight text-aired-text-primary hover:text-white transition-colors duration-150">aired</a>
+    <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener"
+       class="flex items-center gap-1.5 text-sm text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+      GitHub
+    </a>
   </header>
 
-  <!-- ── Main ── -->
-  <main>
+  <!-- ─── Main ─── -->
+  <main class="flex-1 w-full max-w-2xl mx-auto px-6">
 
-    <!-- Hero -->
-    <section class="hero">
-      <h1>Air your artifacts.</h1>
-      <p>
-        Paste or upload HTML — get a live shareable URL in seconds.
-        No signup. Works from the CLI, MCP, or right here.
-      </p>
-      <div class="install-cmds">
-        <code class="cmd">npx aired file.html</code>
-        <code class="cmd">claude mcp add aired npx aired --mcp</code>
+    <!-- ─── Title + Form (single visual unit) ─── -->
+    <section class="mt-12 sm:mt-20">
+      <!-- Tagline -->
+      <div class="mb-8">
+        <h1 class="text-xl font-semibold tracking-tight text-aired-text-primary">Air your artifacts.</h1>
+        <p class="mt-2 text-sm text-aired-text-secondary leading-relaxed">
+          Paste HTML, get a live URL. No signup, no deploy. Open source on
+          <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener" class="text-aired-text-primary hover:text-white transition-colors duration-150 underline decoration-aired-border hover:decoration-aired-text-secondary">GitHub</a>.
+        </p>
+      </div>
+
+      <!-- Form -->
+      <form id="air-form">
+        <div class="form-container border border-aired-border rounded-lg bg-aired-surface overflow-hidden transition-shadow duration-200">
+
+          <!-- Editor area -->
+          <div class="paste-area">
+            <div class="flex">
+              <!-- Line numbers -->
+              <div id="line-numbers" aria-hidden="true"
+                   class="line-numbers w-10 flex-shrink-0 pt-3 pb-3 text-right pr-3 border-r border-aired-border bg-aired-bg/50 select-none font-mono">
+                <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+              </div>
+              <!-- Textarea -->
+              <textarea
+                id="html-input"
+                name="html"
+                placeholder="<html>&#10;  <body>&#10;    <h1>Hello World</h1>&#10;  </body>&#10;</html>"
+                spellcheck="false"
+                autocomplete="off"
+                rows="10"
+                class="flex-1 w-full bg-transparent p-3 pl-4 font-mono text-sm text-aired-text-primary placeholder:text-aired-text-tertiary leading-relaxed focus:outline-none"
+                aria-label="HTML content"
+              ></textarea>
+            </div>
+            <!-- Drag overlay -->
+            <div class="drag-hint absolute inset-0 items-center justify-center bg-aired-bg/90 border-2 border-dashed border-aired-accent/30 rounded-lg z-10">
+              <span class="text-sm text-aired-text-secondary">Drop .html file</span>
+            </div>
+          </div>
+
+          <!-- Divider -->
+          <div class="border-t border-aired-border"></div>
+
+          <!-- Options bar -->
+          <div class="flex items-center gap-3 px-3 py-2.5 text-sm">
+            <!-- Upload -->
+            <button type="button" id="upload-btn"
+                    class="flex items-center gap-1.5 px-2 py-1 rounded-sm text-aired-text-secondary hover:text-aired-text-primary hover:bg-aired-surface-hover transition-all duration-150 focus-ring"
+                    title="Upload .html file">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <span class="hidden sm:inline">Upload</span>
+            </button>
+            <input class="hidden" id="file-input" type="file" accept=".html,.htm,text/html" />
+
+            <!-- Separator -->
+            <div class="w-px h-4 bg-aired-border"></div>
+
+            <!-- TTL -->
+            <div class="flex items-center gap-1.5">
+              <label for="ttl-select" class="text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider">TTL</label>
+              <select id="ttl-select"
+                      class="bg-transparent text-aired-text-secondary text-sm py-0.5 pl-1 pr-5 rounded-sm border-0 focus:ring-0 focus-ring cursor-pointer appearance-none hover:text-aired-text-primary transition-colors duration-150">
+                <option value="3600">1 hour</option>
+                <option value="86400">1 day</option>
+                <option value="604800" selected>7 days</option>
+                <option value="2592000">30 days</option>
+                <option value="permanent">Permanent</option>
+              </select>
+            </div>
+
+            <!-- Separator -->
+            <div class="w-px h-4 bg-aired-border"></div>
+
+            <!-- PIN -->
+            <div class="flex items-center gap-1.5 flex-1 min-w-0">
+              <label for="pin-input" class="text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider flex-shrink-0">PIN</label>
+              <input
+                type="password"
+                id="pin-input"
+                name="pin"
+                placeholder="optional"
+                maxlength="20"
+                inputmode="numeric"
+                autocomplete="new-password"
+                class="w-full min-w-0 bg-transparent text-sm text-aired-text-secondary placeholder:text-aired-text-tertiary py-0.5 border-0 focus:ring-0 focus:outline-none"
+              />
+            </div>
+
+            <!-- Spacer -->
+            <div class="flex-1"></div>
+
+            <!-- Char count -->
+            <span id="char-count" class="text-2xs text-aired-text-tertiary tabular-nums flex-shrink-0"></span>
+          </div>
+        </div>
+
+        <!-- Submit -->
+        <button
+          type="submit"
+          id="submit-btn"
+          disabled
+          class="btn-primary mt-3 w-full h-10 flex items-center justify-center rounded-sm bg-aired-accent text-white text-sm font-medium focus-ring"
+        >
+          Air it
+        </button>
+      </form>
+
+      <!-- Error -->
+      <div class="hidden mt-3" id="error-msg" role="alert">
+        <p class="px-3 py-2 text-sm text-red-400 border border-red-500/20 bg-red-500/5 rounded-sm"></p>
+      </div>
+
+      <!-- ─── Result Card ─── -->
+      <div class="result-card hidden flex-col mt-6" id="result-card" aria-live="polite"
+           style="display:none; opacity:0; transform:translateY(8px);">
+
+        <div class="border border-aired-border rounded-lg bg-aired-surface overflow-hidden">
+          <!-- URL row -->
+          <div class="p-4">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider">Live URL</span>
+              <span class="flex items-center gap-1 text-2xs text-emerald-400">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                Live
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <a id="result-url" href="#" target="_blank"
+                 class="flex-1 font-mono text-sm text-aired-text-primary hover:text-white truncate transition-colors duration-150"></a>
+              <button type="button" id="copy-url-btn"
+                      class="copy-btn flex-shrink-0 px-2.5 py-1 text-sm text-aired-text-secondary border border-aired-border rounded-sm focus-ring">
+                Copy
+              </button>
+            </div>
+          </div>
+
+          <div class="border-t border-aired-border"></div>
+
+          <!-- Token row -->
+          <div class="p-4">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider">Update token</span>
+              <span class="text-2xs text-aired-text-tertiary" id="result-expiry"></span>
+            </div>
+            <div class="flex items-center gap-2">
+              <code id="result-token" class="flex-1 font-mono text-sm text-aired-text-tertiary truncate"></code>
+              <button type="button" id="copy-token-btn"
+                      class="copy-btn flex-shrink-0 px-2.5 py-1 text-sm text-aired-text-secondary border border-aired-border rounded-sm focus-ring">
+                Copy
+              </button>
+            </div>
+            <p class="mt-2 text-2xs text-aired-text-tertiary">Save this token — you need it to update or delete.</p>
+          </div>
+        </div>
+
+        <!-- New button -->
+        <button type="button" id="new-btn"
+                class="mt-3 w-full h-10 flex items-center justify-center rounded-sm border border-aired-border text-sm text-aired-text-secondary hover:text-aired-text-primary hover:border-aired-border-focus transition-all duration-150 focus-ring">
+          Publish another
+        </button>
       </div>
     </section>
 
-    <!-- Paste form -->
-    <div class="form-card">
-      <form id="air-form">
-        <div class="paste-area" id="paste-area">
-          <textarea
-            id="html-input"
-            name="html"
-            placeholder="Paste HTML here — or drop a file…"
-            spellcheck="false"
-            autocomplete="off"
-            autocorrect="off"
-            autocapitalize="off"
-            aria-label="HTML content"
-          ></textarea>
-          <div class="drag-hint" aria-hidden="true">Drop file here</div>
-        </div>
+    <!-- ─── Install Section ─── -->
+    <section id="install" class="mt-20 sm:mt-28 mb-20">
+      <div class="flex items-center gap-3 mb-8">
+        <div class="h-px flex-1 bg-aired-border"></div>
+        <h2 class="text-sm font-medium text-aired-text-tertiary uppercase tracking-wider">Install</h2>
+        <div class="h-px flex-1 bg-aired-border"></div>
+      </div>
 
-        <!-- Options -->
-        <div class="form-options">
-          <!-- Upload -->
-          <div class="option-group">
-            <button type="button" class="upload-btn" id="upload-btn" aria-label="Upload HTML file">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="17 8 12 3 7 8"/>
-                <line x1="12" y1="3" x2="12" y2="15"/>
-              </svg>
-              Upload file
-            </button>
-            <input type="file" id="file-input" accept=".html,.htm,text/html" />
-          </div>
-
-          <div class="sep"></div>
-
-          <!-- TTL -->
-          <div class="option-group">
-            <label class="option-label" for="ttl-select">Expires</label>
-            <select id="ttl-select" name="ttl" aria-label="Expiry">
-              <option value="3600">1 hour</option>
-              <option value="86400">24 hours</option>
-              <option value="604800" selected>7 days</option>
-              <option value="2592000">30 days</option>
-              <option value="permanent">Never</option>
-            </select>
-          </div>
-
-          <!-- PIN -->
-          <div class="option-group">
-            <label class="option-label" for="pin-input">PIN</label>
-            <input
-              type="password"
-              id="pin-input"
-              name="pin"
-              placeholder="optional"
-              maxlength="20"
-              inputmode="numeric"
-              autocomplete="new-password"
-              aria-label="Optional PIN protection"
-            />
+      <div class="space-y-6">
+        <!-- CLI -->
+        <div class="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-4">
+          <h3 class="text-sm font-medium text-aired-text-tertiary w-10 shrink-0">CLI</h3>
+          <div class="flex-1 min-w-0">
+            <code class="font-mono text-sm text-aired-accent select-all">npx aired file.html</code>
+            <span class="text-2xs text-aired-text-tertiary ml-3">
+              <span class="text-aired-text-secondary">--pin</span>
+              <span class="mx-1">/</span>
+              <span class="text-aired-text-secondary">--ttl</span>
+              <span class="mx-1">/</span>
+              <span class="text-aired-text-secondary">--json</span>
+              <span class="mx-1">/</span>
+              stdin
+            </span>
           </div>
         </div>
 
-        <!-- Submit row -->
-        <div class="form-submit">
-          <span class="char-count" id="char-count" aria-live="polite"></span>
-          <button type="submit" class="btn-air" id="submit-btn" disabled>Air it</button>
+        <div class="h-px bg-aired-border/50"></div>
+
+        <!-- MCP -->
+        <div class="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-4">
+          <h3 class="text-sm font-medium text-aired-text-tertiary w-10 shrink-0">MCP</h3>
+          <div class="flex-1 min-w-0">
+            <code class="font-mono text-2xs text-aired-accent select-all">claude mcp add aired -- npx aired --mcp</code>
+            <p class="mt-1 text-2xs text-aired-text-tertiary">
+              Claude Code, Cursor, Windsurf, any MCP client.
+            </p>
+          </div>
         </div>
-      </form>
-    </div>
 
-    <!-- Error -->
-    <div class="error-msg" id="error-msg" role="alert" aria-live="assertive"></div>
+        <div class="h-px bg-aired-border/50"></div>
 
-    <!-- Result card (hidden until publish) -->
-    <div class="result-card" id="result-card" aria-live="polite">
-      <div>
-        <div class="result-label">Your URL</div>
-        <div class="result-url-row">
-          <a class="result-url" id="result-url" href="#" target="_blank" rel="noopener"></a>
-          <button type="button" class="copy-btn" id="copy-url-btn" aria-label="Copy URL">Copy</button>
-        </div>
-      </div>
-
-      <div>
-        <div class="result-label">Update token</div>
-        <div class="result-url-row">
-          <span class="token-value" id="result-token"></span>
-          <button type="button" class="copy-btn" id="copy-token-btn" aria-label="Copy update token">Copy</button>
-        </div>
-      </div>
-
-      <div class="result-expiry" id="result-expiry"></div>
-
-      <div class="result-notice">
-        <strong>Save your update token.</strong> You'll need it to update or delete this page.
-        Pass it back via <code>--token</code> in the CLI, or include it in the <code>update_token</code> field in a new API call to update the same URL.
-      </div>
-
-      <button type="button" class="btn-new" id="new-btn">Publish another</button>
-    </div>
-
-    <!-- Install section -->
-    <section class="install-section" id="install">
-      <h2>Three ways to use it</h2>
-      <div class="install-cards">
-        <div class="install-card">
-          <h3>CLI</h3>
-          <code class="cmd">npx aired file.html</code>
-          <code class="cmd" style="margin-top: 0.5rem;">npx aired file.html --ttl 1h --pin 1234</code>
-          <p>Reads from stdin too: <code style="font-size: 0.75rem;">cat page.html | npx aired</code></p>
-        </div>
-        <div class="install-card">
-          <h3>MCP (Claude &amp; other AI tools)</h3>
-          <code class="cmd">claude mcp add aired npx aired --mcp</code>
-          <p>Gives Claude a <code style="font-size: 0.75rem;">publish_html</code> tool. Say "publish this as HTML" and get a live URL.</p>
-        </div>
-        <div class="install-card">
-          <h3>API</h3>
-          <code class="cmd">POST /api/publish</code>
-          <p>
-            Send <code style="font-size: 0.75rem;">{ html, ttl?, pin?, permanent? }</code>.
-            Get back <code style="font-size: 0.75rem;">{ id, url, update_token, expiresAt }</code>.
-          </p>
+        <!-- API -->
+        <div class="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-4">
+          <h3 class="text-sm font-medium text-aired-text-tertiary w-10 shrink-0">API</h3>
+          <div class="flex-1 min-w-0">
+            <code class="font-mono text-sm text-aired-accent select-all">POST /api/publish</code>
+            <span class="text-2xs text-aired-text-tertiary ml-3">
+              Returns <span class="text-aired-text-secondary">{ url, update_token }</span>. Docs on GitHub.
+            </span>
+          </div>
         </div>
       </div>
     </section>
 
   </main>
 
-  <!-- ── Footer ── -->
-  <footer class="site-footer">
-    <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a>
-    <span>MIT license</span>
-    <span>Built on Cloudflare Workers</span>
+  <!-- ─── Footer ─── -->
+  <footer class="w-full max-w-2xl mx-auto px-6 py-8 border-t border-aired-border">
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-2 text-2xs text-aired-text-tertiary">
+      <p>
+        Built by <a href="https://x.com/iammoizfarooq" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">@iammoizfarooq</a>
+      </p>
+      <p>
+        Deployed on <a href="https://workers.cloudflare.com" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Cloudflare Workers</a>
+      </p>
+    </div>
   </footer>
 
   <script src="/app.js"></script>
+  <script>
+    // ── Line numbers sync ──
+    (function() {
+      var textarea = document.getElementById('html-input');
+      var lineNums = document.getElementById('line-numbers');
+
+      function updateLines() {
+        var count = Math.max(textarea.value.split('\n').length, 8);
+        var spans = '';
+        for (var i = 0; i < count; i++) {
+          spans += '<span></span>';
+        }
+        lineNums.innerHTML = spans;
+      }
+
+      textarea.addEventListener('input', updateLines);
+      updateLines();
+
+      // Sync scroll
+      textarea.addEventListener('scroll', function() {
+        lineNums.style.transform = 'translateY(-' + textarea.scrollTop + 'px)';
+      });
+    })();
+  </script>
 </body>
 </html>

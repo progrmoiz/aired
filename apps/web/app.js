@@ -239,11 +239,11 @@
   // ── Error helpers ──
   function showError(msg) {
     errorMsg.textContent = msg;
-    errorMsg.classList.add("visible");
+    errorMsg.classList.remove("hidden");
   }
 
   function hideError() {
-    errorMsg.classList.remove("visible");
+    errorMsg.classList.add("hidden");
     errorMsg.textContent = "";
   }
 
