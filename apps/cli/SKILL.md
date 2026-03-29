@@ -13,6 +13,9 @@ Publish HTML artifacts to shareable URLs. No signup, no auth, no deploy pipeline
 # Publish a file → get a live URL
 npx aired dashboard.html
 
+# Publish a directory (bundles index.html + CSS + JS + images into one file)
+npx aired ./my-project/
+
 # Pipe HTML from another command
 echo "<h1>Hello</h1>" | npx aired --json | jq .url
 
@@ -24,7 +27,7 @@ npx aired report.html --ttl 24h --pin secret123
 
 | Command | Description |
 |---------|-------------|
-| `aired [file]` | Publish HTML file or stdin (default command) |
+| `aired [file]` | Publish HTML file, directory, or stdin (default command) |
 | `aired update <id> <file>` | Update an existing page |
 | `aired delete <id>` | Delete a page |
 | `aired info <id>` | Show page metadata |
@@ -92,5 +95,7 @@ The MCP tool accepts `html` (string), `file_path`, `title`, `pin`, `ttl_seconds`
 - **Update requires both ID and token.** The token alone can't find the page (KV has no reverse lookup). Always use `aired update <id> <file>`, not the raw API with just a token.
 - **Tokens are local-only.** Stored in `~/.config/aired/tokens.json`. If you lose them, you can't update or delete the page. The `--json` output includes the token — pipe it somewhere safe.
 - **Max file size is 2 MB.** The API rejects anything larger. For bigger artifacts, host them elsewhere.
+- **Directory bundling inlines images as base64.** This adds ~33% to image size. A directory with large images may exceed the 2 MB limit. The CLI warns if bundled size exceeds 2 MB.
+- **Directory requires index.html.** `npx aired ./dir/` looks for `index.html` in the directory root. No other entry point is supported.
 - **PIN is not encryption.** Content is stored in plaintext on R2. PIN just gates browser access. Don't use aired for sensitive data.
 - **Default expiry is 7 days.** Pages auto-delete unless `--permanent` is set. The TTL resets on update.

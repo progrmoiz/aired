@@ -19,6 +19,9 @@ Works from the CLI, as an MCP tool for AI agents, or by pasting at [aired.sh](ht
 # Publish a file
 npx aired file.html
 
+# Publish a directory (bundles index.html + CSS + JS + images)
+npx aired ./my-project/
+
 # With options
 npx aired file.html --ttl 1h --pin 1234
 
