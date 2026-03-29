@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@joplin/htmlpack@3.5.1':
+    hash: ou4qe6yhrkhido7cvwg2xqbtla
+    path: patches/@joplin__htmlpack@3.5.1.patch
+
 importers:
 
   .:
@@ -17,9 +22,6 @@ importers:
 
   apps/cli:
     dependencies:
-      '@aired/core':
-        specifier: workspace:*
-        version: link:../../packages/core
       '@clack/prompts':
         specifier: ^0.9.0
         version: 0.9.1
@@ -28,7 +30,7 @@ importers:
         version: 14.0.0(commander@14.0.3)
       '@joplin/htmlpack':
         specifier: ^3.5.1
-        version: 3.5.1
+        version: 3.5.1(patch_hash=ou4qe6yhrkhido7cvwg2xqbtla)
       commander:
         specifier: ^14.0.0
         version: 14.0.3
@@ -62,7 +64,7 @@ importers:
         version: link:../../packages/core
       '@joplin/htmlpack':
         specifier: ^3.5.1
-        version: 3.5.1
+        version: 3.5.1(patch_hash=ou4qe6yhrkhido7cvwg2xqbtla)
       '@modelcontextprotocol/sdk':
         specifier: ^1.28.0
         version: 1.28.0(@cfworker/json-schema@4.1.1)(zod@3.25.76)
@@ -2790,7 +2792,7 @@ snapshots:
       domutils: 3.2.2
       entities: 2.2.0
 
-  '@joplin/htmlpack@3.5.1':
+  '@joplin/htmlpack@3.5.1(patch_hash=ou4qe6yhrkhido7cvwg2xqbtla)':
     dependencies:
       '@adobe/css-tools': 4.4.3
       '@joplin/fork-htmlparser2': 4.1.60

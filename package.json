@@ -10,5 +10,10 @@
   "devDependencies": {
     "tailwindcss": "3",
     "typescript": "^5.7.0"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "@joplin/htmlpack@3.5.1": "patches/@joplin__htmlpack@3.5.1.patch"
+    }
   }
 }

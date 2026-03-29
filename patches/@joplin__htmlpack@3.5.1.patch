@@ -1,0 +1,16 @@
+diff --git a/dist/packToString.js b/dist/packToString.js
+index 69240fda5c72d96fdd2ffa4fdf83b9288e23fa96..c99e94e8269ddbf900925f8b0c695b0cd4212434 100644
+--- a/dist/packToString.js
++++ b/dist/packToString.js
+@@ -129,7 +129,10 @@ const packToString = async (baseDir, inputFileText, fs) => {
+         content = content.replace(/<script>/g, '<\\script>');
+         content = content.replace(/<\/script>/g, '<\\/script>');
+         content = content.replace(/<!--/g, '<\\!--');
+-        return `<script>${content}</script>`;
++        const modAttrs = Object.assign({}, attrs);
++        delete modAttrs.src;
++        const attrHtml = attributesHtml(modAttrs);
++        return `<script${attrHtml ? ' ' + attrHtml : ''}>${content}</script>`;
+     };
+     const processImgTag = async (_name, attrs) => {
+         const src = attrValue(attrs, 'src');
