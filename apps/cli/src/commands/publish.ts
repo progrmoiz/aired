@@ -8,6 +8,7 @@ import { shouldOutputJson, outputError, ExitCode } from '../lib/output.js'
 import { withSpinner } from '../lib/spinner.js'
 import { publishHTML } from '../core/client.js'
 import { saveToken } from '../core/store.js'
+import { isDirectory, bundleDirectory } from '../core/bundler.js'
 
 function parseTtl(ttl: string): number | null {
   const match = /^(\d+)(h|d|m)?$/i.exec(ttl)
@@ -38,8 +39,8 @@ function formatExpiry(expiresAt: string | null): string {
 export function makePublishCommand(globalOpts: () => GlobalOpts): Command {
   return new Command('publish')
     .alias('p')
-    .description('Publish an HTML file (or pipe via stdin)')
-    .argument('[file]', 'Path to HTML file (omit to read stdin)')
+    .description('Publish an HTML file or directory (or pipe via stdin)')
+    .argument('[file]', 'Path to HTML file or directory (omit to read stdin)')
     .option('-t, --title <title>', 'Custom title')
     .option('-p, --pin <pin>', 'PIN-protect the page')
     .option('--ttl <duration>', 'Expiry duration: 1h, 24h, 7d, 30d')
@@ -52,16 +53,35 @@ export function makePublishCommand(globalOpts: () => GlobalOpts): Command {
       let html: string
       if (file === undefined || file === '-') {
         if (process.stdin.isTTY) {
-          outputError({ code: 'VALIDATION', message: 'Provide a file path or pipe HTML via stdin' }, opts)
+          outputError({ code: 'VALIDATION', message: 'Provide a file path, directory, or pipe HTML via stdin' }, opts)
           process.exit(ExitCode.VALIDATION_ERROR)
         }
         html = await readStdin()
       } else {
-        try {
-          html = await readFile(resolve(file), 'utf-8')
-        } catch (err) {
-          outputError({ code: 'VALIDATION', message: `Cannot read file '${file}': ${(err as Error).message}` }, opts)
-          process.exit(ExitCode.VALIDATION_ERROR)
+        const resolved = resolve(file)
+        if (await isDirectory(resolved)) {
+          try {
+            html = await withSpinner('Bundling directory...', () => bundleDirectory(resolved), opts)
+          } catch (err) {
+            outputError({ code: 'VALIDATION', message: (err as Error).message }, opts)
+            process.exit(ExitCode.VALIDATION_ERROR)
+          }
+        } else {
+          try {
+            html = await readFile(resolved, 'utf-8')
+          } catch (err) {
+            outputError({ code: 'VALIDATION', message: `Cannot read file '${file}': ${(err as Error).message}` }, opts)
+            process.exit(ExitCode.VALIDATION_ERROR)
+          }
+        }
+      }
+
+      // Warn if bundled HTML is large
+      const sizeBytes = new TextEncoder().encode(html).byteLength
+      const sizeMB = sizeBytes / (1024 * 1024)
+      if (sizeMB > 2) {
+        if (!shouldOutputJson(opts)) {
+          process.stderr.write(pc.yellow(`Warning: bundled HTML is ${sizeMB.toFixed(1)} MB (limit: 2 MB). Upload may fail.\n`))
         }
       }
 

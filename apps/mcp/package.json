@@ -14,7 +14,9 @@
   },
   "dependencies": {
     "@aired/core": "workspace:*",
+    "@joplin/htmlpack": "^3.5.1",
     "@modelcontextprotocol/sdk": "^1.28.0",
+    "datauri": "^4.1.0",
     "zod": "^3.22.0"
   },
   "devDependencies": {

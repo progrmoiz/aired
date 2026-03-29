@@ -1,6 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync, accessSync, constants } from "node:fs";
+import { readFile, access } from "node:fs/promises";
+import { join, dirname } from "node:path";
 import { z } from "zod";
 
 const DEFAULT_API_URL = "https://aired.sh";
@@ -90,7 +92,36 @@ server.tool(
       content = html;
     } else if (file_path !== undefined) {
       try {
-        content = readFileSync(file_path, "utf-8");
+        const s = statSync(file_path);
+        if (s.isDirectory()) {
+          // Bundle directory into single HTML
+          const indexPath = join(file_path, "index.html");
+          try {
+            accessSync(indexPath, constants.R_OK);
+          } catch {
+            return {
+              content: [{ type: "text", text: `No index.html found in directory: ${file_path}` }],
+              isError: true,
+            };
+          }
+          const { default: packToString } = await import("@joplin/htmlpack/packToString");
+          const baseDir = dirname(indexPath);
+          const inputHtml = readFileSync(indexPath, "utf-8");
+          content = await packToString(baseDir, inputHtml, {
+            async exists(p: string) {
+              try { await access(p, constants.R_OK); return true; } catch { return false; }
+            },
+            async readFileText(p: string) {
+              return readFile(p, "utf-8");
+            },
+            async readFileDataUri(p: string) {
+              const { default: Datauri } = await import("datauri/sync");
+              return Datauri(p).content;
+            },
+          });
+        } else {
+          content = readFileSync(file_path, "utf-8");
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
