@@ -303,4 +303,31 @@
       });
     });
   });
+
+  // ── MCP client tabs ──
+  (function () {
+    var tabs = document.querySelectorAll(".mcp-tab");
+    if (!tabs.length) return;
+
+    tabs.forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        var target = tab.getAttribute("data-tab");
+
+        // Update tab styles
+        tabs.forEach(function (t) {
+          t.setAttribute("aria-selected", "false");
+          t.className = "mcp-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 text-aired-text-tertiary hover:text-aired-text-secondary";
+        });
+        tab.setAttribute("aria-selected", "true");
+        tab.className = "mcp-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 bg-aired-accent/10 text-aired-accent";
+
+        // Show target panel, hide others
+        document.querySelectorAll(".mcp-panel").forEach(function (panel) {
+          panel.classList.add("hidden");
+        });
+        var panel = document.getElementById("mcp-panel-" + target);
+        if (panel) panel.classList.remove("hidden");
+      });
+    });
+  })();
 })();

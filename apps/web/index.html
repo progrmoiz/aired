@@ -353,34 +353,80 @@
               </span>
               <h3 class="text-sm font-medium text-aired-text-primary">MCP Server</h3>
             </div>
-            <span class="text-2xs text-aired-text-tertiary">For AI tools</span>
+            <span class="text-2xs text-aired-text-tertiary">Streamable HTTP</span>
           </div>
           <div class="p-4 space-y-3">
-            <!-- Claude Code -->
-            <div>
-              <div class="flex items-center gap-1.5 mb-1.5">
-                <span class="text-2xs font-medium text-aired-text-secondary">Claude Code</span>
-              </div>
+            <!-- Client tabs -->
+            <div class="flex flex-wrap gap-1 mb-2" id="mcp-tabs" role="tablist">
+              <button type="button" role="tab" aria-selected="true" data-tab="claude-code" class="mcp-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 bg-aired-accent/10 text-aired-accent">Claude Code</button>
+              <button type="button" role="tab" aria-selected="false" data-tab="cursor" class="mcp-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 text-aired-text-tertiary hover:text-aired-text-secondary">Cursor</button>
+              <button type="button" role="tab" aria-selected="false" data-tab="vscode" class="mcp-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 text-aired-text-tertiary hover:text-aired-text-secondary">VS Code</button>
+              <button type="button" role="tab" aria-selected="false" data-tab="windsurf" class="mcp-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 text-aired-text-tertiary hover:text-aired-text-secondary">Windsurf</button>
+              <button type="button" role="tab" aria-selected="false" data-tab="codex" class="mcp-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 text-aired-text-tertiary hover:text-aired-text-secondary">Codex</button>
+              <button type="button" role="tab" aria-selected="false" data-tab="others" class="mcp-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 text-aired-text-tertiary hover:text-aired-text-secondary">Others</button>
+            </div>
+            <!-- Tab panels -->
+            <div id="mcp-panel-claude-code" class="mcp-panel" role="tabpanel">
               <div class="flex items-center justify-between bg-aired-bg rounded-sm px-3 py-2.5">
-                <code class="font-mono text-sm text-aired-accent select-all truncate">claude mcp add aired -- npx aired --mcp</code>
-                <button type="button" class="copy-snippet copy-btn flex-shrink-0 ml-2 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy="claude mcp add aired -- npx aired --mcp">Copy</button>
+                <code class="font-mono text-sm text-aired-accent select-all truncate">claude mcp add aired --transport http https://aired.sh/mcp</code>
+                <button type="button" class="copy-snippet copy-btn flex-shrink-0 ml-2 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy="claude mcp add aired --transport http https://aired.sh/mcp">Copy</button>
               </div>
             </div>
-            <!-- Cursor / Windsurf -->
-            <div>
-              <div class="flex items-center gap-1.5 mb-1.5">
-                <span class="text-2xs font-medium text-aired-text-secondary">Cursor / Windsurf / ChatGPT</span>
+            <div id="mcp-panel-cursor" class="mcp-panel hidden" role="tabpanel">
+              <div class="bg-aired-bg rounded-sm px-3 py-2.5 relative">
+                <code class="font-mono text-2xs text-aired-text-secondary block whitespace-pre select-all">{
+  "mcpServers": {
+    "aired": { "url": "https://aired.sh/mcp" }
+  }
+}</code>
+                <button type="button" class="copy-snippet copy-btn absolute top-2 right-2 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy='{"mcpServers":{"aired":{"url":"https://aired.sh/mcp"}}}'>Copy</button>
               </div>
-              <div class="bg-aired-bg rounded-sm px-3 py-2.5">
+              <p class="mt-1.5 text-2xs text-aired-text-tertiary">Add to <code class="text-aired-text-secondary">.cursor/mcp.json</code></p>
+            </div>
+            <div id="mcp-panel-vscode" class="mcp-panel hidden" role="tabpanel">
+              <div class="bg-aired-bg rounded-sm px-3 py-2.5 relative">
+                <code class="font-mono text-2xs text-aired-text-secondary block whitespace-pre select-all">{
+  "servers": {
+    "aired": { "type": "http", "url": "https://aired.sh/mcp" }
+  }
+}</code>
+                <button type="button" class="copy-snippet copy-btn absolute top-2 right-2 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy='{"servers":{"aired":{"type":"http","url":"https://aired.sh/mcp"}}}'>Copy</button>
+              </div>
+              <p class="mt-1.5 text-2xs text-aired-text-tertiary">Add to <code class="text-aired-text-secondary">.vscode/mcp.json</code></p>
+            </div>
+            <div id="mcp-panel-windsurf" class="mcp-panel hidden" role="tabpanel">
+              <div class="bg-aired-bg rounded-sm px-3 py-2.5 relative">
+                <code class="font-mono text-2xs text-aired-text-secondary block whitespace-pre select-all">{
+  "mcpServers": {
+    "aired": { "serverUrl": "https://aired.sh/mcp" }
+  }
+}</code>
+                <button type="button" class="copy-snippet copy-btn absolute top-2 right-2 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy='{"mcpServers":{"aired":{"serverUrl":"https://aired.sh/mcp"}}}'>Copy</button>
+              </div>
+              <p class="mt-1.5 text-2xs text-aired-text-tertiary">Add to <code class="text-aired-text-secondary">~/.codeium/windsurf/mcp_config.json</code></p>
+            </div>
+            <div id="mcp-panel-codex" class="mcp-panel hidden" role="tabpanel">
+              <div class="bg-aired-bg rounded-sm px-3 py-2.5 relative">
+                <code class="font-mono text-2xs text-aired-text-secondary block whitespace-pre select-all">[mcp_servers.aired]
+url = "https://aired.sh/mcp"</code>
+                <button type="button" class="copy-snippet copy-btn absolute top-2 right-2 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy='[mcp_servers.aired]
+url = "https://aired.sh/mcp"'>Copy</button>
+              </div>
+              <p class="mt-1.5 text-2xs text-aired-text-tertiary">Add to <code class="text-aired-text-secondary">~/.codex/config.toml</code></p>
+            </div>
+            <div id="mcp-panel-others" class="mcp-panel hidden" role="tabpanel">
+              <div class="bg-aired-bg rounded-sm px-3 py-2.5 relative">
                 <code class="font-mono text-2xs text-aired-text-secondary block whitespace-pre select-all">{
   "mcpServers": {
     "aired": {
       "command": "npx",
-      "args": ["aired", "--mcp"]
+      "args": ["-y", "mcp-remote", "https://aired.sh/mcp"]
     }
   }
 }</code>
+                <button type="button" class="copy-snippet copy-btn absolute top-2 right-2 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy='{"mcpServers":{"aired":{"command":"npx","args":["-y","mcp-remote","https://aired.sh/mcp"]}}}'>Copy</button>
               </div>
+              <p class="mt-1.5 text-2xs text-aired-text-tertiary">For any STDIO-only client. Uses <code class="text-aired-text-secondary">mcp-remote</code> to bridge to the HTTP endpoint.</p>
             </div>
             <p class="text-2xs text-aired-text-tertiary">
               Exposes a <code class="text-aired-text-secondary">publish_html</code> tool. Your AI can publish artifacts directly.

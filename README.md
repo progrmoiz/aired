@@ -59,23 +59,83 @@ npx skills add progrmoiz/aired
 
 Adds a `SKILL.md` to your project. Any AI agent discovers and uses `aired` automatically.
 
-### MCP (Claude Code, Cursor, Windsurf)
+### MCP
 
-Two transports available:
+Two transports: **Streamable HTTP** (remote, zero install) and **STDIO** (local, supports `file_path`).
 
-**STDIO** (local, runs on your machine):
+#### Claude Code
+
 ```bash
+# Remote (recommended)
+claude mcp add aired --transport http https://aired.sh/mcp
+
+# Local
 claude mcp add aired -- npx aired --mcp
 ```
 
-**Streamable HTTP** (remote, zero install):
-```bash
-claude mcp add aired --transport http https://aired.sh/mcp
+#### Cursor
+
+Add to `.cursor/mcp.json`:
+```json
+{
+  "mcpServers": {
+    "aired": { "url": "https://aired.sh/mcp" }
+  }
+}
 ```
 
-Then in Claude: "Publish this HTML artifact" → get a live URL.
+#### VS Code (GitHub Copilot)
 
-Available tool: `publish_html`
+Add to `.vscode/mcp.json`:
+```json
+{
+  "servers": {
+    "aired": { "type": "http", "url": "https://aired.sh/mcp" }
+  }
+}
+```
+
+#### Windsurf
+
+Add to `~/.codeium/windsurf/mcp_config.json`:
+```json
+{
+  "mcpServers": {
+    "aired": { "serverUrl": "https://aired.sh/mcp" }
+  }
+}
+```
+
+#### Codex
+
+Add to `~/.codex/config.toml`:
+```toml
+[mcp_servers.aired]
+url = "https://aired.sh/mcp"
+```
+
+#### Gemini CLI
+
+```bash
+gemini mcp add --transport http aired https://aired.sh/mcp
+```
+
+#### Others
+
+Any MCP client that supports Streamable HTTP can connect to `https://aired.sh/mcp`. For STDIO-only clients, use the `mcp-remote` bridge:
+
+```json
+{
+  "mcpServers": {
+    "aired": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://aired.sh/mcp"]
+    }
+  }
+}
+```
+
+#### Available tool: `publish_html`
 - `html` — HTML string to publish
 - `file_path` — path to HTML file (STDIO only)
 - `title` — page title
