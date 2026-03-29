@@ -184,11 +184,17 @@ function injectAiredBar(
 ): string {
   const { id, title, readCount } = opts;
 
+  const ogImageUrl = `https://aired.sh/og/${id}`;
   const ogTags = `
   <!-- aired OG tags -->
   <meta property="og:title" content="${escapeAttr(title)}" />
   <meta property="og:description" content="Shared via aired.sh — publish HTML artifacts instantly." />
-  <meta property="og:type" content="website" />`;
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="${ogImageUrl}" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="${ogImageUrl}" />`;
 
   // Inject OG tags before </head>
   let out = html.replace(/<\/head>/i, `${ogTags}\n</head>`);

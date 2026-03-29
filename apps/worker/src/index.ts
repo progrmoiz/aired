@@ -5,6 +5,7 @@ import { api } from "./routes/api.js";
 import { viewer } from "./routes/viewer.js";
 import { report } from "./routes/report.js";
 import { handleMcp } from "./routes/mcp.js";
+import { og } from "./routes/og.js";
 
 const app = new Hono<AppBindings>();
 
@@ -29,6 +30,9 @@ app.get("/health", (c) => c.json({ status: "ok" }));
 
 // MCP Streamable HTTP endpoint
 app.all("/mcp", handleMcp);
+
+// OG image route
+app.route("/", og);
 
 // Mount API routes
 app.route("/api", api);
