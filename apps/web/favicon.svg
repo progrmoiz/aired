@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Source dot — bottom-left -->
+  <circle cx="9" cy="23" r="3.5" fill="#7c6aef"/>
+  <!-- Inner broadcast arc — quarter circle, upper-right from source -->
+  <path d="M9 13 A10 10 0 0 1 19 23" fill="none" stroke="#7c6aef" stroke-width="3" stroke-linecap="round"/>
+  <!-- Outer broadcast arc -->
+  <path d="M9 6 A17 17 0 0 1 26 23" fill="none" stroke="#7c6aef" stroke-width="3" stroke-linecap="round"/>
+</svg>
