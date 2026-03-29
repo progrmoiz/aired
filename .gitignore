@@ -6,3 +6,5 @@ dist
 .env
 .env.*
 *.tgz
+docs/ideas.md
+docs/research/
