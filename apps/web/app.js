@@ -275,18 +275,168 @@
   resultCard.style.transform = "translateY(8px)";
   resultCard.style.transition = "opacity 0.25s ease, transform 0.25s ease";
 
-  // ── Live stats ──
+  // ── Country code to lat/lng ──
+  var COUNTRY_COORDS = {
+    US:[37.09,-95.71],GB:[55.38,-3.44],DE:[51.17,10.45],FR:[46.23,2.21],CA:[56.13,-106.35],
+    AU:[-25.27,133.78],IN:[20.59,78.96],JP:[36.2,138.25],BR:[-14.24,-51.93],PK:[30.38,69.35],
+    CN:[35.86,104.2],RU:[61.52,105.32],KR:[35.91,127.77],MX:[23.63,-102.55],ID:[-0.79,113.92],
+    TR:[38.96,35.24],IT:[41.87,12.57],ES:[40.46,-3.75],NL:[52.13,5.29],SE:[60.13,18.64],
+    NO:[60.47,8.47],PL:[51.92,19.15],CH:[46.82,8.23],AT:[47.52,14.55],BE:[50.5,4.47],
+    ZA:[-30.56,22.94],NG:[9.08,8.68],EG:[26.82,30.8],AR:[-38.42,-63.62],CL:[-35.68,-71.54],
+    CO:[4.57,-74.3],SA:[23.89,45.08],AE:[23.42,53.85],SG:[1.35,103.82],TH:[15.87,100.99],
+    PH:[12.88,121.77],VN:[14.06,108.28],MY:[4.21,101.98],NZ:[-40.9,174.89],IL:[31.05,34.85],
+    IE:[53.14,-7.69],PT:[39.4,-8.22],DK:[56.26,9.5],FI:[61.92,25.75],CZ:[49.82,15.47],
+    RO:[45.94,24.97],HU:[47.16,19.5],GR:[39.07,21.82],UA:[48.38,31.17],BD:[23.68,90.36],
+    KE:[-0.02,37.91],GH:[7.95,-1.02],TZ:[-6.37,34.89],ET:[9.15,40.49],MA:[31.79,-7.09],
+    TN:[33.89,9.54],LK:[7.87,80.77],MM:[21.91,95.96],KH:[12.57,104.99],PE:[-9.19,-75.02],
+    QA:[25.35,51.18],KW:[29.31,47.48],BH:[26.07,50.56],OM:[21.47,55.98],JO:[30.59,36.24],
+    LB:[33.85,35.86],IQ:[33.22,43.68],XX:[0,0]
+  };
+
+  // ── Live stats + globe + marquee ──
   (function () {
     fetch("/api/stats")
       .then(function (r) { return r.json(); })
       .then(function (data) {
+        // Inline hero stat
         if (data.publishes > 0) {
-          document.getElementById("stat-count").textContent = data.publishes.toLocaleString();
-          document.getElementById("live-stat").classList.remove("hidden");
+          var sc = document.getElementById("stat-count");
+          if (sc) sc.textContent = data.publishes.toLocaleString();
+          var ls = document.getElementById("live-stat");
+          if (ls) ls.classList.remove("hidden");
+        }
+
+        // Countries inline
+        var sci = document.getElementById("stat-countries-inline");
+        if (sci && data.geo) {
+          var countryCount = Object.keys(data.geo).length;
+          if (countryCount > 0) {
+            sci.textContent = " across " + countryCount + " countries";
+          }
+        }
+
+        // Globe behind hero
+        var canvas = document.getElementById("globe-canvas");
+        function initGlobe() {
+          var cg = window.__createGlobe;
+          if (!canvas || !cg) return;
+          var markers = [];
+          var geo = data.geo || {};
+          var maxViews = 1;
+          for (var cc in geo) {
+            if (geo[cc] > maxViews) maxViews = geo[cc];
+          }
+          for (var cc2 in geo) {
+            var coords = COUNTRY_COORDS[cc2];
+            if (coords) {
+              markers.push({
+                location: coords,
+                size: Math.max(0.03, Math.min(0.12, (geo[cc2] / maxViews) * 0.12))
+              });
+            }
+          }
+          // If no real data yet, show a few default markers for visual appeal
+          if (markers.length === 0) {
+            markers = [
+              { location: [30.38, 69.35], size: 0.06 },
+              { location: [37.09, -95.71], size: 0.04 },
+              { location: [51.17, 10.45], size: 0.03 },
+              { location: [-25.27, 133.78], size: 0.03 },
+              { location: [36.2, 138.25], size: 0.03 },
+            ];
+          }
+
+          var phi = 0;
+          cg(canvas, {
+            devicePixelRatio: 2,
+            width: 1000,
+            height: 1000,
+            phi: 0,
+            theta: 0.2,
+            dark: 1,
+            diffuse: 1.5,
+            mapSamples: 20000,
+            mapBrightness: 4,
+            baseColor: [0.08, 0.08, 0.12],
+            markerColor: [0.49, 0.42, 0.94],
+            glowColor: [0.08, 0.06, 0.18],
+            markers: markers,
+            onRender: function (state) {
+              state.phi = phi;
+              phi += 0.002;
+            }
+          });
+        }
+        // Try init now, or wait for cobe to load
+        if (window.__createGlobe) {
+          initGlobe();
+        } else {
+          window.addEventListener('cobe-ready', initGlobe);
+        }
+
+        // Marquee feed
+        var track = document.getElementById("marquee-track");
+        var section = document.getElementById("marquee-section");
+        if (track && section && data.recent && data.recent.length > 0) {
+          var now = Date.now();
+          var items = data.recent.map(function (item) {
+            var ago = Math.floor((now - item.ts) / 1000);
+            var agoText;
+            if (ago < 60) agoText = ago + "s ago";
+            else if (ago < 3600) agoText = Math.floor(ago / 60) + "m ago";
+            else if (ago < 86400) agoText = Math.floor(ago / 3600) + "h ago";
+            else agoText = Math.floor(ago / 86400) + "d ago";
+            return '<span class="inline-flex items-center gap-1.5">' +
+              '<span>' + flagEmoji(item.country) + '</span>' +
+              '<span class="text-aired-text-secondary">' + escapeHtml(item.title) + '</span>' +
+              '<span class="text-aired-text-tertiary">' + agoText + '</span>' +
+            '</span>';
+          });
+          // Duplicate for seamless loop
+          var html = items.join('') + items.join('');
+          track.innerHTML = html;
+          section.style.display = "block";
         }
       })
-      .catch(function () {});
+      .catch(function () {
+        // Still show globe even if stats fail
+        function initFallbackGlobe() {
+          var cg = window.__createGlobe;
+          var canvas = document.getElementById("globe-canvas");
+          if (!canvas || !cg) return;
+          var phi = 0;
+          cg(canvas, {
+            devicePixelRatio: 2, width: 1000, height: 1000,
+            phi: 0, theta: 0.15, dark: 1, diffuse: 1.2,
+            mapSamples: 16000, mapBrightness: 6,
+            baseColor: [0.12, 0.12, 0.14],
+            markerColor: [0.49, 0.42, 0.94],
+            glowColor: [0.06, 0.06, 0.1],
+            markers: [
+              { location: [30.38, 69.35], size: 0.06 },
+              { location: [37.09, -95.71], size: 0.04 },
+              { location: [51.17, 10.45], size: 0.03 },
+            ],
+            onRender: function (state) { state.phi = phi; phi += 0.002; }
+          });
+        }
+        if (window.__createGlobe) initFallbackGlobe();
+        else window.addEventListener('cobe-ready', initFallbackGlobe);
+      });
   })();
+
+  function flagEmoji(cc) {
+    if (!cc || cc === "XX" || cc.length !== 2) return "🌐";
+    var a = cc.charCodeAt(0) - 65 + 0x1F1E6;
+    var b = cc.charCodeAt(1) - 65 + 0x1F1E6;
+    return String.fromCodePoint(a) + String.fromCodePoint(b);
+  }
+
+  function escapeHtml(str) {
+    var div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
 
   // ── Install section copy buttons ──
   document.querySelectorAll(".copy-snippet").forEach(function (btn) {

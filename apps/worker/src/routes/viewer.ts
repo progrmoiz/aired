@@ -65,10 +65,39 @@ viewer.get("/p/:id", async (c) => {
     }
   }
   // Fire-and-forget — don't block response
+  const country = c.req.header("CF-IPCountry") ?? "XX";
   c.executionCtx.waitUntil(
-    c.env.PAGES_KV.put(`page:${id}`, serializeMetadata(updated), kvOptions).catch(
-      () => {},
-    ),
+    Promise.all([
+      // Update read count
+      c.env.PAGES_KV.put(`page:${id}`, serializeMetadata(updated), kvOptions),
+      // Increment total views counter
+      (async () => {
+        const v = parseInt(await c.env.PAGES_KV.get("stats:views") ?? "0", 10);
+        await c.env.PAGES_KV.put("stats:views", String(v + 1));
+      })(),
+      // Increment country counter
+      (async () => {
+        const cc = country.toUpperCase();
+        const key = `stats:geo:${cc}`;
+        const v = parseInt(await c.env.PAGES_KV.get(key) ?? "0", 10);
+        await c.env.PAGES_KV.put(key, String(v + 1));
+      })(),
+      // Push to recent views list (keep last 20)
+      (async () => {
+        const key = "stats:recent-views";
+        const raw2 = await c.env.PAGES_KV.get(key);
+        const list: { title: string; country: string; ts: number }[] = raw2
+          ? JSON.parse(raw2)
+          : [];
+        list.unshift({
+          title: metadata.title ?? "Untitled",
+          country: country.toUpperCase(),
+          ts: Date.now(),
+        });
+        if (list.length > 20) list.length = 20;
+        await c.env.PAGES_KV.put(key, JSON.stringify(list));
+      })(),
+    ]).catch(() => {}),
   );
 
   const headers = new Headers();

@@ -105,6 +105,56 @@
       outline: none;
       box-shadow: 0 0 0 2px #0a0a0b, 0 0 0 4px rgba(124, 106, 239, 0.4);
     }
+
+    /* Hero globe */
+    .hero-section { position: relative; overflow: visible; }
+    .hero-globe {
+      position: absolute;
+      right: -180px;
+      top: 50%;
+      transform: translateY(-55%);
+      width: 550px;
+      height: 550px;
+      opacity: 0.35;
+      pointer-events: none;
+      z-index: 0;
+      filter: saturate(1.2);
+    }
+    .hero-section::after {
+      content: '';
+      position: absolute;
+      right: -60px;
+      top: 50%;
+      transform: translateY(-55%);
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(124, 106, 239, 0.06) 0%, rgba(124, 106, 239, 0.02) 40%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    @media (max-width: 640px) {
+      .hero-globe, .hero-section::after { display: none; }
+    }
+
+    /* Form sits above globe */
+    .form-container, #air-form, .result-card, #error-msg { position: relative; z-index: 10; }
+
+    /* Marquee feed */
+    .marquee-wrapper {
+      overflow: hidden;
+      mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+      -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+    }
+    .marquee-track {
+      display: flex;
+      gap: 2rem;
+      white-space: nowrap;
+      animation: marquee-scroll 30s linear infinite;
+    }
+    @keyframes marquee-scroll {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col text-aired-text-primary">
@@ -123,14 +173,17 @@
   <main class="flex-1 w-full max-w-2xl mx-auto px-6">
 
     <!-- ─── Title + Form (single visual unit) ─── -->
-    <section class="mt-12 sm:mt-20">
+    <section class="hero-section mt-12 sm:mt-20">
+      <!-- Globe behind hero -->
+      <canvas id="globe-canvas" width="1000" height="1000" class="hero-globe"></canvas>
+
       <!-- Tagline -->
-      <div class="mb-8">
+      <div class="mb-8 relative z-10">
         <h1 class="text-xl font-semibold tracking-tight text-aired-text-primary">Air your artifacts.</h1>
         <p class="mt-2 text-sm text-aired-text-secondary leading-relaxed">
           Paste HTML, get a live URL. No signup, no deploy. Open source on
           <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener" class="text-aired-text-primary hover:text-white transition-colors duration-150 underline decoration-aired-border hover:decoration-aired-text-secondary">GitHub</a>.
-          <span id="live-stat" class="hidden"> · <span id="stat-count" class="text-aired-text-primary tabular-nums"></span> pages aired</span>
+          <span id="live-stat" class="hidden"> · <span id="stat-count" class="text-aired-text-primary tabular-nums"></span> pages aired<span id="stat-countries-inline"></span></span>
         </p>
       </div>
 
@@ -373,50 +426,71 @@
               </div>
             </div>
             <div id="mcp-panel-cursor" class="mcp-panel hidden" role="tabpanel">
-              <div class="bg-aired-bg rounded-sm px-3 py-2.5 relative">
-                <code class="font-mono text-2xs text-aired-text-secondary block whitespace-pre select-all">{
+              <div class="bg-aired-bg rounded-sm overflow-hidden">
+                <div class="flex items-center justify-between px-3 py-1.5 border-b border-aired-border">
+                  <span class="text-2xs text-aired-text-tertiary">.cursor/mcp.json</span>
+                  <button type="button" class="copy-snippet copy-btn px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy='{"mcpServers":{"aired":{"url":"https://aired.sh/mcp"}}}'>Copy</button>
+                </div>
+                <div class="px-3 py-2.5">
+                  <code class="font-mono text-2xs text-aired-text-secondary block whitespace-pre select-all">{
   "mcpServers": {
     "aired": { "url": "https://aired.sh/mcp" }
   }
 }</code>
-                <button type="button" class="copy-snippet copy-btn absolute top-2 right-2 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy='{"mcpServers":{"aired":{"url":"https://aired.sh/mcp"}}}'>Copy</button>
+                </div>
               </div>
-              <p class="mt-1.5 text-2xs text-aired-text-tertiary">Add to <code class="text-aired-text-secondary">.cursor/mcp.json</code></p>
             </div>
             <div id="mcp-panel-vscode" class="mcp-panel hidden" role="tabpanel">
-              <div class="bg-aired-bg rounded-sm px-3 py-2.5 relative">
-                <code class="font-mono text-2xs text-aired-text-secondary block whitespace-pre select-all">{
+              <div class="bg-aired-bg rounded-sm overflow-hidden">
+                <div class="flex items-center justify-between px-3 py-1.5 border-b border-aired-border">
+                  <span class="text-2xs text-aired-text-tertiary">.vscode/mcp.json</span>
+                  <button type="button" class="copy-snippet copy-btn px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy='{"servers":{"aired":{"type":"http","url":"https://aired.sh/mcp"}}}'>Copy</button>
+                </div>
+                <div class="px-3 py-2.5">
+                  <code class="font-mono text-2xs text-aired-text-secondary block whitespace-pre select-all">{
   "servers": {
     "aired": { "type": "http", "url": "https://aired.sh/mcp" }
   }
 }</code>
-                <button type="button" class="copy-snippet copy-btn absolute top-2 right-2 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy='{"servers":{"aired":{"type":"http","url":"https://aired.sh/mcp"}}}'>Copy</button>
+                </div>
               </div>
-              <p class="mt-1.5 text-2xs text-aired-text-tertiary">Add to <code class="text-aired-text-secondary">.vscode/mcp.json</code></p>
             </div>
             <div id="mcp-panel-windsurf" class="mcp-panel hidden" role="tabpanel">
-              <div class="bg-aired-bg rounded-sm px-3 py-2.5 relative">
-                <code class="font-mono text-2xs text-aired-text-secondary block whitespace-pre select-all">{
+              <div class="bg-aired-bg rounded-sm overflow-hidden">
+                <div class="flex items-center justify-between px-3 py-1.5 border-b border-aired-border">
+                  <span class="text-2xs text-aired-text-tertiary">~/.codeium/windsurf/mcp_config.json</span>
+                  <button type="button" class="copy-snippet copy-btn px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy='{"mcpServers":{"aired":{"serverUrl":"https://aired.sh/mcp"}}}'>Copy</button>
+                </div>
+                <div class="px-3 py-2.5">
+                  <code class="font-mono text-2xs text-aired-text-secondary block whitespace-pre select-all">{
   "mcpServers": {
     "aired": { "serverUrl": "https://aired.sh/mcp" }
   }
 }</code>
-                <button type="button" class="copy-snippet copy-btn absolute top-2 right-2 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy='{"mcpServers":{"aired":{"serverUrl":"https://aired.sh/mcp"}}}'>Copy</button>
+                </div>
               </div>
-              <p class="mt-1.5 text-2xs text-aired-text-tertiary">Add to <code class="text-aired-text-secondary">~/.codeium/windsurf/mcp_config.json</code></p>
             </div>
             <div id="mcp-panel-codex" class="mcp-panel hidden" role="tabpanel">
-              <div class="bg-aired-bg rounded-sm px-3 py-2.5 relative">
-                <code class="font-mono text-2xs text-aired-text-secondary block whitespace-pre select-all">[mcp_servers.aired]
-url = "https://aired.sh/mcp"</code>
-                <button type="button" class="copy-snippet copy-btn absolute top-2 right-2 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy='[mcp_servers.aired]
+              <div class="bg-aired-bg rounded-sm overflow-hidden">
+                <div class="flex items-center justify-between px-3 py-1.5 border-b border-aired-border">
+                  <span class="text-2xs text-aired-text-tertiary">~/.codex/config.toml</span>
+                  <button type="button" class="copy-snippet copy-btn px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy='[mcp_servers.aired]
 url = "https://aired.sh/mcp"'>Copy</button>
+                </div>
+                <div class="px-3 py-2.5">
+                  <code class="font-mono text-2xs text-aired-text-secondary block whitespace-pre select-all">[mcp_servers.aired]
+url = "https://aired.sh/mcp"</code>
+                </div>
               </div>
-              <p class="mt-1.5 text-2xs text-aired-text-tertiary">Add to <code class="text-aired-text-secondary">~/.codex/config.toml</code></p>
             </div>
             <div id="mcp-panel-others" class="mcp-panel hidden" role="tabpanel">
-              <div class="bg-aired-bg rounded-sm px-3 py-2.5 relative">
-                <code class="font-mono text-2xs text-aired-text-secondary block whitespace-pre select-all">{
+              <div class="bg-aired-bg rounded-sm overflow-hidden">
+                <div class="flex items-center justify-between px-3 py-1.5 border-b border-aired-border">
+                  <span class="text-2xs text-aired-text-tertiary">STDIO bridge via mcp-remote</span>
+                  <button type="button" class="copy-snippet copy-btn px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy='{"mcpServers":{"aired":{"command":"npx","args":["-y","mcp-remote","https://aired.sh/mcp"]}}}'>Copy</button>
+                </div>
+                <div class="px-3 py-2.5">
+                  <code class="font-mono text-2xs text-aired-text-secondary block whitespace-pre select-all">{
   "mcpServers": {
     "aired": {
       "command": "npx",
@@ -424,9 +498,8 @@ url = "https://aired.sh/mcp"'>Copy</button>
     }
   }
 }</code>
-                <button type="button" class="copy-snippet copy-btn absolute top-2 right-2 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy='{"mcpServers":{"aired":{"command":"npx","args":["-y","mcp-remote","https://aired.sh/mcp"]}}}'>Copy</button>
+                </div>
               </div>
-              <p class="mt-1.5 text-2xs text-aired-text-tertiary">For any STDIO-only client. Uses <code class="text-aired-text-secondary">mcp-remote</code> to bridge to the HTTP endpoint.</p>
             </div>
             <p class="text-2xs text-aired-text-tertiary">
               Exposes a <code class="text-aired-text-secondary">publish_html</code> tool. Your AI can publish artifacts directly.
@@ -462,10 +535,16 @@ url = "https://aired.sh/mcp"'>Copy</button>
       </div>
     </section>
 
+    <!-- ─── Live Feed Marquee ─── -->
+    <div class="mt-16 mb-8 marquee-wrapper" id="marquee-section" style="display: none;">
+      <div class="marquee-track text-2xs text-aired-text-tertiary" id="marquee-track">
+      </div>
+    </div>
+
   </main>
 
   <!-- ─── Footer ─── -->
-  <footer class="w-full max-w-2xl mx-auto px-6 py-8 border-t border-aired-border">
+  <footer class="w-full max-w-2xl mx-auto px-6 py-8">
     <div class="flex flex-col sm:flex-row items-center justify-between gap-2 text-2xs text-aired-text-tertiary">
       <p>
         Built by <a href="https://x.com/iammoizfarooq" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">@iammoizfarooq</a>
@@ -477,6 +556,11 @@ url = "https://aired.sh/mcp"'>Copy</button>
   </footer>
 
   <script src="/app.js"></script>
+  <script type="module">
+    import createGlobe from 'https://esm.sh/cobe@0.6.3';
+    window.__createGlobe = createGlobe;
+    window.dispatchEvent(new Event('cobe-ready'));
+  </script>
   <script>
     // ── Empty state hint ──
     (function() {
