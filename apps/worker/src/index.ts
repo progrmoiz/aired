@@ -4,6 +4,7 @@ import type { AppBindings } from "./types.js";
 import { api } from "./routes/api.js";
 import { viewer } from "./routes/viewer.js";
 import { report } from "./routes/report.js";
+import { handleMcp } from "./routes/mcp.js";
 
 const app = new Hono<AppBindings>();
 
@@ -25,6 +26,9 @@ app.onError((err, c) => {
 
 // Health check
 app.get("/health", (c) => c.json({ status: "ok" }));
+
+// MCP Streamable HTTP endpoint
+app.all("/mcp", handleMcp);
 
 // Mount API routes
 app.route("/api", api);

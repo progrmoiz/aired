@@ -77,17 +77,21 @@ Tokens are stored per page ID. `aired tokens` lists them. `aired tokens prune` r
 
 ## MCP Server
 
+Two transports:
+
+**STDIO** (local, supports file_path):
 ```bash
 aired --mcp
-```
-
-Starts a stdio MCP server with a `publish_html` tool. Configure in Claude Code:
-
-```bash
 claude mcp add aired -- npx aired --mcp
 ```
 
-The MCP tool accepts `html` (string), `file_path`, `title`, `pin`, `ttl_seconds`, `permanent`, `update_token`, and `id`.
+**Streamable HTTP** (remote, zero install):
+```
+https://aired.sh/mcp
+claude mcp add aired --transport http https://aired.sh/mcp
+```
+
+The MCP tool accepts `html` (string), `file_path` (STDIO only), `title`, `pin`, `ttl_seconds`, `permanent`, `update_token`, and `id`.
 
 ## Gotchas
 

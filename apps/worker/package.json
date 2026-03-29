@@ -11,7 +11,10 @@
   },
   "dependencies": {
     "@aired/core": "workspace:*",
-    "hono": "^4.7.0"
+    "@modelcontextprotocol/sdk": "^1.28.0",
+    "agents": "^0.8.7",
+    "hono": "^4.7.0",
+    "zod": "^3.22.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260317.0",

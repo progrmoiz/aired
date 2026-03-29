@@ -61,15 +61,23 @@ Adds a `SKILL.md` to your project. Any AI agent discovers and uses `aired` autom
 
 ### MCP (Claude Code, Cursor, Windsurf)
 
+Two transports available:
+
+**STDIO** (local, runs on your machine):
 ```bash
 claude mcp add aired -- npx aired --mcp
+```
+
+**Streamable HTTP** (remote, zero install):
+```bash
+claude mcp add aired --transport http https://aired.sh/mcp
 ```
 
 Then in Claude: "Publish this HTML artifact" → get a live URL.
 
 Available tool: `publish_html`
 - `html` — HTML string to publish
-- `file_path` — path to HTML file (alternative to `html`)
+- `file_path` — path to HTML file (STDIO only)
 - `title` — page title
 - `pin` — PIN to protect access
 - `ttl_seconds` — time to live (default: 604800 = 7 days)
