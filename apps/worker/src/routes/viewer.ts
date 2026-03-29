@@ -198,48 +198,74 @@ function injectAiredBar(
   }
 
   const bar = `
-<!-- aired floating bar -->
+<!-- aired bar -->
 <style>
   #__aired-bar {
     position: fixed;
-    bottom: 16px;
-    right: 16px;
-    display: flex;
+    bottom: 14px;
+    right: 14px;
+    display: inline-flex;
     align-items: center;
-    gap: 10px;
-    padding: 6px 12px;
-    background: rgba(10, 10, 10, 0.85);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid rgba(255,255,255,0.1);
+    gap: 0;
+    padding: 5px 10px;
+    background: rgba(10, 10, 10, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.08);
     border-radius: 20px;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
     font-size: 11px;
-    color: rgba(255,255,255,0.5);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: rgba(255,255,255,0.4);
     z-index: 2147483647;
     white-space: nowrap;
-    text-decoration: none;
     pointer-events: auto;
     line-height: 1;
+    transition: color 180ms ease, background 180ms ease, border-color 180ms ease;
+  }
+  #__aired-bar:hover {
+    color: rgba(255,255,255,0.7);
+    background: rgba(10, 10, 10, 0.9);
+    border-color: rgba(255,255,255,0.15);
   }
   #__aired-bar a {
-    color: rgba(255,255,255,0.5);
+    color: inherit;
     text-decoration: none;
-    transition: color 0.15s;
   }
-  #__aired-bar a:hover {
-    color: rgba(255,255,255,0.9);
+  #__aired-bar .__aired-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-width 250ms cubic-bezier(0.25, 0.1, 0.25, 1),
+                opacity 200ms ease,
+                margin 250ms ease;
+    margin-left: 0;
   }
-  #__aired-bar .sep {
-    opacity: 0.25;
+  #__aired-bar:hover .__aired-meta {
+    max-width: 200px;
+    opacity: 1;
+    margin-left: 8px;
+  }
+  #__aired-bar .__aired-dot {
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    flex-shrink: 0;
   }
 </style>
-<div id="__aired-bar" aria-label="Page info">
+<div id="__aired-bar" role="complementary" aria-label="aired attribution">
   <a href="https://aired.sh" target="_blank" rel="noopener">aired</a>
-  <span class="sep">·</span>
-  <span>Views: ${readCount}</span>
-  <span class="sep">·</span>
-  <a href="/api/report?id=${encodeURIComponent(id)}" target="_blank" rel="noopener">Report</a>
+  <span class="__aired-meta">
+    <span class="__aired-dot"></span>
+    <span>${readCount} view${readCount !== 1 ? 's' : ''}</span>
+    <span class="__aired-dot"></span>
+    <a href="#" onclick="(function(e){e.preventDefault();if(confirm('Report this page as inappropriate?')){fetch('/api/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:'${id}',reason:'reported via viewer bar'})}).then(function(){alert('Reported. Thank you.')}).catch(function(){alert('Failed to report. Try again.')})}})(event);return false">report</a>
+  </span>
 </div>`;
 
   // Inject bar before </body>
