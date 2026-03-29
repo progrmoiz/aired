@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <radialGradient id="glow" cx="75%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#7c6aef" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#0a0a0b" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#0a0a0b"/>
+
+  <!-- Subtle purple glow on right side -->
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <!-- Broadcast beacon icon (scaled from favicon) -->
+  <g transform="translate(860, 180) scale(5)">
+    <circle cx="9" cy="23" r="3.5" fill="#7c6aef" opacity="0.3"/>
+    <path d="M9 13 A10 10 0 0 1 19 23" fill="none" stroke="#7c6aef" stroke-width="3" stroke-linecap="round" opacity="0.2"/>
+    <path d="M9 6 A17 17 0 0 1 26 23" fill="none" stroke="#7c6aef" stroke-width="3" stroke-linecap="round" opacity="0.12"/>
+  </g>
+
+  <!-- aired wordmark -->
+  <text x="100" y="240" font-family="-apple-system, BlinkMacSystemFont, Inter, system-ui, sans-serif" font-size="72" font-weight="600" fill="#ededef" letter-spacing="-0.03em">aired</text>
+
+  <!-- Tagline -->
+  <text x="100" y="300" font-family="-apple-system, BlinkMacSystemFont, Inter, system-ui, sans-serif" font-size="28" fill="#8a8a8e" letter-spacing="-0.01em">Publish HTML artifacts to shareable URLs instantly.</text>
+
+  <!-- Terminal command -->
+  <rect x="100" y="350" width="520" height="52" rx="8" fill="#111113" stroke="#222225" stroke-width="1"/>
+  <text x="124" y="383" font-family="JetBrains Mono, SF Mono, Fira Code, monospace" font-size="18" fill="#56565a">$</text>
+  <text x="148" y="383" font-family="JetBrains Mono, SF Mono, Fira Code, monospace" font-size="18" fill="#7c6aef">npx aired dashboard.html</text>
+
+  <!-- Result URL -->
+  <rect x="100" y="414" width="520" height="42" rx="8" fill="#111113" stroke="#222225" stroke-width="1"/>
+  <text x="124" y="442" font-family="JetBrains Mono, SF Mono, Fira Code, monospace" font-size="16" fill="#56565a">→</text>
+  <text x="148" y="442" font-family="JetBrains Mono, SF Mono, Fira Code, monospace" font-size="16" fill="#8a8a8e">https://aired.sh/p/a1b2c3d4e5</text>
+
+  <!-- Bottom tags -->
+  <text x="100" y="540" font-family="-apple-system, BlinkMacSystemFont, Inter, system-ui, sans-serif" font-size="16" fill="#56565a">CLI · MCP Server · Open Source</text>
+
+  <!-- URL -->
+  <text x="100" y="575" font-family="-apple-system, BlinkMacSystemFont, Inter, system-ui, sans-serif" font-size="20" font-weight="500" fill="#7c6aef">aired.sh</text>
+</svg>
