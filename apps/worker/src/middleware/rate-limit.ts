@@ -3,7 +3,14 @@ import type { AppBindings } from "../types.js";
 import { RATE_LIMIT, RATE_LIMIT_WINDOW } from "@aired/core";
 
 /**
- * Hash an IP address using SHA-256 so we don't store raw IPs in KV.
+ * In-memory rate limit store.
+ * Resets on worker cold start — that's fine for a low-traffic service.
+ * Uses zero KV writes (the old approach burned through the free-tier daily limit).
+ */
+const store = new Map<string, { count: number; resetAt: number }>();
+
+/**
+ * Hash an IP address using SHA-256 so we don't store raw IPs.
  */
 async function hashIp(ip: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -13,37 +20,46 @@ async function hashIp(ip: string): Promise<string> {
   return Array.from(hashArray)
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("")
-    .slice(0, 16); // 16 hex chars is enough for a KV key prefix
+    .slice(0, 16);
 }
 
 /**
  * Check rate limit for the given IP.
- * Returns true if the request is allowed, false if rate limited.
- * Increments the counter on allowed requests.
  */
-export async function checkRateLimit(
-  kv: KVNamespace,
-  ip: string,
-): Promise<{ allowed: boolean; remaining: number }> {
-  const ipHash = await hashIp(ip);
-  const key = `rate:${ipHash}`;
+function checkRateLimit(ipHash: string): { allowed: boolean; remaining: number } {
+  const now = Date.now();
+  const entry = store.get(ipHash);
 
-  const raw = await kv.get(key);
-  const count = raw !== null ? parseInt(raw, 10) : 0;
+  // Expired or no entry — start fresh
+  if (!entry || now >= entry.resetAt) {
+    store.set(ipHash, { count: 1, resetAt: now + RATE_LIMIT_WINDOW * 1000 });
+    return { allowed: true, remaining: RATE_LIMIT - 1 };
+  }
 
-  if (count >= RATE_LIMIT) {
+  if (entry.count >= RATE_LIMIT) {
     return { allowed: false, remaining: 0 };
   }
 
-  // Increment — use expirationTtl so the window resets after 1 hour
-  await kv.put(key, String(count + 1), { expirationTtl: RATE_LIMIT_WINDOW });
+  entry.count++;
+  return { allowed: true, remaining: RATE_LIMIT - entry.count };
+}
 
-  return { allowed: true, remaining: RATE_LIMIT - (count + 1) };
+/**
+ * Periodically prune expired entries to prevent memory growth.
+ * Runs at most once per minute.
+ */
+let lastPrune = 0;
+function maybePrune() {
+  const now = Date.now();
+  if (now - lastPrune < 60_000) return;
+  lastPrune = now;
+  for (const [key, entry] of store) {
+    if (now >= entry.resetAt) store.delete(key);
+  }
 }
 
 /**
  * Hono middleware: apply rate limiting based on CF-Connecting-IP.
- * Returns 429 if the IP has exceeded the upload limit.
  */
 export async function rateLimitMiddleware(
   c: Context<AppBindings>,
@@ -54,7 +70,10 @@ export async function rateLimitMiddleware(
     c.req.header("X-Forwarded-For") ??
     "unknown";
 
-  const { allowed } = await checkRateLimit(c.env.PAGES_KV, ip);
+  const ipHash = await hashIp(ip);
+  const { allowed } = checkRateLimit(ipHash);
+
+  maybePrune();
 
   if (!allowed) {
     return c.json(

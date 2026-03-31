@@ -1,6 +1,6 @@
 {
   "name": "aired",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Publish HTML artifacts to shareable URLs instantly",
   "type": "module",
   "bin": {

@@ -124,15 +124,34 @@ api.post("/publish", rateLimitMiddleware, async (c) => {
     expiresAt,
   };
 
-  await c.env.PAGES_BUCKET.put(`pages/${id}/index.html`, html, {
-    httpMetadata: { contentType: "text/html; charset=utf-8" },
-  });
+  try {
+    await c.env.PAGES_BUCKET.put(`pages/${id}/index.html`, html, {
+      httpMetadata: { contentType: "text/html; charset=utf-8" },
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("limit exceeded")) {
+      return c.json({ error: "Service temporarily unavailable — storage write limit reached. Try again later." }, 503);
+    }
+    throw err;
+  }
 
   const kvOptions: KVNamespacePutOptions = {};
   if (ttlSeconds !== null) {
     kvOptions.expirationTtl = ttlSeconds;
   }
-  await c.env.PAGES_KV.put(`page:${id}`, serializeMetadata(metadata), kvOptions);
+
+  try {
+    await c.env.PAGES_KV.put(`page:${id}`, serializeMetadata(metadata), kvOptions);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("limit exceeded")) {
+      // HTML is in R2 but metadata failed — clean up
+      await c.env.PAGES_BUCKET.delete(`pages/${id}/index.html`).catch(() => {});
+      return c.json({ error: "Service temporarily unavailable — storage write limit reached. Try again later." }, 503);
+    }
+    throw err;
+  }
 
   // Increment publish counter (fire-and-forget)
   c.executionCtx.waitUntil(
