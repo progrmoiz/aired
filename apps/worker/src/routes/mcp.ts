@@ -3,6 +3,7 @@ import { createMcpHandler } from "agents/mcp";
 import { z } from "zod";
 import type { Context } from "hono";
 import type { AppBindings } from "../types.js";
+import { loadStats, saveStats } from "../lib/stats.js";
 import {
   generateId,
   generateToken,
@@ -146,13 +147,11 @@ function createAiredMcpServer(env: {
         kvOptions,
       );
 
-      // Increment counter (best effort)
+      // Increment publish counter (best effort)
       try {
-        const count = parseInt(
-          (await env.PAGES_KV.get("stats:publishes")) ?? "0",
-          10,
-        );
-        await env.PAGES_KV.put("stats:publishes", String(count + 1));
+        const stats = await loadStats(env.PAGES_KV);
+        stats.publishes += 1;
+        await saveStats(env.PAGES_KV, stats);
       } catch {
         // ignore
       }

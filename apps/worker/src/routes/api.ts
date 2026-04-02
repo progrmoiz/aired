@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { AppBindings } from "../types.js";
+import { loadStats, saveStats } from "../lib/stats.js";
 import { rateLimitMiddleware } from "../middleware/rate-limit.js";
 import {
   generateId,
@@ -156,8 +157,9 @@ api.post("/publish", rateLimitMiddleware, async (c) => {
   // Increment publish counter (fire-and-forget)
   c.executionCtx.waitUntil(
     (async () => {
-      const count = parseInt(await c.env.PAGES_KV.get("stats:publishes") ?? "0", 10);
-      await c.env.PAGES_KV.put("stats:publishes", String(count + 1));
+      const stats = await loadStats(c.env.PAGES_KV);
+      stats.publishes += 1;
+      await saveStats(c.env.PAGES_KV, stats);
     })().catch(() => {}),
   );
 
@@ -309,34 +311,12 @@ api.get("/pages/:id", async (c) => {
 
 // GET /api/stats — public stats
 api.get("/stats", async (c) => {
-  const [publishes, views, recentRaw, geoKeys] = await Promise.all([
-    c.env.PAGES_KV.get("stats:publishes"),
-    c.env.PAGES_KV.get("stats:views"),
-    c.env.PAGES_KV.get("stats:recent-views"),
-    c.env.PAGES_KV.list({ prefix: "stats:geo:" }),
-  ]);
-
-  // Fetch all geo counters in parallel
-  const geo: Record<string, number> = {};
-  if (geoKeys.keys.length > 0) {
-    const values = await Promise.all(
-      geoKeys.keys.map((k) => c.env.PAGES_KV.get(k.name)),
-    );
-    for (let i = 0; i < geoKeys.keys.length; i++) {
-      const cc = geoKeys.keys[i]!.name.replace("stats:geo:", "");
-      geo[cc] = parseInt(values[i] ?? "0", 10);
-    }
-  }
-
-  const recent: { title: string; country: string; ts: number }[] = recentRaw
-    ? JSON.parse(recentRaw)
-    : [];
-
+  const stats = await loadStats(c.env.PAGES_KV);
   return c.json({
-    publishes: parseInt(publishes ?? "0", 10),
-    views: parseInt(views ?? "0", 10),
-    recent,
-    geo,
+    publishes: stats.publishes,
+    views: stats.views,
+    recent: stats.recent,
+    geo: stats.geo,
   });
 });
 

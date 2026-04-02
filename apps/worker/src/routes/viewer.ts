@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { AppBindings } from "../types.js";
 import { parseMetadata, serializeMetadata } from "@aired/core";
 import { applyPageHeaders } from "../middleware/security.js";
+import { loadStats, saveStats } from "../lib/stats.js";
 
 const viewer = new Hono<AppBindings>();
 
@@ -65,37 +66,22 @@ viewer.get("/p/:id", async (c) => {
     }
   }
   // Fire-and-forget — don't block response
-  const country = c.req.header("CF-IPCountry") ?? "XX";
+  // Two KV writes: page metadata (readCount) + merged stats blob
+  const country = (c.req.header("CF-IPCountry") ?? "XX").toUpperCase();
   c.executionCtx.waitUntil(
     Promise.all([
-      // Update read count
       c.env.PAGES_KV.put(`page:${id}`, serializeMetadata(updated), kvOptions),
-      // Increment total views counter
       (async () => {
-        const v = parseInt(await c.env.PAGES_KV.get("stats:views") ?? "0", 10);
-        await c.env.PAGES_KV.put("stats:views", String(v + 1));
-      })(),
-      // Increment country counter
-      (async () => {
-        const cc = country.toUpperCase();
-        const key = `stats:geo:${cc}`;
-        const v = parseInt(await c.env.PAGES_KV.get(key) ?? "0", 10);
-        await c.env.PAGES_KV.put(key, String(v + 1));
-      })(),
-      // Push to recent views list (keep last 20)
-      (async () => {
-        const key = "stats:recent-views";
-        const raw2 = await c.env.PAGES_KV.get(key);
-        const list: { title: string; country: string; ts: number }[] = raw2
-          ? JSON.parse(raw2)
-          : [];
-        list.unshift({
+        const stats = await loadStats(c.env.PAGES_KV);
+        stats.views += 1;
+        stats.geo[country] = (stats.geo[country] ?? 0) + 1;
+        stats.recent.unshift({
           title: metadata.title ?? "Untitled",
-          country: country.toUpperCase(),
+          country,
           ts: Date.now(),
         });
-        if (list.length > 20) list.length = 20;
-        await c.env.PAGES_KV.put(key, JSON.stringify(list));
+        if (stats.recent.length > 20) stats.recent.length = 20;
+        await saveStats(c.env.PAGES_KV, stats);
       })(),
     ]).catch(() => {}),
   );
