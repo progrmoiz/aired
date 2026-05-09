@@ -234,6 +234,22 @@ Serves the raw HTML. If PIN-protected, serves a PIN entry page first.
 
 ---
 
+## Accounts (optional)
+
+Sign in with GitHub at aired.sh to manage all your pages in one place.
+Anonymous publish still works without an account.
+
+CLI:
+```bash
+npx aired login              # browser flow
+npx aired login --device     # SSH-friendly fallback
+npx aired claim --all        # bind existing tokens to your account
+npx aired whoami
+npx aired logout
+```
+
+---
+
 ## Self-hosting
 
 Aired runs on Cloudflare Workers + R2 + KV. Deployment requires a Cloudflare account.

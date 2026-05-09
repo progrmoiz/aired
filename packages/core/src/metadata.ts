@@ -9,6 +9,7 @@ export type PageMetadata = {
   permanent: boolean;
   createdAt: string;
   expiresAt: string | null;
+  ownerId: number | null;
 };
 
 export function serializeMetadata(meta: PageMetadata): string {
@@ -43,6 +44,7 @@ export function parseMetadata(raw: string): PageMetadata | null {
       permanent: obj["permanent"],
       createdAt: obj["createdAt"],
       expiresAt: typeof obj["expiresAt"] === "string" ? obj["expiresAt"] : null,
+      ownerId: typeof obj["ownerId"] === "number" ? obj["ownerId"] : null,
     };
   } catch {
     return null;

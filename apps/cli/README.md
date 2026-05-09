@@ -140,6 +140,23 @@ Every command outputs structured JSON. Exit codes are consistent:
 
 ---
 
+## Accounts (optional)
+
+Sign in with GitHub to manage all your pages in one place.
+Anonymous publish still works without an account.
+
+```bash
+npx aired login              # browser flow
+npx aired login --device     # SSH-friendly fallback
+npx aired claim --all        # bind existing tokens to your account
+npx aired whoami
+npx aired logout
+```
+
+Session is stored in `~/.config/aired/session.json` (mode 0600).
+
+---
+
 ## License
 
 MIT — see [LICENSE](../../LICENSE)

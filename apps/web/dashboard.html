@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>aired — dashboard</title>
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+  <link rel="icon" href="/favicon-16.png" type="image/png" sizes="16x16" />
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    @keyframes skeleton-pulse {
+      from { opacity: 1; }
+      to { opacity: 0.4; }
+    }
+
+    .skeleton-row {
+      animation: skeleton-pulse 1.2s linear infinite alternate;
+    }
+
+    .row-action-btn {
+      transition: color 120ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+  </style>
+</head>
+<body class="bg-aired-bg min-h-screen text-aired-text-primary">
+
+  <main class="max-w-[640px] mx-auto px-6 py-12">
+
+    <!-- hero row: handle + count + sign-out -->
+    <header class="flex items-baseline justify-between mb-10">
+      <div>
+        <h1 class="text-xl font-medium tracking-tight text-aired-text-primary">@</h1>
+        <p class="text-sm text-aired-text-secondary mt-1">0 pages</p>
+      </div>
+      <a href="#" id="sign-out" class="text-xs text-aired-text-tertiary hover:text-aired-text-primary transition-colors duration-150 focus-ring rounded-sm">sign out</a>
+    </header>
+
+    <!-- page list -->
+    <ul id="page-list" class="divide-y divide-aired-border">
+      <!-- skeleton row 1 -->
+      <li class="skeleton-row flex items-center gap-4 min-h-[44px] py-3">
+        <div class="flex-1 flex flex-col gap-1.5">
+          <div class="h-3 w-48 rounded-sm bg-aired-surface-hover"></div>
+          <div class="h-2.5 w-24 rounded-sm bg-aired-surface-hover"></div>
+        </div>
+        <div class="h-3 w-16 rounded-sm bg-aired-surface-hover"></div>
+      </li>
+      <!-- skeleton row 2 -->
+      <li class="skeleton-row flex items-center gap-4 min-h-[44px] py-3" style="animation-delay: 0.2s;">
+        <div class="flex-1 flex flex-col gap-1.5">
+          <div class="h-3 w-36 rounded-sm bg-aired-surface-hover"></div>
+          <div class="h-2.5 w-20 rounded-sm bg-aired-surface-hover"></div>
+        </div>
+        <div class="h-3 w-16 rounded-sm bg-aired-surface-hover"></div>
+      </li>
+      <!-- skeleton row 3 -->
+      <li class="skeleton-row flex items-center gap-4 min-h-[44px] py-3" style="animation-delay: 0.4s;">
+        <div class="flex-1 flex flex-col gap-1.5">
+          <div class="h-3 w-56 rounded-sm bg-aired-surface-hover"></div>
+          <div class="h-2.5 w-28 rounded-sm bg-aired-surface-hover"></div>
+        </div>
+        <div class="h-3 w-16 rounded-sm bg-aired-surface-hover"></div>
+      </li>
+    </ul>
+
+  </main>
+
+  <script src="/dashboard.js" defer></script>
+</body>
+</html>

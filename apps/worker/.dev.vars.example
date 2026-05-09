@@ -1,0 +1,7 @@
+# Copy this file to apps/worker/.dev.vars (gitignored) and fill in real dev values.
+# For prod: use `wrangler secret put <NAME>`.
+
+GITHUB_CLIENT_ID=your_dev_client_id
+GITHUB_CLIENT_SECRET=your_dev_client_secret
+SESSION_SECRET=generate_with_openssl_rand_base64_32
+SESSION_VALID_SINCE=1970-01-01T00:00:00Z

@@ -206,3 +206,27 @@ Would love your feedback — especially on what other formats you'd want to publ
 - [ ] Enable "Always Use HTTPS" in Cloudflare dashboard
 - [ ] GitHub repo description + topics set
 - [ ] GitHub social preview image (use og.png)
+
+---
+
+## Production OAuth setup
+
+1. Register an OAuth app at github.com/settings/developers
+   - Application name: aired
+   - Homepage URL: https://aired.sh
+   - Callback URL: https://aired.sh/auth/callback
+2. wrangler secret put GITHUB_CLIENT_ID
+3. wrangler secret put GITHUB_CLIENT_SECRET
+4. wrangler secret put SESSION_SECRET   # use: openssl rand -base64 32
+5. wrangler secret put SESSION_VALID_SINCE  # value: 1970-01-01T00:00:00Z (rotate later by setting to current ISO timestamp)
+6. After putting secrets, verify with curl:
+   - sign in via web; capture cookie; curl https://aired.sh/api/me -H 'Cookie: aired_session=...' → 200 with user JSON
+
+---
+
+## Deploy
+
+```bash
+pnpm build
+pnpm --filter @aired/worker deploy
+```

@@ -8,6 +8,7 @@ import { shouldOutputJson, outputError, ExitCode } from '../lib/output.js'
 import { withSpinner } from '../lib/spinner.js'
 import { publishHTML } from '../core/client.js'
 import { saveToken } from '../core/store.js'
+import { getSession } from '../core/session.js'
 import { isDirectory, bundleDirectory } from '../core/bundler.js'
 
 function parseTtl(ttl: string): number | null {
@@ -107,8 +108,12 @@ export function makePublishCommand(globalOpts: () => GlobalOpts): Command {
         publishOpts.reads = reads
       }
 
+      // Read session for optional JWT auth
+      const session = getSession()
+      const jwt = session?.jwt
+
       try {
-        const result = await withSpinner('Publishing...', () => publishHTML(baseUrl, html, publishOpts), opts)
+        const result = await withSpinner('Publishing...', () => publishHTML(baseUrl, html, publishOpts, jwt), opts)
 
         saveToken(result.id, result.update_token, {
           title: cmdOpts.title ?? null,
@@ -119,7 +124,8 @@ export function makePublishCommand(globalOpts: () => GlobalOpts): Command {
           process.stdout.write(JSON.stringify(result, null, 2) + '\n')
         } else {
           process.stdout.write('\n')
-          process.stdout.write(pc.green('Published!') + ' ' + pc.bold(result.url) + '\n')
+          const asLogin = jwt !== undefined && session !== null ? ` as @${session.user.login}` : ''
+          process.stdout.write(pc.green('Published!') + ' ' + pc.bold(result.url) + asLogin + '\n')
           process.stdout.write(pc.dim('Token:   ') + result.update_token + '\n')
           process.stdout.write(pc.dim('Expires: ') + formatExpiry(result.expiresAt) + '\n')
           process.stdout.write('\n')

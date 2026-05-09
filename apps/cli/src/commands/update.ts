@@ -8,6 +8,7 @@ import { shouldOutputJson, outputError, ExitCode } from '../lib/output.js'
 import { withSpinner } from '../lib/spinner.js'
 import { updatePage } from '../core/client.js'
 import { getToken, saveToken } from '../core/store.js'
+import { getSession } from '../core/session.js'
 
 function formatExpiry(expiresAt: string | null): string {
   if (expiresAt === null) return 'Never (permanent)'
@@ -25,11 +26,18 @@ export function makeUpdateCommand(globalOpts: () => GlobalOpts): Command {
       const opts = globalOpts()
       const baseUrl = resolveApiUrl(opts)
 
+      // Precedence (R6): local update_token wins; fallback to session JWT
       const token = getToken(id)
-      if (token === null) {
+      const session = getSession()
+
+      if (token === null && session === null) {
         outputError({ code: 'VALIDATION', message: `No token found for page '${id}'. Run 'aired tokens' to list stored tokens.` }, opts)
         process.exit(ExitCode.VALIDATION_ERROR)
       }
+
+      // Precedence: local token wins; fallback to JWT-only path
+      const effectiveToken = token ?? ''
+      const jwt = session?.jwt
 
       let html: string
       try {
@@ -40,7 +48,11 @@ export function makeUpdateCommand(globalOpts: () => GlobalOpts): Command {
       }
 
       try {
-        const result = await withSpinner('Updating...', () => updatePage(baseUrl, id, html, token, { title: cmdOpts.title }), opts)
+        const result = await withSpinner(
+          'Updating...',
+          () => updatePage(baseUrl, id, html, effectiveToken, { title: cmdOpts.title }, jwt),
+          opts,
+        )
 
         saveToken(result.id, result.update_token, {
           title: cmdOpts.title ?? null,

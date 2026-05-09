@@ -103,3 +103,5 @@ The MCP tool accepts `html` (string), `file_path` (STDIO only), `title`, `pin`, 
 - **Directory requires index.html.** `npx aired ./dir/` looks for `index.html` in the directory root. No other entry point is supported.
 - **PIN is not encryption.** Content is stored in plaintext on R2. PIN just gates browser access. Don't use aired for sensitive data.
 - **Default expiry is 7 days.** Pages auto-delete unless `--permanent` is set. The TTL resets on update.
+
+Anonymous by default. `aired login` for cross-machine access. Existing tokens.json still works.

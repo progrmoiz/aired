@@ -6,6 +6,11 @@ workers_dev = true
 
 [assets]
 directory = "../web"
+# Worker handles routing first; static assets accessed via env.ASSETS.fetch
+# in the notFound handler. Required so /dashboard and other auth-gated
+# routes can run their handler before the static asset is served.
+run_worker_first = true
+binding = "ASSETS"
 
 [[r2_buckets]]
 binding = "PAGES_BUCKET"

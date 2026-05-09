@@ -8,6 +8,10 @@ import { makeDeleteCommand } from './commands/delete.js'
 import { makeInfoCommand } from './commands/info.js'
 import { makeTokensCommand } from './commands/tokens.js'
 import { makeDoctorCommand } from './commands/doctor.js'
+import { makeLoginCommand } from './commands/login.js'
+import { makeLogoutCommand } from './commands/logout.js'
+import { makeWhoamiCommand } from './commands/whoami.js'
+import { makeClaimCommand } from './commands/claim.js'
 
 // Handle --mcp flag before Commander parses
 if (process.argv.includes('--mcp')) {
@@ -59,9 +63,13 @@ if (process.argv.includes('--mcp')) {
   program.addCommand(makeInfoCommand(getGlobalOpts))
   program.addCommand(makeTokensCommand(getGlobalOpts))
   program.addCommand(makeDoctorCommand(getGlobalOpts))
+  program.addCommand(makeLoginCommand(getGlobalOpts))
+  program.addCommand(makeLogoutCommand(getGlobalOpts))
+  program.addCommand(makeWhoamiCommand(getGlobalOpts))
+  program.addCommand(makeClaimCommand(getGlobalOpts))
 
   if (process.argv.length <= 2) {
-    process.stderr.write(banner() + '\n')
+    process.stderr.write(banner(getGlobalOpts()) + '\n')
     program.help()
   } else {
     program.parse(process.argv)

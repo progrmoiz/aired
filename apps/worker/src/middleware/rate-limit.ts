@@ -1,48 +1,14 @@
-import type { Context } from "hono";
+import type { Context, Next } from "hono";
 import type { AppBindings } from "../types.js";
-import { RATE_LIMIT, RATE_LIMIT_WINDOW } from "@aired/core";
+import { hashToHex } from "@aired/core";
+import type { RateLimitTier } from "../lib/rate-limit-tiers.js";
 
 /**
  * In-memory rate limit store.
  * Resets on worker cold start — that's fine for a low-traffic service.
- * Uses zero KV writes (the old approach burned through the free-tier daily limit).
+ * Keys are `${tier.bucketPrefix}:${bucketSubKey}`.
  */
 const store = new Map<string, { count: number; resetAt: number }>();
-
-/**
- * Hash an IP address using SHA-256 so we don't store raw IPs.
- */
-async function hashIp(ip: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(ip);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = new Uint8Array(hashBuffer);
-  return Array.from(hashArray)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("")
-    .slice(0, 16);
-}
-
-/**
- * Check rate limit for the given IP.
- */
-function checkRateLimit(ipHash: string): { allowed: boolean; remaining: number } {
-  const now = Date.now();
-  const entry = store.get(ipHash);
-
-  // Expired or no entry — start fresh
-  if (!entry || now >= entry.resetAt) {
-    store.set(ipHash, { count: 1, resetAt: now + RATE_LIMIT_WINDOW * 1000 });
-    return { allowed: true, remaining: RATE_LIMIT - 1 };
-  }
-
-  if (entry.count >= RATE_LIMIT) {
-    return { allowed: false, remaining: 0 };
-  }
-
-  entry.count++;
-  return { allowed: true, remaining: RATE_LIMIT - entry.count };
-}
 
 /**
  * Periodically prune expired entries to prevent memory growth.
@@ -59,19 +25,95 @@ function maybePrune() {
 }
 
 /**
- * Hono middleware: apply rate limiting based on CF-Connecting-IP.
+ * Check and update the rate limit for a bucket key.
+ */
+function checkRateLimit(
+  key: string,
+  limit: number,
+  windowSeconds: number,
+): { allowed: boolean; remaining: number } {
+  const now = Date.now();
+  const entry = store.get(key);
+
+  if (!entry || now >= entry.resetAt) {
+    store.set(key, { count: 1, resetAt: now + windowSeconds * 1000 });
+    return { allowed: true, remaining: limit - 1 };
+  }
+
+  if (entry.count >= limit) {
+    return { allowed: false, remaining: 0 };
+  }
+
+  entry.count++;
+  return { allowed: true, remaining: limit - entry.count };
+}
+
+/**
+ * Factory: create a Hono middleware that applies the given rate-limit tier.
+ *
+ * Bucket key strategy:
+ *   - rl:ip  → hashed IP (anonymous)
+ *   - rl:user, rl:claim, rl:delete → user.id (requires authMiddleware to run first)
+ *
+ * Fallback: when a user tier is requested but user is null (unauthenticated),
+ * fall back to anonymous IP-based limiting using the tier's own limit/window.
+ * This keeps the fallback simple — the anonymous bucket may already be tighter.
+ */
+export function rateLimit(
+  tier: RateLimitTier,
+): (c: Context<AppBindings>, next: Next) => Promise<Response | void> {
+  return async (c: Context<AppBindings>, next: Next): Promise<Response | void> => {
+    const ip =
+      c.req.header("CF-Connecting-IP") ??
+      c.req.header("X-Forwarded-For") ??
+      "unknown";
+
+    let bucketSubKey: string;
+
+    if (tier.bucketPrefix === "rl:ip") {
+      bucketSubKey = await hashToHex(ip, 16);
+    } else {
+      // User-keyed tiers (rl:user, rl:claim, rl:delete)
+      const user = c.get("user");
+      if (user !== null && user !== undefined) {
+        bucketSubKey = String(user.id);
+      } else {
+        // Fall back to anonymous IP bucket with same tier limits
+        bucketSubKey = await hashToHex(ip, 16);
+      }
+    }
+
+    const key = `${tier.bucketPrefix}:${bucketSubKey}`;
+    const { allowed } = checkRateLimit(key, tier.limit, tier.windowSeconds);
+
+    maybePrune();
+
+    if (!allowed) {
+      return c.json(
+        { error: "Rate limit exceeded. Please try again later." },
+        429,
+      );
+    }
+
+    await next();
+  };
+}
+
+/**
+ * @deprecated Use rateLimit(tier) factory instead.
+ * Kept for backward-compatibility during migration.
  */
 export async function rateLimitMiddleware(
   c: Context<AppBindings>,
-  next: () => Promise<void>,
+  next: Next,
 ): Promise<Response | void> {
   const ip =
     c.req.header("CF-Connecting-IP") ??
     c.req.header("X-Forwarded-For") ??
     "unknown";
 
-  const ipHash = await hashIp(ip);
-  const { allowed } = checkRateLimit(ipHash);
+  const ipHash = await hashToHex(ip, 16);
+  const { allowed } = checkRateLimit(`rl:ip:${ipHash}`, 5, 3600);
 
   maybePrune();
 

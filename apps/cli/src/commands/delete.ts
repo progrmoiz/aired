@@ -6,6 +6,7 @@ import { shouldOutputJson, outputError, ExitCode } from '../lib/output.js'
 import { withSpinner } from '../lib/spinner.js'
 import { deletePage } from '../core/client.js'
 import { getToken, removeToken } from '../core/store.js'
+import { getSession } from '../core/session.js'
 
 export function makeDeleteCommand(globalOpts: () => GlobalOpts): Command {
   return new Command('delete')
@@ -15,14 +16,20 @@ export function makeDeleteCommand(globalOpts: () => GlobalOpts): Command {
       const opts = globalOpts()
       const baseUrl = resolveApiUrl(opts)
 
+      // Precedence (R6): local update_token wins; fallback to session JWT
       const token = getToken(id)
-      if (token === null) {
+      const session = getSession()
+
+      if (token === null && session === null) {
         outputError({ code: 'VALIDATION', message: `No token found for page '${id}'. Run 'aired tokens' to list stored tokens.` }, opts)
         process.exit(ExitCode.VALIDATION_ERROR)
       }
 
+      const effectiveToken = token ?? ''
+      const jwt = session?.jwt
+
       try {
-        await withSpinner('Deleting...', () => deletePage(baseUrl, id, token), opts)
+        await withSpinner('Deleting...', () => deletePage(baseUrl, id, effectiveToken, jwt), opts)
         removeToken(id)
 
         if (shouldOutputJson(opts)) {

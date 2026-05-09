@@ -269,6 +269,25 @@
     });
   }
 
+  // ── Auth link: update if user is signed in ──
+  (function () {
+    var authLink = document.getElementById("auth-link");
+    if (!authLink) return;
+    fetch("/api/me", { credentials: "same-origin" })
+      .then(function (res) {
+        if (res.status === 200) {
+          return res.json().then(function (user) {
+            authLink.href = "/dashboard";
+            authLink.textContent = "@" + user.login + " · dashboard →";
+          });
+        }
+        // 401 — leave link as-is
+      })
+      .catch(function () {
+        // Network failure — leave link as-is
+      });
+  })();
+
   // ── Initial state: hide result card ──
   resultCard.style.display = "none";
   resultCard.style.opacity = "0";

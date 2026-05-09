@@ -44,6 +44,9 @@ importers:
         specifier: ^1.1.0
         version: 1.1.1
     devDependencies:
+      '@aired/core':
+        specifier: workspace:^
+        version: link:../../packages/core
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.15
@@ -99,6 +102,9 @@ importers:
       hono:
         specifier: ^4.7.0
         version: 4.12.9
+      jose:
+        specifier: ^6.0.10
+        version: 6.2.2
       zod:
         specifier: ^3.22.0
         version: 3.25.76

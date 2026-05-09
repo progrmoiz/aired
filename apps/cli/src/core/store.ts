@@ -1,23 +1,11 @@
-import Conf from 'conf'
 import type { TokenRecord } from './types.js'
+import { createStore } from './store-factory.js'
 import { pageExists } from './client.js'
 
 type TokenStore = Record<string, TokenRecord>
 
-let _conf: Conf<TokenStore> | null = null
-
-function getConf(): Conf<TokenStore> {
-  if (_conf === null) {
-    _conf = new Conf<TokenStore>({
-      projectName: 'aired',
-      configName: 'tokens',
-      cwd: `${process.env['HOME'] ?? '~'}/.config/aired`,
-      fileExtension: 'json',
-      configFileMode: 0o600,
-      defaults: {},
-    })
-  }
-  return _conf
+function getConf() {
+  return createStore<TokenStore>('tokens')
 }
 
 export function saveToken(

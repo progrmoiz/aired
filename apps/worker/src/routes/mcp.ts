@@ -8,8 +8,10 @@ import {
   generateId,
   generateToken,
   hashToken,
+  verifyToken,
   validateHtml,
   extractTitle,
+  parseMetadata,
   serializeMetadata,
   DEFAULT_TTL,
 } from "@aired/core";
@@ -74,7 +76,22 @@ function createAiredMcpServer(env: {
           };
         }
 
-        // Simplified — no token verify for brevity; call internal publish API
+        const metadata = parseMetadata(raw);
+        if (metadata === null) {
+          return {
+            content: [{ type: "text" as const, text: "Page metadata is corrupted" }],
+            isError: true,
+          };
+        }
+
+        const valid = await verifyToken(update_token, metadata.tokenHash);
+        if (!valid) {
+          return {
+            content: [{ type: "text" as const, text: "Invalid update token" }],
+            isError: true,
+          };
+        }
+
         await env.PAGES_BUCKET.put(
           `pages/${existingId}/index.html`,
           html,
@@ -131,6 +148,7 @@ function createAiredMcpServer(env: {
         permanent: isPermanent,
         createdAt: now.toISOString(),
         expiresAt,
+        ownerId: null,
       };
 
       await env.PAGES_BUCKET.put(`pages/${pageId}/index.html`, html, {

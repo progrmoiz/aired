@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { getCookie } from "hono/cookie";
 import type { AppBindings } from "../types.js";
 import { parseMetadata, serializeMetadata } from "@aired/core";
 import { applyPageHeaders } from "../middleware/security.js";
@@ -36,7 +37,7 @@ viewer.get("/p/:id", async (c) => {
 
   // Check PIN protection
   if (metadata.pin !== null) {
-    const pinCookie = getCookie(c.req.header("Cookie"), `pin_${id}`);
+    const pinCookie = getCookie(c, `pin_${id}`) ?? null;
     if (pinCookie !== metadata.pin) {
       return new Response(renderPinPage(id), {
         status: 200,
@@ -359,17 +360,6 @@ function escapeAttr(str: string): string {
     .replace(/>/g, "&gt;");
 }
 
-function getCookie(cookieHeader: string | undefined, name: string): string | null {
-  if (!cookieHeader) return null;
-  const cookies = cookieHeader.split(";");
-  for (const cookie of cookies) {
-    const [key, ...valueParts] = cookie.trim().split("=");
-    if (key?.trim() === name) {
-      return valueParts.join("=").trim() || null;
-    }
-  }
-  return null;
-}
 
 function renderPinPage(id: string): string {
   return `<!DOCTYPE html>

@@ -10,3 +10,9 @@ docs/ideas.md
 docs/research/
 docs/tmp/
 .forge/
+
+# Wrangler dev secrets — never commit; use .dev.vars.example as template
+.dev.vars
+
+# Claude Code session artifacts
+.claude/

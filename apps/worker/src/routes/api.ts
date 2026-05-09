@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import type { AppBindings } from "../types.js";
 import { loadStats, saveStats } from "../lib/stats.js";
-import { rateLimitMiddleware } from "../middleware/rate-limit.js";
+import { rateLimit } from "../middleware/rate-limit.js";
+import { requireCsrfHeader } from "../middleware/csrf.js";
+import { TIERS } from "../lib/rate-limit-tiers.js";
 import {
   generateId,
   generateToken,
@@ -14,11 +16,12 @@ import {
   DEFAULT_TTL,
 } from "@aired/core";
 import type { PageMetadata } from "@aired/core";
+import { addPageToOwner, removePageFromOwner } from "../lib/owner-index.js";
 
 const api = new Hono<AppBindings>();
 
 // POST /api/publish — create a new page or update an existing one via update_token
-api.post("/publish", rateLimitMiddleware, async (c) => {
+api.post("/publish", rateLimit(TIERS.anonymous), async (c) => {
   let body: unknown;
   try {
     body = await c.req.json();
@@ -112,6 +115,8 @@ api.post("/publish", rateLimitMiddleware, async (c) => {
     ? new Date(now.getTime() + ttlSeconds * 1000).toISOString()
     : null;
 
+  const user = c.get('user');
+
   const metadata: PageMetadata = {
     id,
     title: resolvedTitle,
@@ -123,6 +128,7 @@ api.post("/publish", rateLimitMiddleware, async (c) => {
     permanent: isPermanent,
     createdAt: now.toISOString(),
     expiresAt,
+    ownerId: user !== null ? user.id : null,
   };
 
   try {
@@ -154,6 +160,21 @@ api.post("/publish", rateLimitMiddleware, async (c) => {
     throw err;
   }
 
+  // Write owner index entry (best-effort; failure does not abort publish)
+  if (metadata.ownerId !== null) {
+    try {
+      await addPageToOwner(
+        c.env.PAGES_KV,
+        metadata.ownerId,
+        id,
+        metadata.createdAt,
+        metadata.expiresAt,
+      );
+    } catch (err) {
+      console.error('owner-index write failed', { id, ownerId: metadata.ownerId, err });
+    }
+  }
+
   // Increment publish counter (fire-and-forget)
   c.executionCtx.waitUntil(
     (async () => {
@@ -171,8 +192,8 @@ api.post("/publish", rateLimitMiddleware, async (c) => {
   });
 });
 
-// PUT /api/pages/:id — update by token
-api.put("/pages/:id", async (c) => {
+// PUT /api/pages/:id — update by token (from body) or owner JWT
+api.put("/pages/:id", requireCsrfHeader, async (c) => {
   const id = c.req.param("id");
 
   let body: unknown;
@@ -190,9 +211,6 @@ api.put("/pages/:id", async (c) => {
 
   if (typeof html !== "string") {
     return c.json({ error: "html is required and must be a string" }, 400);
-  }
-  if (typeof update_token !== "string") {
-    return c.json({ error: "update_token is required" }, 400);
   }
 
   const validation = validateHtml(html);
@@ -214,9 +232,28 @@ api.put("/pages/:id", async (c) => {
     return c.json({ error: "Page metadata is corrupted" }, 500);
   }
 
-  const valid = await verifyToken(update_token, metadata.tokenHash);
-  if (!valid) {
-    return c.json({ error: "Invalid update token" }, 403);
+  // Authorization: update_token from body wins (R6); else owner JWT
+  const putUser = c.get('user');
+  const hasToken = typeof update_token === "string";
+  let authorized = false;
+  let tokenValid = false;
+
+  if (hasToken) {
+    tokenValid = await verifyToken(update_token as string, metadata.tokenHash);
+    if (tokenValid) {
+      authorized = true;
+    }
+  }
+
+  if (!authorized && putUser !== null && metadata.ownerId === putUser.id) {
+    authorized = true;
+  }
+
+  if (!authorized) {
+    if (hasToken) {
+      return c.json({ error: "Invalid update token" }, 403);
+    }
+    return c.json({ error: "update_token required" }, 400);
   }
 
   await c.env.PAGES_BUCKET.put(`pages/${id}/index.html`, html, {
@@ -243,25 +280,21 @@ api.put("/pages/:id", async (c) => {
   await c.env.PAGES_KV.put(`page:${id}`, serializeMetadata(updated), kvOptions);
 
   const origin = new URL(c.req.url).origin;
+  // Return the token string back (prefer the body token; if owner-JWT path used, no token in response)
+  const returnToken = hasToken && tokenValid ? (update_token as string) : undefined;
 
   return c.json({
     id,
     url: `${origin}/p/${id}`,
-    update_token,
+    ...(returnToken !== undefined ? { update_token: returnToken } : {}),
     expiresAt,
   });
 });
 
-// DELETE /api/pages/:id — delete by token in Authorization header
-api.delete("/pages/:id", async (c) => {
-  const id = c.req.param("id");
+// DELETE /api/pages/:id — delete by Bearer token OR owner-JWT convenience path
+api.delete("/pages/:id", requireCsrfHeader, async (c) => {
+  const id = c.req.param("id") ?? "";
   const authHeader = c.req.header("Authorization");
-
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return c.json({ error: "Authorization: Bearer <token> is required" }, 401);
-  }
-
-  const token = authHeader.slice("Bearer ".length).trim();
 
   const raw = await c.env.PAGES_KV.get(`page:${id}`);
   if (raw === null) {
@@ -273,15 +306,55 @@ api.delete("/pages/:id", async (c) => {
     return c.json({ error: "Page metadata is corrupted" }, 500);
   }
 
-  const valid = await verifyToken(token, metadata.tokenHash);
-  if (!valid) {
-    return c.json({ error: "Invalid token" }, 403);
+  const deleteUser = c.get('user');
+  let authorized = false;
+
+  // Primary path: Authorization: Bearer <update_token>
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.slice("Bearer ".length).trim();
+    const valid = await verifyToken(token, metadata.tokenHash);
+    if (valid) {
+      authorized = true;
+    }
+  }
+
+  // Owner-convenience path: JWT owner match (rate-limited)
+  if (!authorized && deleteUser !== null && metadata.ownerId === deleteUser.id) {
+    // Apply delete rate limit for owner-convenience path
+    const deleteRateLimit = rateLimit(TIERS.delete);
+    const rlResult = await deleteRateLimit(c, async () => {});
+    if (rlResult !== undefined) {
+      // Rate limit exceeded — middleware returned a Response
+      return rlResult;
+    }
+    authorized = true;
+  }
+
+  if (!authorized) {
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      return c.json({ error: "Invalid token" }, 403);
+    }
+    return c.json({ error: "Authorization: Bearer <token> is required" }, 401);
   }
 
   await Promise.all([
     c.env.PAGES_BUCKET.delete(`pages/${id}/index.html`),
     c.env.PAGES_KV.delete(`page:${id}`),
   ]);
+
+  // Remove from owner index (best-effort)
+  if (metadata.ownerId !== null) {
+    try {
+      await removePageFromOwner(
+        c.env.PAGES_KV,
+        metadata.ownerId,
+        id,
+        metadata.createdAt,
+      );
+    } catch (err) {
+      console.error('owner-index delete failed', { id, ownerId: metadata.ownerId, err });
+    }
+  }
 
   return c.json({ ok: true });
 });

@@ -1,3 +1,5 @@
+import { hashToHex } from "./crypto.js";
+
 const TOKEN_PREFIX = "at_";
 
 /**
@@ -15,15 +17,10 @@ export function generateToken(): string {
 /**
  * Hash a token using SHA-256. Returns a hex string.
  * Only the hash is stored server-side.
+ * Thin wrapper around hashToHex (no truncation).
  */
 export async function hashToken(token: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(token);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = new Uint8Array(hashBuffer);
-  return Array.from(hashArray)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  return hashToHex(token);
 }
 
 /**
