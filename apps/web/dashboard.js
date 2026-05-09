@@ -176,12 +176,27 @@
 
   function renderPageCount() {
     var countEl = document.getElementById('page-count');
-    if (!countEl) return;
-    if (currentPageCount === null) {
-      countEl.innerHTML = '&nbsp;';
-      return;
+    if (countEl) {
+      if (currentPageCount === null) {
+        countEl.innerHTML = '&nbsp;';
+      } else {
+        countEl.textContent = currentPageCount + ' page' + (currentPageCount === 1 ? '' : 's');
+      }
     }
-    countEl.textContent = currentPageCount + ' page' + (currentPageCount === 1 ? '' : 's');
+
+    var heroPublish = document.getElementById('hero-publish');
+    if (heroPublish && currentPageCount !== null) {
+      heroPublish.textContent = currentPageCount === 0 ? 'Publish your first →' : 'Publish another →';
+    }
+
+    var emptyState = document.getElementById('empty-state');
+    if (emptyState && currentPageCount !== null) {
+      if (currentPageCount === 0) {
+        emptyState.classList.remove('hidden');
+      } else {
+        emptyState.classList.add('hidden');
+      }
+    }
   }
 
   // ── Load more ──
@@ -229,6 +244,9 @@
     if (!ul) return;
     ul.innerHTML = '';
 
+    var emptyState = document.getElementById('empty-state');
+    if (emptyState) emptyState.classList.add('hidden');
+
     var wrap = document.createElement('div');
     wrap.id = 'load-error';
     wrap.className = 'flex items-center justify-between py-3';
@@ -267,14 +285,12 @@
       pagesRes = await fetch('/api/me/pages', { credentials: 'same-origin' });
     } catch (_err) {
       if (ul) ul.innerHTML = '';
-      setPageCount(0);
       showLoadError(ul);
       return;
     }
 
     if (!pagesRes.ok) {
       if (ul) ul.innerHTML = '';
-      setPageCount(0);
       showLoadError(ul);
       return;
     }
@@ -284,7 +300,6 @@
       pagesData = await pagesRes.json();
     } catch (_err) {
       if (ul) ul.innerHTML = '';
-      setPageCount(0);
       showLoadError(ul);
       return;
     }
@@ -313,7 +328,6 @@
     } catch (_err) {
       var ul0 = document.getElementById('page-list');
       if (ul0) ul0.innerHTML = '';
-      setPageCount(0);
       showLoadError(ul0);
       return;
     }

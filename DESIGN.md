@@ -234,8 +234,16 @@ Appears after successful publish.
 
 ### 8.7 Empty / error inline messaging
 
-There is no "EmptyState" component — aired's UI never has empty data views. For form-level errors:
+No decorative empty-state cards — no illustrations, no big "Get started" panels, no celebratory copy. A single inline factual line is allowed (and required) when the user lands somewhere with no data and no obvious path forward. Treat it like a CLI: an empty list prints nothing if the next step is implied, or one line if it isn't.
 
+**Empty state (when shown at all):**
+- One sentence, factual, sentence case.
+- Names the next action and the tool to do it (CLI command, page link).
+- Same color/size as helper text: `text-sm text-aired-text-secondary`.
+- Mono for any command literal: `aired publish file.html`.
+- Example: `Nothing aired yet. Publish from the homepage or run aired publish file.html.`
+
+**Form-level errors:**
 - Single line below the input: `text-xs text-red-400`
 - Factual + next step: `"Could not publish. Try again."` not `"Oops! Something went wrong!"`
 
@@ -312,7 +320,7 @@ Don't, unless the new feature can't live in a modal-less inline state. If it nee
 | Shadows | Only the form-container focus glow | Drop shadows on cards, buttons |
 | Focus | Two-stop ring (bg gap + purple) | Default browser outline, single flat ring |
 | Transitions | 120-200ms `ease-out-expo` | 300ms+, `ease-in-out` |
-| Empty data | Don't show the empty state — show nothing | "No items yet" decorative cards |
+| Empty data | One inline factual line naming the next action; nothing if next action is obvious | "No items yet" decorative cards, illustrations, big "Get started" panels |
 | Confirmations | Past-tense fact (`"Copied"`) | `"Got it!"`, `"Awesome!"` |
 | New feature | Prefer CLI flag over new web UI | Add a route, modal, or settings page |
 
@@ -324,4 +332,5 @@ Append-only record of design decisions. One line per entry. Append on every nota
 
 ```
 2026-05-09 — DESIGN.md bootstrapped from existing tokens in apps/web/tailwind.config.js. Dark-only, purple-accent (#7c6aef), 14px body, ease-out-expo motion.
+2026-05-10 — Empty-state rule softened: one inline factual line allowed (required) when user has no breadcrumb to the next action; decorative cards still forbidden. Dashboard 0-pages state is the canonical example.
 ```

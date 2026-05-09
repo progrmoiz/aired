@@ -95,7 +95,7 @@
         <h1 id="user-handle" class="text-xl font-medium tracking-tight text-aired-text-primary truncate">@</h1>
         <p id="page-count" class="text-sm text-aired-text-secondary mt-1" aria-live="polite">&nbsp;</p>
       </div>
-      <a href="/" class="text-sm text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150 focus-ring rounded-sm whitespace-nowrap">Publish another →</a>
+      <a id="hero-publish" href="/" class="text-sm text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150 focus-ring rounded-sm whitespace-nowrap">Publish another →</a>
     </section>
 
     <!-- page list -->
@@ -129,6 +129,11 @@
         <div class="h-3 w-10 rounded-sm bg-aired-surface-hover"></div>
       </li>
     </ul>
+
+    <!-- empty state — single inline line, no card, no illustration -->
+    <p id="empty-state" class="hidden text-sm text-aired-text-secondary py-3">
+      Nothing aired yet. Publish from <a href="/" class="text-aired-text-primary hover:text-white underline decoration-aired-border hover:decoration-aired-text-secondary transition-colors duration-150">the homepage</a> or run <code class="font-mono text-aired-text-primary">aired publish file.html</code>.
+    </p>
 
     <!-- live region for action results (Copied, Deleted) -->
     <div id="action-status" class="sr-only" role="status" aria-live="polite"></div>
