@@ -269,23 +269,33 @@
     });
   }
 
-  // ── Auth link: update if user is signed in ──
+  // ── Auth surfaces: top-nav slot (always visible) + bottom CTA (signed-out only) ──
   (function () {
-    var authLink = document.getElementById("auth-link");
-    if (!authLink) return;
+    var authSection = document.getElementById("auth-section");
+    var navAuth = document.getElementById("nav-auth");
+
+    function reveal() {
+      if (navAuth) navAuth.classList.remove("hidden");
+    }
+
+    if (!authSection && !navAuth) return;
+
     fetch("/api/me", { credentials: "same-origin" })
       .then(function (res) {
         if (res.status === 200) {
           return res.json().then(function (user) {
-            authLink.href = "/dashboard";
-            authLink.textContent = "@" + user.login + " · dashboard →";
+            if (navAuth) {
+              navAuth.href = "/dashboard";
+              navAuth.textContent = "@" + user.login;
+            }
+            // Signed in: collapse the bottom pitch entirely — top nav covers it.
+            if (authSection) authSection.classList.add("hidden");
+            reveal();
           });
         }
-        // 401 — leave link as-is
+        reveal(); // signed out — keep section visible, "sign in" in nav
       })
-      .catch(function () {
-        // Network failure — leave link as-is
-      });
+      .catch(reveal); // network failure — keep fallback
   })();
 
   // ── Initial state: hide result card ──
