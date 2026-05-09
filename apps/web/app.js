@@ -438,6 +438,31 @@
     return div.innerHTML;
   }
 
+  // ── Setup copy button (hero agent flow) ──
+  (function () {
+    var btn = document.getElementById("setup-copy-btn");
+    if (!btn) return;
+    var label = btn.querySelector(".setup-btn-label");
+    var prompt = [
+      "I'd like you to set up aired: HTML hosting for agents. Paste HTML, get a live URL, no signup.",
+      "",
+      "Install as a skill if I have npm: npx skills add progrmoiz/aired -g",
+      "",
+      "If not, do this instead: read https://aired.sh/llms.txt and use the HTTP API at https://aired.sh/api/publish."
+    ].join("\n");
+    btn.addEventListener("click", function () {
+      navigator.clipboard.writeText(prompt).then(function () {
+        var orig = label.textContent;
+        label.textContent = "Copied — paste into your agent";
+        btn.classList.add("copied");
+        setTimeout(function () {
+          label.textContent = orig;
+          btn.classList.remove("copied");
+        }, 2000);
+      });
+    });
+  })();
+
   // ── Install section copy buttons ──
   document.querySelectorAll(".copy-snippet").forEach(function (btn) {
     btn.addEventListener("click", function () {
@@ -453,6 +478,31 @@
       });
     });
   });
+
+  // ── Install path tabs (Skill / CLI / MCP / API) ──
+  (function () {
+    var tabs = document.querySelectorAll(".install-tab");
+    if (!tabs.length) return;
+
+    tabs.forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        var target = tab.getAttribute("data-install-tab");
+
+        tabs.forEach(function (t) {
+          t.setAttribute("aria-selected", "false");
+          t.className = "install-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 text-aired-text-tertiary hover:text-aired-text-secondary";
+        });
+        tab.setAttribute("aria-selected", "true");
+        tab.className = "install-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 bg-aired-accent/10 text-aired-accent";
+
+        document.querySelectorAll(".install-panel").forEach(function (panel) {
+          panel.classList.add("hidden");
+        });
+        var panel = document.getElementById("install-panel-" + target);
+        if (panel) panel.classList.remove("hidden");
+      });
+    });
+  })();
 
   // ── MCP client tabs ──
   (function () {

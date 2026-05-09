@@ -1,0 +1,116 @@
+{
+  "schema_version": "v1",
+  "name": "aired",
+  "name_for_human": "aired",
+  "name_for_model": "aired",
+  "description_for_human": "Paste HTML, get a live URL. No signup, no deploy. Built for AI agents.",
+  "description_for_model": "Use aired to publish HTML artifacts to a shareable URL. Accepts a single HTML string up to 2 MB. Returns { url, update_token, expiresAt }. No authentication required for publishing. Anonymous publishes default to a 7-day TTL.",
+  "homepage_url": "https://aired.sh",
+  "documentation_url": "https://aired.sh/llms-full.txt",
+  "logo_url": "https://aired.sh/favicon.svg",
+  "contact_email": "hello@aired.sh",
+  "legal_info_url": "https://aired.sh",
+  "capabilities": [
+    "publish_html",
+    "update_html",
+    "delete_html",
+    "pin_protect",
+    "ttl_control"
+  ],
+  "auth": {
+    "type": "none",
+    "notes": "No credentials required to publish. Update token returned with each publish is the credential for that single artifact."
+  },
+  "endpoints": {
+    "publish": {
+      "method": "POST",
+      "url": "https://aired.sh/api/publish",
+      "body_schema": {
+        "html": "string, required, max 2 MB",
+        "title": "string, optional",
+        "ttl": "number (seconds), optional, default 604800",
+        "permanent": "boolean, optional, overrides ttl",
+        "pin": "string, optional",
+        "reads": "number, optional, auto-delete after N views",
+        "id": "string, optional, present means update",
+        "update_token": "string, optional, required when id is present"
+      },
+      "response_schema": {
+        "id": "string",
+        "url": "string",
+        "update_token": "string",
+        "expiresAt": "ISO 8601 string or null for permanent"
+      }
+    },
+    "update": {
+      "method": "PUT",
+      "url": "https://aired.sh/api/pages/:id",
+      "auth": "update_token in JSON body (NOT a header)",
+      "body_schema": {
+        "html": "string, required",
+        "title": "string, optional",
+        "update_token": "string, required"
+      }
+    },
+    "delete": {
+      "method": "DELETE",
+      "url": "https://aired.sh/api/pages/:id",
+      "auth": "Authorization: Bearer <update_token>"
+    },
+    "metadata": {
+      "method": "GET",
+      "url": "https://aired.sh/api/pages/:id",
+      "response_schema": {
+        "id": "string",
+        "title": "string|null",
+        "size": "number (bytes)",
+        "readCount": "number",
+        "expiresAt": "ISO 8601 string or null"
+      }
+    },
+    "stats": {
+      "method": "GET",
+      "url": "https://aired.sh/api/stats",
+      "response_schema": {
+        "publishes": "number",
+        "views": "number",
+        "recent": "array of recent publishes",
+        "geo": "object, country code -> view count"
+      }
+    },
+    "report": {
+      "method": "POST",
+      "url": "https://aired.sh/api/report",
+      "body_schema": {
+        "id": "string, required",
+        "reason": "string, required, max 500 chars"
+      }
+    },
+    "verify_pin": {
+      "method": "POST",
+      "url": "https://aired.sh/p/:id/verify-pin",
+      "body_schema": { "pin": "string, required" },
+      "side_effect": "sets HttpOnly cookie for 1 hour scoped to /p/:id"
+    }
+  },
+  "mcp": {
+    "transport": "http",
+    "url": "https://aired.sh/mcp",
+    "tools": ["publish_html"]
+  },
+  "skill": {
+    "install": "npx skills add progrmoiz/aired -g",
+    "registry": "https://skills.sh"
+  },
+  "discovery": {
+    "llms_txt": "https://aired.sh/llms.txt",
+    "llms_full_txt": "https://aired.sh/llms-full.txt",
+    "index_md": "https://aired.sh/index.md",
+    "ai_plugin": "https://aired.sh/.well-known/ai-plugin.json"
+  },
+  "limits": {
+    "max_bytes": 2097152,
+    "rate_limit_per_hour_per_ip": 5,
+    "default_ttl_seconds": 604800
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "aired",
+  "name_for_model": "aired",
+  "description_for_human": "Paste HTML, get a live URL. No signup, no deploy.",
+  "description_for_model": "Plugin for publishing HTML artifacts to a shareable URL. Use the publish endpoint when the user wants to share, host, deploy, or get a URL for an HTML document, dashboard, prototype, report, or visualization. Returns a live URL plus an update_token for later mutation.",
+  "auth": {
+    "type": "none"
+  },
+  "api": {
+    "type": "url",
+    "url": "https://aired.sh/llms-full.txt"
+  },
+  "logo_url": "https://aired.sh/favicon.svg",
+  "contact_email": "hello@aired.sh",
+  "legal_info_url": "https://aired.sh"
+}

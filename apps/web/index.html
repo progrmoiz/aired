@@ -163,6 +163,26 @@
       0% { transform: translateX(0); }
       100% { transform: translateX(-50%); }
     }
+
+    /* Setup-copy button */
+    .setup-btn {
+      transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1), transform 120ms ease;
+    }
+    .setup-btn:hover { background-color: #ffffff; }
+    .setup-btn:active { transform: translateY(1px); }
+    .setup-btn.copied { background-color: #34d399; color: #0a0a0b; }
+    .setup-btn .setup-btn-icon { opacity: 0.7; }
+
+    /* Agent icons */
+    .agent-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      transition: color 150ms ease;
+    }
+    .agent-icon:hover { color: #ededef; }
   </style>
 </head>
 <body class="min-h-screen flex flex-col text-aired-text-primary">
@@ -170,11 +190,14 @@
   <!-- ─── Header ─── -->
   <header class="w-full px-6 h-14 flex items-center justify-between max-w-2xl mx-auto">
     <a href="/" class="text-base font-semibold tracking-tight text-aired-text-primary hover:text-white transition-colors duration-150">aired</a>
-    <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener"
-       class="flex items-center gap-1.5 text-sm text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-      GitHub
-    </a>
+    <nav class="flex items-center gap-5 text-sm text-aired-text-secondary">
+      <a href="/docs.html" class="hover:text-aired-text-primary transition-colors duration-150">Docs</a>
+      <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener"
+         class="flex items-center gap-1.5 hover:text-aired-text-primary transition-colors duration-150">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+        GitHub
+      </a>
+    </nav>
   </header>
 
   <!-- ─── Main ─── -->
@@ -193,6 +216,61 @@
           <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener" class="text-aired-text-primary hover:text-white transition-colors duration-150 underline decoration-aired-border hover:decoration-aired-text-secondary">GitHub</a>.
           <span id="live-stat" class="hidden"> · <span id="stat-count" class="text-aired-text-primary tabular-nums"></span> pages aired<span id="stat-countries-inline"></span></span>
         </p>
+      </div>
+
+      <!-- Agent flow -->
+      <div class="mb-8 relative z-10">
+        <ol class="space-y-2.5">
+          <li class="flex items-start gap-3">
+            <span class="flex-shrink-0 inline-flex items-center justify-center w-5 h-5 mt-px rounded-sm bg-aired-surface border border-aired-border text-2xs font-medium text-aired-text-secondary tabular-nums">1</span>
+            <span class="text-sm text-aired-text-secondary leading-relaxed">Tell your agent to publish to <code class="font-mono text-aired-text-primary">aired.sh</code>.</span>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="flex-shrink-0 inline-flex items-center justify-center w-5 h-5 mt-px rounded-sm bg-aired-surface border border-aired-border text-2xs font-medium text-aired-text-secondary tabular-nums">2</span>
+            <span class="text-sm text-aired-text-secondary leading-relaxed">It is online at <code class="font-mono text-aired-text-primary">aired.sh/p/{slug}</code>, no account needed.</span>
+          </li>
+        </ol>
+
+        <div class="mt-6 flex flex-col sm:flex-row sm:items-end gap-5 sm:gap-8">
+          <!-- TRY IT NOW + Copy button -->
+          <div class="flex-1 min-w-0">
+            <div class="text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider mb-2">Try it now</div>
+            <button type="button" id="setup-copy-btn"
+                    class="setup-btn w-full sm:w-auto group flex items-center justify-center gap-2 h-10 px-4 rounded bg-aired-text-primary text-aired-bg text-sm font-medium focus-ring transition-all duration-150"
+                    title="Copy setup instructions for any AI agent">
+              <span class="setup-btn-label">Copy setup instructions for my agent</span>
+              <svg class="setup-btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            </button>
+          </div>
+
+          <!-- WORKS WITH EVERY AGENT + icons -->
+          <div class="flex-shrink-0">
+            <div class="text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider mb-2">Works with every agent</div>
+            <div class="flex items-center gap-3 h-10 text-aired-text-secondary">
+              <span title="Claude Code" class="agent-icon" aria-label="Claude">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true"><title>Claude</title><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg>
+              </span>
+              <span title="Cursor" class="agent-icon" aria-label="Cursor">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true"><title>Cursor</title><path d="M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23"/></svg>
+              </span>
+              <span title="Codex / ChatGPT (OpenAI)" class="agent-icon" aria-label="OpenAI">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true"><title>OpenAI</title><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.0719.0719 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.4069-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg>
+              </span>
+              <span title="Windsurf" class="agent-icon" aria-label="Windsurf">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true"><title>Windsurf</title><path d="M23.55 5.067c-1.2038-.002-2.1806.973-2.1806 2.1765v4.8676c0 .972-.8035 1.7594-1.7597 1.7594-.568 0-1.1352-.286-1.4718-.7659l-4.9713-7.1003c-.4125-.5896-1.0837-.941-1.8103-.941-1.1334 0-2.1533.9635-2.1533 2.153v4.8957c0 .972-.7969 1.7594-1.7596 1.7594-.57 0-1.1363-.286-1.4728-.7658L.4076 5.1598C.2822 4.9798 0 5.0688 0 5.2882v4.2452c0 .2147.0656.4228.1884.599l5.4748 7.8183c.3234.462.8006.8052 1.3509.9298 1.3771.313 2.6446-.747 2.6446-2.0977v-4.893c0-.972.7875-1.7593 1.7596-1.7593h.003a1.798 1.798 0 0 1 1.4718.7658l4.9723 7.0994c.4135.5905 1.05.941 1.8093.941 1.1587 0 2.1515-.9645 2.1515-2.153v-4.8948c0-.972.7875-1.7594 1.7596-1.7594h.194a.22.22 0 0 0 .2204-.2202v-4.622a.22.22 0 0 0-.2203-.2203Z"/></svg>
+              </span>
+              <span title="Any agent that can curl" class="agent-icon" aria-label="Any agent">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Manual paste divider -->
+      <div class="relative my-8 z-10" aria-hidden="true">
+        <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-aired-border"></div></div>
+        <div class="relative flex justify-center"><span class="px-3 bg-aired-bg text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider">Or paste HTML</span></div>
       </div>
 
       <!-- Form -->
@@ -348,200 +426,79 @@
 
     <!-- ─── Install Section ─── -->
     <section id="install" class="mt-20 sm:mt-28 mb-20">
-      <div class="mb-8">
-        <h2 class="text-lg font-semibold tracking-tight text-aired-text-primary">Built for agents.</h2>
-        <p class="mt-1 text-sm text-aired-text-secondary">Install as a skill, MCP server, CLI, or raw API. Works with any AI tool.</p>
+      <div class="mb-6 flex items-end justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-semibold tracking-tight text-aired-text-primary">Wire it up yourself.</h2>
+          <p class="mt-1 text-sm text-aired-text-secondary">Skill, CLI, MCP, or raw HTTP — pick a path.</p>
+        </div>
+        <a href="/docs.html" class="text-sm text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150 whitespace-nowrap">Full docs →</a>
       </div>
 
-      <div class="space-y-4">
-
-        <!-- Skills -->
-        <div class="border border-aired-border rounded-lg bg-aired-surface overflow-hidden">
-          <div class="flex items-center justify-between px-4 py-3 border-b border-aired-border">
-            <div class="flex items-center gap-2.5">
-              <span class="flex items-center justify-center w-6 h-6 rounded bg-aired-accent/10 text-aired-accent">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-              </span>
-              <h3 class="text-sm font-medium text-aired-text-primary">Skills</h3>
-            </div>
-            <a href="https://skills.sh" target="_blank" rel="noopener" class="text-2xs text-aired-text-tertiary hover:text-aired-text-secondary transition-colors duration-150">skills.sh</a>
-          </div>
-          <div class="p-4 space-y-3">
-            <div class="flex items-center justify-between bg-aired-bg rounded-sm px-3 py-2.5">
-              <code class="font-mono text-sm text-aired-accent select-all">npx skills add progrmoiz/aired</code>
-              <button type="button" class="copy-snippet copy-btn flex-shrink-0 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy="npx skills add progrmoiz/aired">Copy</button>
-            </div>
-            <p class="text-2xs text-aired-text-tertiary">
-              Adds a <code class="text-aired-text-secondary">SKILL.md</code> to your project. Any AI agent (Claude Code, Cursor, Windsurf) discovers and uses <code class="text-aired-text-secondary">aired</code> automatically.
-            </p>
-          </div>
+      <div class="border border-aired-border rounded-lg bg-aired-surface overflow-hidden">
+        <!-- Top tabs -->
+        <div class="flex flex-wrap gap-1 px-3 py-2 border-b border-aired-border" id="install-tabs" role="tablist">
+          <button type="button" role="tab" aria-selected="true" data-install-tab="skill" class="install-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 bg-aired-accent/10 text-aired-accent">Skill</button>
+          <button type="button" role="tab" aria-selected="false" data-install-tab="cli" class="install-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 text-aired-text-tertiary hover:text-aired-text-secondary">CLI</button>
+          <button type="button" role="tab" aria-selected="false" data-install-tab="mcp" class="install-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 text-aired-text-tertiary hover:text-aired-text-secondary">MCP</button>
+          <button type="button" role="tab" aria-selected="false" data-install-tab="api" class="install-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 text-aired-text-tertiary hover:text-aired-text-secondary">API</button>
         </div>
 
-        <!-- CLI -->
-        <div class="border border-aired-border rounded-lg bg-aired-surface overflow-hidden">
-          <div class="flex items-center justify-between px-4 py-3 border-b border-aired-border">
-            <div class="flex items-center gap-2.5">
-              <span class="flex items-center justify-center w-6 h-6 rounded bg-aired-accent/10 text-aired-accent">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-              </span>
-              <h3 class="text-sm font-medium text-aired-text-primary">Command Line</h3>
-            </div>
-            <span class="text-2xs text-aired-text-tertiary">Agent-ready</span>
+        <!-- Skill panel -->
+        <div id="install-panel-skill" class="install-panel p-4 space-y-3" role="tabpanel">
+          <div class="flex items-center justify-between bg-aired-bg rounded-sm px-3 py-2.5">
+            <code class="font-mono text-sm text-aired-accent select-all">npx skills add progrmoiz/aired -g</code>
+            <button type="button" class="copy-snippet copy-btn flex-shrink-0 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy="npx skills add progrmoiz/aired -g">Copy</button>
           </div>
-          <div class="p-4 space-y-3">
-            <div class="flex items-center justify-between bg-aired-bg rounded-sm px-3 py-2.5">
-              <code class="font-mono text-sm text-aired-accent select-all">npx aired dashboard.html</code>
-              <button type="button" class="copy-snippet copy-btn flex-shrink-0 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy="npx aired dashboard.html">Copy</button>
-            </div>
-            <div class="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-aired-text-tertiary">
-              <span><code class="text-aired-text-secondary">aired ./dir/</code> Bundle directory</span>
-              <span><code class="text-aired-text-secondary">--json</code> Structured output</span>
-              <span><code class="text-aired-text-secondary">--pin secret</code> PIN-protect</span>
-              <span><code class="text-aired-text-secondary">--ttl 24h</code> Custom expiry</span>
-            </div>
-            <p class="text-2xs text-aired-text-tertiary">
-              Files or directories. Inlines CSS, JS, images automatically. JSON when piped.
-            </p>
-          </div>
+          <p class="text-2xs text-aired-text-tertiary">
+            Adds a <code class="text-aired-text-secondary">SKILL.md</code> via <a href="https://skills.sh" target="_blank" rel="noopener" class="hover:text-aired-text-secondary underline decoration-aired-border">skills.sh</a>. Any AI agent (Claude Code, Cursor, Windsurf, Codex) discovers and uses <code class="text-aired-text-secondary">aired</code> automatically.
+          </p>
         </div>
 
-        <!-- MCP Server -->
-        <div class="border border-aired-border rounded-lg bg-aired-surface overflow-hidden">
-          <div class="flex items-center justify-between px-4 py-3 border-b border-aired-border">
-            <div class="flex items-center gap-2.5">
-              <span class="flex items-center justify-center w-6 h-6 rounded bg-aired-accent/10 text-aired-accent">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-              </span>
-              <h3 class="text-sm font-medium text-aired-text-primary">MCP Server</h3>
-            </div>
-            <span class="text-2xs text-aired-text-tertiary">Streamable HTTP</span>
+        <!-- CLI panel -->
+        <div id="install-panel-cli" class="install-panel hidden p-4 space-y-3" role="tabpanel">
+          <div class="flex items-center justify-between bg-aired-bg rounded-sm px-3 py-2.5">
+            <code class="font-mono text-sm text-aired-accent select-all">npx aired dashboard.html</code>
+            <button type="button" class="copy-snippet copy-btn flex-shrink-0 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy="npx aired dashboard.html">Copy</button>
           </div>
-          <div class="p-4 space-y-3">
-            <!-- Client tabs -->
-            <div class="flex flex-wrap gap-1 mb-2" id="mcp-tabs" role="tablist">
-              <button type="button" role="tab" aria-selected="true" data-tab="claude-code" class="mcp-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 bg-aired-accent/10 text-aired-accent">Claude Code</button>
-              <button type="button" role="tab" aria-selected="false" data-tab="cursor" class="mcp-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 text-aired-text-tertiary hover:text-aired-text-secondary">Cursor</button>
-              <button type="button" role="tab" aria-selected="false" data-tab="vscode" class="mcp-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 text-aired-text-tertiary hover:text-aired-text-secondary">VS Code</button>
-              <button type="button" role="tab" aria-selected="false" data-tab="windsurf" class="mcp-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 text-aired-text-tertiary hover:text-aired-text-secondary">Windsurf</button>
-              <button type="button" role="tab" aria-selected="false" data-tab="codex" class="mcp-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 text-aired-text-tertiary hover:text-aired-text-secondary">Codex</button>
-              <button type="button" role="tab" aria-selected="false" data-tab="others" class="mcp-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 text-aired-text-tertiary hover:text-aired-text-secondary">Others</button>
-            </div>
-            <!-- Tab panels -->
-            <div id="mcp-panel-claude-code" class="mcp-panel" role="tabpanel">
-              <div class="flex items-center justify-between bg-aired-bg rounded-sm px-3 py-2.5">
-                <code class="font-mono text-sm text-aired-accent select-all truncate">claude mcp add aired --transport http https://aired.sh/mcp</code>
-                <button type="button" class="copy-snippet copy-btn flex-shrink-0 ml-2 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy="claude mcp add aired --transport http https://aired.sh/mcp">Copy</button>
-              </div>
-            </div>
-            <div id="mcp-panel-cursor" class="mcp-panel hidden" role="tabpanel">
-              <div class="bg-aired-bg rounded-sm overflow-hidden">
-                <div class="flex items-center justify-between px-3 py-1.5 border-b border-aired-border">
-                  <span class="text-2xs text-aired-text-tertiary">.cursor/mcp.json</span>
-                  <button type="button" class="copy-snippet copy-btn px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy='{"mcpServers":{"aired":{"url":"https://aired.sh/mcp"}}}'>Copy</button>
-                </div>
-                <div class="px-3 py-2.5">
-                  <code class="font-mono text-2xs text-aired-text-secondary block whitespace-pre select-all">{
-  "mcpServers": {
-    "aired": { "url": "https://aired.sh/mcp" }
-  }
-}</code>
-                </div>
-              </div>
-            </div>
-            <div id="mcp-panel-vscode" class="mcp-panel hidden" role="tabpanel">
-              <div class="bg-aired-bg rounded-sm overflow-hidden">
-                <div class="flex items-center justify-between px-3 py-1.5 border-b border-aired-border">
-                  <span class="text-2xs text-aired-text-tertiary">.vscode/mcp.json</span>
-                  <button type="button" class="copy-snippet copy-btn px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy='{"servers":{"aired":{"type":"http","url":"https://aired.sh/mcp"}}}'>Copy</button>
-                </div>
-                <div class="px-3 py-2.5">
-                  <code class="font-mono text-2xs text-aired-text-secondary block whitespace-pre select-all">{
-  "servers": {
-    "aired": { "type": "http", "url": "https://aired.sh/mcp" }
-  }
-}</code>
-                </div>
-              </div>
-            </div>
-            <div id="mcp-panel-windsurf" class="mcp-panel hidden" role="tabpanel">
-              <div class="bg-aired-bg rounded-sm overflow-hidden">
-                <div class="flex items-center justify-between px-3 py-1.5 border-b border-aired-border">
-                  <span class="text-2xs text-aired-text-tertiary">~/.codeium/windsurf/mcp_config.json</span>
-                  <button type="button" class="copy-snippet copy-btn px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy='{"mcpServers":{"aired":{"serverUrl":"https://aired.sh/mcp"}}}'>Copy</button>
-                </div>
-                <div class="px-3 py-2.5">
-                  <code class="font-mono text-2xs text-aired-text-secondary block whitespace-pre select-all">{
-  "mcpServers": {
-    "aired": { "serverUrl": "https://aired.sh/mcp" }
-  }
-}</code>
-                </div>
-              </div>
-            </div>
-            <div id="mcp-panel-codex" class="mcp-panel hidden" role="tabpanel">
-              <div class="bg-aired-bg rounded-sm overflow-hidden">
-                <div class="flex items-center justify-between px-3 py-1.5 border-b border-aired-border">
-                  <span class="text-2xs text-aired-text-tertiary">~/.codex/config.toml</span>
-                  <button type="button" class="copy-snippet copy-btn px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy='[mcp_servers.aired]
-url = "https://aired.sh/mcp"'>Copy</button>
-                </div>
-                <div class="px-3 py-2.5">
-                  <code class="font-mono text-2xs text-aired-text-secondary block whitespace-pre select-all">[mcp_servers.aired]
-url = "https://aired.sh/mcp"</code>
-                </div>
-              </div>
-            </div>
-            <div id="mcp-panel-others" class="mcp-panel hidden" role="tabpanel">
-              <div class="bg-aired-bg rounded-sm overflow-hidden">
-                <div class="flex items-center justify-between px-3 py-1.5 border-b border-aired-border">
-                  <span class="text-2xs text-aired-text-tertiary">STDIO bridge via mcp-remote</span>
-                  <button type="button" class="copy-snippet copy-btn px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy='{"mcpServers":{"aired":{"command":"npx","args":["-y","mcp-remote","https://aired.sh/mcp"]}}}'>Copy</button>
-                </div>
-                <div class="px-3 py-2.5">
-                  <code class="font-mono text-2xs text-aired-text-secondary block whitespace-pre select-all">{
-  "mcpServers": {
-    "aired": {
-      "command": "npx",
-      "args": ["-y", "mcp-remote", "https://aired.sh/mcp"]
-    }
-  }
-}</code>
-                </div>
-              </div>
-            </div>
-            <p class="text-2xs text-aired-text-tertiary">
-              Exposes a <code class="text-aired-text-secondary">publish_html</code> tool. Your AI can publish artifacts directly.
-            </p>
+          <div class="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-aired-text-tertiary">
+            <span><code class="text-aired-text-secondary">aired ./dir/</code> Bundle directory</span>
+            <span><code class="text-aired-text-secondary">--json</code> Structured output</span>
+            <span><code class="text-aired-text-secondary">--pin secret</code> PIN-protect</span>
+            <span><code class="text-aired-text-secondary">--ttl 24h</code> Custom expiry</span>
           </div>
+          <p class="text-2xs text-aired-text-tertiary">
+            Files or directories. Inlines CSS, JS, images automatically. JSON when piped.
+          </p>
         </div>
 
-        <!-- API -->
-        <div class="border border-aired-border rounded-lg bg-aired-surface overflow-hidden">
-          <div class="flex items-center justify-between px-4 py-3 border-b border-aired-border">
-            <div class="flex items-center gap-2.5">
-              <span class="flex items-center justify-center w-6 h-6 rounded bg-aired-accent/10 text-aired-accent">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-              </span>
-              <h3 class="text-sm font-medium text-aired-text-primary">HTTP API</h3>
-            </div>
-            <span class="text-2xs text-aired-text-tertiary">No auth required</span>
+        <!-- MCP panel -->
+        <div id="install-panel-mcp" class="install-panel hidden p-4 space-y-3" role="tabpanel">
+          <div class="flex items-center justify-between bg-aired-bg rounded-sm px-3 py-2.5">
+            <code class="font-mono text-sm text-aired-accent select-all truncate">claude mcp add aired --transport http https://aired.sh/mcp</code>
+            <button type="button" class="copy-snippet copy-btn flex-shrink-0 ml-2 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy="claude mcp add aired --transport http https://aired.sh/mcp">Copy</button>
           </div>
-          <div class="p-4 space-y-3">
-            <div class="bg-aired-bg rounded-sm px-3 py-2.5">
-              <code class="font-mono text-sm text-aired-text-secondary block whitespace-pre select-all">curl -X POST https://aired.sh/api/publish \
+          <p class="text-2xs text-aired-text-tertiary">
+            Streamable HTTP at <code class="text-aired-text-secondary">https://aired.sh/mcp</code>. Exposes a <code class="text-aired-text-secondary">publish_html</code> tool. Cursor, VS Code, Windsurf, Codex configs in <a href="/docs.html#mcp" class="hover:text-aired-text-secondary underline decoration-aired-border">/docs</a>.
+          </p>
+        </div>
+
+        <!-- API panel -->
+        <div id="install-panel-api" class="install-panel hidden p-4 space-y-3" role="tabpanel">
+          <div class="bg-aired-bg rounded-sm px-3 py-2.5">
+            <code class="font-mono text-sm text-aired-text-secondary block whitespace-pre select-all">curl -X POST https://aired.sh/api/publish \
   -H "Content-Type: application/json" \
   -d '{"html": "&lt;h1&gt;Hello&lt;/h1&gt;"}'</code>
-            </div>
-            <div class="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-aired-text-tertiary">
-              <span>Returns <code class="text-aired-text-secondary">{ url, update_token, expiresAt }</code></span>
-              <span>2 MB max</span>
-              <span>5 uploads/hour</span>
-            </div>
+          </div>
+          <div class="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-aired-text-tertiary">
+            <span>Returns <code class="text-aired-text-secondary">{ url, update_token, expiresAt }</code></span>
+            <span>No auth</span>
+            <span>2 MB max</span>
+            <span>5 uploads/hour</span>
           </div>
         </div>
-
       </div>
     </section>
+
 
     <!-- ─── Live Feed Marquee ─── -->
     <div class="mt-16 mb-8 marquee-wrapper" id="marquee-section" style="display: none;">
@@ -557,9 +514,11 @@ url = "https://aired.sh/mcp"</code>
       <p>
         Built by <a href="https://x.com/iammoizfarooq" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">@iammoizfarooq</a>
       </p>
-      <p>
-        Deployed on <a href="https://workers.cloudflare.com" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Cloudflare Workers</a>
-      </p>
+      <div class="flex items-center gap-4">
+        <a href="/llms.txt" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150 font-mono">llms.txt</a>
+        <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">GitHub</a>
+        <a href="https://workers.cloudflare.com" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Cloudflare</a>
+      </div>
     </div>
   </footer>
 

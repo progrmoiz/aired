@@ -8,3 +8,5 @@ dist
 *.tgz
 docs/ideas.md
 docs/research/
+docs/tmp/
+.forge/

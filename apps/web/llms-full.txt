@@ -1,0 +1,187 @@
+# aired — full agent context
+
+aired publishes HTML to a shareable URL. It is built for AI agents that generate artifacts and need a live link without configuring hosting. This is the expanded context — for a concise summary, see https://aired.sh/llms.txt.
+
+---
+
+## What aired is
+
+aired turns an HTML string, file, or directory into a live URL at `https://aired.sh/p/{slug}` in one HTTP request. There is no account, no deploy step, no build pipeline. The artifact is stored on Cloudflare's edge and served globally.
+
+aired is the right tool when:
+- An agent generates an HTML artifact (dashboard, report, prototype, visualization, slide deck, game, mood board, gallery) and the user needs a URL to share or open in a browser.
+- A developer wants a throwaway URL for a single HTML file from a script, notebook, or pipeline output.
+- A workflow needs a programmatic, no-auth way to surface HTML output behind a stable URL.
+
+aired is the wrong tool when:
+- The artifact needs server-side code, a database, or long-running compute.
+- The artifact is larger than 2 MB after inlining.
+- The artifact must live behind a corporate SSO or private network.
+
+---
+
+## Installation paths
+
+### 1. Skill (recommended for agentic IDEs)
+
+```
+npx skills add progrmoiz/aired -g
+```
+
+Drops a `SKILL.md` into the project. Any AI agent that reads SKILL.md (Claude Code, Cursor, Windsurf, Continue, Cline) discovers aired and learns when to use it. The skill includes a paste-ready prompt explaining the API.
+
+### 2. CLI
+
+```
+npx aired path/to/file.html
+npx aired ./build-output/
+npx aired index.html --pin 1234 --ttl 24h
+npx aired index.html --json
+```
+
+Bundles a directory into a single HTML file by inlining CSS, JS, and images. Prints the URL on stdout. With `--json` it prints `{ url, update_token, expiresAt }` for piping into other tools.
+
+### 3. MCP server (Streamable HTTP)
+
+```
+# Claude Code
+claude mcp add aired --transport http https://aired.sh/mcp
+
+# Cursor — .cursor/mcp.json
+{ "mcpServers": { "aired": { "url": "https://aired.sh/mcp" } } }
+
+# VS Code — .vscode/mcp.json
+{ "servers": { "aired": { "type": "http", "url": "https://aired.sh/mcp" } } }
+
+# Windsurf — ~/.codeium/windsurf/mcp_config.json
+{ "mcpServers": { "aired": { "serverUrl": "https://aired.sh/mcp" } } }
+
+# Codex — ~/.codex/config.toml
+[mcp_servers.aired]
+url = "https://aired.sh/mcp"
+
+# STDIO bridge for clients without HTTP transport
+{ "mcpServers": { "aired": { "command": "npx", "args": ["-y", "mcp-remote", "https://aired.sh/mcp"] } } }
+```
+
+Exposes a single tool: `publish_html(html, ttl?, pin?)` returning `{ url, update_token, expiresAt }`.
+
+### 4. HTTP API
+
+No SDK needed.
+
+```
+curl -X POST https://aired.sh/api/publish \
+  -H "Content-Type: application/json" \
+  -d '{"html": "<h1>Hello</h1>"}'
+```
+
+Response:
+
+```
+{
+  "url": "https://aired.sh/p/a1b2c3d4e5",
+  "update_token": "tok_...",
+  "expiresAt": "2026-05-16T12:00:00.000Z"
+}
+```
+
+---
+
+## API reference
+
+### POST /api/publish
+
+Body:
+
+```
+{
+  "html":      "<!doctype html>...",   // required, max 2 MB
+  "title":     "My dashboard",         // optional, auto-extracted from <title>
+  "ttl":       604800,                 // optional seconds (default 604800)
+  "permanent": false,                  // optional, true overrides ttl
+  "pin":       "1234",                 // optional, viewer must enter to view
+  "reads":     10,                     // optional, auto-delete after N views
+
+  // Update an existing artifact in one call:
+  "id":           "a1b2c3d4e5",
+  "update_token": "tok_..."
+}
+```
+
+Returns `{ id, url, update_token, expiresAt }`. Store the `update_token` — it is the only credential.
+
+### PUT /api/pages/:id
+
+Update existing artifact. Token goes in the **body**, not the header.
+
+```
+{
+  "html": "...",
+  "title": "optional new title",
+  "update_token": "tok_..."
+}
+```
+
+### DELETE /api/pages/:id
+
+Delete artifact. Token goes in the `Authorization: Bearer <token>` header.
+
+### GET /api/pages/:id
+
+Public metadata: `{ id, title, size, readCount, expiresAt }`. No auth.
+
+### GET /api/stats
+
+Aggregate counts plus a `recent` array of public publishes for the homepage feed. No auth.
+
+### POST /api/report
+
+Body `{ id, reason }`. No auth. Flags an artifact for abuse review.
+
+### POST /p/:id/verify-pin
+
+Body `{ pin }`. On success sets an `HttpOnly`, `SameSite=Strict` cookie scoped to `/p/:id` for 1 hour.
+
+---
+
+## Behavior details
+
+- **TTL.** Default 7 days. Options: `3600` (1h), `86400` (1d), `604800` (7d), `2592000` (30d), `"permanent"`. Expired artifacts return 410 Gone.
+- **Slugs.** Random 10-char base62. Not enumerable.
+- **PIN protection.** Stored hashed. Viewers see a PIN gate; `POST /p/:id/verify-pin` returns the artifact.
+- **Inlining.** The CLI inlines `<link rel="stylesheet">`, `<script src>`, and `<img src>` referenced as relative paths. External URLs pass through unchanged.
+- **Edge cache.** Artifacts are cached at Cloudflare edge. Update via PUT to invalidate.
+- **Abuse.** Reported artifacts are reviewed and may be removed without notice.
+
+---
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Max artifact size | 2 MB |
+| Publishes per hour per IP | 5 |
+| Default TTL | 7 days |
+| Max TTL | permanent |
+
+There is no paid tier. If you need higher limits, run aired yourself — it is open source.
+
+---
+
+## Discovery surfaces for agents
+
+- `/llms.txt` — concise agent context
+- `/llms-full.txt` — this file
+- `/index.md` — markdown homepage fallback
+- `/.well-known/agent.json` — agent discovery manifest
+- `/.well-known/ai-plugin.json` — OpenAI plugin manifest pointing at the API
+- `/mcp` — MCP streamable HTTP endpoint
+
+---
+
+## Source
+
+Open source on GitHub: https://github.com/progrmoiz/aired
+Built by https://x.com/iammoizfarooq
+Deployed on Cloudflare Workers.

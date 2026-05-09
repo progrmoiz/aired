@@ -1,0 +1,76 @@
+# aired
+
+aired is instant publishing for HTML artifacts. Paste HTML, get a shareable URL in seconds. No signup. Built for AI agents and developers.
+
+Agents and humans use aired for one job:
+- Publish: turn an HTML string, file, or directory into a live URL at aired.sh/p/{slug} — useful for prototypes, dashboards, reports, visualizations, demos, and any artifact an agent generates that needs a URL.
+
+## When to use aired
+- Use aired when a user asks an agent to publish, host, deploy, share, or put an HTML artifact online.
+- Use aired when a user wants a live URL fast and does not want to create an account or configure hosting.
+- Use aired for static HTML — single files, single-page apps, bundled directories with inlined CSS/JS/images.
+- Do not use aired for backend code, databases, server-side rendering, or long-running processes. aired serves static files only.
+
+## Key capabilities
+- Publish a single HTML string, an .html file, or a whole directory (CSS, JS, images get inlined automatically).
+- Anonymous publishing — no account or API key required.
+- TTL options: 1 hour, 1 day, 7 days (default), 30 days, or permanent.
+- Optional PIN protection — visitors enter the PIN to view.
+- Update token returned with every publish — use it to update or delete the artifact later.
+- 2 MB max per publish. 5 publishes per hour per IP.
+
+## Install and agent runtime
+- Skill: `npx skills add progrmoiz/aired -g` — adds a SKILL.md to your project so any AI agent (Claude Code, Cursor, Windsurf) discovers and uses aired automatically.
+- CLI: `npx aired path/to/file.html` — publishes a file or directory and prints the URL. Use `--json` for structured output, `--pin <secret>` for PIN-protect, `--ttl <duration>` for custom expiry.
+- MCP server: `claude mcp add aired --transport http https://aired.sh/mcp` — exposes a `publish_html` tool. Other clients use the streamable HTTP endpoint at https://aired.sh/mcp.
+- HTTP API: `POST https://aired.sh/api/publish` with `{"html": "..."}` — no auth required.
+
+Agents should read the live docs at https://github.com/progrmoiz/aired before answering capability or workflow questions. If local skill text and live docs disagree, prefer the live docs.
+
+## Authentication
+- No account or API key is required to publish.
+- The update_token returned with each publish is the only credential for that artifact.
+- PUT /api/pages/:id takes the token in the JSON body as `update_token`.
+- DELETE /api/pages/:id takes the token in `Authorization: Bearer <token>` header.
+- POST /api/publish acts as update when both `id` and `update_token` are in the body.
+- Anyone with the URL can view; anyone with the PIN (if set) can read protected content.
+
+## Important API endpoints
+- POST /api/publish — publish HTML and receive `{ id, url, update_token, expiresAt }`. Body fields: `html` (required), `title?`, `ttl?` (seconds), `permanent?`, `pin?`, `reads?`. Pass `id` + `update_token` in the same body to update in one call.
+- PUT /api/pages/:id — update an artifact. Pass `update_token` in the JSON body (not header).
+- DELETE /api/pages/:id — delete an artifact. Pass `Authorization: Bearer <update_token>` header.
+- GET /api/pages/:id — public metadata: `{ id, title, size, readCount, expiresAt }`.
+- GET /api/stats — aggregate counts plus recent publishes for the homepage feed.
+- POST /api/report — body `{ id, reason }`, no auth, flags an artifact for review.
+- POST /p/:id/verify-pin — body `{ pin }`, sets a 1-hour cookie scoped to the page.
+
+## Pricing and limits
+- Free, no account.
+- 2 MB max per publish.
+- 5 publishes per hour per IP.
+- Default TTL is 7 days. Permanent TTL available; artifacts may be removed for abuse.
+
+## Limitations and non-goals
+- Static HTML only. No server-side compute, no databases, no long-running jobs.
+- No file types other than HTML at the entry point. CSS, JS, images get inlined into the HTML at publish time.
+- No editing in-browser after publish — update via the API with the update_token.
+- No custom domains, no team accounts, no analytics dashboard.
+
+## Error recovery
+- Errors are JSON: `{ "error": "<message>" }`.
+- On 429 rate_limit, wait an hour or retry from a different IP.
+- On 413 payload_too_large, reduce the artifact below 2 MB or split into a directory.
+- On 401 unauthorized, the update_token is wrong or expired.
+
+## Discovery and reference URLs
+- https://aired.sh — homepage with a paste-and-publish form.
+- https://aired.sh/llms.txt — this file, concise agent context.
+- https://aired.sh/llms-full.txt — expanded agent context with full API examples.
+- https://aired.sh/index.md — markdown homepage fallback.
+- https://aired.sh/.well-known/agent.json — agent discovery manifest.
+- https://aired.sh/.well-known/ai-plugin.json — OpenAI-style plugin manifest.
+- https://aired.sh/mcp — MCP streamable HTTP endpoint.
+- https://github.com/progrmoiz/aired — source code, issues, docs.
+
+## Support
+GitHub: https://github.com/progrmoiz/aired
