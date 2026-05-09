@@ -198,32 +198,62 @@ function injectAiredBar(
     right: 14px;
     display: inline-flex;
     align-items: center;
-    gap: 0;
-    padding: 5px 10px;
-    background: rgba(10, 10, 10, 0.8);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 20px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
+    gap: 6px;
+    padding: 5px 10px 5px 8px;
+    background: rgba(10, 10, 11, 0.72);
+    backdrop-filter: saturate(160%) blur(14px);
+    -webkit-backdrop-filter: saturate(160%) blur(14px);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 999px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     font-size: 11px;
     font-weight: 500;
-    letter-spacing: 0.02em;
-    color: rgba(255,255,255,0.4);
+    letter-spacing: 0.01em;
+    color: rgba(237,237,239,0.55);
     z-index: 2147483647;
     white-space: nowrap;
     pointer-events: auto;
     line-height: 1;
-    transition: color 180ms ease, background 180ms ease, border-color 180ms ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.25), 0 4px 16px rgba(0,0,0,0.18);
+    transition: color 180ms ease, background 180ms ease,
+                border-color 180ms ease, box-shadow 220ms ease,
+                transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
-  #__aired-bar:hover {
-    color: rgba(255,255,255,0.7);
-    background: rgba(10, 10, 10, 0.9);
-    border-color: rgba(255,255,255,0.15);
+  #__aired-bar:hover,
+  #__aired-bar:focus-within,
+  #__aired-bar.is-open {
+    color: rgba(237,237,239,0.92);
+    background: rgba(10, 10, 11, 0.88);
+    border-color: rgba(124, 106, 239, 0.28);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3),
+                0 6px 24px rgba(0,0,0,0.22),
+                0 0 0 3px rgba(124, 106, 239, 0.08);
+    transform: translateY(-1px);
   }
   #__aired-bar a {
     color: inherit;
     text-decoration: none;
+  }
+  #__aired-bar a:focus-visible {
+    outline: 1px solid rgba(124, 106, 239, 0.6);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+  #__aired-bar .__aired-mark {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+    color: #7c6aef;
+    transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  #__aired-bar:hover .__aired-mark,
+  #__aired-bar:focus-within .__aired-mark,
+  #__aired-bar.is-open .__aired-mark {
+    transform: rotate(-8deg) scale(1.05);
+  }
+  #__aired-bar .__aired-wordmark {
+    color: rgba(237,237,239,0.85);
+    font-weight: 600;
   }
   #__aired-bar .__aired-meta {
     display: inline-flex;
@@ -232,33 +262,88 @@ function injectAiredBar(
     max-width: 0;
     overflow: hidden;
     opacity: 0;
-    transition: max-width 250ms cubic-bezier(0.25, 0.1, 0.25, 1),
+    transition: max-width 280ms cubic-bezier(0.2, 0.8, 0.2, 1),
                 opacity 200ms ease,
-                margin 250ms ease;
+                margin 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
     margin-left: 0;
   }
-  #__aired-bar:hover .__aired-meta {
-    max-width: 200px;
+  #__aired-bar:hover .__aired-meta,
+  #__aired-bar:focus-within .__aired-meta,
+  #__aired-bar.is-open .__aired-meta {
+    max-width: 220px;
     opacity: 1;
-    margin-left: 8px;
+    margin-left: 4px;
   }
-  #__aired-bar .__aired-dot {
-    width: 2px;
-    height: 2px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.2);
+  #__aired-bar .__aired-sep {
+    width: 1px;
+    height: 9px;
+    background: rgba(255,255,255,0.12);
     flex-shrink: 0;
   }
+  #__aired-bar .__aired-views {
+    color: rgba(237,237,239,0.55);
+    font-variant-numeric: tabular-nums;
+  }
+  #__aired-bar .__aired-report {
+    color: rgba(237,237,239,0.45);
+    transition: color 140ms ease;
+  }
+  #__aired-bar .__aired-report:hover {
+    color: rgba(237,237,239,0.9);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #__aired-bar,
+    #__aired-bar .__aired-mark,
+    #__aired-bar .__aired-meta {
+      transition: none;
+    }
+  }
 </style>
-<div id="__aired-bar" role="complementary" aria-label="aired attribution">
-  <a href="https://aired.sh" target="_blank" rel="noopener">aired</a>
+<div id="__aired-bar" role="complementary" aria-label="Published with aired">
+  <a href="https://aired.sh" target="_blank" rel="noopener" class="__aired-brand" aria-label="aired.sh">
+    <svg class="__aired-mark" viewBox="0 0 32 32" aria-hidden="true">
+      <circle cx="9" cy="23" r="3.5" fill="currentColor"/>
+      <path d="M9 13 A10 10 0 0 1 19 23" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+      <path d="M9 6 A17 17 0 0 1 26 23" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+    </svg>
+  </a>
+  <a href="https://aired.sh" target="_blank" rel="noopener" class="__aired-wordmark">aired</a>
   <span class="__aired-meta">
-    <span class="__aired-dot"></span>
-    <span>${readCount} view${readCount !== 1 ? 's' : ''}</span>
-    <span class="__aired-dot"></span>
-    <a href="#" onclick="(function(e){e.preventDefault();if(confirm('Report this page as inappropriate?')){fetch('/api/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:'${id}',reason:'reported via viewer bar'})}).then(function(){alert('Reported. Thank you.')}).catch(function(){alert('Failed to report. Try again.')})}})(event);return false">report</a>
+    <span class="__aired-sep"></span>
+    <span class="__aired-views">${readCount.toLocaleString('en-US')} view${readCount !== 1 ? 's' : ''}</span>
+    <span class="__aired-sep"></span>
+    <a href="#" class="__aired-report" data-aired-report="${id}">report</a>
   </span>
-</div>`;
+</div>
+<script>
+(function(){
+  var bar = document.getElementById('__aired-bar');
+  if (!bar) return;
+  var hasHover = window.matchMedia && window.matchMedia('(hover: hover)').matches;
+  if (!hasHover) {
+    bar.addEventListener('click', function(e){
+      if (e.target.closest('a')) return;
+      bar.classList.toggle('is-open');
+    });
+    document.addEventListener('click', function(e){
+      if (!bar.contains(e.target)) bar.classList.remove('is-open');
+    });
+  }
+  var report = bar.querySelector('[data-aired-report]');
+  if (report) {
+    report.addEventListener('click', function(e){
+      e.preventDefault();
+      if (!confirm('Report this page as inappropriate?')) return;
+      fetch('/api/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: report.getAttribute('data-aired-report'), reason: 'reported via viewer bar' })
+      }).then(function(){ alert('Reported. Thank you.'); })
+        .catch(function(){ alert('Failed to report. Try again.'); });
+    });
+  }
+})();
+</script>`;
 
   // Inject bar before </body>
   const barOut = out.replace(/<\/body>/i, `${bar}\n</body>`);
