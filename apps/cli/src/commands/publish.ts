@@ -6,9 +6,9 @@ import type { GlobalOpts } from '../lib/config.js'
 import { resolveApiUrl } from '../lib/config.js'
 import { shouldOutputJson, outputError, ExitCode } from '../lib/output.js'
 import { withSpinner } from '../lib/spinner.js'
-import { publishHTML } from '../core/client.js'
+import { publishHTML, validateSession } from '../core/client.js'
 import { saveToken } from '../core/store.js'
-import { getSession } from '../core/session.js'
+import { getSession, clearSession } from '../core/session.js'
 import { isDirectory, bundleDirectory } from '../core/bundler.js'
 
 function parseTtl(ttl: string): number | null {
@@ -110,7 +110,30 @@ export function makePublishCommand(globalOpts: () => GlobalOpts): Command {
 
       // Read session for optional JWT auth
       const session = getSession()
-      const jwt = session?.jwt
+      let jwt = session?.jwt
+
+      // Validate the session before relying on it. If the server has revoked
+      // the token, publishing with it would silently fall back to anonymous
+      // (7-day expiry) — so detect that here, clear the dead session, and warn
+      // loudly instead of letting the page quietly expire.
+      if (session !== null && jwt !== undefined) {
+        try {
+          const serverUser = await validateSession(baseUrl, jwt)
+          if (serverUser === null) {
+            clearSession()
+            jwt = undefined
+            if (!shouldOutputJson(opts)) {
+              process.stderr.write(
+                pc.yellow('Your aired session expired — publishing anonymously (expires in 7 days).\n') +
+                pc.dim('Run `aired login` to publish to your account.\n'),
+              )
+            }
+          }
+        } catch {
+          // Couldn't reach the server to validate — proceed optimistically with
+          // the token rather than blocking a publish on a flaky network.
+        }
+      }
 
       try {
         const result = await withSpinner('Publishing...', () => publishHTML(baseUrl, html, publishOpts, jwt), opts)

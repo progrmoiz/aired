@@ -210,6 +210,32 @@ export async function getMe(baseUrl: string, jwt: string): Promise<MeResult> {
   return handleResponse<MeResult>(resp, 'Get me')
 }
 
+/**
+ * Validate a session token against the server.
+ * Returns the user on 200, `null` when the server rejects the token (401/403),
+ * and throws on network failures or unexpected status codes.
+ *
+ * The null-vs-throw distinction lets callers separate "logged out" (clear the
+ * stale local session) from "can't reach the server" (keep the cached session).
+ */
+export async function validateSession(
+  baseUrl: string,
+  jwt: string,
+): Promise<User | null> {
+  const resp = await fetch(`${baseUrl}/api/me`, {
+    headers: {
+      'User-Agent': USER_AGENT,
+      [AUTH_HEADER]: jwt,
+    },
+  })
+
+  if (resp.status === 401 || resp.status === 403) {
+    return null
+  }
+
+  return handleResponse<User>(resp, 'Validate session')
+}
+
 export async function claimPage(
   baseUrl: string,
   jwt: string,
