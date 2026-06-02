@@ -18,6 +18,9 @@ export function normalizeProject(raw: unknown): string | null {
   if (typeof raw !== 'string') return null;
   const trimmed = raw.trim();
   if (trimmed.length === 0) return null;
+  // Reject the reserved sentinel so a page can never be tagged with a name that
+  // collides with the "no project" query value (would otherwise be unreachable).
+  if (trimmed === UNSORTED_PROJECT) return null;
   return trimmed.slice(0, MAX_PROJECT_LENGTH);
 }
 

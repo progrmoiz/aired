@@ -7,12 +7,15 @@ import { basename } from 'node:path'
  * stripping a trailing .git and any trailing slash. Returns null if nothing usable.
  */
 export function repoNameFromUrl(url: string): string | null {
-  const trimmed = url.trim().replace(/\/+$/, '')
+  let trimmed = url.trim().replace(/\/+$/, '')
   if (trimmed.length === 0) return null
-  // Last path segment after the final '/' or ':' (SCP form uses ':')
-  const lastSlash = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf(':'))
-  const tail = lastSlash >= 0 ? trimmed.slice(lastSlash + 1) : trimmed
-  const name = tail.replace(/\.git$/i, '')
+  // Strip a leading scheme (https://, ssh://, git://, …) so the host is first.
+  trimmed = trimmed.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
+  // Expect host<sep>path where sep is '/' (URL) or ':' (SCP). With no separator
+  // we only have a bare host (e.g. "github.com") and no repo name to take.
+  const sep = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf(':'))
+  if (sep < 0) return null
+  const name = trimmed.slice(sep + 1).replace(/\.git$/i, '')
   return name.length > 0 ? name : null
 }
 

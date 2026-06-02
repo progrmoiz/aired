@@ -6,6 +6,7 @@ import {
   parseMetadata,
   serializeMetadata,
   redactNoreplyEmail,
+  normalizeProject,
   UNSORTED_PROJECT,
 } from '@aired/core';
 import type { PageMetadata } from '@aired/core';
@@ -83,10 +84,16 @@ me.get('/pages', async (c) => {
   let predicate: ((m: PageMetadata) => boolean) | null = null;
 
   if (projectFilter !== undefined && projectFilter !== UNSORTED_PROJECT) {
-    const res = await listPagesForOwnerProject(c.env.PAGES_KV, ownerId, projectFilter, cursor, limit);
+    // Match the read filter to the write-time normalization. A query that can't
+    // normalize to a stored value (empty, whitespace, >64 chars) matches nothing.
+    const normalized = normalizeProject(projectFilter);
+    if (normalized === null) {
+      return c.json({ pages: [], cursor: null });
+    }
+    const res = await listPagesForOwnerProject(c.env.PAGES_KV, ownerId, normalized, cursor, limit);
     ids = res.ids;
     nextCursor = res.cursor;
-    predicate = (m) => m.project === projectFilter;
+    predicate = (m) => m.project === normalized;
   } else {
     const res = await listPagesForOwner(c.env.PAGES_KV, ownerId, cursor, limit);
     ids = res.ids;

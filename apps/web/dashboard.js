@@ -225,13 +225,18 @@
   function renderGroup(container, group, expandInitially) {
     var ulId = 'group-ul-' + (groupSeq++);
 
+    var labelId = ulId + '-label';
+
     var section = document.createElement('section');
     section.className = 'project-group border-b border-aired-border';
     section.setAttribute('data-project', group.key);
+    // Give the section an accessible name so it's a meaningful landmark, not a
+    // generic unlabeled region.
+    section.setAttribute('aria-labelledby', labelId);
 
     var header = document.createElement('button');
     header.type = 'button';
-    header.className = 'group-header w-full flex items-center gap-2 min-h-[44px] py-3 text-left focus-ring rounded-sm text-sm text-aired-text-primary';
+    header.className = 'group-header w-full flex items-center gap-2 min-h-[44px] py-3 px-2 -mx-2 text-left rounded-sm focus-ring text-sm text-aired-text-primary hover:bg-aired-surface-hover active:bg-aired-border transition-colors duration-150';
     header.setAttribute('aria-expanded', 'false');
     header.setAttribute('aria-controls', ulId);
 
@@ -241,6 +246,7 @@
     chevron.textContent = '›';
 
     var nameEl = document.createElement('span');
+    nameEl.id = labelId;
     nameEl.className = 'font-medium truncate';
     nameEl.textContent = group.label;
 
@@ -276,9 +282,15 @@
     function setCount(n) {
       state.count = Math.max(0, n);
       countEl.textContent = String(state.count);
-      // Prune an emptied group entirely.
-      if (state.count === 0 && ul.children.length === 0) {
+      // Prune an emptied group entirely (once).
+      if (state.count === 0 && ul.children.length === 0 && !state.pruned) {
+        state.pruned = true;
         section.remove();
+        // Keep the "· N projects" summary honest as named groups disappear.
+        if (!state.isUnsorted && projectCount > 0) {
+          projectCount--;
+          renderPageCount();
+        }
       }
     }
 
@@ -320,12 +332,23 @@
     function loadPage(append) {
       if (state.loading) return Promise.resolve();
       state.loading = true;
+      return fetchOnce(append, 0).then(function () {
+        state.loading = false;
+        renderLoadMore();
+      }).catch(function (err) {
+        state.loading = false;
+        throw err;
+      });
+    }
 
+    // The Unsorted group reads the FLAT index and post-filters project===null, so a
+    // 20-item page can yield zero rows while more remain. Follow the cursor past
+    // those empty pages (bounded) so unsorted/legacy pages stay reachable.
+    function fetchOnce(append, depth) {
       var url = '/api/me/pages?project=' + encodeURIComponent(state.key) + '&limit=20';
       if (append && state.cursor) {
         url += '&cursor=' + encodeURIComponent(state.cursor);
       }
-
       return fetchJson(url).then(function (data) {
         var rows = data.pages || [];
         appendRows(rows);
@@ -337,12 +360,10 @@
           setCount(ul.children.length);
           currentPageCount += rows.length;
           renderPageCount();
+          if (rows.length === 0 && state.cursor && depth < 25) {
+            return fetchOnce(true, depth + 1);
+          }
         }
-        state.loading = false;
-        renderLoadMore();
-      }).catch(function (err) {
-        state.loading = false;
-        throw err;
       });
     }
 
@@ -351,12 +372,14 @@
       state.loaded = true;
 
       // Unsorted may carry prefetched first-page rows from the dashboard probe.
-      if (group.prefetched) {
+      if (group.prefetched && group.prefetched.length > 0) {
         appendRows(group.prefetched);
         renderLoadMore();
         return Promise.resolve();
       }
-      return loadPage(false).catch(function () {
+      // No prefetched rows: load from the cursor (Unsorted, prefetch was empty but
+      // more pages remain) or from the first page (named groups, prefetched null).
+      return loadPage(group.prefetched ? true : false).catch(function () {
         // Surface a minimal inline failure inside the group.
         var p = document.createElement('p');
         p.className = 'text-sm text-aired-text-secondary py-2';
@@ -440,7 +463,9 @@
       setPageCount(namedTotal + unsortedRows.length);
 
       // Nothing at all → empty state (renderPageCount already toggles it on 0).
-      if (projects.length === 0 && unsortedRows.length === 0) {
+      // A non-null unsorted cursor means more pages exist further down, so it is
+      // not actually empty even when the probe's first page filtered to zero rows.
+      if (projects.length === 0 && unsortedRows.length === 0 && !unsortedData.cursor) {
         return;
       }
 
@@ -459,7 +484,11 @@
         rendered++;
       }
 
-      if (unsortedRows.length > 0) {
+      // Render Unsorted when it has rows OR a cursor: a non-null cursor with zero
+      // rows means unsorted/legacy pages exist further down the flat index (the
+      // first page happened to be all project-tagged). Without this, those pages
+      // would be invisible. The group's loader follows the cursor on expand.
+      if (unsortedRows.length > 0 || unsortedData.cursor) {
         renderGroup(container, {
           key: UNSORTED_KEY,
           label: UNSORTED_LABEL,
