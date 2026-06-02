@@ -5,6 +5,7 @@ import {
   generateOpaqueId,
   redactNoreplyEmail,
   AUTH_HEADER,
+  CLI_SESSION_MAX_AGE_SECONDS,
 } from '@aired/core';
 import { signSession, verifySession } from '../lib/jwt.js';
 import {
@@ -243,12 +244,17 @@ auth.get('/callback', rateLimit(TIERS.oauth_init), async (c) => {
     return c.redirect('/?login_failed=1', 302);
   }
 
+  // CLI flow (port present) gets a long-lived, non-rotating token; the web
+  // cookie keeps the default sliding 30-day lifetime.
+  const isCliFlow = typeof authState.port === 'number';
+
   // Mint JWT
   let jwt: string;
   try {
     jwt = await signSession(
       { sub: user.id, login: user.login, email: user.email, name: user.name },
       c.env.SESSION_SECRET,
+      isCliFlow ? CLI_SESSION_MAX_AGE_SECONDS : undefined,
     );
   } catch (err) {
     console.error('Failed to mint JWT:', err);
@@ -258,7 +264,7 @@ auth.get('/callback', rateLimit(TIERS.oauth_init), async (c) => {
   clearOAuthStateCookie(c);
 
   // Determine flow: CLI (port present) or web
-  if (typeof authState.port === 'number') {
+  if (isCliFlow) {
     // CLI flow
     const cliCode = generateOpaqueId();
     const clientState = authState.client_state ?? '';
@@ -473,6 +479,7 @@ auth.post('/device/poll', rateLimit(TIERS.oauth_init), async (c) => {
       jwt = await signSession(
         { sub: user.id, login: user.login, email: user.email, name: user.name },
         c.env.SESSION_SECRET,
+        CLI_SESSION_MAX_AGE_SECONDS,
       );
     } catch (err) {
       console.error('Failed to mint JWT on device poll:', err);

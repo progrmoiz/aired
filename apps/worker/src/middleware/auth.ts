@@ -72,9 +72,13 @@ export async function authMiddleware(
     return;
   }
 
-  // Step 5: sliding reissue
+  // Step 5: sliding reissue — web (cookie) sessions only.
+  // Header-presented (CLI/MCP) tokens are NOT rotated: the reissue path revokes
+  // the old jti but can only deliver the replacement via Set-Cookie, so a CLI
+  // would revoke its own token and never receive the new one (silent 7-day death).
+  // CLI tokens ride their full TTL instead.
   const now = Date.now();
-  if (shouldReissue(claims, now)) {
+  if (isWebContext && shouldReissue(claims, now)) {
     const oldJti = claims.jti;
     const oldExp = claims.exp;
     const nowSeconds = Math.floor(now / 1000);

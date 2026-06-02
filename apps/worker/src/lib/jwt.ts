@@ -16,6 +16,7 @@ function secretKey(secret: string): Uint8Array {
 export async function signSession(
   claims: Omit<JwtClaims, 'iat' | 'exp' | 'jti' | 'v'>,
   secret: string,
+  maxAgeSeconds: number = SESSION_MAX_AGE_SECONDS,
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const jti = generateOpaqueId();
@@ -30,7 +31,7 @@ export async function signSession(
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt(now)
-    .setExpirationTime(now + SESSION_MAX_AGE_SECONDS)
+    .setExpirationTime(now + maxAgeSeconds)
     .sign(secretKey(secret));
 }
 
