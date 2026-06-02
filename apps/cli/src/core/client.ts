@@ -9,6 +9,7 @@ export interface PublishOptions {
   ttl?: number
   reads?: number
   permanent?: boolean
+  project?: string
   update_token?: string
   id?: string
 }
@@ -84,6 +85,7 @@ export async function publishHTML(
   if (options.ttl !== undefined) body['ttl'] = options.ttl
   if (options.reads !== undefined) body['reads'] = options.reads
   if (options.permanent === true) body['permanent'] = true
+  if (options.project !== undefined) body['project'] = options.project
   if (options.update_token !== undefined) body['update_token'] = options.update_token
   if (options.id !== undefined) body['id'] = options.id
 

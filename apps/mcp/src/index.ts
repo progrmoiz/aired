@@ -23,6 +23,7 @@ async function publishHTML(
     pin?: string;
     ttl?: number;
     permanent?: boolean;
+    project?: string;
     update_token?: string;
     id?: string;
     apiUrl?: string;
@@ -35,6 +36,7 @@ async function publishHTML(
   if (options.pin !== undefined) body["pin"] = options.pin;
   if (options.ttl !== undefined) body["ttl"] = options.ttl;
   if (options.permanent === true) body["permanent"] = true;
+  if (options.project !== undefined) body["project"] = options.project;
   if (options.update_token !== undefined) body["update_token"] = options.update_token;
   if (options.id !== undefined) body["id"] = options.id;
 
@@ -93,10 +95,11 @@ server.tool(
     pin: z.string().optional().describe("PIN to protect access"),
     ttl_seconds: z.number().optional().describe("Time to live in seconds (default: 604800 = 7 days)"),
     permanent: z.boolean().optional().describe("If true, page never expires"),
+    project: z.string().optional().describe("Group this page under a project on your dashboard (e.g. the repo or app name). Not auto-detected over MCP — pass it explicitly to organize related pages together."),
     update_token: z.string().optional().describe("Pass a previously returned token to update the same URL instead of creating a new one"),
     id: z.string().optional().describe("Page ID — required when update_token is provided to update the same URL"),
   },
-  async ({ html, file_path, title, pin, ttl_seconds, permanent, update_token, id }) => {
+  async ({ html, file_path, title, pin, ttl_seconds, permanent, project, update_token, id }) => {
     // Resolve HTML content
     let content: string;
 
@@ -167,6 +170,7 @@ server.tool(
         pin,
         ttl: ttl_seconds,
         permanent,
+        project,
         update_token,
         id,
       });

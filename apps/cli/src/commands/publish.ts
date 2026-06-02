@@ -10,6 +10,7 @@ import { publishHTML, validateSession } from '../core/client.js'
 import { saveToken } from '../core/store.js'
 import { getSession, clearSession } from '../core/session.js'
 import { isDirectory, bundleDirectory } from '../core/bundler.js'
+import { detectProject } from '../core/project.js'
 
 function parseTtl(ttl: string): number | null {
   const match = /^(\d+)(h|d|m)?$/i.exec(ttl)
@@ -47,6 +48,8 @@ export function makePublishCommand(globalOpts: () => GlobalOpts): Command {
     .option('--ttl <duration>', 'Expiry duration: 1h, 24h, 7d, 30d')
     .option('--permanent', 'No expiry')
     .option('--reads <n>', 'Max read count before page is gone')
+    .option('--project <name>', 'Tag with a project (auto-detected from git/dir by default)')
+    .option('--no-project', 'Do not tag this publish with a project')
     .action(async (file, cmdOpts) => {
       const opts = globalOpts()
       const baseUrl = resolveApiUrl(opts)
@@ -108,6 +111,18 @@ export function makePublishCommand(globalOpts: () => GlobalOpts): Command {
         publishOpts.reads = reads
       }
 
+      // Resolve the project tag. commander sets `project` to false for --no-project,
+      // a string for --project <name>, and true (the --no-project default) otherwise.
+      let resolvedProject: string | null
+      if (cmdOpts.project === false) {
+        resolvedProject = null
+      } else if (typeof cmdOpts.project === 'string') {
+        resolvedProject = cmdOpts.project.trim() || null
+      } else {
+        resolvedProject = detectProject(process.cwd())
+      }
+      if (resolvedProject !== null) publishOpts.project = resolvedProject
+
       // Read session for optional JWT auth
       const session = getSession()
       let jwt = session?.jwt
@@ -151,6 +166,9 @@ export function makePublishCommand(globalOpts: () => GlobalOpts): Command {
           process.stdout.write(pc.green('Published!') + ' ' + pc.bold(result.url) + asLogin + '\n')
           process.stdout.write(pc.dim('Token:   ') + result.update_token + '\n')
           process.stdout.write(pc.dim('Expires: ') + formatExpiry(result.expiresAt) + '\n')
+          if (resolvedProject !== null) {
+            process.stdout.write(pc.dim('Project: ') + resolvedProject + '\n')
+          }
           process.stdout.write('\n')
           process.stdout.write(pc.dim('Update:  ') + `npx aired update ${result.id} new-file.html\n`)
           process.stdout.write(pc.dim('Delete:  ') + `npx aired delete ${result.id}\n`)

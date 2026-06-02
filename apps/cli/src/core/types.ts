@@ -11,6 +11,7 @@ export interface PageInfo {
   size: number
   readCount: number
   expiresAt: string | null
+  project?: string | null
 }
 
 export interface TokenRecord {
