@@ -4,6 +4,8 @@ import { readFileSync, statSync, accessSync, constants } from "node:fs";
 import { readFile, access } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { z } from "zod";
+import { AUTH_HEADER, CSRF_HEADER } from "@aired/core";
+import { readCliSession } from "./session.js";
 
 const DEFAULT_API_URL = "https://aired.sh";
 
@@ -36,9 +38,19 @@ async function publishHTML(
   if (options.update_token !== undefined) body["update_token"] = options.update_token;
   if (options.id !== undefined) body["id"] = options.id;
 
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+
+  // Attach the CLI session if signed in, so the page is owned by the account
+  // (authenticated publishes default to permanent rather than a 7-day expiry).
+  const jwt = readCliSession();
+  if (jwt !== null) {
+    headers[AUTH_HEADER] = jwt;
+    headers[CSRF_HEADER] = "1";
+  }
+
   const resp = await fetch(`${base}/api/publish`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(body),
   });
 
