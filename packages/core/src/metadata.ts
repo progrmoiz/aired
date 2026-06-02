@@ -10,6 +10,9 @@ export type PageMetadata = {
   createdAt: string;
   expiresAt: string | null;
   ownerId: number | null;
+  /** Source project this page was published from. Null for old records (pre-tagging),
+   *  anonymous publishes, or MCP publishes without an explicit project. */
+  project: string | null;
 };
 
 export function serializeMetadata(meta: PageMetadata): string {
@@ -45,6 +48,7 @@ export function parseMetadata(raw: string): PageMetadata | null {
       createdAt: obj["createdAt"],
       expiresAt: typeof obj["expiresAt"] === "string" ? obj["expiresAt"] : null,
       ownerId: typeof obj["ownerId"] === "number" ? obj["ownerId"] : null,
+      project: typeof obj["project"] === "string" ? obj["project"] : null,
     };
   } catch {
     return null;

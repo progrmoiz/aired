@@ -149,6 +149,8 @@ function createAiredMcpServer(env: {
         createdAt: now.toISOString(),
         expiresAt,
         ownerId: null,
+        // Anonymous (ownerId null) — never owner-indexed or grouped, so always Unsorted.
+        project: null,
       };
 
       await env.PAGES_BUCKET.put(`pages/${pageId}/index.html`, html, {

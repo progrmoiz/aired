@@ -13,10 +13,17 @@ import {
   extractTitle,
   parseMetadata,
   serializeMetadata,
+  normalizeProject,
   DEFAULT_TTL,
 } from "@aired/core";
 import type { PageMetadata } from "@aired/core";
-import { addPageToOwner, removePageFromOwner } from "../lib/owner-index.js";
+import {
+  addPageToOwner,
+  removePageFromOwner,
+  addPageToOwnerProject,
+  removePageFromOwnerProject,
+  bumpProjectCount,
+} from "../lib/owner-index.js";
 
 const api = new Hono<AppBindings>();
 
@@ -34,7 +41,7 @@ api.post("/publish", rateLimit(TIERS.anonymous), async (c) => {
   }
 
   const req = body as Record<string, unknown>;
-  const { html, title, pin, ttl, reads, permanent, update_token, id: existingId } = req;
+  const { html, title, pin, ttl, reads, permanent, project, update_token, id: existingId } = req;
 
   if (typeof html !== "string") {
     return c.json({ error: "html is required and must be a string" }, 400);
@@ -133,6 +140,7 @@ api.post("/publish", rateLimit(TIERS.anonymous), async (c) => {
     createdAt: now.toISOString(),
     expiresAt,
     ownerId: user !== null ? user.id : null,
+    project: normalizeProject(project),
   };
 
   try {
@@ -176,6 +184,23 @@ api.post("/publish", rateLimit(TIERS.anonymous), async (c) => {
       );
     } catch (err) {
       console.error('owner-index write failed', { id, ownerId: metadata.ownerId, err });
+    }
+
+    // Write owner+project index + bump the project manifest (best-effort)
+    if (metadata.project !== null) {
+      try {
+        await addPageToOwnerProject(
+          c.env.PAGES_KV,
+          metadata.ownerId,
+          metadata.project,
+          id,
+          metadata.createdAt,
+          metadata.expiresAt,
+        );
+        await bumpProjectCount(c.env.PAGES_KV, metadata.ownerId, metadata.project, 1);
+      } catch (err) {
+        console.error('owner-project-index write failed', { id, ownerId: metadata.ownerId, project: metadata.project, err });
+      }
     }
   }
 
@@ -357,6 +382,22 @@ api.delete("/pages/:id", requireCsrfHeader, async (c) => {
       );
     } catch (err) {
       console.error('owner-index delete failed', { id, ownerId: metadata.ownerId, err });
+    }
+
+    // Remove from owner+project index + decrement the manifest (best-effort)
+    if (metadata.project !== null) {
+      try {
+        await removePageFromOwnerProject(
+          c.env.PAGES_KV,
+          metadata.ownerId,
+          metadata.project,
+          id,
+          metadata.createdAt,
+        );
+        await bumpProjectCount(c.env.PAGES_KV, metadata.ownerId, metadata.project, -1);
+      } catch (err) {
+        console.error('owner-project-index delete failed', { id, ownerId: metadata.ownerId, project: metadata.project, err });
+      }
     }
   }
 

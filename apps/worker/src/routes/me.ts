@@ -6,6 +6,7 @@ import {
   parseMetadata,
   serializeMetadata,
   redactNoreplyEmail,
+  UNSORTED_PROJECT,
 } from '@aired/core';
 import type { PageMetadata } from '@aired/core';
 import { requireAuth } from '../middleware/auth.js';
@@ -16,6 +17,10 @@ import {
   addPageToOwner,
   listPagesForOwner,
   removePageFromOwner,
+  addPageToOwnerProject,
+  listPagesForOwnerProject,
+  listProjectsForOwner,
+  bumpProjectCount,
 } from '../lib/owner-index.js';
 import { clearSessionCookie, readSessionCookie } from '../lib/cookies.js';
 import { AUTH_HEADER } from '@aired/core';
@@ -57,7 +62,9 @@ me.get('/', async (c) => {
   });
 });
 
-// GET /api/me/pages — list pages owned by the authenticated user
+// GET /api/me/pages — list pages owned by the authenticated user.
+// Optional ?project=<name> filters to one project; ?project=__unsorted__ lists
+// pages with no project (including old records published before tagging existed).
 me.get('/pages', async (c) => {
   const user = c.get('user')!;
   const ownerId = user.id;
@@ -65,13 +72,29 @@ me.get('/pages', async (c) => {
   const rawLimit = parseInt(c.req.query('limit') ?? '20', 10);
   const limit = Math.min(isNaN(rawLimit) || rawLimit <= 0 ? 20 : rawLimit, 50);
   const cursor = c.req.query('cursor') || undefined;
+  const projectFilter = c.req.query('project') || undefined;
 
-  const { ids, cursor: nextCursor } = await listPagesForOwner(
-    c.env.PAGES_KV,
-    ownerId,
-    cursor,
-    limit,
-  );
+  // Decide the id source + an optional metadata predicate.
+  // - named project: query the project index, double-check metadata.project matches.
+  // - __unsorted__: walk the flat index, keep only project === null.
+  // - default: the flat index, no project predicate.
+  let ids: string[];
+  let nextCursor: string | null;
+  let predicate: ((m: PageMetadata) => boolean) | null = null;
+
+  if (projectFilter !== undefined && projectFilter !== UNSORTED_PROJECT) {
+    const res = await listPagesForOwnerProject(c.env.PAGES_KV, ownerId, projectFilter, cursor, limit);
+    ids = res.ids;
+    nextCursor = res.cursor;
+    predicate = (m) => m.project === projectFilter;
+  } else {
+    const res = await listPagesForOwner(c.env.PAGES_KV, ownerId, cursor, limit);
+    ids = res.ids;
+    nextCursor = res.cursor;
+    if (projectFilter === UNSORTED_PROJECT) {
+      predicate = (m) => m.project === null;
+    }
+  }
 
   // Fetch all page metadata in parallel
   const rawPages = await Promise.all(
@@ -90,6 +113,7 @@ me.get('/pages', async (c) => {
     expiresAt: string | null;
     hasPin: boolean;
     ownerId: number | null;
+    project: string | null;
   }> = [];
 
   for (const raw of rawPages) {
@@ -98,6 +122,8 @@ me.get('/pages', async (c) => {
     if (metadata === null) continue;
     // Self-heal: filter stale index entries where ownerId doesn't match
     if (metadata.ownerId !== ownerId) continue;
+    // Apply the project predicate (self-heals stale project-index entries too)
+    if (predicate !== null && !predicate(metadata)) continue;
     pages.push({
       id: metadata.id,
       title: metadata.title,
@@ -109,10 +135,18 @@ me.get('/pages', async (c) => {
       expiresAt: metadata.expiresAt,
       hasPin: metadata.pin !== null,
       ownerId: metadata.ownerId,
+      project: metadata.project,
     });
   }
 
   return c.json({ pages, cursor: nextCursor });
+});
+
+// GET /api/me/projects — distinct projects for the authenticated user, with counts.
+me.get('/projects', async (c) => {
+  const user = c.get('user')!;
+  const projects = await listProjectsForOwner(c.env.PAGES_KV, user.id);
+  return c.json({ projects });
 });
 
 // POST /api/me/claim — claim a single page by id + update_token
@@ -347,6 +381,47 @@ me.delete('/', requireCsrfHeader, async (c) => {
         }
         sweepCursor = list.cursor ?? undefined;
       }
+
+      // Second sweep: delete the owner's project-index entries (page records were
+      // already handled above — here we only clear the secondary index keys).
+      let projectSweepCursor: string | undefined = undefined;
+      while (true) {
+        const listOptions: KVNamespaceListOptions = {
+          prefix: kvKeys.pagesByOwnerProjectOwnerPrefix(userId),
+          limit: 50,
+        };
+        if (projectSweepCursor) {
+          listOptions.cursor = projectSweepCursor;
+        }
+
+        let list: KVNamespaceListResult<unknown, string>;
+        try {
+          list = await c.env.PAGES_KV.list(listOptions);
+        } catch (err) {
+          console.error('Failed to list project index during account deletion sweep:', err);
+          break;
+        }
+
+        for (const entry of list.keys) {
+          try {
+            await c.env.PAGES_KV.delete(entry.name);
+          } catch (err) {
+            console.error('Failed to delete project index entry during deletion sweep:', { key: entry.name, err });
+          }
+        }
+
+        if (list.list_complete) {
+          break;
+        }
+        projectSweepCursor = list.cursor ?? undefined;
+      }
+
+      // Finally, drop the project manifest.
+      try {
+        await c.env.PAGES_KV.delete(kvKeys.projectsByOwner(userId));
+      } catch (err) {
+        console.error('Failed to delete project manifest during deletion sweep:', err);
+      }
     })(),
   );
 
@@ -412,6 +487,16 @@ async function claimPage(
     await addPageToOwner(kv, userId, pageId, metadata.createdAt, metadata.expiresAt);
   } catch (err) {
     console.error('owner-index write failed during claim', { pageId, userId, err });
+  }
+
+  // Mirror create: index + count the page under its project (best-effort)
+  if (metadata.project !== null) {
+    try {
+      await addPageToOwnerProject(kv, userId, metadata.project, pageId, metadata.createdAt, metadata.expiresAt);
+      await bumpProjectCount(kv, userId, metadata.project, 1);
+    } catch (err) {
+      console.error('owner-project-index write failed during claim', { pageId, userId, project: metadata.project, err });
+    }
   }
 
   // Step 6: return success
