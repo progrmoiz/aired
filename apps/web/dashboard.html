@@ -58,6 +58,17 @@
       border-color: #3b3b40;
     }
 
+    /* Project group header chevron — rotates when the group is expanded */
+    .group-chevron {
+      transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .group-header[aria-expanded="true"] .group-chevron {
+      transform: rotate(90deg);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .group-chevron { transition: none; }
+    }
+
     .sr-only {
       position: absolute;
       width: 1px;
@@ -98,37 +109,39 @@
       <a id="hero-publish" href="/" class="text-sm text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150 focus-ring rounded-sm whitespace-nowrap">Publish another →</a>
     </section>
 
-    <!-- page list -->
-    <ul id="page-list" class="divide-y divide-aired-border" aria-label="Published pages">
+    <!-- page list, grouped by project (filled by dashboard.js) -->
+    <div id="project-groups" aria-label="Published pages grouped by project">
       <!-- skeleton rows match real row layout: title + (id · age) | views | Copy | Delete -->
-      <li class="skeleton-row flex items-center gap-3 min-h-[44px] py-3">
-        <div class="flex-1 min-w-0 flex flex-col gap-1.5">
-          <div class="h-3 w-48 rounded-sm bg-aired-surface-hover"></div>
-          <div class="h-2.5 w-32 rounded-sm bg-aired-surface-hover"></div>
+      <div id="initial-skeleton" class="divide-y divide-aired-border">
+        <div class="skeleton-row flex items-center gap-3 min-h-[44px] py-3">
+          <div class="flex-1 min-w-0 flex flex-col gap-1.5">
+            <div class="h-3 w-48 rounded-sm bg-aired-surface-hover"></div>
+            <div class="h-2.5 w-32 rounded-sm bg-aired-surface-hover"></div>
+          </div>
+          <div class="h-3 w-12 rounded-sm bg-aired-surface-hover"></div>
+          <div class="h-3 w-8 rounded-sm bg-aired-surface-hover"></div>
+          <div class="h-3 w-10 rounded-sm bg-aired-surface-hover"></div>
         </div>
-        <div class="h-3 w-12 rounded-sm bg-aired-surface-hover"></div>
-        <div class="h-3 w-8 rounded-sm bg-aired-surface-hover"></div>
-        <div class="h-3 w-10 rounded-sm bg-aired-surface-hover"></div>
-      </li>
-      <li class="skeleton-row flex items-center gap-3 min-h-[44px] py-3" style="animation-delay: 0.2s;">
-        <div class="flex-1 min-w-0 flex flex-col gap-1.5">
-          <div class="h-3 w-36 rounded-sm bg-aired-surface-hover"></div>
-          <div class="h-2.5 w-24 rounded-sm bg-aired-surface-hover"></div>
+        <div class="skeleton-row flex items-center gap-3 min-h-[44px] py-3" style="animation-delay: 0.2s;">
+          <div class="flex-1 min-w-0 flex flex-col gap-1.5">
+            <div class="h-3 w-36 rounded-sm bg-aired-surface-hover"></div>
+            <div class="h-2.5 w-24 rounded-sm bg-aired-surface-hover"></div>
+          </div>
+          <div class="h-3 w-12 rounded-sm bg-aired-surface-hover"></div>
+          <div class="h-3 w-8 rounded-sm bg-aired-surface-hover"></div>
+          <div class="h-3 w-10 rounded-sm bg-aired-surface-hover"></div>
         </div>
-        <div class="h-3 w-12 rounded-sm bg-aired-surface-hover"></div>
-        <div class="h-3 w-8 rounded-sm bg-aired-surface-hover"></div>
-        <div class="h-3 w-10 rounded-sm bg-aired-surface-hover"></div>
-      </li>
-      <li class="skeleton-row flex items-center gap-3 min-h-[44px] py-3" style="animation-delay: 0.4s;">
-        <div class="flex-1 min-w-0 flex flex-col gap-1.5">
-          <div class="h-3 w-56 rounded-sm bg-aired-surface-hover"></div>
-          <div class="h-2.5 w-28 rounded-sm bg-aired-surface-hover"></div>
+        <div class="skeleton-row flex items-center gap-3 min-h-[44px] py-3" style="animation-delay: 0.4s;">
+          <div class="flex-1 min-w-0 flex flex-col gap-1.5">
+            <div class="h-3 w-56 rounded-sm bg-aired-surface-hover"></div>
+            <div class="h-2.5 w-28 rounded-sm bg-aired-surface-hover"></div>
+          </div>
+          <div class="h-3 w-12 rounded-sm bg-aired-surface-hover"></div>
+          <div class="h-3 w-8 rounded-sm bg-aired-surface-hover"></div>
+          <div class="h-3 w-10 rounded-sm bg-aired-surface-hover"></div>
         </div>
-        <div class="h-3 w-12 rounded-sm bg-aired-surface-hover"></div>
-        <div class="h-3 w-8 rounded-sm bg-aired-surface-hover"></div>
-        <div class="h-3 w-10 rounded-sm bg-aired-surface-hover"></div>
-      </li>
-    </ul>
+      </div>
+    </div>
 
     <!-- empty state — single inline line, no card, no illustration -->
     <p id="empty-state" class="hidden text-sm text-aired-text-secondary py-3">
