@@ -5,7 +5,8 @@
     "dev": "pnpm --filter @aired/worker dev",
     "build": "pnpm run build:css && pnpm -r build",
     "build:css": "npx tailwindcss -c apps/web/tailwind.config.js -i apps/web/src/input.css -o apps/web/style.css --minify",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r --if-present run test"
   },
   "devDependencies": {
     "tailwindcss": "3",
