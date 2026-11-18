@@ -4,10 +4,11 @@
   "description": "Publish HTML artifacts to shareable URLs instantly",
   "type": "module",
   "bin": {
-    "aired": "./dist/cli.cjs"
+    "aired": "./bin/aired"
   },
   "files": [
     "dist/cli.cjs",
+    "bin/",
     "SKILL.md"
   ],
   "scripts": {

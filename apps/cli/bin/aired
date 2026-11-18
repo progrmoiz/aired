@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Launcher: runs dist/cli.cjs on a Node >= 20 (see node-pick.sh), with the usual tool
+# folders on PATH so Homebrew and Python tools are found even from a bare shell.
+here="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+for d in /opt/homebrew/bin /usr/local/bin "$HOME/.local/bin" /Library/Frameworks/Python.framework/Versions/*/bin; do
+  [ -d "$d" ] || continue
+  case ":$PATH:" in *":$d:"*) ;; *) PATH="$PATH:$d" ;; esac
+done
+node_bin="$("$here/node-pick.sh")"
+PATH="$(dirname "$node_bin"):$PATH"
+export PATH
+exec "$node_bin" "$here/../dist/cli.cjs" "$@"
