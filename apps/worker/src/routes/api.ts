@@ -4,6 +4,7 @@ import { loadStats, saveStats } from "../lib/stats.js";
 import { rateLimit } from "../middleware/rate-limit.js";
 import { requireCsrfHeader } from "../middleware/csrf.js";
 import { TIERS } from "../lib/rate-limit-tiers.js";
+import { detectSpam, SPAM_REJECTION } from "../lib/spam.js";
 import {
   generateId,
   generateToken,
@@ -57,6 +58,17 @@ api.post("/publish", rateLimit(TIERS.anonymous), async (c) => {
     extractTitle(html);
 
   const origin = new URL(c.req.url).origin;
+  const user = c.get('user');
+
+  // Anonymous publishes (create or update) are screened for spam.
+  // Signed-in publishers are accountable and skip the filter.
+  if (user === null) {
+    const verdict = detectSpam(html, resolvedTitle);
+    if (verdict.spam) {
+      console.log({ event: "spam_rejected", route: "api_publish", reason: verdict.reason });
+      return c.json({ error: SPAM_REJECTION }, 422);
+    }
+  }
 
   // Update path: update_token + id provided
   if (typeof update_token === "string" && typeof existingId === "string") {
@@ -110,8 +122,6 @@ api.post("/publish", rateLimit(TIERS.anonymous), async (c) => {
   const id = generateId();
   const token = generateToken();
   const tokenHash = await hashToken(token);
-
-  const user = c.get('user');
 
   // Authenticated publishers default to permanent (no expiry).
   // Explicit `permanent: false` or an explicit `ttl` opts back into expiration.
@@ -283,6 +293,16 @@ api.put("/pages/:id", requireCsrfHeader, async (c) => {
       return c.json({ error: "Invalid update token" }, 403);
     }
     return c.json({ error: "update_token required" }, 400);
+  }
+
+  // Anonymous pages are screened on update too, so a clean page can't be
+  // swapped for spam after publishing.
+  if (metadata.ownerId === null) {
+    const verdict = detectSpam(html, resolvedTitle);
+    if (verdict.spam) {
+      console.log({ event: "spam_rejected", route: "api_put", reason: verdict.reason });
+      return c.json({ error: SPAM_REJECTION }, 422);
+    }
   }
 
   await c.env.PAGES_BUCKET.put(`pages/${id}/index.html`, html, {

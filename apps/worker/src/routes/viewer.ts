@@ -88,7 +88,7 @@ viewer.get("/p/:id", async (c) => {
   );
 
   const headers = new Headers();
-  applyPageHeaders(headers);
+  applyPageHeaders(headers, { indexable: metadata.ownerId !== null });
 
   // Extract title from HTML for OG tags
   const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);

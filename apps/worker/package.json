@@ -7,7 +7,8 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
-    "build": "tsc --noEmit"
+    "build": "tsc --noEmit",
+    "test": "node --experimental-strip-types --no-warnings --test 'test/*.test.ts'"
   },
   "dependencies": {
     "@aired/core": "workspace:*",

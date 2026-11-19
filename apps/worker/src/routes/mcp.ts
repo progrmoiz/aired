@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Context } from "hono";
 import type { AppBindings } from "../types.js";
 import { loadStats, saveStats } from "../lib/stats.js";
+import { detectSpam, SPAM_REJECTION } from "../lib/spam.js";
 import {
   generateId,
   generateToken,
@@ -62,6 +63,16 @@ function createAiredMcpServer(env: {
 
       const resolvedTitle =
         (title && title.trim() ? title.trim() : null) ?? extractTitle(html);
+
+      // Remote MCP publishes are always anonymous, so every one is screened.
+      const verdict = detectSpam(html, resolvedTitle);
+      if (verdict.spam) {
+        console.log({ event: "spam_rejected", route: "mcp", reason: verdict.reason });
+        return {
+          content: [{ type: "text" as const, text: SPAM_REJECTION }],
+          isError: true,
+        };
+      }
 
       // Update path
       if (

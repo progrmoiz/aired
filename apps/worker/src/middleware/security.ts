@@ -24,11 +24,18 @@ export async function securityHeadersMiddleware(
 
 /**
  * Apply CSP and security headers to an HTML response for a published page.
+ *
+ * Anonymous pages are never indexable: search engines are told not to index
+ * them or follow their links. That removes the payoff for backlink spam, which
+ * only works if the page ranks and passes link equity from aired.sh.
  */
-export function applyPageHeaders(headers: Headers): void {
+export function applyPageHeaders(headers: Headers, opts: { indexable: boolean }): void {
   headers.set("Content-Type", "text/html; charset=utf-8");
   headers.set("Content-Security-Policy", PAGE_CSP);
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("X-Frame-Options", "DENY");
   headers.set("Referrer-Policy", "no-referrer");
+  if (!opts.indexable) {
+    headers.set("X-Robots-Tag", "noindex, nofollow");
+  }
 }
