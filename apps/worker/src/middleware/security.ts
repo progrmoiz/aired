@@ -2,11 +2,35 @@ import type { Context } from "hono";
 import type { AppBindings } from "../types.js";
 
 /**
+ * Sandbox flags for served pages. `allow-same-origin` is deliberately absent:
+ * the page runs in an opaque origin, so its scripts cannot call aired.sh's
+ * API with the visitor's session (the cookie is SameSite=Lax and CORS only
+ * allows https://aired.sh). Without this, any published page could read a
+ * signed-in visitor's account or delete their pages.
+ *
+ * allow-forms keeps JS `submit` handlers firing (form-action 'none' still
+ * blocks real submissions). allow-popups-to-escape-sandbox lets links that
+ * open new tabs, like the report link, load normally.
+ */
+export const PAGE_SANDBOX = [
+  "allow-scripts",
+  "allow-forms",
+  "allow-modals",
+  "allow-popups",
+  "allow-popups-to-escape-sandbox",
+  "allow-downloads",
+  "allow-pointer-lock",
+  "allow-presentation",
+  "allow-orientation-lock",
+].join(" ");
+
+/**
  * CSP header value for served pages.
- * Allows full JS execution while blocking form submissions and framing.
+ * Allows full JS execution while blocking form submissions and framing, and
+ * sandboxes the page into its own origin.
  */
 export const PAGE_CSP =
-  "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; form-action 'none'; frame-ancestors 'none'";
+  `default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; form-action 'none'; frame-ancestors 'none'; sandbox ${PAGE_SANDBOX}`;
 
 /**
  * Hono middleware: add security headers to all responses.

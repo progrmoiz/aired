@@ -4,6 +4,7 @@ import type { AppBindings } from "../types.js";
 import { parseMetadata, serializeMetadata } from "@aired/core";
 import { applyPageHeaders } from "../middleware/security.js";
 import { loadStats, saveStats } from "../lib/stats.js";
+import { SANDBOX_SHIM, injectEarlyScript } from "../lib/sandbox-shim.js";
 
 const viewer = new Hono<AppBindings>();
 
@@ -94,11 +95,16 @@ viewer.get("/p/:id", async (c) => {
   const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
   const pageTitle = titleMatch?.[1]?.trim() || metadata.title || "Shared page";
 
-  const wrappedHtml = injectAiredBar(html, {
-    id,
-    title: pageTitle,
-    readCount: newReadCount,
-  });
+  // The shim must run before page scripts, so it goes in after the bar's
+  // own <head> injection.
+  const wrappedHtml = injectEarlyScript(
+    injectAiredBar(html, {
+      id,
+      title: pageTitle,
+      readCount: newReadCount,
+    }),
+    SANDBOX_SHIM,
+  );
 
   return new Response(wrappedHtml, { status: 200, headers });
 });
