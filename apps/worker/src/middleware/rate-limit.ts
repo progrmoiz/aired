@@ -2,6 +2,7 @@ import type { Context, Next } from "hono";
 import type { AppBindings } from "../types.js";
 import { hashToHex } from "@aired/core";
 import type { RateLimitTier } from "../lib/rate-limit-tiers.js";
+import { underBurstLimit } from "../lib/burst-limit.js";
 
 /**
  * In-memory rate limit store.
@@ -84,6 +85,18 @@ export function rateLimit(
     }
 
     const key = `${tier.bucketPrefix}:${bucketSubKey}`;
+
+    // Per-minute flood guard for anonymous traffic, counted by Cloudflare
+    // rather than per isolate.
+    if (tier.burst !== undefined && !c.get("user")) {
+      if (!(await underBurstLimit(c.env[tier.burst], key))) {
+        return c.json(
+          { error: "Too many requests. Please wait a minute and try again." },
+          429,
+        );
+      }
+    }
+
     const { allowed } = checkRateLimit(key, tier.limit, tier.windowSeconds);
 
     maybePrune();

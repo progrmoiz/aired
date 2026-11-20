@@ -13,6 +13,7 @@ import { rateLimit } from "./middleware/rate-limit.js";
 import { corsMiddleware } from "./middleware/cors.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { TIERS } from "./lib/rate-limit-tiers.js";
+import { isMcpToolCall } from "./lib/mcp-rpc.js";
 
 const app = new Hono<AppBindings>();
 
@@ -40,9 +41,23 @@ app.use("*", authMiddleware);
 app.get("/health", (c) => c.json({ status: "ok" }));
 
 // MCP Streamable HTTP endpoint
-// POST is a publish/update mutation — rate-limited.
-// Non-POST (initialize, tools/list, etc.) passes through without rate-limit.
-app.post("/mcp", rateLimit(TIERS.anonymous), handleMcp);
+// Every JSON-RPC message is a POST, so only tool calls (publishes) are
+// rate-limited; initialize, tools/list and notifications pass through.
+const mcpPublishLimit = rateLimit(TIERS.anonymous);
+app.post(
+  "/mcp",
+  async (c, next) => {
+    let body: unknown = null;
+    try {
+      body = await c.req.raw.clone().json();
+    } catch {
+      // Malformed body: let the MCP handler return the JSON-RPC error.
+    }
+    if (isMcpToolCall(body)) return mcpPublishLimit(c, next);
+    await next();
+  },
+  handleMcp,
+);
 app.on(["GET", "DELETE", "OPTIONS"], "/mcp", handleMcp);
 
 // OG image route

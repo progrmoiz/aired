@@ -8,6 +8,9 @@ export type Env = {
   SESSION_VALID_SINCE: string;
   GITHUB_CLIENT_ID: string;
   GITHUB_CLIENT_SECRET: string;
+  /** Workers Rate Limiting bindings (wrangler.toml [[ratelimits]]). Optional so tests run without them. */
+  PUBLISH_BURST?: RateLimit;
+  REPORT_BURST?: RateLimit;
 };
 
 export type AppBindings = {

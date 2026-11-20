@@ -1,10 +1,14 @@
 import { Hono } from "hono";
 import type { AppBindings } from "../types.js";
+import { rateLimit } from "../middleware/rate-limit.js";
+import { TIERS } from "../lib/rate-limit-tiers.js";
+import { parseReport } from "../lib/report.js";
 
 const report = new Hono<AppBindings>();
 
-// POST /api/report — store a content report in KV
-report.post("/report", async (c) => {
+// POST /api/report — store an abuse report in KV for review.
+// Reviewed with `node scripts/abuse.mjs list`.
+report.post("/report", rateLimit(TIERS.report), async (c) => {
   let body: unknown;
   try {
     body = await c.req.json();
@@ -12,34 +16,27 @@ report.post("/report", async (c) => {
     return c.json({ error: "Invalid JSON body" }, 400);
   }
 
-  if (typeof body !== "object" || body === null || Array.isArray(body)) {
-    return c.json({ error: "Request body must be a JSON object" }, 400);
+  const parsed = parseReport(body);
+  if (!parsed.ok) {
+    return c.json({ error: parsed.error }, 400);
+  }
+  const { pageId, category, reason, contact } = parsed.report;
+
+  // Only accept reports for pages that exist, so the queue holds no junk.
+  const exists = await c.env.PAGES_KV.get(`page:${pageId}`);
+  if (exists === null) {
+    return c.json({ error: "Page not found. It may already be removed." }, 404);
   }
 
-  const { id, reason } = body as Record<string, unknown>;
-
-  if (typeof id !== "string" || id.trim().length === 0) {
-    return c.json({ error: "id is required" }, 400);
-  }
-
-  if (typeof reason !== "string" || reason.trim().length === 0) {
-    return c.json({ error: "reason is required" }, 400);
-  }
-
-  const timestamp = new Date().toISOString();
-  const reportKey = `report:${id.trim()}:${timestamp}`;
-
-  // Store report — keep for 30 days for review
+  const reportedAt = new Date().toISOString();
   await c.env.PAGES_KV.put(
-    reportKey,
-    JSON.stringify({
-      pageId: id.trim(),
-      reason: reason.trim().slice(0, 500),
-      reportedAt: timestamp,
-    }),
+    `report:${pageId}:${reportedAt}`,
+    JSON.stringify({ pageId, category, reason, contact, reportedAt }),
+    // Keep for 30 days for review
     { expirationTtl: 60 * 60 * 24 * 30 },
   );
 
+  console.log({ event: "page_reported", pageId, category });
   return c.json({ ok: true });
 });
 

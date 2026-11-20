@@ -20,6 +20,19 @@ bucket_name = "aired-pages"
 binding = "PAGES_KV"
 id = "6388d6b3b6c04fe5ad8529ae029e723e"
 
+# Per-minute flood guards for anonymous traffic, counted by Cloudflare per
+# location (no KV writes). The hourly limits live in middleware/rate-limit.ts.
+# Real spam ran at most 2 publishes a minute, so 6 only catches floods.
+[[ratelimits]]
+name = "PUBLISH_BURST"
+namespace_id = "1001"
+simple = { limit = 6, period = 60 }
+
+[[ratelimits]]
+name = "REPORT_BURST"
+namespace_id = "1002"
+simple = { limit = 3, period = 60 }
+
 # Custom domain
 [[routes]]
 pattern = "aired.sh/*"

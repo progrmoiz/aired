@@ -335,7 +335,7 @@ url = "https://aired.sh/mcp"</code></pre>
             <tr><td><code>DELETE</code></td><td><code>/api/pages/:id</code></td><td>Delete by <code>Authorization: Bearer &lt;token&gt;</code> header.</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/pages/:id</code></td><td>Public metadata: <code>{ id, title, size, readCount, expiresAt }</code>. No auth.</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/stats</code></td><td>Aggregate counts and recent publishes for the homepage feed.</td></tr>
-            <tr><td><code>POST</code></td><td><code>/api/report</code></td><td>Body <code>{ id, reason }</code>. Flag a page for abuse review.</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/report</code></td><td>Body <code>{ id, category?, reason, contact? }</code>. <code>id</code> is a page ID or URL; <code>category</code> is one of <code>spam</code>, <code>phishing</code>, <code>malware</code>, <code>illegal</code>, <code>other</code>. Flags a page for abuse review. Or use the <a href="/abuse" class="underline">report form</a>.</td></tr>
             <tr><td><code>GET</code></td><td><code>/og/:id</code></td><td>Generated Open Graph image for the page.</td></tr>
             <tr><td><code>GET</code></td><td><code>/p/:id</code></td><td>Public viewer for a published page.</td></tr>
             <tr><td><code>POST</code></td><td><code>/p/:id/verify-pin</code></td><td>Submit a PIN to view a protected page.</td></tr>
@@ -463,6 +463,7 @@ url = "https://aired.sh/mcp"</code></pre>
     <div class="flex flex-col sm:flex-row items-center justify-between gap-2 text-2xs text-aired-text-tertiary">
       <p>Built by <a href="https://x.com/iammoizfarooq" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">@iammoizfarooq</a></p>
       <div class="flex items-center gap-4">
+        <a href="/abuse" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Report abuse</a>
         <a href="/llms.txt" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150 font-mono">llms.txt</a>
         <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">GitHub</a>
         <a href="https://workers.cloudflare.com" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Cloudflare</a>
