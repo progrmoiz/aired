@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tiiny Host alternative: free HTML links, no sign-up — aired</title>
+  <meta name="description" content="aired vs Tiiny Host for sharing an HTML page: no email sign-up, free PIN protection, no fixed project limit, and publishing straight from Claude, ChatGPT and AI agents." />
+  <link rel="canonical" href="https://aired.sh/tiiny-host-alternative" />
+  <meta property="og:site_name" content="aired" />
+  <meta property="og:url" content="https://aired.sh/tiiny-host-alternative" />
+  <meta property="og:title" content="Tiiny Host alternative: free HTML links, no sign-up — aired" />
+  <meta property="og:description" content="aired vs Tiiny Host for sharing an HTML page: no email sign-up, free PIN protection, no fixed project limit, and publishing straight from Claude, ChatGPT and AI agents." />
+  <meta property="og:type" content="article" />
+  <meta property="og:image" content="https://aired.sh/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Tiiny Host alternative: free HTML links, no sign-up — aired" />
+  <meta name="twitter:description" content="aired vs Tiiny Host for sharing an HTML page: no email sign-up, free PIN protection, no fixed project limit, and publishing straight from Claude, ChatGPT and AI agents." />
+  <meta name="twitter:image" content="https://aired.sh/og.png" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebPage",
+        "@id": "https://aired.sh/tiiny-host-alternative#page",
+        "url": "https://aired.sh/tiiny-host-alternative",
+        "name": "Tiiny Host alternative: free HTML links, no sign-up — aired",
+        "description": "aired vs Tiiny Host for sharing an HTML page: no email sign-up, free PIN protection, no fixed project limit, and publishing straight from Claude, ChatGPT and AI agents.",
+        "isPartOf": {
+          "@id": "https://aired.sh/#website"
+        },
+        "about": {
+          "@id": "https://aired.sh/#app"
+        },
+        "dateModified": "2026-11-21"
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "aired",
+            "item": "https://aired.sh/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Tiiny Host alternative",
+            "item": "https://aired.sh/tiiny-host-alternative"
+          }
+        ]
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://aired.sh/#website",
+        "name": "aired",
+        "url": "https://aired.sh/"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://aired.sh/#app",
+        "name": "aired",
+        "url": "https://aired.sh/",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Web, macOS, Windows, Linux",
+        "isAccessibleForFree": true,
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://aired.sh/tiiny-host-alternative#faq",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Is aired a free alternative to Tiiny Host?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Publishing, viewing and PIN protection are free, with no email sign-up."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I use my own domain on aired?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Not yet. Pages live at aired.sh/p/. If you need a custom domain today, Tiiny Host offers one on its Solo plan."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I upload a zip file?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "The web form takes one HTML file. To publish a folder, run npx aired ./folder, which bundles CSS, JavaScript and images into a single page."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does aired work with pages made by ChatGPT or Claude?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Copy the HTML from the chat and paste it in, or connect your AI tool so it can publish for you."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Do aired pages expire?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Only if you want them to. The default is 7 days, and you can choose 1 hour, 1 day, 30 days or permanent."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+  <link rel="icon" href="/favicon-16.png" type="image/png" sizes="16x16" />
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #0a0a0b;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Textarea */
+    textarea { resize: none; }
+    textarea:focus { outline: none; }
+    textarea::placeholder { color: #56565a; }
+
+    /* Number input spinners */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type="number"] { -moz-appearance: textfield; }
+
+    /* Select arrow override */
+    select { background-image: none; }
+
+    /* Hidden file input */
+    #file-input { display: none; }
+
+    /* Drag state */
+    .paste-area { position: relative; }
+    .drag-hint { display: none; }
+    .paste-area.drag-over .drag-hint {
+      display: flex;
+    }
+
+    /* Subtle glow on form focus */
+    .form-container:focus-within {
+      box-shadow: 0 0 0 1px #3b3b40, 0 0 40px -12px rgba(124, 106, 239, 0.08);
+    }
+
+    /* Smooth transitions */
+    .btn-primary {
+      transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .btn-primary:not(:disabled):hover {
+      background-color: #8b7bf2;
+    }
+    .btn-primary:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    /* Copy button states */
+    .copy-btn {
+      transition: all 120ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .copy-btn:hover {
+      background-color: #18181b;
+      border-color: #3b3b40;
+    }
+    .copy-btn.copied {
+      color: #34d399;
+      border-color: rgba(52, 211, 153, 0.3);
+    }
+
+    /* Result card animation */
+    .result-card {
+      transition: opacity 200ms cubic-bezier(0.16, 1, 0.3, 1),
+                  transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* Install card hover */
+    .install-card {
+      transition: border-color 150ms ease, background-color 150ms ease;
+    }
+    .install-card:hover {
+      border-color: #3b3b40;
+      background-color: rgba(17, 17, 19, 0.5);
+    }
+
+    /* Keyboard shortcut badge */
+    kbd {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.6875rem;
+      padding: 1px 5px;
+      border-radius: 4px;
+      border: 1px solid #222225;
+      background: #111113;
+      color: #56565a;
+    }
+
+    /* Focus ring utility */
+    .focus-ring:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px #0a0a0b, 0 0 0 4px rgba(124, 106, 239, 0.4);
+    }
+
+    /* Hero globe */
+    .hero-section { position: relative; overflow: visible; }
+    .hero-globe {
+      position: absolute;
+      right: -180px;
+      top: 50%;
+      transform: translateY(-55%);
+      width: 550px;
+      height: 550px;
+      opacity: 0.35;
+      pointer-events: none;
+      z-index: 0;
+      filter: saturate(1.2);
+    }
+    .hero-section::after {
+      content: '';
+      position: absolute;
+      right: -60px;
+      top: 50%;
+      transform: translateY(-55%);
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(124, 106, 239, 0.06) 0%, rgba(124, 106, 239, 0.02) 40%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    @media (max-width: 640px) {
+      .hero-globe, .hero-section::after { display: none; }
+    }
+
+    /* Form sits above globe */
+    .form-container, #air-form, .result-card, #error-msg { position: relative; z-index: 10; }
+
+    /* Marquee feed */
+    .marquee-wrapper {
+      overflow: hidden;
+      mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+      -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+    }
+    .marquee-track {
+      display: flex;
+      gap: 2rem;
+      white-space: nowrap;
+      animation: marquee-scroll 30s linear infinite;
+    }
+    @keyframes marquee-scroll {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    /* Setup-copy button */
+    .setup-btn {
+      transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1), transform 120ms ease;
+    }
+    .setup-btn:hover { background-color: #ffffff; }
+    .setup-btn:active { transform: translateY(1px); }
+    .setup-btn.copied { background-color: #34d399; color: #0a0a0b; }
+    .setup-btn .setup-btn-icon { opacity: 0.7; }
+
+    /* Agent icons */
+    .agent-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      transition: color 150ms ease;
+    }
+    .agent-icon:hover { color: #ededef; }
+  </style>
+  <style>
+    .guide { font-size: 0.875rem; line-height: 1.5rem; }
+    .guide h2 { color: #ededef; font-size: 1.125rem; line-height: 1.75rem; font-weight: 500; letter-spacing: -0.01em; margin-top: 3rem; }
+    .guide h3 { color: #ededef; font-size: 0.875rem; font-weight: 500; margin-top: 1.5rem; }
+    .guide p { color: #8a8a8e; line-height: 1.625; margin-top: 0.75rem; }
+    .guide ul, .guide ol { color: #8a8a8e; margin-top: 0.75rem; padding-left: 1.25rem; }
+    .guide ul { list-style: disc; }
+    .guide ol { list-style: decimal; }
+    .guide li { margin-top: 0.375rem; line-height: 1.625; }
+    .guide li::marker { color: #56565a; }
+    .guide strong { color: #ededef; font-weight: 500; }
+    .guide a { color: #ededef; text-decoration: underline; text-decoration-color: #3b3b40; transition: text-decoration-color 150ms ease; }
+    .guide a:hover { text-decoration-color: #8a8a8e; }
+    .guide code { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace; font-size: 0.8125em; color: #ededef; background: #111113; border: 1px solid #222225; border-radius: 4px; padding: 1px 5px; }
+    .guide .table-wrap { margin-top: 1rem; overflow-x: auto; border: 1px solid #222225; border-radius: 12px; }
+    .guide table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; min-width: 520px; }
+    .guide th, .guide td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid #222225; }
+    .guide tr:last-child td { border-bottom: 0; }
+    .guide th { color: #8a8a8e; font-weight: 500; background: #111113; }
+    .guide td { color: #8a8a8e; }
+    .guide td:first-child { color: #ededef; }
+    .guide .note { font-size: 0.75rem; color: #56565a; margin-top: 0.5rem; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col text-aired-text-primary">
+
+  <!-- ─── Header ─── -->
+  <header class="w-full px-6 h-14 flex items-center justify-between max-w-2xl mx-auto">
+    <a href="/" class="text-base font-semibold tracking-tight text-aired-text-primary hover:text-white transition-colors duration-150">aired</a>
+    <nav class="flex items-center gap-5 text-sm text-aired-text-secondary">
+      <a href="/docs" class="hover:text-aired-text-primary transition-colors duration-150">Docs</a>
+      <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener"
+         class="flex items-center gap-1.5 hover:text-aired-text-primary transition-colors duration-150">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+        GitHub
+      </a>
+      <a id="nav-auth" href="/auth/github?return=/dashboard"
+         class="hidden hover:text-aired-text-primary transition-colors duration-150 focus-ring rounded-sm">sign in</a>
+    </nav>
+  </header>
+
+  <!-- ─── Main ─── -->
+  <main class="flex-1 w-full max-w-2xl mx-auto px-6">
+
+    <!-- ─── Title + Form ─── -->
+    <section class="mt-12 sm:mt-16">
+      <nav aria-label="Breadcrumb" class="mb-4 text-2xs text-aired-text-tertiary">
+        <a href="/" class="hover:text-aired-text-secondary transition-colors duration-150">aired</a>
+        <span aria-hidden="true" class="mx-1">/</span>
+        <span>Tiiny Host alternative</span>
+      </nav>
+      <div class="mb-8">
+        <h1 class="text-xl font-medium tracking-tight text-aired-text-primary">A Tiiny Host alternative for quick HTML links</h1>
+        <p class="mt-2 text-sm text-aired-text-secondary leading-relaxed">Tiiny Host is a solid host for small sites. If what you mostly do is send one HTML page, from Claude, ChatGPT or your own files, aired gets you a link without an email sign-up, and password protection is free.</p>
+      </div>
+
+      <!-- Form -->
+      <form id="air-form">
+        <div class="form-container border border-aired-border rounded-lg bg-aired-surface overflow-hidden transition-shadow duration-200">
+
+          <!-- Editor area -->
+          <div class="paste-area">
+            <!-- Empty state hint (shown when textarea is empty) -->
+            <div id="empty-hint" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-[1] transition-opacity duration-150">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-aired-text-tertiary mb-2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+              <span class="text-sm text-aired-text-tertiary">Paste HTML or drop a file</span>
+              <span class="text-2xs text-aired-text-tertiary mt-1">⌘V to paste · 2 MB max</span>
+            </div>
+            <!-- Textarea -->
+            <textarea
+              id="html-input"
+              name="html"
+              spellcheck="false"
+              autocomplete="off"
+              rows="8"
+              class="relative z-[2] w-full bg-transparent p-4 font-mono text-sm text-aired-text-primary leading-relaxed focus:outline-none"
+              aria-label="HTML content"
+            ></textarea>
+            <!-- Drag overlay -->
+            <div class="drag-hint absolute inset-0 items-center justify-center bg-aired-bg/90 border-2 border-dashed border-aired-accent/30 rounded-lg z-10">
+              <span class="text-sm text-aired-text-secondary">Drop .html file</span>
+            </div>
+          </div>
+
+          <!-- Divider -->
+          <div class="border-t border-aired-border"></div>
+
+          <!-- Options bar -->
+          <div class="flex items-center gap-3 px-3 py-2.5 text-sm">
+            <!-- Upload -->
+            <button type="button" id="upload-btn"
+                    class="flex items-center gap-1.5 px-2 py-1 rounded-sm text-aired-text-secondary hover:text-aired-text-primary hover:bg-aired-surface-hover transition-all duration-150 focus-ring"
+                    title="Upload .html file">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <span class="hidden sm:inline">Upload</span>
+            </button>
+            <input class="hidden" id="file-input" type="file" accept=".html,.htm,text/html" />
+
+            <!-- Separator -->
+            <div class="w-px h-4 bg-aired-border"></div>
+
+            <!-- TTL -->
+            <div class="flex items-center gap-1.5">
+              <label for="ttl-select" class="text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider">TTL</label>
+              <select id="ttl-select"
+                      class="bg-transparent text-aired-text-secondary text-sm py-0.5 pl-1 pr-5 rounded-sm border-0 focus:ring-0 focus-ring cursor-pointer appearance-none hover:text-aired-text-primary transition-colors duration-150">
+                <option value="3600">1 hour</option>
+                <option value="86400">1 day</option>
+                <option value="604800" selected>7 days</option>
+                <option value="2592000">30 days</option>
+                <option value="permanent">Permanent</option>
+              </select>
+            </div>
+
+            <!-- Separator -->
+            <div class="w-px h-4 bg-aired-border"></div>
+
+            <!-- PIN -->
+            <div class="flex items-center gap-1.5 flex-1 min-w-0">
+              <label for="pin-input" class="text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider flex-shrink-0">PIN</label>
+              <input
+                type="password"
+                id="pin-input"
+                name="pin"
+                placeholder="optional"
+                maxlength="20"
+                inputmode="numeric"
+                autocomplete="new-password"
+                class="w-full min-w-0 bg-transparent text-sm text-aired-text-secondary placeholder:text-aired-text-tertiary py-0.5 border-0 focus:ring-0 focus:outline-none"
+              />
+            </div>
+
+            <!-- Spacer -->
+            <div class="flex-1"></div>
+
+            <!-- Char count -->
+            <span id="char-count" class="text-2xs text-aired-text-tertiary tabular-nums flex-shrink-0"></span>
+          </div>
+        </div>
+
+        <!-- Submit -->
+        <button
+          type="submit"
+          id="submit-btn"
+          disabled
+          class="btn-primary mt-3 w-full h-10 flex items-center justify-center rounded-sm bg-aired-accent text-white text-sm font-medium focus-ring"
+        >
+          Publish
+        </button>
+      </form>
+
+      <!-- Error -->
+      <div class="hidden mt-3" id="error-msg" role="alert">
+        <p class="px-3 py-2 text-sm text-red-400 border border-red-500/20 bg-red-500/5 rounded-sm"></p>
+      </div>
+
+      <!-- ─── Result Card ─── -->
+      <div class="result-card hidden flex-col mt-6" id="result-card" aria-live="polite"
+           style="display:none; opacity:0; transform:translateY(8px);">
+
+        <div class="border border-aired-border rounded-lg bg-aired-surface overflow-hidden">
+          <!-- URL row -->
+          <div class="p-4">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider">Live URL</span>
+              <span class="flex items-center gap-1 text-2xs text-emerald-400">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                Live
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <a id="result-url" href="#" target="_blank"
+                 class="flex-1 font-mono text-sm text-aired-text-primary hover:text-white truncate transition-colors duration-150"></a>
+              <button type="button" id="copy-url-btn"
+                      class="copy-btn flex-shrink-0 px-2.5 py-1 text-sm text-aired-text-secondary border border-aired-border rounded-sm focus-ring">
+                Copy
+              </button>
+            </div>
+          </div>
+
+          <div class="border-t border-aired-border"></div>
+
+          <!-- Token row -->
+          <div class="p-4">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider">Update token</span>
+              <span class="text-2xs text-aired-text-tertiary" id="result-expiry"></span>
+            </div>
+            <div class="flex items-center gap-2">
+              <code id="result-token" class="flex-1 font-mono text-sm text-aired-text-tertiary truncate"></code>
+              <button type="button" id="copy-token-btn"
+                      class="copy-btn flex-shrink-0 px-2.5 py-1 text-sm text-aired-text-secondary border border-aired-border rounded-sm focus-ring">
+                Copy
+              </button>
+            </div>
+            <p class="mt-2 text-2xs text-aired-text-tertiary">Save this token — you need it to update or delete.</p>
+          </div>
+        </div>
+
+        <!-- New button -->
+        <button type="button" id="new-btn"
+                class="mt-3 w-full h-10 flex items-center justify-center rounded-sm border border-aired-border text-sm text-aired-text-secondary hover:text-aired-text-primary hover:border-aired-border-focus transition-all duration-150 focus-ring">
+          Publish another
+        </button>
+      </div>
+
+    </section>
+
+    <!-- ─── Guide ─── -->
+    <article class="guide mt-4 mb-20">
+
+      <h2 id="short">The short answer</h2>
+      <ul>
+        <li><strong>Pick aired</strong> to share single pages fast: reports, AI-made pages, games and previews, with no account and a free PIN.</li>
+        <li><strong>Pick Tiiny Host</strong> if you need your own domain, PDF or zip hosting, or files bigger than 2 MB.</li>
+      </ul>
+
+      <h2 id="compare">aired vs Tiiny Host</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th></th><th>Tiiny Host</th><th>aired</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Sign-up to publish</td><td>Email verification</td><td>None</td></tr>
+            <tr><td>Free projects</td><td>1</td><td>No fixed limit (5 publishes an hour without an account)</td></tr>
+            <tr><td>Free upload size</td><td>3 MB</td><td>2 MB per page</td></tr>
+            <tr><td>Free visits</td><td>5,000 a month</td><td>No platform cap</td></tr>
+            <tr><td>Branding on free pages</td><td>Tiiny banner</td><td>Small corner badge</td></tr>
+            <tr><td>Password protection</td><td>From $13/mo (Solo)</td><td>Free PIN</td></tr>
+            <tr><td>How long free links last</td><td>While you log in every 3 months</td><td>1 hour to permanent, you choose</td></tr>
+            <tr><td>Custom domain</td><td>From $13/mo (Solo)</td><td>Not yet</td></tr>
+            <tr><td>Visitor analytics</td><td>From $5/mo (Tiny)</td><td>View count on every page</td></tr>
+            <tr><td>Publish from AI agents</td><td>API from $13/mo (Solo)</td><td>Free CLI, MCP server and HTTP API</td></tr>
+            <tr><td>File types</td><td>HTML, zip, PDF and more</td><td>HTML (folders bundled by the CLI)</td></tr>
+            <tr><td>Open source</td><td>No</td><td>Yes</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Tiiny Host details from tiiny.host/pricing, November 2026. Their prices may change.</p>
+
+      <h2 id="when-tiiny">When Tiiny Host is the better choice</h2>
+      <ul>
+        <li>You want the page on your own domain today.</li>
+        <li>You're sharing a PDF, a zip of many files, or anything over 2 MB.</li>
+        <li>You need email capture or several team members on one account.</li>
+      </ul>
+
+      <h2 id="move">How to move a page from Tiiny Host to aired</h2>
+      <ol>
+        <li>Download your HTML file from Tiiny Host, or open the original file on your computer.</li>
+        <li>Drop it in the box above, choose how long the link lasts and add a PIN if you need one.</li>
+        <li>Click <strong>Publish</strong> and send the new link.</li>
+      </ol>
+      <p>For a folder with separate CSS, JavaScript or images, run <code>npx aired ./folder</code>. The CLI puts everything into one page for you. See the <a href="/docs#cli">CLI docs</a>.</p>
+
+      <h2 id="netlify-drop">What about Netlify Drop?</h2>
+      <p>Netlify Drop also works without an account, but an anonymous drop is password-protected until you claim it, you get an hour to claim it, and unclaimed drops are deleted. It suits whole sites you plan to keep on Netlify. For a link you can send right away, use aired or read <a href="/html-to-link">how to turn an HTML file into a link</a>.</p>
+
+      <h2 id="faq">Questions</h2>
+      <dl class="mt-4 divide-y divide-aired-border border-y border-aired-border">
+        <div class="py-4"><dt class="text-sm font-medium text-aired-text-primary">Is aired a free alternative to Tiiny Host?</dt><dd class="mt-1 text-sm text-aired-text-secondary leading-relaxed">Yes. Publishing, viewing and PIN protection are free, with no email sign-up.</dd></div>
+        <div class="py-4"><dt class="text-sm font-medium text-aired-text-primary">Can I use my own domain on aired?</dt><dd class="mt-1 text-sm text-aired-text-secondary leading-relaxed">Not yet. Pages live at <code>aired.sh/p/…</code>. If you need a custom domain today, Tiiny Host offers one on its Solo plan.</dd></div>
+        <div class="py-4"><dt class="text-sm font-medium text-aired-text-primary">Can I upload a zip file?</dt><dd class="mt-1 text-sm text-aired-text-secondary leading-relaxed">The web form takes one HTML file. To publish a folder, run <code>npx aired ./folder</code>, which bundles CSS, JavaScript and images into a single page.</dd></div>
+        <div class="py-4"><dt class="text-sm font-medium text-aired-text-primary">Does aired work with pages made by ChatGPT or Claude?</dt><dd class="mt-1 text-sm text-aired-text-secondary leading-relaxed">Yes. Copy the HTML from the chat and paste it in, or connect your AI tool so it can publish for you. See <a href="/share-claude-artifacts">sharing Claude artifacts</a>.</dd></div>
+        <div class="py-4"><dt class="text-sm font-medium text-aired-text-primary">Do aired pages expire?</dt><dd class="mt-1 text-sm text-aired-text-secondary leading-relaxed">Only if you want them to. The default is 7 days, and you can choose 1 hour, 1 day, 30 days or permanent.</dd></div>
+      </dl>
+
+      <p class="mt-12 text-xs text-aired-text-tertiary">Updated November 2026.</p>
+    </article>
+
+  </main>
+
+  <!-- ─── Footer ─── -->
+  <footer class="w-full max-w-2xl mx-auto px-6 py-8">
+    <nav aria-label="Guides" class="mb-4 flex flex-wrap justify-center sm:justify-start gap-x-4 gap-y-1 text-2xs">
+      <a href="/html-to-link" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">HTML to link</a>
+      <a href="/share-claude-artifacts" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Share Claude artifacts</a>
+      <a href="/tiiny-host-alternative" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Tiiny Host alternative</a>
+      <a href="/docs" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Docs</a>
+    </nav>
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-2 text-2xs text-aired-text-tertiary">
+      <p>
+        Built by <a href="https://x.com/iammoizfarooq" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">@iammoizfarooq</a>
+      </p>
+      <div class="flex items-center gap-4">
+        <a href="/abuse" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Report abuse</a>
+        <a href="/llms.txt" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150 font-mono">llms.txt</a>
+        <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">GitHub</a>
+        <a href="https://workers.cloudflare.com" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Cloudflare</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/app.js"></script>
+  <script>
+    // ── Empty state hint ──
+    (function() {
+      var textarea = document.getElementById('html-input');
+      var hint = document.getElementById('empty-hint');
+
+      function toggleHint() {
+        hint.style.opacity = textarea.value.length === 0 ? '1' : '0';
+      }
+
+      textarea.addEventListener('input', toggleHint);
+      textarea.addEventListener('focus', function() {
+        if (textarea.value.length === 0) hint.style.opacity = '0.5';
+      });
+      textarea.addEventListener('blur', function() {
+        toggleHint();
+      });
+      toggleHint();
+    })();
+  </script>
+</body>
+</html>

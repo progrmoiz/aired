@@ -1,0 +1,13 @@
+# aired.sh
+# Published pages under /p/ stay crawlable so search engines can read their
+# X-Robots-Tag header: anonymous pages are noindex, signed-in owners' pages
+# are indexable. Blocking /p/ here would hide that header from crawlers.
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /auth/
+Disallow: /dashboard
+Disallow: /mcp
+
+Sitemap: https://aired.sh/sitemap.xml

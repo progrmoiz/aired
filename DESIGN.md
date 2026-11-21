@@ -333,4 +333,5 @@ Append-only record of design decisions. One line per entry. Append on every nota
 ```
 2026-05-09 — DESIGN.md bootstrapped from existing tokens in apps/web/tailwind.config.js. Dark-only, purple-accent (#7c6aef), 14px body, ease-out-expo motion.
 2026-05-10 — Empty-state rule softened: one inline factual line allowed (required) when user has no breadcrumb to the next action; decorative cards still forbidden. Dashboard 0-pages state is the canonical example.
+2026-11-21 — Guide pages added (/html-to-link, /share-claude-artifacts, /tiiny-host-alternative). They reuse the homepage form and tokens, keep 14px body and 18px h2, and exist for search traffic from non-technical visitors. Homepage H1 and button now use font-medium and "Publish" per §3 and §8.1.
 ```

@@ -64,6 +64,10 @@ Agents should read the live docs at https://github.com/progrmoiz/aired before an
 
 ## Discovery and reference URLs
 - https://aired.sh — homepage with a paste-and-publish form.
+- https://aired.sh/html-to-link — guide: turn an HTML file into a shareable link.
+- https://aired.sh/share-claude-artifacts — guide: share a Claude artifact with people who do not use Claude.
+- https://aired.sh/tiiny-host-alternative — comparison with Tiiny Host and Netlify Drop.
+- https://aired.sh/docs — install and API reference.
 - https://aired.sh/llms.txt — this file, concise agent context.
 - https://aired.sh/llms-full.txt — expanded agent context with full API examples.
 - https://aired.sh/index.md — markdown homepage fallback.
