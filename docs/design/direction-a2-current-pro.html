@@ -125,6 +125,15 @@
   .fcols div { display: grid; gap: 6px; align-content: start; color: var(--text-2); }
   .fcols p { color: var(--text-3); font-size: 12px; max-width: 18em; }
 
+  .later { margin-top: 12px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .later a { display: grid; grid-template-columns: 90px 1fr auto; gap: 4px 16px; align-items: baseline; padding: 14px 18px; font-size: 14px; color: var(--text-2); }
+  .later a + a { border-top: 1px solid var(--border); }
+  .later b { color: var(--text-1); font-weight: 500; }
+  .later em { font-style: normal; color: var(--text-1); white-space: nowrap; }
+  .later span.go { font-size: 13px; white-space: nowrap; }
+  @media (max-width: 560px) { .later a { grid-template-columns: 1fr auto; } .later a > span:nth-child(2) { grid-column: 1 / -1; order: 3; } }
+  .all { display: inline-block; margin-top: 12px; font-size: 14px; color: var(--text-2); }
+
   .changes { margin-top: 64px; padding: 20px; border: 1px dashed var(--border-2); border-radius: 12px; font-size: 13px; color: var(--text-2); display: grid; gap: 8px; }
   .changes b { color: var(--text-1); font-weight: 500; }
 </style>
@@ -132,13 +141,15 @@
 <body>
 <div class="switcher"><div class="col">
   <span>Mockups:</span>
-  <a href="direction-a2-current-pro.html" class="on">Current look + product signals</a>
+  <a href="direction-a2-current-pro.html" class="on">Home · narrow</a>
+  <a href="direction-a3-current-wide.html">Home · wide</a>
+  <a href="pricing-page.html">Pricing page</a>
   <a href="index.html">Compare</a>
 </div></div>
 
 <header><div class="col">
   <a class="logo" href="#"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>aired</a>
-  <nav><a href="#pricing">Pricing</a><a href="#">Guides</a><a href="#">Docs</a></nav>
+  <nav><a href="pricing-page.html">Pricing</a><a href="#">Guides</a><a href="#">Docs</a></nav>
   <div class="right"><a class="login" href="#">Log in</a><a class="start" href="#">Start free</a></div>
 </div></header>
 
@@ -197,6 +208,11 @@
         <ul><li>Your own domain</li><li>No aired badge</li><li>Who opened it, and when</li><li>Pages that never expire</li><li>API key for CI and scripts</li></ul>
         <a class="btn solid" href="#">Start Pro</a></div>
     </div>
+    <div class="later">
+      <a href="pricing-page.html"><b>Team</b><span>Shared workspace, roles, comments, brand kit. Guests are free. <em>$12 / editor / mo</em></span><span class="go">Join waitlist →</span></a>
+      <a href="pricing-page.html"><b>Business</b><span>SSO, sharing policies, 90-day audit log. <em>$20 / editor / mo</em></span><span class="go">Talk to us →</span></a>
+    </div>
+    <a class="all" href="pricing-page.html">Compare all plans →</a>
   </section>
 
   <section class="block">

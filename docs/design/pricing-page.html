@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>aired — Pricing page</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  /* /pricing in today's aired look. Four tiers from the growth plan; Team and
+     Business open later, so their buttons are a waitlist and a contact form. */
+  :root {
+    --bg: #0a0a0b; --surface: #111113; --surface-2: #18181b; --border: #222225; --border-2: #34343a;
+    --text-1: #ededef; --text-2: #a1a1a6; --text-3: #84848a; --mark: #7c6aef; --btn: #ededef; --ok: #34d399;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { font: 15px/1.6 Inter, -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text-1); -webkit-font-smoothing: antialiased; }
+  a { color: inherit; text-decoration: none; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
+  .cap { font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+
+  .switcher { font: 12px 'JetBrains Mono', monospace; background: #050506; border-bottom: 1px solid var(--border); color: var(--text-3); }
+  .switcher .wrap { display: flex; gap: 16px; align-items: center; height: 34px; overflow-x: auto; white-space: nowrap; }
+  .switcher a.on { color: var(--text-1); }
+
+  header .wrap { display: flex; align-items: center; gap: 22px; height: 60px; }
+  .logo { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; font-size: 15px; margin-right: 6px; }
+  .logo svg { width: 16px; height: 16px; color: var(--mark); }
+  nav { display: flex; gap: 20px; font-size: 14px; color: var(--text-2); }
+  nav a.on { color: var(--text-1); }
+  .right { margin-left: auto; display: flex; align-items: center; gap: 16px; font-size: 14px; }
+  .login { color: var(--text-2); }
+  .start { background: var(--btn); color: var(--bg); border-radius: 8px; padding: 6px 12px; font-weight: 500; }
+  @media (max-width: 560px) { nav { display: none; } }
+
+  .top { padding: 56px 0 28px; display: flex; justify-content: space-between; align-items: end; gap: 24px; flex-wrap: wrap; }
+  h1 { font-size: 30px; font-weight: 500; letter-spacing: -0.025em; line-height: 1.15; }
+  .top p { color: var(--text-2); margin-top: 8px; max-width: 34em; }
+  .bill { display: inline-flex; border: 1px solid var(--border-2); border-radius: 8px; padding: 3px; font-size: 13px; }
+  .bill button { font: inherit; color: var(--text-2); background: none; border: 0; border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+  .bill button[aria-pressed="true"] { background: var(--surface-2); color: var(--text-1); }
+  .bill button:focus-visible, .btn:focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; }
+  .bill em { font-style: normal; color: var(--ok); margin-left: 4px; }
+
+  .tiers { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  @media (max-width: 900px) { .tiers { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 560px) { .tiers { grid-template-columns: 1fr; } }
+  .tier { padding: 22px; display: grid; grid-template-rows: auto auto auto auto 1fr auto; gap: 4px; background: var(--surface); }
+  .tier + .tier { border-left: 1px solid var(--border); }
+  @media (max-width: 900px) { .tier:nth-child(3) { border-left: 0; } .tier:nth-child(n+3) { border-top: 1px solid var(--border); } }
+  @media (max-width: 560px) { .tier + .tier { border-left: 0; border-top: 1px solid var(--border); } }
+  .tier.pro { background: var(--surface-2); }
+  .tier h2 { font-size: 15px; font-weight: 500; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .soon { font-size: 11px; font-weight: 500; color: var(--text-3); border: 1px solid var(--border-2); border-radius: 4px; padding: 1px 6px; }
+  .for { font-size: 13px; color: var(--text-3); min-height: 2.6em; }
+  .price { font-size: 32px; font-weight: 500; letter-spacing: -0.02em; margin-top: 10px; font-variant-numeric: tabular-nums; }
+  .price small { font-size: 13px; color: var(--text-2); letter-spacing: 0; font-weight: 400; }
+  .per { font-size: 12px; color: var(--text-3); min-height: 1.6em; }
+  .tier ul { list-style: none; padding: 0; margin: 14px 0 18px; font-size: 14px; color: var(--text-2); }
+  .tier li { padding: 6px 0; border-top: 1px solid var(--border); }
+  .tier li.lead { color: var(--text-1); }
+  .btn { display: block; text-align: center; height: 36px; line-height: 34px; border-radius: 8px; font-size: 13px; font-weight: 500; border: 1px solid var(--border-2); }
+  .btn.solid { background: var(--btn); color: var(--bg); border-color: var(--btn); }
+
+  .viewers { margin-top: 14px; display: flex; gap: 10px 24px; flex-wrap: wrap; font-size: 13px; color: var(--text-2); padding: 12px 16px; border: 1px solid var(--border); border-radius: 8px; }
+  .viewers b { color: var(--text-1); font-weight: 500; }
+
+  h3 { font-size: 19px; font-weight: 500; letter-spacing: -0.015em; margin-top: 72px; }
+  .scroll { overflow-x: auto; margin-top: 16px; border: 1px solid var(--border); border-radius: 12px; }
+  table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  thead th { position: sticky; top: 0; background: var(--bg); font-weight: 500; color: var(--text-1); }
+  thead th:first-child { width: 28%; }
+  tbody td { color: var(--text-2); }
+  tbody td:first-child { color: var(--text-1); }
+  tr.group td { color: var(--text-3); font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; padding-top: 22px; background: var(--bg); }
+  .no { color: #55555b; }
+  .proc { background: rgba(255,255,255,.02); }
+
+  dl.faq { margin-top: 16px; border-top: 1px solid var(--border); max-width: 720px; }
+  dl.faq div { padding: 14px 0; border-bottom: 1px solid var(--border); }
+  dl.faq dt { font-weight: 500; font-size: 14px; } dl.faq dd { margin: 4px 0 0; color: var(--text-2); font-size: 14px; }
+
+  footer { margin-top: 80px; border-top: 1px solid var(--border); padding: 28px 0 44px; font-size: 13px; color: var(--text-3); }
+  footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+</style>
+</head>
+<body>
+<div class="switcher"><div class="wrap">
+  <span>Mockups:</span>
+  <a href="direction-a2-current-pro.html">Home · narrow</a>
+  <a href="direction-a3-current-wide.html">Home · wide</a>
+  <a href="pricing-page.html" class="on">Pricing page</a>
+  <a href="index.html">Compare</a>
+</div></div>
+
+<header><div class="wrap">
+  <a class="logo" href="#"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>aired</a>
+  <nav><a class="on" href="#">Pricing</a><a href="#">Guides</a><a href="#">Docs</a></nav>
+  <div class="right"><a class="login" href="#">Log in</a><a class="start" href="#">Start free</a></div>
+</div></header>
+
+<main class="wrap">
+  <div class="top">
+    <div><h1>Pricing</h1><p>Publishing and viewing are free on every plan, with no cap on views. You pay for your name on the link, for seeing who opened it, and for working as a team.</p></div>
+    <div class="bill" role="group" aria-label="Billing period"><button type="button" aria-pressed="true" data-b="y">Yearly <em>save 25%</em></button><button type="button" aria-pressed="false" data-b="m">Monthly</button></div>
+  </div>
+
+  <div class="tiers">
+    <div class="tier">
+      <h2>Free</h2>
+      <p class="for">A quick share, or a place to keep your links</p>
+      <div class="price">$0</div><p class="per">No account needed to start</p>
+      <ul><li class="lead">Unlimited pages and views</li><li>Password (PIN) on any page</li><li>50 permanent pages with an account</li><li>Share with up to 5 people per page</li><li>Decks, docs and reports</li><li>CLI, MCP and HTTP API</li></ul>
+      <a class="btn" href="#">Publish a page</a>
+    </div>
+    <div class="tier pro">
+      <h2>Pro</h2>
+      <p class="for">One person sending work to clients</p>
+      <div class="price"><span data-y="$9" data-m="$12">$9</span> <small>/ month</small></div><p class="per" data-y="Billed yearly, $108" data-m="Billed monthly">Billed yearly, $108</p>
+      <ul><li class="lead">Everything in Free, plus</li><li>Your own domain</li><li>No aired badge, or your logo</li><li>Who opened it, and when</li><li>Unlimited permanent pages</li><li>PDF export, per-slide analytics</li><li>API key for CI and agents</li></ul>
+      <a class="btn solid" href="#">Start Pro</a>
+    </div>
+    <div class="tier">
+      <h2>Team <span class="soon">Waitlist</span></h2>
+      <p class="for">A team that publishes together</p>
+      <div class="price"><span data-y="$12" data-m="$15">$12</span> <small>/ editor / month</small></div><p class="per">Minimum 2 editors · guests free</p>
+      <ul><li class="lead">Everything in Pro, plus</li><li>Shared workspace and folders</li><li>Owner, admin, editor roles</li><li>Comments and 1-year history</li><li>Brand kit for decks and docs</li><li>5 custom domains</li></ul>
+      <a class="btn" href="#">Join the waitlist</a>
+    </div>
+    <div class="tier">
+      <h2>Business <span class="soon">Talk to us</span></h2>
+      <p class="for">An organization whose IT has rules</p>
+      <div class="price"><span data-y="$20" data-m="$25">$20</span> <small>/ editor / month</small></div><p class="per">Minimum 3 editors</p>
+      <ul><li class="lead">Everything in Team, plus</li><li>SSO: SAML, Okta, Google</li><li>Sharing policies</li><li>90-day audit log and export</li><li>Retention rules</li><li>Unlimited custom domains</li></ul>
+      <a class="btn" href="#">Contact us</a>
+    </div>
+  </div>
+  <div class="viewers"><span><b>Viewers are always free.</b> People you send pages to never pay and never need an aired account.</span><span>Prices in USD. Cancel anytime.</span></div>
+
+  <h3>Compare plans</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th></th><th>Free</th><th>Pro</th><th>Team</th><th>Business</th></tr></thead>
+      <tbody>
+        <tr class="group"><td colspan="5">Publishing</td></tr>
+        <tr><td>Page size</td><td>2 MB</td><td>10 MB</td><td>10 MB</td><td>10 MB</td></tr>
+        <tr><td>How long pages last</td><td>1 hour – 30 days; permanent with an account</td><td>Permanent</td><td>Permanent</td><td>Permanent, or your retention policy</td></tr>
+        <tr><td>Permanent pages</td><td>50</td><td>Unlimited</td><td>Unlimited</td><td>Unlimited</td></tr>
+        <tr><td>Views</td><td>Unlimited</td><td>Unlimited</td><td>Unlimited</td><td>Unlimited</td></tr>
+        <tr class="group"><td colspan="5">Sharing</td></tr>
+        <tr><td>Link and PIN</td><td>Yes</td><td>Plus real passwords and view-limited links</td><td>Same as Pro</td><td>Within admin policy</td></tr>
+        <tr><td>Share with named people</td><td>5 per page</td><td>Unlimited, or anyone @yourcompany.com</td><td>Plus anyone in the workspace</td><td>Plus groups</td></tr>
+        <tr><td>What they can do</td><td>View</td><td>View or comment</td><td>View, comment or edit</td><td>View, comment or edit</td></tr>
+        <tr class="group"><td colspan="5">Your brand</td></tr>
+        <tr><td>aired badge</td><td>Shown</td><td>Off, or your logo</td><td>Off</td><td>Off</td></tr>
+        <tr><td>Custom domains</td><td class="no">—</td><td>1</td><td>5</td><td>Unlimited</td></tr>
+        <tr class="group"><td colspan="5">Analytics</td></tr>
+        <tr><td>What you see</td><td>View count</td><td>Views over time, countries, referrers, who opened it</td><td>Same, per folder</td><td>Same, plus export</td></tr>
+        <tr class="group"><td colspan="5">Team and admin</td></tr>
+        <tr><td>Workspace</td><td>Personal</td><td>Personal</td><td>Shared, with folders</td><td>Several, under one organization</td></tr>
+        <tr><td>Roles</td><td class="no">—</td><td class="no">—</td><td>Owner, admin, editor; guests free</td><td>Plus groups and custom roles</td></tr>
+        <tr><td>Version history</td><td>Update token</td><td>30 days</td><td>1 year</td><td>Unlimited</td></tr>
+        <tr><td>SSO, policies, audit log</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td>Yes</td></tr>
+        <tr class="group"><td colspan="5">Developers</td></tr>
+        <tr><td>API</td><td>Anonymous HTTP API, CLI, MCP</td><td>API key for CI and agents</td><td>Keys per member, workspace keys</td><td>Scoped service keys</td></tr>
+        <tr><td>Self-host</td><td>MIT licence, free</td><td></td><td></td><td>Paid support on request</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Questions</h3>
+  <dl class="faq">
+    <div><dt>Do the people I share with need to pay or sign up?</dt><dd>No. Viewers, commenters and guests are free on every plan. Invited people confirm their email once; they never create an aired account.</dd></div>
+    <div><dt>Team and Business aren't open yet. What happens if I join?</dt><dd>You're on the list and we email you when it opens. Nothing is charged until then.</dd></div>
+    <div><dt>What happens to my pages if I cancel Pro?</dt><dd>They stay up on aired.sh links, the badge comes back, and pages over the free limit stop being permanent.</dd></div>
+    <div><dt>Is there a discount for nonprofits or students?</dt><dd>Write to us and we'll sort something out.</dd></div>
+  </dl>
+</main>
+<footer><div class="wrap"><span>aired · Pricing · Docs · Guides</span><span>Contact · Terms · Privacy · Status · Report abuse · GitHub</span></div></footer>
+
+<script>
+  document.querySelectorAll('.bill button').forEach(function (b) {
+    b.onclick = function () {
+      var mode = b.dataset.b;
+      document.querySelectorAll('.bill button').forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
+      document.querySelectorAll('[data-y]').forEach(function (el) { el.textContent = el.dataset[mode]; });
+    };
+  });
+</script>
+</body>
+</html>

@@ -28,6 +28,11 @@
   .preview { margin-top: 20px; border: 1px solid var(--border-2); border-radius: 12px; overflow: hidden; position: relative; height: 520px; }
   .preview iframe { position: absolute; top: 0; left: 0; width: 1100px; height: 2600px; border: 0; transform-origin: 0 0; pointer-events: none; }
   .open { display: inline-block; margin-top: 12px; font-weight: 500; }
+  .pick { margin-top: 16px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  @media (max-width: 640px) { .pick { grid-template-columns: 1fr; } }
+  .pk { text-decoration: none; display: grid; gap: 4px; align-content: start; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--t1); font-size: 14px; }
+  .pk span { color: var(--t2); font-size: 13px; }
+  .pk:hover { border-color: var(--border-2); }
   .scroll { overflow-x: auto; margin-top: 16px; }
   table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 14px; }
   th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
@@ -53,9 +58,26 @@
 
   <section>
     <h2>Recommended: current look, product signals</h2>
-    <p class="lead">Same palette, fonts, column and form as aired.sh today. Pricing, a Pro offer and a real footer added; developer material moved down.</p>
-    <div class="preview"><iframe src="direction-a2-current-pro.html" title="Recommended mockup" loading="lazy" tabindex="-1"></iframe></div>
-    <a class="open" href="direction-a2-current-pro.html">Open the full mockup →</a>
+    <p class="lead">Same palette, fonts and form as aired.sh today. Pricing, a Pro offer and a real footer added; developer material moved down. Two homepage layouts and the pricing page they link to.</p>
+    <div class="pick">
+      <a class="pk" href="direction-a2-current-pro.html"><b>Home · narrow</b><span>Today's single column, tool first. Smallest change from the live site.</span></a>
+      <a class="pk" href="direction-a3-current-wide.html"><b>Home · wide (my pick)</b><span>Form and the recipient's view side by side, so a visitor sees the product before scrolling.</span></a>
+      <a class="pk" href="pricing-page.html"><b>Pricing page</b><span>Free, Pro, Team, Business with a yearly/monthly switch and a full comparison table.</span></a>
+    </div>
+    <div class="preview"><iframe src="direction-a3-current-wide.html" title="Wide homepage mockup" loading="lazy" tabindex="-1"></iframe></div>
+    <a class="open" href="direction-a3-current-wide.html">Open the wide homepage →</a>
+  </section>
+
+  <section>
+    <h2>Plans: not just Pro</h2>
+    <p class="lead">The growth plan has four tiers. Free and Pro open first; Team and Business show prices but take a waitlist and a contact form until enough people ask for them.</p>
+    <div class="scroll"><table>
+      <tr><th>Plan</th><th>Price</th><th>Who it's for</th><th>What it adds</th></tr>
+      <tr><td>Free</td><td>$0</td><td>A quick share, or keeping your links</td><td>Unlimited pages and views, PIN, 50 permanent pages with an account</td></tr>
+      <tr><td>Pro</td><td>$9 / mo yearly, $12 monthly</td><td>One person sending work to clients</td><td>Own domain, no badge, who opened it, permanent pages, API key</td></tr>
+      <tr><td>Team · waitlist</td><td>$12 / editor / mo, min 2</td><td>A team that publishes together</td><td>Shared workspace, roles, comments, brand kit, free guests</td></tr>
+      <tr><td>Business · talk to us</td><td>$20 / editor / mo, min 3</td><td>An organization whose IT has rules</td><td>SSO, sharing policies, 90-day audit log, export</td></tr>
+    </table></div>
   </section>
 
   <section>

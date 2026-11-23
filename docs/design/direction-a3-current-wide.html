@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>aired — Current look, wide layout</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  /* Same tokens and type as today's aired.sh. The difference from the narrow
+     version is layout: a wider page, the form and the recipient's view side by
+     side above the fold, audience rows instead of install tabs, and a
+     four-plan strip that links to /pricing. */
+  :root {
+    --bg: #0a0a0b; --surface: #111113; --surface-2: #18181b; --border: #222225; --border-2: #34343a;
+    --text-1: #ededef; --text-2: #a1a1a6; --text-3: #84848a; --mark: #7c6aef; --btn: #ededef; --btn-hover: #fff; --ok: #34d399;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { font: 15px/1.6 Inter, -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text-1); -webkit-font-smoothing: antialiased; }
+  a { color: inherit; text-decoration: none; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
+  .cap { font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+
+  .switcher { font: 12px 'JetBrains Mono', monospace; background: #050506; border-bottom: 1px solid var(--border); color: var(--text-3); }
+  .switcher .wrap { display: flex; gap: 16px; align-items: center; height: 34px; overflow-x: auto; white-space: nowrap; }
+  .switcher a.on { color: var(--text-1); }
+
+  header .wrap { display: flex; align-items: center; gap: 22px; height: 60px; }
+  .logo { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; font-size: 15px; margin-right: 6px; }
+  .logo svg { width: 16px; height: 16px; color: var(--mark); }
+  nav { display: flex; gap: 20px; font-size: 14px; color: var(--text-2); }
+  .right { margin-left: auto; display: flex; align-items: center; gap: 16px; font-size: 14px; }
+  .login { color: var(--text-2); }
+  .start { background: var(--btn); color: var(--bg); border-radius: 8px; padding: 6px 12px; font-weight: 500; }
+  @media (max-width: 560px) { nav { display: none; } }
+
+  .hero { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; padding: 64px 0 0; }
+  @media (max-width: 880px) { .hero { grid-template-columns: 1fr; gap: 40px; padding-top: 40px; } }
+  h1 { font-size: 34px; line-height: 1.12; font-weight: 500; letter-spacing: -0.03em; text-wrap: balance; }
+  .lede { margin-top: 12px; color: var(--text-2); font-size: 16px; max-width: 32em; }
+  .form { margin-top: 28px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .form:focus-within { border-color: var(--border-2); }
+  .drop { height: 140px; display: grid; place-content: center; text-align: center; gap: 2px; color: var(--text-2); font-size: 14px; border-bottom: 1px solid var(--border); }
+  .drop small { color: var(--text-3); font-size: 12px; }
+  .opts { display: flex; align-items: center; gap: 16px; padding: 10px 10px 10px 14px; font-size: 13px; color: var(--text-2); flex-wrap: wrap; }
+  .opts label { color: var(--text-3); margin-right: 6px; }
+  .opts select, .opts input { font: inherit; color: var(--text-1); background: none; border: 0; padding: 0; width: 7em; }
+  .publish { margin-left: auto; background: var(--btn); color: var(--bg); border: 0; border-radius: 8px; padding: 8px 16px; font: 500 13px Inter, sans-serif; cursor: pointer; }
+  .publish:hover, .start:hover { background: var(--btn-hover); }
+  .publish:focus-visible, .opts select:focus-visible, .opts input:focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; border-radius: 6px; }
+  .proof { margin-top: 12px; font-size: 13px; color: var(--text-3); } .proof b { color: var(--text-1); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+  .seen-cap { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 8px; font-size: 12px; color: var(--text-3); }
+  .seen-cap .mono { color: var(--text-2); }
+  .crop { position: relative; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .report { background: #fff; color: #1d2433; padding: 20px 20px 60px; font: 13px/1.5 -apple-system, 'Segoe UI', sans-serif; }
+  .report h4 { font-size: 15px; font-weight: 600; } .report p { color: #5a6475; font-size: 12px; }
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
+  .kpi { border: 1px solid #e6e9ef; border-radius: 6px; padding: 10px; } .kpi b { display: block; font-size: 18px; } .kpi small { color: #0f7a4a; font-size: 11px; }
+  .bars { display: flex; align-items: flex-end; gap: 6px; height: 90px; border-bottom: 1px solid #e6e9ef; } .bars i { flex: 1; display: block; background: #3b6fe0; border-radius: 2px 2px 0 0; }
+  .rows2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; } .rows2 div { border: 1px solid #e6e9ef; border-radius: 6px; padding: 10px; font-size: 12px; color: #5a6475; } .rows2 b { color: #1d2433; }
+  .badge { position: absolute; right: 12px; bottom: 12px; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 8px; border-radius: 6px;
+           background: #fff; color: #333338; border: 1px solid #e0e0e4; font: 500 12px Inter, sans-serif; white-space: nowrap; }
+  .badge svg { width: 12px; height: 12px; color: #5847d4; }
+  .seen-note { margin-top: 10px; font-size: 13px; color: var(--text-3); }
+
+  section.block { margin-top: 96px; }
+  h2 { font-size: 22px; font-weight: 500; letter-spacing: -0.02em; }
+  .sub { margin-top: 6px; color: var(--text-2); max-width: 36em; }
+
+  /* Who it's for: label column + description, not icon cards */
+  .who { margin-top: 20px; border-top: 1px solid var(--border); }
+  .who > div { display: grid; grid-template-columns: 240px 1fr auto; gap: 8px 32px; padding: 18px 0; border-bottom: 1px solid var(--border); align-items: baseline; }
+  @media (max-width: 720px) { .who > div { grid-template-columns: 1fr; } }
+  .who b { font-weight: 500; }
+  .who p { color: var(--text-2); }
+  .who a { font-size: 13px; color: var(--text-2); white-space: nowrap; }
+  .who code { font: 13px 'JetBrains Mono', monospace; color: var(--text-1); }
+
+  /* Pro, side by side */
+  .pro { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 820px) { .pro { grid-template-columns: 1fr; } }
+  .links { display: grid; gap: 10px; }
+  .linkrow { display: grid; grid-template-columns: 60px 1fr; gap: 12px; align-items: center; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }
+  .linkrow .mono { font-size: 14px; overflow-wrap: anywhere; min-width: 0; }
+  .linkrow.free .mono { color: var(--text-3); } .linkrow.on { border-color: var(--border-2); }
+  .links ul { list-style: none; padding: 0; margin-top: 6px; color: var(--text-2); font-size: 14px; }
+  .links li { padding: 7px 0; border-top: 1px solid var(--border); }
+  .opens { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .opens-head { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  .opens-head b { font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .spark { display: flex; align-items: flex-end; gap: 3px; height: 44px; padding: 10px 16px 0; }
+  .spark i { flex: 1; display: block; background: var(--border-2); border-radius: 1px; } .spark i.hi { background: var(--text-2); }
+  .opens table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .opens td { padding: 9px 16px; border-top: 1px solid var(--border); color: var(--text-2); }
+  .opens td:last-child { text-align: right; color: var(--text-3); white-space: nowrap; }
+  .opens .new { color: var(--ok); }
+
+  /* Plans strip */
+  .strip { margin-top: 20px; display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  @media (max-width: 820px) { .strip { grid-template-columns: 1fr 1fr; } }
+  .strip > div { padding: 18px; background: var(--surface); display: grid; gap: 2px; align-content: start; }
+  .strip > div + div { border-left: 1px solid var(--border); }
+  @media (max-width: 820px) { .strip > div:nth-child(3) { border-left: 0; } .strip > div:nth-child(n+3) { border-top: 1px solid var(--border); } }
+  .strip .on { background: var(--surface-2); }
+  .strip h3 { font-size: 14px; font-weight: 500; display: flex; justify-content: space-between; gap: 8px; }
+  .strip h3 span { font-size: 11px; color: var(--text-3); font-weight: 500; }
+  .strip .price { font-size: 24px; font-weight: 500; letter-spacing: -0.02em; margin-top: 6px; } .strip .price small { font-size: 12px; color: var(--text-2); letter-spacing: 0; font-weight: 400; }
+  .strip p { font-size: 13px; color: var(--text-3); }
+  .all { display: inline-block; margin-top: 12px; font-size: 14px; color: var(--text-2); }
+
+  footer { margin-top: 96px; border-top: 1px solid var(--border); padding: 32px 0 44px; }
+  .fcols { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 24px; font-size: 13px; }
+  @media (max-width: 560px) { .fcols { grid-template-columns: 1fr 1fr; } }
+  .fcols div { display: grid; gap: 6px; align-content: start; color: var(--text-2); }
+  .fcols p { color: var(--text-3); font-size: 12px; max-width: 18em; }
+</style>
+</head>
+<body>
+<div class="switcher"><div class="wrap">
+  <span>Mockups:</span>
+  <a href="direction-a2-current-pro.html">Home · narrow</a>
+  <a href="direction-a3-current-wide.html" class="on">Home · wide</a>
+  <a href="pricing-page.html">Pricing page</a>
+  <a href="index.html">Compare</a>
+</div></div>
+
+<header><div class="wrap">
+  <a class="logo" href="#"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>aired</a>
+  <nav><a href="pricing-page.html">Pricing</a><a href="#">Guides</a><a href="#">Docs</a></nav>
+  <div class="right"><a class="login" href="#">Log in</a><a class="start" href="#">Start free</a></div>
+</div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <div>
+      <h1>Turn HTML into a link anyone can open.</h1>
+      <p class="lede">Made a report, page or game with Claude, ChatGPT or another AI tool? Paste the HTML or drop the file. You get a link to send in seconds. Free, no account.</p>
+      <div class="form" role="group" aria-label="Publish HTML">
+        <div class="drop">Paste HTML or drop a file<small>⌘V to paste · 2 MB max</small></div>
+        <div class="opts">
+          <span><label for="exp3">Expires</label><select id="exp3"><option>1 hour</option><option>1 day</option><option selected>7 days</option><option>30 days</option></select></span>
+          <span><label for="pw3">Password</label><input id="pw3" placeholder="none" /></span>
+          <button class="publish" type="button">Publish</button>
+        </div>
+      </div>
+      <p class="proof"><b>10,827</b> pages published · opened <b>102,156</b> times in 141 countries</p>
+    </div>
+    <div>
+      <div class="seen-cap"><span>What they open</span><span class="mono">aired.sh/p/q3-northwind</span></div>
+      <div class="crop"><div class="report">
+        <h4>Q3 performance — Northwind Dental</h4><p>Prepared for Sam Ortiz · Oct 2026</p>
+        <div class="kpis"><div class="kpi">Leads<b>1,284</b><small>+18%</small></div><div class="kpi">Calls<b>412</b><small>+9%</small></div><div class="kpi">Cost / lead<b>$21</b><small>−12%</small></div></div>
+        <div class="bars"><i style="height:38%"></i><i style="height:52%"></i><i style="height:45%"></i><i style="height:61%"></i><i style="height:58%"></i><i style="height:74%"></i><i style="height:69%"></i><i style="height:88%"></i><i style="height:80%"></i><i style="height:93%"></i></div>
+        <div class="rows2"><div><b>Top channel</b><br>Google Ads, 46% of leads</div><div><b>Next step</b><br>Shift $800 to call ads</div></div>
+      </div>
+      <a class="badge" href="#"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>Shared with aired</a></div>
+      <p class="seen-note">Opens on any phone or laptop. They don't sign in.</p>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>Who uses it</h2>
+    <div class="who">
+      <div><b>You made something with AI</b><p>A report, a game, a landing page from Claude, ChatGPT or Gemini. Send it to someone who doesn't use that tool.</p><a href="#">Share a Claude artifact →</a></div>
+      <div><b>You send work to clients</b><p>Monthly reports, proposals, prototypes. Put them on your own domain and see when the client opens them.</p><a href="#">Pro for client work →</a></div>
+      <div><b>Your agent or script publishes</b><p>Publish from Claude Code, Cursor or CI with <code>npx aired report.html</code>, the MCP server or the HTTP API.</p><a href="#">Developer docs →</a></div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>Send it under your name</h2>
+    <p class="sub">Pro swaps our link and badge for yours, and shows you who opened each page.</p>
+    <div class="pro">
+      <div class="links">
+        <div class="linkrow free"><span class="cap">Free</span><span class="mono">aired.sh/p/q3-northwind</span></div>
+        <div class="linkrow on"><span class="cap">Pro</span><span class="mono">reports.youragency.com/q3-northwind</span></div>
+        <ul><li>No aired badge, or your logo in its place</li><li>Passwords and links that expire after a number of views</li><li>Pages that never expire</li></ul>
+      </div>
+      <div class="opens">
+        <div class="opens-head"><span class="cap">Q3 performance · last 14 days</span><b>14 opens</b></div>
+        <div class="spark" aria-hidden="true"><i style="height:10%"></i><i style="height:0%"></i><i style="height:30%"></i><i style="height:20%"></i><i style="height:0%"></i><i style="height:10%"></i><i style="height:60%"></i><i style="height:40%"></i><i style="height:10%"></i><i style="height:0%"></i><i style="height:20%"></i><i style="height:30%"></i><i style="height:50%"></i><i class="hi" style="height:100%"></i></div>
+        <table>
+          <tr><td class="new">Chicago, US · iPhone</td><td>12 min ago</td></tr>
+          <tr><td>Chicago, US · Mac</td><td>yesterday</td></tr>
+          <tr><td>Austin, US · Windows</td><td>Mon</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>Plans</h2>
+    <p class="sub">Viewers are always free and never need an account.</p>
+    <div class="strip">
+      <div><h3>Free</h3><div class="price">$0</div><p>Unlimited pages and views, PIN, CLI and MCP</p></div>
+      <div class="on"><h3>Pro</h3><div class="price">$9 <small>/ mo</small></div><p>Your domain, no badge, who opened it</p></div>
+      <div><h3>Team <span>Waitlist</span></h3><div class="price">$12 <small>/ editor / mo</small></div><p>Shared workspace, roles, free guests</p></div>
+      <div><h3>Business <span>Talk to us</span></h3><div class="price">$20 <small>/ editor / mo</small></div><p>SSO, sharing policies, audit log</p></div>
+    </div>
+    <a class="all" href="pricing-page.html">Compare all plans →</a>
+  </section>
+</main>
+
+<footer><div class="wrap">
+  <div class="fcols">
+    <div><a class="logo" href="#"><svg viewBox="0 0 32 32" aria-hidden="true" style="width:14px;height:14px;color:var(--mark)"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>aired</a><p>Turn HTML into a link anyone can open.</p></div>
+    <div><span class="cap">Product</span><a href="pricing-page.html">Pricing</a><a href="#">Docs</a><a href="#">Changelog</a><a href="#">Status</a></div>
+    <div><span class="cap">Guides</span><a href="#">HTML to link</a><a href="#">Share Claude artifacts</a><a href="#">Tiiny Host alternative</a></div>
+    <div><span class="cap">Company</span><a href="#">Contact</a><a href="#">Terms</a><a href="#">Privacy</a><a href="#">Report abuse</a><a href="#">GitHub</a></div>
+  </div>
+</div></footer>
+</body>
+</html>
