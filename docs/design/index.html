@@ -6,135 +6,95 @@
 <title>aired Design Direction</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <style>
-  /* A review sheet: one column of argument, three live mockups side by side. */
-  :root { --bg: #f2f4f7; --sheet: #ffffff; --ink: #15181e; --t2: #545b68; --t3: #6a7180; --rule: #dde2ea; --mark: #1e3d8f; --good: #13734a; --bad: #b42318;
-          --text: 'Instrument Sans', -apple-system, 'Segoe UI', sans-serif; --mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0f1115; --sheet: #171a20; --ink: #eef0f4; --t2: #a7aebb; --t3: #8b93a2; --rule: #2a2f38; --mark: #9db2f2; --good: #4ade80; --bad: #f87171; color-scheme: dark; } }
-  :root[data-theme="dark"] { --bg: #0f1115; --sheet: #171a20; --ink: #eef0f4; --t2: #a7aebb; --t3: #8b93a2; --rule: #2a2f38; --mark: #9db2f2; --good: #4ade80; --bad: #f87171; color-scheme: dark; }
+  /* Review note in aired's own dark style: one column, the recommendation first. */
+  :root { --bg: #0a0a0b; --surface: #111113; --border: #222225; --border-2: #34343a; --t1: #ededef; --t2: #a1a1a6; --t3: #84848a; --mark: #9d8ff5; --bad: #f87171; --good: #4ade80; color-scheme: dark; }
+  @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --bg: #ffffff; --surface: #f6f6f7; --border: #e4e4e7; --border-2: #d4d4d8; --t1: #111113; --t2: #55555c; --t3: #6b6b72; --mark: #5847d4; --bad: #b42318; --good: #13734a; color-scheme: light; } }
+  :root[data-theme="light"] { --bg: #ffffff; --surface: #f6f6f7; --border: #e4e4e7; --border-2: #d4d4d8; --t1: #111113; --t2: #55555c; --t3: #6b6b72; --mark: #5847d4; --bad: #b42318; --good: #13734a; color-scheme: light; }
   * { box-sizing: border-box; margin: 0; }
-  body { font: 16px/1.6 var(--text); background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; }
-  .wrap { max-width: 1180px; margin: 0 auto; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
+  body { font: 15px/1.65 Inter, -apple-system, sans-serif; background: var(--bg); color: var(--t1); -webkit-font-smoothing: antialiased; }
+  .col { max-width: 760px; margin: 0 auto; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
   a { color: var(--mark); }
-  code { font: .88em var(--mono); }
-  .k { font: 500 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--t3); }
-  header { padding-block: 44px 8px; }
-  h1 { font-weight: 600; font-size: clamp(30px, 4.4vw, 46px); letter-spacing: -0.03em; line-height: 1.06; margin: 10px 0 14px; max-width: 20ch; text-wrap: balance; }
-  .verdict { font-size: 19px; color: var(--t2); max-width: 42em; }
-  .verdict b { color: var(--ink); font-weight: 600; }
-  section { padding-block: 40px; border-top: 1px solid var(--rule); margin-top: 36px; }
-  h2 { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
-  .lead { color: var(--t2); max-width: 46em; margin-top: 6px; }
-
-  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 24px; }
-  @media (max-width: 960px) { .cards { grid-template-columns: 1fr; } }
-  .card { background: var(--sheet); border: 1px solid var(--rule); display: flex; flex-direction: column; min-width: 0; }
-  .card.rec { outline: 2px solid var(--ink); outline-offset: -2px; }
-  .thumb { position: relative; overflow: hidden; border-bottom: 1px solid var(--rule); height: 300px; }
-  .thumb iframe { position: absolute; top: 0; left: 0; width: 1280px; height: 1100px; border: 0; transform-origin: 0 0; transform: scale(.28); pointer-events: none; }
-  .body { padding: 18px 20px 20px; display: grid; gap: 10px; flex: 1; align-content: start; }
-  .card h3 { font-size: 19px; font-weight: 600; letter-spacing: -0.01em; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .tag { font: 500 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px; border: 1px solid var(--rule); color: var(--t2); }
-  .tag.rec { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
-  .card p { font-size: 15px; color: var(--t2); }
-  .idea { font-size: 15px; color: var(--ink) !important; }
-  .meta { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 14px; padding-top: 12px; border-top: 1px solid var(--rule); margin-top: 4px; }
-  .meta dt { color: var(--t3); } .meta dd { margin: 0; }
-  .open { font-weight: 600; font-size: 15px; }
-
-  .scroll { overflow-x: auto; margin-top: 18px; }
-  table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 14px; background: var(--sheet); border: 1px solid var(--rule); }
-  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
-  th { font: 500 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--t3); }
-  td:first-child { font-weight: 600; white-space: nowrap; }
-  .good { color: var(--good); } .bad { color: var(--bad); }
-  ol { margin-top: 14px; padding-left: 20px; display: grid; gap: 8px; max-width: 48em; color: var(--t2); }
-  ol b { color: var(--ink); font-weight: 600; }
-  .older { margin-top: 12px; font-size: 15px; color: var(--t2); }
-  footer { padding-block: 36px 60px; color: var(--t3); font-size: 13px; }
+  code { font: .9em 'JetBrains Mono', monospace; }
+  .cap { font: 500 11px 'JetBrains Mono', monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--t3); }
+  header { padding-block: 48px 0; }
+  h1 { font-size: clamp(26px, 4vw, 34px); font-weight: 500; letter-spacing: -0.025em; line-height: 1.15; margin: 10px 0 14px; text-wrap: balance; }
+  .verdict { font-size: 17px; color: var(--t2); }
+  .verdict b { color: var(--t1); font-weight: 500; }
+  section { margin-top: 48px; padding-top: 32px; border-top: 1px solid var(--border); }
+  h2 { font-size: 18px; font-weight: 500; letter-spacing: -0.01em; }
+  .lead { color: var(--t2); margin-top: 6px; }
+  .preview { margin-top: 20px; border: 1px solid var(--border-2); border-radius: 12px; overflow: hidden; position: relative; height: 520px; }
+  .preview iframe { position: absolute; top: 0; left: 0; width: 1100px; height: 2600px; border: 0; transform-origin: 0 0; pointer-events: none; }
+  .open { display: inline-block; margin-top: 12px; font-weight: 500; }
+  .scroll { overflow-x: auto; margin-top: 16px; }
+  table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font: 500 11px 'JetBrains Mono', monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--t3); }
+  td:first-child { color: var(--t1); width: 34%; }
+  td { color: var(--t2); }
+  ol { margin-top: 14px; padding-left: 20px; display: grid; gap: 8px; color: var(--t2); }
+  ol b { color: var(--t1); font-weight: 500; }
+  .others { margin-top: 14px; display: grid; gap: 10px; }
+  .other { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 14px; }
+  .other span { color: var(--t2); }
+  .other a { grid-row: span 2; align-self: center; white-space: nowrap; }
+  footer { padding-block: 40px 60px; color: var(--t3); font-size: 13px; }
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="col">
   <header>
-    <p class="k">aired.sh · design direction · round 2 · 23 Nov 2026</p>
-    <h1>Pick a look that only aired could have.</h1>
-    <p class="verdict">Round 1 used the looks every AI-built page lands on. This round starts from what aired is: a name that means broadcast and airmail, and a job that is sending a page to someone. <b>My pick is E, Airmail.</b> It explains the product to a non-technical visitor at a glance, and it gives the badge a reason to exist: every letter carries a postmark. <b>D, Signal</b> is the runner-up if you'd rather lean on the name and the existing logo.</p>
+    <p class="cap">aired.sh · design direction · 23 Nov 2026</p>
+    <h1>Keep the look. Make it read like a product people pay for.</h1>
+    <p class="verdict">The dark style isn't why aired feels like a side project. Vercel, Linear and Raycast are dark and people pay for them. <b>What reads as "free open-source tool" is what's on the page:</b> GitHub in the main nav, GitHub-only sign-in, CLI tabs as the second section, a ticker of strangers' page titles, "Built by @handle", and no pricing anywhere. Fix those, keep the design.</p>
   </header>
 
   <section>
-    <h2>Three directions</h2>
-    <p class="lead">Each has the hero with the publish form, pricing, and the badge on a light client report and a dark game. Open them full size; they link to each other.</p>
-    <div class="cards">
-      <div class="card">
-        <div class="thumb"><iframe src="direction-d-signal.html" title="Signal preview" loading="lazy" tabindex="-1"></iframe></div>
-        <div class="body">
-          <h3>D · Signal <span class="tag">Runner-up</span></h3>
-          <p class="idea">aired as a broadcaster. A page goes on air.</p>
-          <p>Test-card colour bars as the only decoration, a red on-air lamp, the result shown as a TV lower third, pricing as a rate card. Wide Archivo headings like a station ident.</p>
-          <dl class="meta"><dt>Effort</dt><dd>3–4 days</dd><dt>Risk</dt><dd>Colour bars can tip into retro if overused; keep them to the strip, the result and the badge.</dd></dl>
-          <a class="open" href="direction-d-signal.html">Open Signal →</a>
-        </div>
-      </div>
-      <div class="card rec">
-        <div class="thumb"><iframe src="direction-e-airmail.html" title="Airmail preview" loading="lazy" tabindex="-1"></iframe></div>
-        <div class="body">
-          <h3>E · Airmail <span class="tag rec">Recommended</span></h3>
-          <p class="idea">A link is something you send to a person.</p>
-          <p>The form is an airmail envelope with a stamp and postmark. Pricing is two postage stamps. The badge becomes a small postmark that says "Sent with aired". Pro removes it, like franking your own mail.</p>
-          <dl class="meta"><dt>Effort</dt><dd>4–5 days</dd><dt>Risk</dt><dd>The metaphor has to stay light on guide and docs pages, which should read as plain text with the envelope only on the form.</dd></dl>
-          <a class="open" href="direction-e-airmail.html">Open Airmail →</a>
-        </div>
-      </div>
-      <div class="card">
-        <div class="thumb"><iframe src="direction-f-utility.html" title="Utility preview" loading="lazy" tabindex="-1"></iframe></div>
-        <div class="body">
-          <h3>F · Utility <span class="tag">Safest</span></h3>
-          <p class="idea">The page is the tool. No metaphor.</p>
-          <p>White, black and one signal blue. Square corners, thick rules, huge type. The drop target fills the width and the returned link is the biggest thing on screen. The badge is a blue square tab.</p>
-          <dl class="meta"><dt>Effort</dt><dd>2–3 days</dd><dt>Risk</dt><dd>Confident but cold. Memorable for its type, not for an idea.</dd></dl>
-          <a class="open" href="direction-f-utility.html">Open Utility →</a>
-        </div>
-      </div>
-    </div>
+    <h2>Recommended: current look, product signals</h2>
+    <p class="lead">Same palette, fonts, column and form as aired.sh today. Pricing, a Pro offer and a real footer added; developer material moved down.</p>
+    <div class="preview"><iframe src="direction-a2-current-pro.html" title="Recommended mockup" loading="lazy" tabindex="-1"></iframe></div>
+    <a class="open" href="direction-a2-current-pro.html">Open the full mockup →</a>
   </section>
 
   <section>
-    <h2>Side by side</h2>
+    <h2>Today vs the mockup</h2>
     <div class="scroll"><table>
-      <tr><th></th><th>D · Signal</th><th>E · Airmail</th><th>F · Utility</th></tr>
-      <tr><td>Who it speaks to</td><td>People who like the name; makers, devs</td><td class="good">Non-technical senders, agencies sending to clients</td><td>Anyone in a hurry</td></tr>
-      <tr><td>Badge on a client report</td><td>Dark lower-third tab: reads as a credit</td><td class="good">Postmark pill: expected on anything delivered</td><td>Blue square: clear, a little loud</td></tr>
-      <tr><td>Against Tiiny, Gamma, Claude</td><td class="good">Nobody uses broadcast imagery</td><td class="good">Nobody uses mail imagery</td><td>Close to Vercel and Swiss-style tools</td></tr>
-      <tr><td>Fonts added</td><td>Archivo (one variable file) + Plex Mono</td><td>Familjen Grotesk + Instrument Sans + Plex Mono</td><td>Schibsted Grotesk + JetBrains Mono</td></tr>
-      <tr><td>SEO guide pages</td><td>Restyle only; copy and URLs unchanged</td><td>Restyle only; "send" wording in form labels</td><td>Restyle only</td></tr>
-      <tr><td>Globe</td><td class="good">Removed</td><td class="good">Removed</td><td class="good">Removed</td></tr>
-      <tr><td>Effort</td><td>3–4 days</td><td>4–5 days</td><td>2–3 days</td></tr>
+      <tr><th>Side-project signal today</th><th>In the mockup</th></tr>
+      <tr><td>GitHub icon in the main nav, "sign in" lowercase</td><td>Pricing · Guides · Docs, then "Log in" and a "Start free" button. GitHub moves to the footer.</td></tr>
+      <tr><td>No pricing, no paid plan visible</td><td>A Pro section that shows the custom-domain link and an opens list, then Free and Pro cards.</td></tr>
+      <tr><td>CLI, MCP, API tabs as the second section</td><td>One band near the bottom: <code>npx aired report.html</code> and a docs link.</td></tr>
+      <tr><td>Live ticker of visitors' page titles</td><td>Removed. Titles are random and some are spam, which a buyer reads as "anyone dumps stuff here".</td></tr>
+      <tr><td>"Built by @handle", Cloudflare and llms.txt links in the footer</td><td>Product, Guides and Company columns with Contact, Terms, Privacy, Status.</td></tr>
+      <tr><td>Purple button and purple globe glow</td><td>Light button on dark; purple only on the logo. Globe removed. Both are flagged AI-default tells in the anti-slop catalogs.</td></tr>
+      <tr><td>Helper text at 2.7:1 contrast</td><td>Raised to 4.8:1. Labels say "Expires" and "Password", not TTL and PIN.</td></tr>
     </table></div>
   </section>
 
   <section>
-    <h2>Same in every direction</h2>
+    <h2>What design can't fix</h2>
     <ol>
-      <li><b>Badge first, on its own.</b> Match the page background, say what it is, link to <code>aired.sh/?ref=badge</code>. It's on 102,156 page views so far, far more than the homepage.</li>
-      <li><b>Drop the WebGL globe.</b> Three chained requests and a canvas redrawn every frame, at 35% opacity.</li>
-      <li><b>Fix contrast.</b> Today's helper text is 2.7:1 and the button text 4.07:1; all three directions clear 4.5:1.</li>
-      <li><b>Plain labels.</b> "Expires" and "Password" instead of TTL and PIN.</li>
+      <li><b>There's nothing to buy yet.</b> The pricing block only works with a real "Start Pro" checkout or waitlist behind it, which is step 5 of the growth plan.</li>
+      <li><b>GitHub-only sign-in</b> blocks the non-developers the copy now talks to. Google sign-in or an email link matters more than any color.</li>
+      <li><b>The badge</b> is what most people see (102,156 page views so far). It should say "Shared with aired" and match the page under it, as in the mockup.</li>
     </ol>
-    <p class="older">Round 1, kept for reference: <a href="direction-a-tuned-dark.html">A · Tuned dark</a> · <a href="direction-b-paper.html">B · Paper</a> · <a href="direction-c-bright.html">C · Bright</a></p>
   </section>
 
-  <footer>Static mockups in <code>docs/design/</code>. Stats are live figures from aired.sh. Pricing follows <code>docs/growth/seo-marketing-pricing.md</code>: Pro $9 a month billed yearly, $12 monthly.</footer>
+  <section>
+    <h2>Explored and set aside</h2>
+    <div class="others">
+      <div class="other"><b>B refined · Plain light</b><span>Light, black button, same layout. Simple, but loses the identity you like.</span><a href="direction-b2-plain.html">Open →</a></div>
+      <div class="other"><b>Round 2 · Signal, Airmail, Utility</b><span>Concept looks built on the name. Too much for what aired needs.</span><a href="direction-e-airmail.html">Open →</a></div>
+      <div class="other"><b>Round 1 · Tuned dark, Paper, Bright</b><span>First pass. Paper and Bright used common AI-default looks.</span><a href="direction-a-tuned-dark.html">Open →</a></div>
+    </div>
+  </section>
+
+  <footer>Static mockups in <code>docs/design/</code>. Stats are live aired.sh figures; Pro pricing follows <code>docs/growth/seo-marketing-pricing.md</code>. Anti-slop checks from the vibecoded-design-tells and kill-ai-slop skills on GitHub.</footer>
 </div>
 <script>
-  function fitThumbs() {
-    document.querySelectorAll('.thumb').forEach(function (t) {
-      var s = t.clientWidth / 1280; t.querySelector('iframe').style.transform = 'scale(' + s + ')';
-      t.style.height = Math.round(820 * s) + 'px';
-    });
-  }
-  fitThumbs(); addEventListener('resize', fitThumbs);
+  function fit() { var p = document.querySelector('.preview'), s = p.clientWidth / 1100; p.querySelector('iframe').style.transform = 'scale(' + s + ')'; p.style.height = Math.round(1500 * s) + 'px'; }
+  fit(); addEventListener('resize', fit);
 </script>
 </body>
 </html>

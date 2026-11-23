@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>aired — Current look, product signals</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  /* Today's aired.sh look, kept: near-black, Inter, JetBrains Mono, the narrow
+     single column, 8/12px radius, no shadows. What changes is what the page says:
+     pricing, a Pro offer, what the recipient sees, proper footer, and the
+     developer material moved down. Purple leaves the button and stays on the
+     logo mark only; the globe and its purple glow are gone. */
+  :root {
+    --bg: #0a0a0b;
+    --surface: #111113;
+    --surface-2: #18181b;
+    --border: #222225;
+    --border-2: #34343a;
+    --text-1: #ededef;
+    --text-2: #a1a1a6;      /* was #8a8a8e */
+    --text-3: #84848a;      /* was #56565a, which failed contrast */
+    --mark: #7c6aef;        /* logo only */
+    --btn: #ededef;         /* primary button: light on dark */
+    --btn-hover: #ffffff;
+    --ok: #34d399;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { font: 15px/1.6 Inter, -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text-1); -webkit-font-smoothing: antialiased; }
+  a { color: inherit; text-decoration: none; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .col { max-width: 680px; margin: 0 auto; padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
+  .cap { font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+
+  .switcher { font: 12px 'JetBrains Mono', monospace; background: #050506; border-bottom: 1px solid var(--border); color: var(--text-3); }
+  .switcher .col { max-width: 1040px; display: flex; gap: 16px; align-items: center; height: 34px; overflow-x: auto; white-space: nowrap; }
+  .switcher a.on { color: var(--text-1); }
+
+  header .col { display: flex; align-items: center; gap: 22px; height: 60px; }
+  .logo { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; font-size: 15px; margin-right: 6px; }
+  .logo svg { width: 16px; height: 16px; color: var(--mark); }
+  nav { display: flex; gap: 20px; font-size: 14px; color: var(--text-2); }
+  nav a:hover, .login:hover { color: var(--text-1); }
+  .right { margin-left: auto; display: flex; align-items: center; gap: 16px; font-size: 14px; }
+  .login { color: var(--text-2); }
+  .start { background: var(--btn); color: var(--bg); border-radius: 8px; padding: 6px 12px; font-weight: 500; }
+  @media (max-width: 560px) { nav { display: none; } }
+
+  .hero { padding: 64px 0 0; }
+  h1 { font-size: 30px; line-height: 1.15; font-weight: 500; letter-spacing: -0.025em; }
+  .lede { margin-top: 10px; color: var(--text-2); max-width: 36em; }
+  .form { margin-top: 28px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .form:focus-within { border-color: var(--border-2); }
+  .drop { height: 150px; display: grid; place-content: center; text-align: center; gap: 2px; color: var(--text-2); font-size: 14px; border-bottom: 1px solid var(--border); }
+  .drop small { color: var(--text-3); font-size: 12px; }
+  .opts { display: flex; align-items: center; gap: 16px; padding: 10px 10px 10px 14px; font-size: 13px; color: var(--text-2); flex-wrap: wrap; }
+  .opts label { color: var(--text-3); margin-right: 6px; }
+  .opts select, .opts input { font: inherit; color: var(--text-1); background: none; border: 0; padding: 0; width: 7em; }
+  .publish { margin-left: auto; background: var(--btn); color: var(--bg); border: 0; border-radius: 8px; padding: 8px 16px; font: 500 13px Inter, sans-serif; cursor: pointer; }
+  .publish:hover, .start:hover { background: var(--btn-hover); }
+  .publish:focus-visible, .start:focus-visible, .opts select:focus-visible, .opts input:focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; border-radius: 6px; }
+  .proof { margin-top: 12px; font-size: 13px; color: var(--text-3); } .proof b { color: var(--text-1); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+  section.block { margin-top: 72px; }
+  h2 { font-size: 19px; font-weight: 500; letter-spacing: -0.015em; }
+  .sub { margin-top: 6px; color: var(--text-2); }
+
+  /* What the recipient opens */
+  .seen-cap { display: flex; justify-content: space-between; gap: 12px; margin: 18px 0 8px; font-size: 12px; color: var(--text-3); }
+  .seen-cap .mono { color: var(--text-2); }
+  .crop { position: relative; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .report { background: #fff; color: #1d2433; padding: 20px 20px 60px; font: 13px/1.5 -apple-system, 'Segoe UI', sans-serif; }
+  .report h4 { font-size: 15px; font-weight: 600; } .report p { color: #5a6475; font-size: 12px; }
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
+  .kpi { border: 1px solid #e6e9ef; border-radius: 6px; padding: 10px; } .kpi b { display: block; font-size: 18px; } .kpi small { color: #0f7a4a; font-size: 11px; }
+  .bars { display: flex; align-items: flex-end; gap: 6px; height: 60px; border-bottom: 1px solid #e6e9ef; } .bars i { flex: 1; display: block; background: #3b6fe0; border-radius: 2px 2px 0 0; }
+  .badge { position: absolute; right: 12px; bottom: 12px; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 8px; border-radius: 6px;
+           background: #fff; color: #333338; border: 1px solid #e0e0e4; font: 500 12px Inter, sans-serif; white-space: nowrap; }
+  .badge svg { width: 12px; height: 12px; color: #5847d4; }
+  .badge span { color: #6b6b72; }
+
+  /* Pro, shown rather than listed */
+  .pro-show { margin-top: 18px; display: grid; gap: 12px; }
+  .linkrow { display: grid; grid-template-columns: 70px 1fr; gap: 12px; align-items: center; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }
+  .linkrow .mono { font-size: 14px; overflow-wrap: anywhere; min-width: 0; }
+  .linkrow.free .mono { color: var(--text-3); } .linkrow.pro { border-color: var(--border-2); }
+  .opens { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .opens-head { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  .opens-head b { font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .opens table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .opens td { padding: 9px 16px; border-bottom: 1px solid var(--border); color: var(--text-2); }
+  .opens tr:last-child td { border-bottom: 0; }
+  .opens td:last-child { text-align: right; color: var(--text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .opens .new { color: var(--ok); }
+
+  /* Pricing */
+  .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
+  @media (max-width: 560px) { .plans { grid-template-columns: 1fr; } }
+  .plan { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px; display: grid; gap: 2px; align-content: start; }
+  .plan.pro { border-color: #5a5a62; }
+  .plan h3 { font-size: 13px; font-weight: 500; color: var(--text-2); display: flex; justify-content: space-between; }
+  .price { font-size: 30px; font-weight: 500; letter-spacing: -0.02em; margin-top: 4px; } .price small { font-size: 13px; color: var(--text-2); letter-spacing: 0; }
+  .note { font-size: 12px; color: var(--text-3); }
+  .plan ul { list-style: none; padding: 0; margin: 14px 0 18px; font-size: 14px; color: var(--text-2); }
+  .plan li { padding: 6px 0; border-top: 1px solid var(--border); }
+  .btn { display: block; text-align: center; height: 36px; line-height: 36px; border-radius: 8px; font-size: 13px; font-weight: 500; border: 1px solid var(--border-2); }
+  .btn.solid { background: var(--btn); color: var(--bg); border-color: var(--btn); }
+
+  /* Developers: kept, moved down, one band */
+  .dev { margin-top: 18px; display: grid; grid-template-columns: 1fr auto; gap: 12px 20px; align-items: center; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+  @media (max-width: 560px) { .dev { grid-template-columns: 1fr; } }
+  .dev code { font: 13px 'JetBrains Mono', monospace; color: var(--text-1); }
+  .dev p { font-size: 13px; color: var(--text-3); margin-top: 4px; }
+  .dev a { font-size: 13px; color: var(--text-2); white-space: nowrap; }
+
+  dl.faq { margin-top: 16px; border-top: 1px solid var(--border); }
+  dl.faq div { padding: 14px 0; border-bottom: 1px solid var(--border); }
+  dl.faq dt { font-weight: 500; font-size: 14px; } dl.faq dd { margin: 4px 0 0; color: var(--text-2); font-size: 14px; }
+
+  footer { margin-top: 80px; border-top: 1px solid var(--border); padding: 32px 0 44px; }
+  .fcols { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 24px; font-size: 13px; }
+  @media (max-width: 560px) { .fcols { grid-template-columns: 1fr 1fr; } }
+  .fcols div { display: grid; gap: 6px; align-content: start; color: var(--text-2); }
+  .fcols p { color: var(--text-3); font-size: 12px; max-width: 18em; }
+
+  .changes { margin-top: 64px; padding: 20px; border: 1px dashed var(--border-2); border-radius: 12px; font-size: 13px; color: var(--text-2); display: grid; gap: 8px; }
+  .changes b { color: var(--text-1); font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="switcher"><div class="col">
+  <span>Mockups:</span>
+  <a href="direction-a2-current-pro.html" class="on">Current look + product signals</a>
+  <a href="index.html">Compare</a>
+</div></div>
+
+<header><div class="col">
+  <a class="logo" href="#"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>aired</a>
+  <nav><a href="#pricing">Pricing</a><a href="#">Guides</a><a href="#">Docs</a></nav>
+  <div class="right"><a class="login" href="#">Log in</a><a class="start" href="#">Start free</a></div>
+</div></header>
+
+<main class="col">
+  <section class="hero">
+    <h1>Turn HTML into a link anyone can open.</h1>
+    <p class="lede">Made a report, page or game with Claude, ChatGPT or another AI tool? Paste the HTML or drop the file. You get a link to send in seconds. Free, no account.</p>
+    <div class="form" role="group" aria-label="Publish HTML">
+      <div class="drop">Paste HTML or drop a file<small>⌘V to paste · 2 MB max</small></div>
+      <div class="opts">
+        <span><label for="exp">Expires</label><select id="exp"><option>1 hour</option><option>1 day</option><option selected>7 days</option><option>30 days</option></select></span>
+        <span><label for="pw">Password</label><input id="pw" placeholder="none" /></span>
+        <button class="publish" type="button">Publish</button>
+      </div>
+    </div>
+    <p class="proof"><b>10,827</b> pages published · opened <b>102,156</b> times in 141 countries</p>
+  </section>
+
+  <section class="block">
+    <h2>What they open</h2>
+    <p class="sub">Your page, as you made it, on any phone or laptop. No sign-in for the person you send it to.</p>
+    <div class="seen-cap"><span>Free plan</span><span class="mono">aired.sh/p/q3-northwind</span></div>
+    <div class="crop"><div class="report">
+      <h4>Q3 performance — Northwind Dental</h4><p>Prepared for Sam Ortiz · Oct 2026</p>
+      <div class="kpis"><div class="kpi">Leads<b>1,284</b><small>+18%</small></div><div class="kpi">Calls<b>412</b><small>+9%</small></div><div class="kpi">Cost / lead<b>$21</b><small>−12%</small></div></div>
+      <div class="bars"><i style="height:38%"></i><i style="height:52%"></i><i style="height:45%"></i><i style="height:61%"></i><i style="height:58%"></i><i style="height:74%"></i><i style="height:69%"></i><i style="height:88%"></i></div>
+    </div>
+    <a class="badge" href="#"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>Shared with aired</a></div>
+  </section>
+
+  <section class="block">
+    <h2>Send it under your name with Pro</h2>
+    <p class="sub">For work that goes to clients: your domain on the link, no aired badge, and a record of every open.</p>
+    <div class="pro-show">
+      <div class="linkrow free"><span class="cap">Free</span><span class="mono">aired.sh/p/q3-northwind</span></div>
+      <div class="linkrow pro"><span class="cap">Pro</span><span class="mono">reports.youragency.com/q3-northwind</span></div>
+      <div class="opens">
+        <div class="opens-head"><span class="cap">Q3 performance · opens</span><b>14</b></div>
+        <table>
+          <tr><td class="new">Chicago, US · iPhone</td><td>12 min ago</td></tr>
+          <tr><td>Chicago, US · Mac</td><td>yesterday</td></tr>
+          <tr><td>Austin, US · Windows</td><td>Mon</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="pricing">
+    <h2>Pricing</h2>
+    <p class="sub">Publishing and viewing stay free, with no cap on views.</p>
+    <div class="plans">
+      <div class="plan"><h3>Free <span>No account</span></h3><div class="price">$0</div><p class="note">Forever</p>
+        <ul><li>Unlimited pages and views</li><li>Password on any page</li><li>Links last 1 hour to 30 days</li><li>Publish from Claude, ChatGPT, CLI, MCP</li></ul>
+        <a class="btn" href="#">Publish a page</a></div>
+      <div class="plan pro"><h3>Pro <span>For client work</span></h3><div class="price">$9 <small>/ month</small></div><p class="note">Billed yearly, or $12 monthly</p>
+        <ul><li>Your own domain</li><li>No aired badge</li><li>Who opened it, and when</li><li>Pages that never expire</li><li>API key for CI and scripts</li></ul>
+        <a class="btn solid" href="#">Start Pro</a></div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>Publishing from an agent or a script?</h2>
+    <div class="dev">
+      <div><code>npx aired report.html</code><p>CLI, MCP server and HTTP API. Your agent can publish without an account.</p></div>
+      <a href="#">Developer docs →</a>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>Questions</h2>
+    <dl class="faq">
+      <div><dt>Does the person I send it to need an account?</dt><dd>No. They open the link in any browser.</dd></div>
+      <div><dt>Can I keep a page private?</dt><dd>Add a password before you publish. Pages without an account are hidden from search engines.</dd></div>
+      <div><dt>What happens when I cancel Pro?</dt><dd>Your pages stay up on aired.sh links with the badge back on.</dd></div>
+    </dl>
+  </section>
+
+  <div class="changes">
+    <div><b>Kept from today:</b> the dark palette, Inter and JetBrains Mono, the single column, the form, 12px cards, no shadows, the copy.</div>
+    <div><b>Added:</b> Pricing in the nav, "Log in" and "Start free", what the recipient sees, a Pro section that shows the custom-domain link and an opens list, a pricing block, a real footer with Terms, Privacy, Status and Contact.</div>
+    <div><b>Moved down:</b> the CLI, MCP and API tabs become one band linking to the docs. GitHub moves to the footer.</div>
+    <div><b>Removed:</b> the WebGL globe and its purple glow, purple as the button colour (now on the logo only), the live ticker of visitors' page titles, "Built by @handle".</div>
+  </div>
+</main>
+
+<footer><div class="col">
+  <div class="fcols">
+    <div><a class="logo" href="#"><svg viewBox="0 0 32 32" aria-hidden="true" style="width:14px;height:14px;color:var(--mark)"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>aired</a><p>Turn HTML into a link anyone can open.</p></div>
+    <div><span class="cap">Product</span><a href="#">Pricing</a><a href="#">Docs</a><a href="#">Changelog</a><a href="#">Status</a></div>
+    <div><span class="cap">Guides</span><a href="#">HTML to link</a><a href="#">Share Claude artifacts</a><a href="#">Tiiny Host alternative</a></div>
+    <div><span class="cap">Company</span><a href="#">Contact</a><a href="#">Terms</a><a href="#">Privacy</a><a href="#">Report abuse</a><a href="#">GitHub</a></div>
+  </div>
+</div></footer>
+</body>
+</html>
