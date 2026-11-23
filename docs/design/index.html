@@ -55,14 +55,14 @@
   .seen-cap { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 8px; font-size: 12px; color: var(--text-3); }
   .seen-cap .mono { color: var(--text-2); }
   .crop { position: relative; border: 1px solid var(--border-2); border-radius: 12px; overflow: hidden; }
-  .report { background: #fff; color: #1d2433; padding: 20px 20px 58px; font: 13px/1.5 -apple-system, 'Segoe UI', sans-serif; }
-  .report h4 { font-size: 15px; font-weight: 600; } .report p { color: #5a6475; font-size: 12px; }
+  .report { background: #131316; color: #ececee; padding: 20px 20px 58px; font: 13px/1.5 -apple-system, 'Segoe UI', sans-serif; }
+  .report h4 { font-size: 15px; font-weight: 600; } .report p { color: #8b8b92; font-size: 12px; }
   .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
-  .kpi { border: 1px solid #e6e9ef; border-radius: 6px; padding: 10px; } .kpi b { display: block; font-size: 18px; } .kpi small { color: #0f7a4a; font-size: 11px; }
-  .bars { display: flex; align-items: flex-end; gap: 6px; height: 96px; border-bottom: 1px solid #e6e9ef; } .bars i { flex: 1; display: block; background: #3b6fe0; border-radius: 2px 2px 0 0; }
+  .kpi { border: 1px solid #26262b; background: #19191d; border-radius: 6px; padding: 10px; color: #9a9aa1; } .kpi b { display: block; font-size: 18px; color: #ececee; } .kpi small { color: #34d399; font-size: 11px; }
+  .bars { display: flex; align-items: flex-end; gap: 6px; height: 96px; border-bottom: 1px solid #26262b; } .bars i { flex: 1; display: block; background: #5b7cfa; border-radius: 2px 2px 0 0; } .bars i:last-child { background: #8ea6ff; }
   .badge { position: absolute; right: 12px; bottom: 12px; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 8px; border-radius: 6px;
-           background: #fff; color: #333338; border: 1px solid #e0e0e4; font: 500 12px Inter, sans-serif; white-space: nowrap; }
-  .badge svg { width: 12px; height: 12px; color: #5847d4; }
+           background: #1c1c20; color: #ececee; border: 1px solid #2e2e34; font: 500 12px Inter, sans-serif; white-space: nowrap; }
+  .badge svg { width: 12px; height: 12px; color: #9d8ff5; }
 
   /* Works-with strip */
   .works { margin-top: 88px; text-align: center; }
@@ -153,12 +153,17 @@
   .vis.nofade { -webkit-mask-image: none; mask-image: none; }
 
   /* Card visuals */
-  .phone { position: absolute; left: 50%; top: 4px; transform: translateX(-50%); width: 210px; height: 400px; border-radius: 34px; background: #050506; border: 1px solid var(--border-2); padding: 10px; }
-  .phone .scr { height: 100%; border-radius: 26px; background: #fff; overflow: hidden; padding: 30px 14px 0; font: 11px/1.4 -apple-system, sans-serif; color: #1d2433; }
-  .phone .scr b { display: block; font-size: 13px; }
-  .phone .scr p { color: #5a6475; font-size: 10px; }
-  .phone .k2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 10px 0; } .phone .k2 span { border: 1px solid #e6e9ef; border-radius: 6px; padding: 6px; font-size: 10px; } .phone .k2 b { font-size: 14px; }
-  .phone .bars { height: 80px; gap: 4px; }
+  .vers { padding: 0 22px; display: grid; gap: 0; position: relative; }
+  .vlink { margin-bottom: 18px; padding: 9px 12px; border: 1px solid var(--border-2); border-radius: 10px; background: var(--bg); font-size: 12.5px; color: var(--text-1); }
+  .v { display: grid; grid-template-columns: 18px 1fr; gap: 12px; padding-bottom: 22px; position: relative; }
+  .v::before { content: ''; position: absolute; left: 8px; top: 14px; bottom: -2px; width: 1px; background: var(--border-2); }
+  .v:last-child::before { display: none; }
+  .v i { width: 17px; height: 17px; border-radius: 50%; border: 1px solid var(--border-2); background: var(--surface-2); margin-top: 2px; position: relative; z-index: 1; }
+  .v.live i { background: var(--ok); border-color: var(--ok); box-shadow: 0 0 0 4px rgba(52,211,153,.12); }
+  .v b { display: block; font-weight: 500; font-size: 14px; }
+  .v span { font-size: 12px; color: var(--text-3); }
+  .v.live span { color: var(--ok); }
+
 
   .pin { display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 6px; }
   .pin-dots { display: flex; gap: 10px; }
@@ -287,11 +292,14 @@
     </div>
     <div class="bento">
       <div class="card tall">
-        <div class="card-text"><h3>Opens on any device</h3><p>Phone, tablet or laptop. Nothing to install, nothing to sign in to.</p></div>
-        <div class="vis"><div class="phone" aria-hidden="true"><div class="scr"><b>Q3 performance</b><p>Northwind Dental · Oct 2026</p>
-          <div class="k2"><span>Leads<br><b>1,284</b></span><span>Calls<br><b>412</b></span></div>
-          <div class="bars"><i style="height:40%"></i><i style="height:55%"></i><i style="height:50%"></i><i style="height:70%"></i><i style="height:66%"></i><i style="height:92%"></i></div>
-          <div class="k2"><span>Cost / lead<br><b>$21</b></span><span>Top channel<br><b>Ads</b></span></div></div></div></div>
+        <div class="card-text"><h3>Same link, new version</h3><p>Publish an update and everyone with the link sees it. Roll back anytime.</p></div>
+        <div class="vis"><div class="vers" aria-hidden="true">
+          <div class="vlink"><span class="mono">aired.sh/p/q3-northwind</span></div>
+          <div class="v live"><i></i><div><b>v4 · Final numbers</b><span>Today, 9:41 · live</span></div></div>
+          <div class="v"><i></i><div><b>v3 · Added call data</b><span>Yesterday, 18:02</span></div></div>
+          <div class="v"><i></i><div><b>v2 · Fixed chart labels</b><span>Mon, 11:15</span></div></div>
+          <div class="v"><i></i><div><b>v1 · First draft</b><span>Mon, 10:30</span></div></div>
+        </div></div>
       </div>
       <div class="card">
         <div class="card-text"><h3>Password on any page</h3><p>Add a PIN and only people you tell can open it.</p></div>
