@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>aired Design Direction</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  /* aired.sh homepage, proposed. Today's dark look and single column, kept
+     plain: the form, one example of what the recipient opens, pricing. */
+  :root {
+    --bg: #0a0a0b; --surface: #111113; --surface-2: #18181b; --border: #222225; --border-2: #34343a;
+    --text-1: #ededef; --text-2: #a1a1a6; --text-3: #84848a; --mark: #7c6aef; --btn: #ededef; --btn-hover: #ffffff;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { font: 15px/1.6 Inter, -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text-1); -webkit-font-smoothing: antialiased; }
+  a { color: inherit; text-decoration: none; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .col { max-width: 680px; margin: 0 auto; padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
+
+  header .col { display: flex; align-items: center; gap: 22px; height: 60px; }
+  .logo { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; font-size: 15px; margin-right: 6px; }
+  .logo svg { width: 16px; height: 16px; color: var(--mark); }
+  nav { display: flex; gap: 20px; font-size: 14px; color: var(--text-2); }
+  nav a:hover, .login:hover { color: var(--text-1); }
+  .right { margin-left: auto; display: flex; align-items: center; gap: 16px; font-size: 14px; }
+  .login { color: var(--text-2); }
+  .start { background: var(--btn); color: var(--bg); border-radius: 8px; padding: 6px 12px; font-weight: 500; }
+  @media (max-width: 520px) { nav { display: none; } }
+
+  .hero { padding: 72px 0 0; }
+  h1 { font-size: 30px; line-height: 1.15; font-weight: 500; letter-spacing: -0.025em; }
+  .lede { margin-top: 10px; color: var(--text-2); }
+  .form { margin-top: 28px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .form:focus-within { border-color: var(--border-2); }
+  .drop { height: 160px; display: grid; place-content: center; text-align: center; gap: 2px; color: var(--text-2); font-size: 14px; border-bottom: 1px solid var(--border); }
+  .drop small { color: var(--text-3); font-size: 12px; }
+  .opts { display: flex; align-items: center; gap: 16px; padding: 10px 10px 10px 14px; font-size: 13px; color: var(--text-2); flex-wrap: wrap; }
+  .opts label { color: var(--text-3); margin-right: 6px; }
+  .opts select, .opts input { font: inherit; color: var(--text-1); background: none; border: 0; padding: 0; width: 7em; }
+  .publish { margin-left: auto; background: var(--btn); color: var(--bg); border: 0; border-radius: 8px; padding: 8px 16px; font: 500 13px Inter, sans-serif; cursor: pointer; }
+  .publish:hover, .start:hover { background: var(--btn-hover); }
+  .publish:focus-visible, .start:focus-visible, .opts select:focus-visible, .opts input:focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; border-radius: 6px; }
+  .proof { margin-top: 12px; font-size: 13px; color: var(--text-3); }
+  .proof b { color: var(--text-1); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .proof a { color: var(--text-2); }
+
+  section.block { margin-top: 80px; }
+  h2 { font-size: 19px; font-weight: 500; letter-spacing: -0.015em; }
+  .sub { margin-top: 6px; color: var(--text-2); }
+
+  .seen-cap { display: flex; justify-content: flex-end; margin: 16px 0 8px; font: 12px 'JetBrains Mono', monospace; color: var(--text-3); }
+  .crop { position: relative; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .report { background: #fff; color: #1d2433; padding: 20px 20px 60px; font: 13px/1.5 -apple-system, 'Segoe UI', sans-serif; }
+  .report h4 { font-size: 15px; font-weight: 600; } .report p { color: #5a6475; font-size: 12px; }
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
+  .kpi { border: 1px solid #e6e9ef; border-radius: 6px; padding: 10px; } .kpi b { display: block; font-size: 18px; } .kpi small { color: #0f7a4a; font-size: 11px; }
+  .bars { display: flex; align-items: flex-end; gap: 6px; height: 70px; border-bottom: 1px solid #e6e9ef; } .bars i { flex: 1; display: block; background: #3b6fe0; border-radius: 2px 2px 0 0; }
+  .badge { position: absolute; right: 12px; bottom: 12px; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 8px; border-radius: 6px;
+           background: #fff; color: #333338; border: 1px solid #e0e0e4; font: 500 12px Inter, sans-serif; white-space: nowrap; }
+  .badge svg { width: 12px; height: 12px; color: #5847d4; }
+
+  .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
+  @media (max-width: 520px) { .plans { grid-template-columns: 1fr; } }
+  .plan { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px; display: grid; gap: 2px; align-content: start; }
+  .plan.pro { border-color: #5a5a62; }
+  .plan h3 { font-size: 13px; font-weight: 500; color: var(--text-2); }
+  .price { font-size: 30px; font-weight: 500; letter-spacing: -0.02em; margin-top: 4px; } .price small { font-size: 13px; color: var(--text-2); letter-spacing: 0; }
+  .note { font-size: 12px; color: var(--text-3); }
+  .plan ul { list-style: none; padding: 0; margin: 14px 0 18px; font-size: 14px; color: var(--text-2); }
+  .plan li { padding: 6px 0; border-top: 1px solid var(--border); }
+  .btn { display: block; text-align: center; height: 36px; line-height: 34px; border-radius: 8px; font-size: 13px; font-weight: 500; border: 1px solid var(--border-2); }
+  .btn.solid { background: var(--btn); color: var(--bg); border-color: var(--btn); }
+  .later { margin-top: 12px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .later a { display: flex; align-items: baseline; gap: 16px; padding: 13px 18px; font-size: 14px; color: var(--text-2); }
+  .later a + a { border-top: 1px solid var(--border); }
+  .later b { color: var(--text-1); font-weight: 500; width: 80px; flex: none; }
+  .later span { flex: 1; min-width: 0; }
+  .later em { font-style: normal; font-size: 13px; white-space: nowrap; }
+  .all { display: inline-block; margin-top: 12px; font-size: 14px; color: var(--text-2); }
+
+  footer { margin-top: 96px; border-top: 1px solid var(--border); padding: 28px 0 44px; }
+  footer .col { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px 24px; font-size: 13px; color: var(--text-3); }
+  footer nav { display: flex; gap: 18px; flex-wrap: wrap; color: var(--text-3); font-size: 13px; }
+  footer a:hover { color: var(--text-1); }
+</style>
+</head>
+<body>
+<header><div class="col">
+  <a class="logo" href="index.html"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>aired</a>
+  <nav><a href="pricing-page.html">Pricing</a><a href="#">Docs</a></nav>
+  <div class="right"><a class="login" href="#">Log in</a><a class="start" href="#">Start free</a></div>
+</div></header>
+
+<main class="col">
+  <section class="hero">
+    <h1>Turn HTML into a link anyone can open.</h1>
+    <p class="lede">Made a report, page or game with Claude, ChatGPT or another AI tool? Drop the file and send the link. Free, no account.</p>
+    <div class="form" role="group" aria-label="Publish HTML">
+      <div class="drop">Paste HTML or drop a file<small>⌘V to paste · 2 MB max</small></div>
+      <div class="opts">
+        <span><label for="exp">Expires</label><select id="exp"><option>1 hour</option><option>1 day</option><option selected>7 days</option><option>30 days</option></select></span>
+        <span><label for="pw">Password</label><input id="pw" placeholder="none" /></span>
+        <button class="publish" type="button">Publish</button>
+      </div>
+    </div>
+    <p class="proof"><b>10,827</b> pages published · opened <b>102,156</b> times · <a href="#">publish from your agent →</a></p>
+  </section>
+
+  <section class="block">
+    <h2>What they open</h2>
+    <p class="sub">Your page as you made it, on any phone or laptop. No sign-in for them.</p>
+    <div class="seen-cap">aired.sh/p/q3-northwind</div>
+    <div class="crop"><div class="report">
+      <h4>Q3 performance — Northwind Dental</h4><p>Prepared for Sam Ortiz · Oct 2026</p>
+      <div class="kpis"><div class="kpi">Leads<b>1,284</b><small>+18%</small></div><div class="kpi">Calls<b>412</b><small>+9%</small></div><div class="kpi">Cost / lead<b>$21</b><small>−12%</small></div></div>
+      <div class="bars"><i style="height:38%"></i><i style="height:52%"></i><i style="height:45%"></i><i style="height:61%"></i><i style="height:58%"></i><i style="height:74%"></i><i style="height:69%"></i><i style="height:88%"></i></div>
+    </div>
+    <a class="badge" href="#"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>Shared with aired</a></div>
+  </section>
+
+  <section class="block" id="pricing">
+    <h2>Pricing</h2>
+    <p class="sub">Publishing and viewing are free, with no cap on views.</p>
+    <div class="plans">
+      <div class="plan"><h3>Free</h3><div class="price">$0</div><p class="note">No account needed</p>
+        <ul><li>Unlimited pages and views</li><li>Password on any page</li><li>Links last 1 hour to 30 days</li></ul>
+        <a class="btn" href="#">Publish a page</a></div>
+      <div class="plan pro"><h3>Pro</h3><div class="price">$9 <small>/ month</small></div><p class="note">Billed yearly, or $12 monthly</p>
+        <ul><li>Your own domain</li><li>No aired badge</li><li>See who opened it</li></ul>
+        <a class="btn solid" href="#">Start Pro</a></div>
+    </div>
+    <div class="later">
+      <a href="pricing-page.html"><b>Team</b><span>Shared workspace, free guests</span><em>$12 / editor · waitlist</em></a>
+      <a href="pricing-page.html"><b>Business</b><span>SSO, audit log</span><em>$20 / editor · talk to us</em></a>
+    </div>
+    <a class="all" href="pricing-page.html">Compare all plans →</a>
+  </section>
+</main>
+
+<footer><div class="col">
+  <span>aired</span>
+  <nav><a href="pricing-page.html">Pricing</a><a href="#">Docs</a><a href="#">Guides</a><a href="#">Terms</a><a href="#">Privacy</a><a href="#">Contact</a><a href="#">GitHub</a></nav>
+</div></footer>
+</body>
+</html>
