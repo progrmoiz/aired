@@ -5,12 +5,13 @@
 ## The decisions
 
 1. **Rank for the job, not the jargon.** People don't search "publish HTML artifacts". They search "share html file as link", "how to share claude artifact" and "tiiny host alternative". The homepage and three new guide pages now target those phrases.
-2. **Position aired for people who make things with AI, not only for developers.** New one-liner: *aired turns anything your AI makes into a link anyone can open.* Developers still reach the CLI, MCP and API through the docs and the "let your agent publish it" block.
+2. **Position aired for people who make things with AI, not only for developers.** New one-liner: *aired turns anything your AI makes into a link anyone can open.* The same link works for a page, a deck, a doc or a report. Developers still reach the CLI, MCP and API through the docs and the "let your agent publish it" block.
 3. **Make money from control, not access.** Publishing, viewing and PINs stay free with no view cap, and the badge stays on. Pro ($9/mo billed yearly, $12 monthly) sells your own domain, no badge, analytics on who viewed, permanent pages without limits, and an API key for CI. Team ($12 per editor/mo billed yearly) sells a shared workspace with roles and permissions. Business ($20 per editor/mo billed yearly) sells what an organization's admin needs: SSO, sharing policies and an audit log.
+4. **Free signup is the first conversion, so make it possible for non-developers.** Sign-in is GitHub-only today, which shuts out the audience this plan targets. Add Google sign-in (or an email magic link) before the Pro test.
+5. **Test Pro with a checkout or waitlist button before building it.** Build custom domains and analytics only after people pay or join. Each later stage (Pro, Team, Business) starts when the previous one passes its gate, not on a date (section 10).
 6. **Accounts are workspaces, not just logins.** Every account gets a personal workspace, and pages belong to a workspace, not to a user. That one data-model choice is what makes sharing with named people, team workspaces, roles and org admin possible later without a migration. Make it while accounts are still small (section 6, "Workspaces, sharing and permissions").
 7. **Charge for people who publish, never for people who view.** Viewers, commenters and guests are always free and don't need an aired account; they confirm their email with a one-time link. That's the gap against Claude and ChatGPT, which make every invited viewer sign in to their product, and it turns every invite into a free visit from a new person.
-4. **Free signup is the first conversion, so make it possible for non-developers.** Sign-in is GitHub-only today, which shuts out the audience this plan targets. Add Google sign-in (or an email magic link) before the Pro test.
-5. **Test Pro with a checkout or waitlist button before building it.** Build custom domains and analytics only after people pay or join. Each later stage (Pro, Team, Business) starts when the previous one passes its gate, not on a date (section 9).
+8. **Publish decks, docs and reports, not just pages, and still build no editors.** Claude now makes Slides, Docs, Sheets, Data dashboards and Whiteboards; ChatGPT has Pages, Slides and Sites. aired gives each kind the agent already writes a proper viewer, export and analytics: present mode and per-slide analytics for decks, Markdown docs, render checks for reports (section 7).
 
 ---
 
@@ -88,6 +89,7 @@ Build "share [tool] HTML as a link" pages only for tools whose export steps real
 | 6 | `/publish-html-from-ci` | github actions html report link | The headless wedge Claude can't serve | Pro API key | Month 1 |
 | 7 | `/html-game-hosting` | host html game free | Matches the content that already gets the most views | Volume, badge impressions | Month 1 |
 | 8 | `/share-html-privately` (upgrade) | share html with specific people | Rewrite 4a's page around named sharing once it exists | Free account → Pro | When named sharing ships |
+| 8a | `/html-slides`, `/share-markdown`, `/claude-slides` | html slides to pdf, share markdown online, claude slides | Autocomplete shows demand; few products serve "share and present" for AI-made decks | Decks and docs → Pro (PDF, per-slide analytics) | With the deck viewer |
 | 9 | `/teams` | (sales page) claude artifacts for teams, share internal reports | Claude Team keeps outside sharing off by default and makes every invitee sign in; aired doesn't | Team, Business | When Team ships |
 | 10 | `/netlify-drop-alternative`, `/password-protect-html` | — | Long tail | Volume | Later |
 
@@ -106,7 +108,7 @@ Every guide page embeds the real publish form, so a searcher can get a link with
 | **What's different** | No account for the sender or the viewer. One link from any AI tool, or from an agent or CI job. A free PIN. Open source and self-hostable. |
 | **The value** | What your AI made, in front of the right person, in seconds, looking like a real web page. |
 | **Category** | "Turn HTML into a link" — a utility, not "web hosting". Hosting invites comparison with Netlify and Vercel on features aired doesn't need. |
-| **One-liner** | aired turns anything your AI makes into a link anyone can open. |
+| **One-liner** | aired turns anything your AI makes into a link anyone can open: a page, a deck, a doc or a report. |
 
 ### Homepage: what changed (implemented on this branch)
 
@@ -216,6 +218,7 @@ Full notes, with source URLs: [research/competitor-pricing.md](research/competit
 | Share with named people | — | Up to 5 people per page | Unlimited people, plus "anyone at @company.com" | Same, plus "anyone in this workspace" | Same, plus groups |
 | What a shared person can do | View | View | View or comment | View, comment or edit | View, comment or edit |
 | Workspace roles | — | — | — | Owner, admin, editor; guests free | Same, plus groups and custom roles |
+| Decks, docs, reports | Publish, present mode, slide links | Same | Plus PDF export, per-slide analytics | Plus a workspace brand kit and shared templates | Same |
 | Comments | — | — | On your pages | Threads, and agents can read and resolve them | Same |
 | Version history | Update token | Update token and dashboard | 30 days | 1 year | Unlimited, with retention rules |
 | Badge | On | On | Off, or your logo | Off | Off |
@@ -311,7 +314,7 @@ SSO and SCIM: use a provider such as WorkOS rather than building SAML. It costs 
 1. Add a `/pricing` page with the Free, Pro, Team and Business columns. Pro and Team buttons go to a Stripe checkout ("billing starts when the features ship, cancel anytime") or a waitlist. Business goes to a "talk to us" form that asks for team size and which of SSO, policies or the audit log they need. Link to it from the dashboard and the result card.
 2. Show the Pro features as locked items in the dashboard (custom domain, analytics, no badge, share with named people). Count clicks.
 3. Put "Invite your team" in the dashboard, leading to the Team waitlist, and ask for teammates' emails. Each email given is a signal of team intent, and of the seat count.
-4. Decision rules (the gates in section 9):
+4. Decision rules (the gates in section 10):
    - Within 30 days: build custom domains and analytics if 20 or more people pay or join for Pro, or 3% of active free accounts click a locked feature.
    - Within 60 days of the Pro launch: build team workspaces (step 3) if 10 or more teams join the Team waitlist with at least 3 emails each.
    - Build Business (step 5) only when 3 organizations ask for SSO or the audit log by name.
@@ -319,7 +322,46 @@ SSO and SCIM: use a provider such as WorkOS rather than building SAML. It costs 
 
 ---
 
-## 7. Tiiny Host: the benchmark
+## 7. Beyond pages: decks, docs and reports
+
+Claude Artifacts and ChatGPT both now keep a library of things people made, sorted by type. Claude has Slides, Docs, Sheets, Data, Design, Whiteboard and Motion; ChatGPT's library has Pages, Slides, Sheets, Images and Sites. People expect "make me a deck" to give them a deck they can present, export and send, not a long HTML page. Details are in `docs/research/artifacts-chatgpt-parity.md` (sections 1.6 and 1.7).
+
+**aired's answer: kinds, not editors.** The agent keeps writing the content, as it does today. aired recognizes what kind of thing it is and gives it the right viewer, export and analytics. No in-product editing, no canvases, no live co-editing: those compete with Claude and ChatGPT on their home ground, and the parity research already rules them out.
+
+| Kind | What the agent publishes | What aired adds | Free | Paid |
+|---|---|---|---|---|
+| **Page** (today) | One HTML file, or a folder the CLI bundles | Hosting, PIN, expiry, view limit | All of it | Domain, no badge, analytics (Pro) |
+| **Deck** | HTML with one `<section>` per slide, or Markdown split by `---`, 16:9 or 4:3 | Present mode (arrow keys, fullscreen, progress bar), a link to each slide (`#slide-7`), speaker notes only the owner sees, a slide grid | Present, slide links, notes | **PDF export and per-slide analytics** (which slides each viewer saw, for how long) in Pro; PowerPoint export only if people ask |
+| **Doc** | Markdown or plain text | A styled reading page with a table of contents | Publish and read | PDF and .docx export (Pro); inline comments (Team) |
+| **Report** | HTML plus CSV or JSON data | A render check sent back to the agent (script errors, failed loads, blank charts), a PDF snapshot | Render check | Scheduled PDF snapshot (Pro); scheduled refresh only if asked |
+| *Not building* | Sheets, Whiteboard, Design canvas, Motion | — | — | — |
+
+**Why decks matter for revenue.** Decks are what founders, consultants and salespeople send to clients, and the paid question is always "did they read it, and which slides?". DocSend sells per-page analytics from $10 yearly / $15 monthly per user and branded links at $45 (third-party prices, November 2026). Per-slide analytics inside a $9 Pro is a strong reason to pay that Claude and ChatGPT don't offer for public links.
+
+**How it ties into workspaces.** A Team workspace gets a **brand kit**: logo, colors and fonts that the agent applies to every deck and doc it publishes there. It's aired's version of Claude's Design System type, and it's a reason for a whole team to publish through one workspace. The dashboard becomes a library: thumbnails, filter by kind, search.
+
+**How it ties into agents.** The MCP and CLI take a `kind` (`page`, `deck`, `doc`, `report`), and the aired skill ships deck and doc templates with design rules, so Claude Code makes a good deck on the first try. The render check (parity item 17a) tells the agent whether its page actually worked, which no other host does.
+
+**Search demand (Google autocomplete, 2026-11-23; volumes not yet measured):** "html presentation claude", "html slides to pdf", "html slides to pptx", "claude slides skill", "claude presentation maker", "share markdown online", "share markdown file". New pages:
+- `/html-slides`: share and present HTML slides, and turn them into a PDF.
+- `/share-markdown`: share a Markdown file as a page.
+- `/claude-slides`: make slides with Claude and send them as a link.
+
+**Build order**
+
+| # | Step | Size | Stage |
+|---|---|---|---|
+| 1 | Markdown docs (parity item 7) | S | 1 |
+| 2 | Deck viewer: present mode, slide links, owner-only notes | M | 1 |
+| 3 | PDF export of any page, deck or doc (Cloudflare Browser Rendering) | M | 2, Pro |
+| 4 | Per-slide and per-section analytics | M | 2, Pro |
+| 5 | Render check for the agent (`aired check`, an MCP tool) | M | 2 |
+| 6 | Brand kit and shared templates | M | 3, Team |
+| 7 | PowerPoint and .docx export | L | Only when customers ask |
+
+---
+
+## 8. Tiiny Host: the benchmark
 
 Tiiny Host is the closest business to aired: a bootstrapped HTML and PDF host for non-technical people. Every revenue number below is the founder's own post; none is independently verified. Sources are in [research/tiiny-host.md](research/tiiny-host.md).
 
@@ -345,7 +387,7 @@ What that means for aired:
 
 ---
 
-## 8. Marketing channels, ranked
+## 9. Marketing channels, ranked
 
 From the competitor study ([research/competitor-seo.md](research/competitor-seo.md)): sitemaps, 13 Google results pages and visible channels, checked 2026-11-23.
 
@@ -362,16 +404,16 @@ From the competitor study ([research/competitor-seo.md](research/competitor-seo.
 
 ---
 
-## 9. Rollout: when and how
+## 10. Rollout: when and how
 
 Each stage starts when the previous gate passes, not on a date. Dates are the earliest each could start.
 
 | Stage | Earliest | What ships | Gate to move on |
 |---|---|---|---|
 | **0. Deploy and measure** | This week (from 2026-11-24) | This branch. Search Console and Bing, Cloudflare Web Analytics, `?ref=badge`. Submit `/mcp` to Claude's directory and the MCP registries. | Guides indexed (2–4 weeks); analytics show publishes per guide |
-| **1. Accounts for everyone, and a pricing test** | December 2026 | Google sign-in with `workspaceId` on pages and a personal workspace per account. Result-card nudge ("Sign in to keep this link"). `/pricing` with Pro checkout or waitlist, the Team waitlist and the Business form. Pages 4, 4a, 4b. First YouTube videos. | **Gate A** (30 days): 20+ Pro payers or waitlist sign-ups, or 3% of active free accounts click a locked feature |
-| **2. Pro launch** | January–February 2027 | Badge removal, API keys, analytics, custom domains (Cloudflare for SaaS). Move user pages to `aired.page`, then named sharing. Same day: the 30-day cap on anonymous pages and permanent pages for free accounts. | **Gate B** (60 days): 10+ teams on the Team waitlist with 3+ emails each |
-| **3. Team launch** | March–May 2027 | Team workspaces, roles, guests, shared folders, comments, version history. `/teams` and `/client-reports`. Affiliate program once 20 customers pay. | **Gate C**: 3 organizations ask for SSO or the audit log by name |
+| **1. Accounts for everyone, and a pricing test** | December 2026 | Google sign-in with `workspaceId` on pages and a personal workspace per account. Markdown docs and the deck viewer (section 7), free. Result-card nudge ("Sign in to keep this link"). `/pricing` with Pro checkout or waitlist, the Team waitlist and the Business form. Pages 4, 4a, 4b. First YouTube videos. | **Gate A** (30 days): 20+ Pro payers or waitlist sign-ups, or 3% of active free accounts click a locked feature |
+| **2. Pro launch** | January–February 2027 | Badge removal, API keys, analytics, custom domains (Cloudflare for SaaS), PDF export, per-slide analytics, render check. Move user pages to `aired.page`, then named sharing. Same day: the 30-day cap on anonymous pages and permanent pages for free accounts. | **Gate B** (60 days): 10+ teams on the Team waitlist with 3+ emails each |
+| **3. Team launch** | March–May 2027 | Team workspaces, roles, guests, shared folders, comments, version history, brand kit and shared templates. `/teams` and `/client-reports`. Affiliate program once 20 customers pay. | **Gate C**: 3 organizations ask for SSO or the audit log by name |
 | **4. Business** | Mid-2027 or later | SSO through a provider such as WorkOS, sharing policies, 90-day audit log, export. | An Enterprise deal that needs more |
 
 **How to launch Pro**
@@ -393,7 +435,7 @@ Each stage starts when the previous gate passes, not on a date. Dates are the ea
 
 ---
 
-## 10. Prioritized checklist
+## 11. Prioritized checklist
 
 ### Done on this branch (`claude/seo-growth-59c8e2`)
 - [x] `robots.txt` with `Sitemap:`; disallow `/api/`, `/auth/`, `/dashboard`, `/mcp`; `/p/` left crawlable so the noindex header is seen
@@ -416,14 +458,14 @@ Each stage starts when the previous gate passes, not on a date. Dates are the ea
 - [ ] Badge link `?ref=badge`, and new copy for the injected OG description (`viewer.ts`)
 - [ ] Google sign-in (or an email magic link) next to GitHub, shipped together with `workspaceId` on pages and a personal workspace per account (section 6, build order step 1)
 - [ ] Result-card nudge: "Sign in to keep this link and see who opened it"
-- [ ] Submit the remote MCP to Claude's connectors directory, ChatGPT apps and the MCP registries (section 8)
+- [ ] Submit the remote MCP to Claude's connectors directory, ChatGPT apps and the MCP registries (section 9)
 - [ ] `/share-chatgpt-html`, the private-sharing pages (4a), then one page per AI tool (4b)
 - [ ] A `404.html` page, plus `not_found_handling = "404-page"` in wrangler
 - [ ] Speed: lazy-load the globe on desktop only; self-host Inter 400/500 as woff2; run Lighthouse before and after
 - [ ] Answer, honestly, the Reddit threads that rank for these queries (r/ClaudeAI, r/BuildWithClaude, r/ChatGPT, r/CodingHelp, r/godot). They sit at #1–2 on most target SERPs.
 
 ### Next 30 days
-- [ ] Stage 1 of section 9: `/pricing` page plus the Pro and Team checkout or waitlist test, the Business "talk to us" form and the "Invite your team" waitlist, with the decision rules from section 6
+- [ ] Stage 1 of section 10: `/pricing` page plus the Pro and Team checkout or waitlist test, the Business "talk to us" form and the "Invite your team" waitlist, with the decision rules from section 6
 - [ ] Named sharing (build order step 2), with `docs/privacy.md` updated for viewer emails, then `/share-html-privately`
 - [ ] Anonymous pages capped at 30 days; permanent pages for free accounts
 - [ ] `/client-reports` sales page and `/publish-html-from-ci`
