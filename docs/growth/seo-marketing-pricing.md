@@ -96,7 +96,7 @@ Every guide page embeds the real publish form, so a searcher can get a link with
 | | |
 |---|---|
 | **Who it's for** | (1) People who make reports, pages and games with Claude, ChatGPT or Gemini and want to send them. (2) Agencies and freelancers sending client reports. (3) Small businesses that need a page up today. Developers and agents remain a core channel through the CLI, MCP and API. |
-| **What they do today** | Email the `.html` file (blocked, or shown as code); upload it to Drive (which shows the code); use Claude's Share button (plan and admin limits, an "unverified" notice for viewers, nothing from the API or CI); Tiiny Host (email sign-up, 1 free project, password from $13/mo); Netlify Drop (claim within an hour or it's deleted); GitHub Pages (needs Git). |
+| **What they do today** | Email the `.html` file (blocked, or shown as code); upload it to Drive (which shows the code); use Claude's Share button (paid plans only, admin limits on Team and Enterprise, no public link for artifacts that load other websites, an "unverified" notice for viewers, nothing from the API or CI); Tiiny Host (email sign-up, 1 free project, password from $13/mo); Netlify Drop (claim within an hour or it's deleted); GitHub Pages (needs Git). |
 | **What's different** | No account for the sender or the viewer. One link from any AI tool, or from an agent or CI job. A free PIN. Open source and self-hostable. |
 | **The value** | What your AI made, in front of the right person, in seconds, looking like a real web page. |
 | **Category** | "Turn HTML into a link" — a utility, not "web hosting". Hosting invites comparison with Netlify and Vercel on features aired doesn't need. |
@@ -227,7 +227,7 @@ Full notes, with source URLs: [competitor-pricing.md](competitor-pricing.md).
 - [x] DESIGN.md pattern log entry; `style.css` rebuilt
 
 ### Owner, before or at deploy
-- [ ] Re-check the Claude sharing claims on `/share-claude-artifacts`: plan requirement, admin setting, "unverified" notice, no API or CI. They came from the internal brief, not from Anthropic's docs in this pass.
+- [x] Claude sharing claims on `/share-claude-artifacts` checked against Anthropic's "Share artifacts" help article (2026-11-23): link sharing is paid-only; Team and Enterprise need an owner to allow outside sharing; artifacts that connect to other websites can't get a public link; Claude-powered parts don't work for link viewers. The "unverified" notice is confirmed by third-party reports, not the article.
 - [ ] Review and deploy, then confirm `curl https://aired.sh/robots.txt` shows the `Sitemap:` line under Cloudflare's managed block.
 - [ ] Verify aired.sh in Search Console (Domain property, DNS TXT) and Bing Webmaster Tools; submit `https://aired.sh/sitemap.xml`; request indexing for the three guides.
 - [ ] Turn on Cloudflare Web Analytics for aired.sh.

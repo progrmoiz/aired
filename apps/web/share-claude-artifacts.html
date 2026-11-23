@@ -533,9 +533,10 @@
 
       <h2 id="limits">When Claude's built-in sharing gets in the way</h2>
       <ul>
-        <li><strong>It depends on your plan.</strong> Publishing to the web needs a Claude plan that includes it. On Team and Enterprise, an admin has to turn public sharing on.</li>
+        <li><strong>It depends on your plan.</strong> Sharing a new artifact by link needs a paid plan. On Team and Enterprise, artifacts stay inside the organization unless an owner allows outside sharing.</li>
+        <li><strong>Some artifacts can't get a public link.</strong> Claude won't share an artifact that connects to other websites with "Anyone with the link".</li>
         <li><strong>It isn't there outside the Claude apps.</strong> Pages made through the API, Amazon Bedrock, Google Vertex, the Agent SDK or a CI job have no Share button.</li>
-        <li><strong>Viewers may see a warning.</strong> People who aren't signed in to Claude can see a notice that the content is unverified, which is awkward in front of a client.</li>
+        <li><strong>Viewers see less.</strong> For people opening the link, the parts that use Claude or connected apps don't work, some content waits for them to sign in, and they can see a notice that the content is user-generated and unverified. That is awkward in front of a client.</li>
         <li><strong>There's no control over the page.</strong> You can't set an expiry, add a password or put it on your own domain.</li>
       </ul>
 
@@ -547,17 +548,18 @@
             <tr><th></th><th>Claude's Share button</th><th>aired</th></tr>
           </thead>
           <tbody>
-            <tr><td>Who can open the link</td><td>Depends on plan and admin settings</td><td>Anyone with the link</td></tr>
-            <tr><td>Viewer needs Claude</td><td>No, but may see an "unverified" notice</td><td>No</td></tr>
+            <tr><td>Who can open the link</td><td>Depends on plan and admin settings. Not available on the Free plan</td><td>Anyone with the link</td></tr>
+            <tr><td>Viewer needs Claude</td><td>Usually not, but some content needs sign-in and an "unverified" notice can show</td><td>No</td></tr>
+            <tr><td>Page can load other websites</td><td>Then it can't be shared by public link</td><td>Yes</td></tr>
             <tr><td>Works from API, Claude Code, CI</td><td>No</td><td>Yes, through the CLI, MCP or HTTP API</td></tr>
-            <tr><td>Password</td><td>No</td><td>Optional PIN</td></tr>
+            <tr><td>Password</td><td>No. Email invites work, but each person needs a Claude account</td><td>Optional PIN</td></tr>
             <tr><td>Expiry</td><td>Stays until you unpublish</td><td>1 hour to permanent, your choice</td></tr>
-            <tr><td>Page can call Claude</td><td>Yes, in AI-powered artifacts</td><td>No. Scripts run, but there is no Claude inside</td></tr>
+            <tr><td>Page can call Claude</td><td>Yes, but not for people opening a public link</td><td>No. Scripts run, but there is no Claude inside</td></tr>
             <tr><td>Price</td><td>Part of your Claude plan</td><td>Free</td></tr>
           </tbody>
         </table>
       </div>
-      <p class="note">Claude features change often. Check Anthropic's help center for your plan.</p>
+      <p class="note">Claude details from Anthropic's help center article "Share artifacts", November 2026. Claude features change often.</p>
 
       <h2 id="chatgpt">The same works for ChatGPT and Gemini</h2>
       <p>Canvas in ChatGPT and Gemini can also write HTML. Ask for a single HTML file, copy it and publish it the same way. See <a href="/html-to-link">turn an HTML file into a link</a>.</p>
