@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>aired — Direction C: Bright</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+<style>
+  /* Direction C — Full redesign toward consumer AI tools (Gamma, Tiiny, Carrd):
+     a display typeface, a soft gradient wash, pill buttons, colored tiles, and a
+     louder badge. New type, new components, new brand gradient. */
+  :root {
+    --bg: #ffffff;
+    --ink: #17123a;
+    --text-2: #4d4870;
+    --text-3: #6b6790;
+    --violet: #6a3cf0;
+    --pink: #ee4fa0;
+    --sun: #ffb648;
+    --mint: #2fc59a;
+    --grad: linear-gradient(100deg, #6a3cf0 0%, #b345e0 50%, #ee4fa0 100%);
+    --card: #ffffff;
+    --line: #ebe7fb;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: Inter, -apple-system, sans-serif; color: var(--ink); background: var(--bg); font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  a { color: inherit; text-decoration: none; }
+  .display { font-family: 'Bricolage Grotesque', Inter, sans-serif; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+  .switcher { font-size: 12px; background: #f6f3ff; color: var(--text-3); border-bottom: 1px solid var(--line); }
+  .switcher .wrap { display: flex; gap: 16px; align-items: center; height: 36px; overflow-x: auto; white-space: nowrap; }
+  .switcher a.on { color: var(--ink); font-weight: 600; }
+
+  .wash { background:
+      radial-gradient(60% 50% at 15% 0%, rgba(106,60,240,.16), transparent 70%),
+      radial-gradient(50% 45% at 90% 10%, rgba(238,79,160,.14), transparent 70%),
+      radial-gradient(40% 40% at 60% 80%, rgba(255,182,72,.14), transparent 70%); }
+  header .wrap { display: flex; align-items: center; justify-content: space-between; height: 72px; }
+  .logo { display: inline-flex; gap: 8px; align-items: center; font: 800 22px 'Bricolage Grotesque', sans-serif; letter-spacing: -0.02em; }
+  .logo i { width: 28px; height: 28px; border-radius: 9px; background: var(--grad); display: grid; place-items: center; }
+  .logo svg { width: 16px; height: 16px; color: #fff; }
+  nav { display: flex; gap: 24px; align-items: center; font-size: 15px; font-weight: 500; color: var(--text-2); }
+  nav .pill { background: var(--ink); color: #fff; border-radius: 999px; padding: 8px 18px; }
+  @media (max-width: 640px) { nav .hide-sm { display: none; } }
+
+  .hero { text-align: center; padding: 56px 0 80px; }
+  .tagline { display: inline-block; font-size: 14px; font-weight: 600; color: var(--violet); background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; box-shadow: 0 2px 10px rgba(106,60,240,.08); }
+  h1 { font: 800 clamp(40px, 7vw, 76px)/1 'Bricolage Grotesque', sans-serif; letter-spacing: -0.035em; margin: 22px auto 18px; max-width: 13ch; }
+  h1 span { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lede { font-size: 19px; color: var(--text-2); max-width: 34em; margin: 0 auto; }
+  .drop { margin: 36px auto 0; max-width: 640px; background: #fff; border-radius: 24px; padding: 10px; box-shadow: 0 20px 60px -20px rgba(70,40,160,.35); }
+  .drop-inner { border: 2px dashed #d9cffd; border-radius: 18px; padding: 32px 20px; display: grid; justify-items: center; gap: 8px; }
+  .drop-icon { width: 52px; height: 52px; border-radius: 16px; background: #f3eeff; display: grid; place-items: center; color: var(--violet); }
+  .drop strong { font-size: 18px; } .drop small { color: var(--text-3); font-size: 14px; }
+  .cta { display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; background: var(--grad); color: #fff; font-weight: 600; font-size: 16px; border: 0; border-radius: 999px; padding: 13px 26px; box-shadow: 0 8px 24px -8px rgba(179,69,224,.6); cursor: pointer; }
+  .opts { display: flex; justify-content: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; font-size: 14px; color: var(--text-2); }
+  .opts span { background: #f6f3ff; border-radius: 999px; padding: 5px 12px; }
+  .logos { margin-top: 28px; font-size: 14px; color: var(--text-3); }
+  .logos b { color: var(--ink); }
+
+  section.block { padding: 88px 0; }
+  h2 { font: 800 clamp(30px, 4.5vw, 46px)/1.05 'Bricolage Grotesque', sans-serif; letter-spacing: -0.03em; text-align: center; }
+  .sub { text-align: center; color: var(--text-2); margin: 12px auto 0; max-width: 34em; font-size: 18px; }
+
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 40px; }
+  @media (max-width: 760px) { .tiles { grid-template-columns: 1fr; } }
+  .tile { border-radius: 24px; padding: 24px; min-height: 300px; position: relative; overflow: hidden; }
+  .tile h3 { font: 800 24px 'Bricolage Grotesque', sans-serif; letter-spacing: -0.02em; }
+  .tile p { font-size: 15px; margin-top: 4px; opacity: .8; }
+  .t1 { background: #efe9ff; } .t2 { background: #ffe8f3; } .t3 { background: #fff2dc; }
+  .mini { position: absolute; left: 24px; right: 24px; bottom: -10px; height: 170px; background: #fff; border-radius: 16px 16px 0 0; box-shadow: 0 10px 30px rgba(23,18,58,.12); padding: 14px 14px 44px; font-size: 12px; }
+  .mini.dark { background: #0d1117; color: #c9d1d9; font-family: 'JetBrains Mono', monospace; }
+  .mini b { display: block; font-size: 13px; }
+  .mini .bars { display: flex; align-items: flex-end; gap: 5px; height: 56px; margin-top: 10px; } .mini .bars i { flex: 1; display: block; border-radius: 4px 4px 0 0; background: var(--violet); }
+  .grid { display: grid; grid-template-columns: repeat(14, 1fr); gap: 3px; margin-top: 8px; } .grid i { aspect-ratio: 1; display: block; background: #161b22; border-radius: 2px; } .grid i.s { background: #39d353; } .grid i.f { background: #f85149; }
+  .slide { height: 90px; margin-top: 10px; border-radius: 10px; background: var(--grad); color: #fff; display: grid; place-items: center; font: 800 18px 'Bricolage Grotesque', sans-serif; }
+
+  /* Pricing */
+  .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 800px; margin: 40px auto 0; }
+  @media (max-width: 720px) { .plans { grid-template-columns: 1fr; } }
+  .plan { background: #fff; border: 1px solid var(--line); border-radius: 28px; padding: 32px; }
+  .plan.pro { border: 2px solid transparent; background: linear-gradient(#fff, #fff) padding-box, var(--grad) border-box; box-shadow: 0 24px 60px -24px rgba(106,60,240,.45); }
+  .plan h3 { font: 800 22px 'Bricolage Grotesque', sans-serif; display: flex; align-items: center; gap: 10px; }
+  .plan h3 span { font: 600 12px Inter, sans-serif; color: #fff; background: var(--grad); border-radius: 999px; padding: 3px 10px; }
+  .price { font: 800 54px/1 'Bricolage Grotesque', sans-serif; letter-spacing: -0.03em; margin-top: 14px; } .price small { font: 500 16px Inter, sans-serif; color: var(--text-2); }
+  .note { font-size: 14px; color: var(--text-3); margin-top: 6px; }
+  .plan ul { list-style: none; padding: 0; margin: 22px 0 26px; display: grid; gap: 10px; }
+  .plan li { display: flex; gap: 10px; align-items: center; } .plan li::before { content: '✓'; flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--violet); background: #f1ebff; }
+  .btn { display: block; text-align: center; border-radius: 999px; padding: 13px; font-weight: 600; }
+  .btn.soft { background: #f3eeff; color: var(--violet); } .btn.grad { background: var(--grad); color: #fff; }
+
+  /* Badge: louder, branded */
+  .aired-badge { position: absolute; right: 12px; bottom: 12px; display: inline-flex; align-items: center; gap: 7px; padding: 6px 13px 6px 6px; border-radius: 999px;
+                 background: var(--grad); color: #fff; font: 600 12px Inter, sans-serif; box-shadow: 0 6px 18px -6px rgba(179,69,224,.7); white-space: nowrap; }
+  .aired-badge i { width: 18px; height: 18px; border-radius: 50%; background: rgba(255,255,255,.22); display: grid; place-items: center; }
+  .aired-badge svg { width: 11px; height: 11px; }
+  .showcase { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 880px; margin: 40px auto 0; }
+  @media (max-width: 720px) { .showcase { grid-template-columns: 1fr; } }
+  .frame { border-radius: 20px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 16px 40px -20px rgba(23,18,58,.25); }
+  .frame .bar { padding: 10px 14px; background: #f7f5ff; font: 500 12px 'JetBrains Mono', monospace; color: var(--text-3); }
+  .report { position: relative; background: #fff; padding: 20px 20px 60px; font-size: 13px; color: #1d2433; min-height: 210px; }
+  .report h4 { font-size: 15px; font-weight: 600; } .report p { color: #5a6475; font-size: 12px; }
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; } .kpi { border: 1px solid #e6e9ef; border-radius: 8px; padding: 8px; } .kpi b { display: block; font-size: 17px; }
+  .game { position: relative; background: #0d1117; color: #c9d1d9; padding: 18px 18px 56px; font: 12px 'JetBrains Mono', monospace; min-height: 210px; }
+  .specs { max-width: 640px; margin: 24px auto 0; text-align: center; color: var(--text-2); font-size: 15px; }
+
+  footer { background: var(--ink); color: #c9c4ee; padding: 40px 0; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="switcher"><div class="wrap">
+  <span>Design mockups:</span>
+  <a href="direction-a-tuned-dark.html">A · Tuned dark</a>
+  <a href="direction-b-paper.html">B · Paper (recommended)</a>
+  <a href="direction-c-bright.html" class="on">C · Bright</a>
+  <a href="index.html">Compare</a>
+</div></div>
+
+<div class="wash">
+<header><div class="wrap">
+  <a class="logo" href="#"><i><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg></i>aired</a>
+  <nav><a class="hide-sm" href="#">Use cases</a><a class="hide-sm" href="#pricing">Pricing</a><a class="hide-sm" href="#">Log in</a><a class="pill" href="#">Get started</a></nav>
+</div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <span class="tagline">Free · No account needed</span>
+    <h1>Turn HTML into a link <span>anyone can open.</span></h1>
+    <p class="lede">Made something with Claude or ChatGPT? Drop it here and share it with anyone, on any device.</p>
+    <div class="drop"><div class="drop-inner">
+      <span class="drop-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0l-4 4m4-4l4 4"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg></span>
+      <strong>Drop your HTML file here</strong>
+      <small>or paste the code · up to 2 MB</small>
+      <button class="cta" type="button">Get my link</button>
+    </div></div>
+    <div class="opts"><span>Expires in 7 days</span><span>Add a password</span></div>
+    <p class="logos">Works with <b>Claude</b>, <b>ChatGPT</b>, <b>Gemini</b>, <b>Cursor</b> and any AI tool · <b>10,827</b> pages shared</p>
+  </section>
+</main>
+</div>
+
+<main class="wrap">
+  <section class="block">
+    <h2>Share anything your AI makes</h2>
+    <p class="sub">Reports for clients, games for friends, decks for the team.</p>
+    <div class="tiles">
+      <div class="tile t1"><h3>Client reports</h3><p>Send a live dashboard, not a PDF.</p>
+        <div class="mini"><b>Q3 — Northwind Dental</b>Leads 1,284 · +18%<div class="bars"><i style="height:40%"></i><i style="height:55%"></i><i style="height:48%"></i><i style="height:70%"></i><i style="height:90%"></i></div></div></div>
+      <div class="tile t2"><h3>Games &amp; toys</h3><p>Playable on any phone.</p>
+        <div class="mini dark">SNAKE · 14<div class="grid"></div></div></div>
+      <div class="tile t3"><h3>Decks &amp; pages</h3><p>Present from a link.</p>
+        <div class="mini"><b>Launch plan</b><div class="slide">Slide 1 of 8</div></div></div>
+    </div>
+  </section>
+
+  <section class="block" id="pricing">
+    <h2>Simple pricing</h2>
+    <p class="sub">Free forever for sharing. Go Pro to make it yours.</p>
+    <div class="plans">
+      <div class="plan"><h3>Free</h3><div class="price">$0</div><p class="note">No account needed</p>
+        <ul><li>Unlimited pages and views</li><li>Password protection</li><li>Links up to 30 days</li><li>Works with every AI tool</li></ul><a class="btn soft" href="#">Get a link</a></div>
+      <div class="plan pro"><h3>Pro <span>Most popular</span></h3><div class="price">$9<small> / month</small></div><p class="note">Billed yearly, or $12 month to month</p>
+        <ul><li>Your own domain</li><li>Remove the badge</li><li>See who viewed</li><li>Permanent pages</li><li>API key for CI</li></ul><a class="btn grad" href="#">Go Pro</a></div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>The badge</h2>
+    <p class="sub">A branded "Made with aired" pill. Easy to spot, hard to miss.</p>
+    <div class="showcase">
+      <div class="frame"><div class="bar">aired.sh/p/q3-northwind</div><div class="report"><h4>Proposal — website refresh</h4><p>Draft for review.</p>
+        <div class="kpis"><div class="kpi">Design<b>$4.8k</b></div><div class="kpi">Build<b>$7.2k</b></div><div class="kpi">Total<b>$12k</b></div></div>
+        <a class="aired-badge" href="#"><i><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg></i>Made with aired</a></div></div>
+      <div class="frame"><div class="bar">aired.sh/p/snake-v2</div><div class="game">SNAKE · score 14<div class="grid g2"></div>
+        <a class="aired-badge" href="#"><i><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg></i>Made with aired</a></div></div>
+    </div>
+    <p class="specs">Louder means more clicks, but it also competes with the user's own page, which is exactly what a client report or proposal can't afford. Expect more "how do I remove the badge" pressure.</p>
+  </section>
+</main>
+<footer><div class="wrap">aired · Use cases · Pricing · Docs · Report abuse · GitHub</div></footer>
+
+<script>
+  document.querySelectorAll('.grid').forEach(function (g) { var s = [16,17,18,19,33,47], h = '';
+    for (var i = 0; i < 56; i++) h += '<i class="' + (s.indexOf(i) > -1 ? 's' : i === 38 ? 'f' : '') + '"></i>'; g.innerHTML = h; });
+</script>
+</body>
+</html>

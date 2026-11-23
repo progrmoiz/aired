@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>aired design direction</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet" />
+<style>
+  :root { --bg: #fbfaf7; --surface: #fff; --border: #e7e4dc; --ink: #1a1917; --t2: #5c5a55; --t3: #6f6c66; --accent: #5847d4; --good: #0f7a4a; --bad: #b42318; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0c0c0d; --surface: #141416; --border: #26262a; --ink: #f2f2f3; --t2: #a1a1a6; --t3: #85858b; --accent: #9d8ff5; --good: #4ade80; --bad: #f87171; } }
+  * { box-sizing: border-box; margin: 0; }
+  body { font: 16px/1.6 Inter, -apple-system, sans-serif; background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+  a { color: var(--accent); }
+  code, .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: .88em; }
+  header { padding: 48px 0 8px; }
+  .kicker { font-size: 13px; color: var(--t3); }
+  h1 { font-size: clamp(28px, 4vw, 40px); letter-spacing: -0.03em; line-height: 1.1; font-weight: 600; margin: 8px 0 12px; }
+  .verdict { font-size: 19px; color: var(--t2); max-width: 44em; }
+  .verdict b { color: var(--ink); font-weight: 600; }
+  section { padding: 40px 0; border-top: 1px solid var(--border); margin-top: 40px; }
+  h2 { font-size: 22px; letter-spacing: -0.02em; font-weight: 600; margin-bottom: 6px; }
+  .lead { color: var(--t2); max-width: 46em; }
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 24px; }
+  @media (max-width: 900px) { .cards { grid-template-columns: 1fr; } }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+  .card.rec { border: 2px solid var(--ink); }
+  .thumb { position: relative; height: 300px; overflow: hidden; border-bottom: 1px solid var(--border); background: var(--bg); }
+  .thumb iframe { position: absolute; top: 0; left: 0; width: 1280px; height: 1000px; border: 0; transform: scale(.27); transform-origin: 0 0; pointer-events: none; }
+  @media (max-width: 900px) { .thumb iframe { transform: scale(.4); } .thumb { height: 380px; } }
+  .card .body { padding: 18px 20px 20px; display: grid; gap: 10px; flex: 1; }
+  .card h3 { font-size: 17px; font-weight: 600; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .pill { font-size: 12px; font-weight: 500; border-radius: 999px; padding: 1px 9px; border: 1px solid var(--border); color: var(--t2); }
+  .pill.rec { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .card p, .card li { font-size: 14px; color: var(--t2); }
+  .card ul { padding-left: 18px; display: grid; gap: 4px; }
+  .meta { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border); }
+  .meta dt { color: var(--t3); } .meta dd { margin: 0; color: var(--ink); }
+  .open { font-size: 14px; font-weight: 500; }
+  table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-weight: 500; color: var(--t3); font-size: 13px; }
+  td b { font-weight: 600; }
+  .scroll { overflow-x: auto; }
+  .bad { color: var(--bad); } .good { color: var(--good); }
+  ol.steps { margin-top: 16px; padding-left: 20px; display: grid; gap: 10px; max-width: 48em; }
+  ol.steps li { color: var(--t2); } ol.steps b { color: var(--ink); font-weight: 600; }
+  footer { padding: 40px 0 64px; color: var(--t3); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="kicker">aired.sh · design direction · 23 Nov 2026 · mockups only, nothing shipped</p>
+    <h1>Refresh it: go light-first, keep the bones.</h1>
+    <p class="verdict">The dark developer look fits a CLI, not someone who just made a client report in ChatGPT. <b>Recommendation: Direction B, "Paper".</b> Light by default with dark mode kept for people who prefer it. Ink-black buttons like Claude, ChatGPT and Notion, purple kept for the logo mark and links, bigger reading text, the globe swapped for a picture of what the recipient sees. <b>Ship the badge change first.</b> It's the surface most people see, and it's a separate 15-line change.</p>
+  </header>
+
+  <section>
+    <h2>Three directions</h2>
+    <p class="lead">Each mockup has the hero, a pricing card and the page badge on a light client report and a dark game. Open them full size; B has a theme toggle.</p>
+    <div class="cards">
+      <div class="card">
+        <div class="thumb"><iframe src="direction-a-tuned-dark.html" title="Direction A preview" loading="lazy" tabindex="-1"></iframe></div>
+        <div class="body">
+          <h3>A · Tuned dark <span class="pill">Keep</span></h3>
+          <p>Today's look with the failures fixed: readable contrast, 15px reading text, "Expires" and "Password" instead of TTL and PIN, no globe, an adaptive badge.</p>
+          <dl class="meta"><dt>Effort</dt><dd>About 1 day</dd><dt>Risk</dt><dd>Low to build. Still reads as a developer tool to the people the new copy targets.</dd></dl>
+          <a class="open" href="direction-a-tuned-dark.html">Open A →</a>
+        </div>
+      </div>
+      <div class="card rec">
+        <div class="thumb"><iframe src="direction-b-paper.html" title="Direction B preview" loading="lazy" tabindex="-1"></iframe></div>
+        <div class="body">
+          <h3>B · Paper <span class="pill rec">Recommended</span></h3>
+          <p>Warm white, ink text and buttons, purple only for the mark, links and focus. Same Inter, same token names, same page structure. Dark mode follows the visitor's system setting.</p>
+          <dl class="meta"><dt>Effort</dt><dd>2 to 3 days</dd><dt>Risk</dt><dd>Low. URLs, copy, headings and schema don't change, so rankings aren't at risk.</dd></dl>
+          <a class="open" href="direction-b-paper.html">Open B →</a>
+        </div>
+      </div>
+      <div class="card">
+        <div class="thumb"><iframe src="direction-c-bright.html" title="Direction C preview" loading="lazy" tabindex="-1"></iframe></div>
+        <div class="body">
+          <h3>C · Bright <span class="pill">Redesign</span></h3>
+          <p>Consumer AI-tool look: display typeface, gradient wash, pill buttons, colored use-case tiles, a loud "Made with aired" badge.</p>
+          <dl class="meta"><dt>Effort</dt><dd>1 to 2 weeks</dd><dt>Risk</dt><dd>High. Looks like Tiiny and Gamma, adds font weight, and the loud badge fights users' own pages.</dd></dl>
+          <a class="open" href="direction-c-bright.html">Open C →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>What's wrong with the current style</h2>
+    <p class="lead">Checked on the branch locally and live on aired.sh, at desktop and phone widths.</p>
+    <div class="scroll"><table>
+      <tr><th>Finding</th><th>Evidence</th><th>Why it matters now</th></tr>
+      <tr><td><b>Wrong signal for the new audience</b></td><td>Near-black, purple glow, mono snippets, "TTL", "PIN", "Update token" and "Wire it up yourself" on the homepage</td><td>The new one-liner speaks to anyone who makes things with AI. The tools they use every day (Claude, ChatGPT, Notion, Google Docs) are all light, with a black primary button.</td></tr>
+      <tr><td><b>Helper text fails contrast</b></td><td>Tertiary <code>#56565a</code> on <code>#0a0a0b</code> is <span class="bad">2.7:1</span> (AA needs 4.5). It's used for the TTL/PIN labels, "⌘V to paste", captions and the footer.</td><td>The labels a first-time visitor needs are the hardest to read.</td></tr>
+      <tr><td><b>Primary button fails contrast</b></td><td>White on <code>#7c6aef</code> is <span class="bad">4.07:1</span> for 14px text. Disabled state at 30% opacity reads as muddy purple.</td><td>The one button on the page.</td></tr>
+      <tr><td><b>14px body on long guides</b></td><td>The three SEO guides are 600-line reading pages with comparison tables, set at 14px gray on black.</td><td>Search visitors read these; the style was written for a 30-second tool page.</td></tr>
+      <tr><td><b>The globe costs more than it shows</b></td><td>Three chained module requests (esm.sh → cobe → phenomenon), a 1000×1000 WebGL canvas redrawn every frame forever, shown at 35% opacity and barely visible. Hidden on phones, but the script still loads.</td><td>LCP and battery on the pages meant to rank. Nothing about it explains the product.</td></tr>
+      <tr><td><b>Phone form clips</b></td><td>At 375px the PIN placeholder shows as "op", and Upload loses its label.</td><td>Most AI-chat sharing starts on a phone.</td></tr>
+      <tr><td><b>The badge ignores its page</b></td><td>A dark blurred pill with a purple mark on every page, light or dark. It says only "aired", links with no <code>?ref</code> tag.</td><td>Published pages have had <b>102,156 views</b> (live <code>/api/stats</code>), each carrying the badge. On a white client report it reads as a foreign object, and a recipient can't tell what it is.</td></tr>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>How the neighbors look</h2>
+    <div class="scroll"><table>
+      <tr><th>Product</th><th>Look</th><th>Takeaway for aired</th></tr>
+      <tr><td>Tiiny Host</td><td>White, bold sans headline, purple gradient buttons, dashed drop zone. <span class="mono">(seen today)</span></td><td>The direct SEO rival already owns "light + purple button". A light aired with purple buttons would look like a Tiiny clone, which is why B uses ink buttons.</td></tr>
+      <tr><td>Claude</td><td>Warm off-white, serif headings, near-black buttons, clay accent. <span class="mono">(seen today)</span></td><td>Where many visitors arrive from. Warm white plus ink feels familiar without copying the serif.</td></tr>
+      <tr><td>ChatGPT</td><td>White, black text and buttons, very little color. <span class="mono">(from memory)</span></td><td>Same lesson: neutral, light, one black action.</td></tr>
+      <tr><td>Notion Sites</td><td>White, big black headline, black pill button. <span class="mono">(seen today)</span></td><td>"Publish anything, fast" with almost no decoration.</td></tr>
+      <tr><td>Gamma</td><td>Illustrated night-sky hero, rounded display type, white pill CTA. <span class="mono">(seen today)</span></td><td>Shows what C costs: illustration and motion carry it. Without them it looks generic.</td></tr>
+      <tr><td>Vercel</td><td>Black and white, Geist, dark and light. <span class="mono">(from memory)</span></td><td>Proof that a developer brand can be monochrome and calm in light mode too.</td></tr>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Cost and risk</h2>
+    <div class="scroll"><table>
+      <tr><th></th><th>A · Tuned dark</th><th>B · Paper</th><th>C · Bright</th></tr>
+      <tr><td><b>Work</b></td><td>3 token values, reading size on guides, drop the globe, relabel controls</td><td>Tokens become CSS variables in <code>tailwind.config.js</code> (light in <code>:root</code>, dark under <code>prefers-color-scheme</code>); move the form CSS each guide copies (~30 hex values per page, 173 across 7 files) into <code>src/input.css</code>; bigger type; product preview; dashboard light pass; new <code>og.png</code>; rewrite DESIGN.md §2–3</td><td>New type pairing, components, illustration or art, every page's markup, new logo treatment, full DESIGN.md rewrite</td></tr>
+      <tr><td><b>Effort</b></td><td>~1 day</td><td>~2–3 days</td><td>1–2 weeks</td></tr>
+      <tr><td><b>SEO pages already written</b></td><td class="good">Untouched</td><td class="good">Copy, URLs, headings and schema untouched. Markup keeps its <code>aired-*</code> classes; only token values change.</td><td class="bad">Every page re-marked-up during the window when the three guides are being indexed</td></tr>
+      <tr><td><b>Performance</b></td><td class="good">Better: globe gone</td><td class="good">Better: globe gone, one font family</td><td class="bad">Worse: extra display font, images or illustration</td></tr>
+      <tr><td><b>Audience fit</b></td><td class="bad">Developers only</td><td class="good">Non-technical visitors and agencies, with developers kept through dark mode, docs and the agent block</td><td>Consumer, but loses the quiet character</td></tr>
+      <tr><td><b>Main risk</b></td><td>Fixes polish, not the positioning gap</td><td>Developers who liked the dark site; covered by auto dark mode</td><td>Looks like the category default; badge backlash on client pages</td></tr>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>If you pick B, the order I'd ship it in</h2>
+    <ol class="steps">
+      <li><b>Badge first, on its own.</b> Pick a light or dark skin from the page background, say "Shared with aired", link to <code>aired.sh/?ref=badge</code>, and fix the injected OG description. It works with any direction and reaches the most people.</li>
+      <li><b>Remove the globe.</b> Put the "what they see" preview in its place. A perf win even before the restyle.</li>
+      <li><b>Token swap.</b> CSS variables, light default, dark under <code>prefers-color-scheme</code>. Shared form CSS moves into <code>src/input.css</code>.</li>
+      <li><b>Type and copy.</b> 16px reading text on guides and docs, a larger H1, "Expires" and "Password" labels. Optionally "Get link" instead of "Publish" on the homepage form.</li>
+      <li><b>DESIGN.md.</b> Rewrite §2 Color, §3 Typography and the audience line, then log it in §12.</li>
+    </ol>
+  </section>
+
+  <footer>Mockups live in <code>docs/design/</code>. They're static HTML with no build step. Pricing shown matches <code>docs/growth/seo-marketing-pricing.md</code> (Pro $9/month billed yearly, $12 monthly).</footer>
+</div>
+</body>
+</html>
