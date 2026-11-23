@@ -8,22 +8,21 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <style>
-  /* Same tokens and type as today's aired.sh. The difference from the narrow
-     version is layout: a wider page, the form and the recipient's view side by
-     side above the fold, audience rows instead of install tabs, and a
-     four-plan strip that links to /pricing. */
+  /* Today's aired.sh tokens and type. Visual-first: every section shows the
+     product (the page, the link, the opens, the terminal) with a few words. */
   :root {
     --bg: #0a0a0b; --surface: #111113; --surface-2: #18181b; --border: #222225; --border-2: #34343a;
     --text-1: #ededef; --text-2: #a1a1a6; --text-3: #84848a; --mark: #7c6aef; --btn: #ededef; --btn-hover: #fff; --ok: #34d399;
+    --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
   }
   * { box-sizing: border-box; margin: 0; }
   body { font: 15px/1.6 Inter, -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text-1); -webkit-font-smoothing: antialiased; }
   a { color: inherit; text-decoration: none; }
-  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .mono { font-family: var(--mono); }
   .wrap { max-width: 1080px; margin: 0 auto; padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
   .cap { font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
 
-  .switcher { font: 12px 'JetBrains Mono', monospace; background: #050506; border-bottom: 1px solid var(--border); color: var(--text-3); }
+  .switcher { font: 12px var(--mono); background: #050506; border-bottom: 1px solid var(--border); color: var(--text-3); }
   .switcher .wrap { display: flex; gap: 16px; align-items: center; height: 34px; overflow-x: auto; white-space: nowrap; }
   .switcher a.on { color: var(--text-1); }
 
@@ -36,86 +35,122 @@
   .start { background: var(--btn); color: var(--bg); border-radius: 8px; padding: 6px 12px; font-weight: 500; }
   @media (max-width: 560px) { nav { display: none; } }
 
-  .hero { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; padding: 64px 0 0; }
-  @media (max-width: 880px) { .hero { grid-template-columns: 1fr; gap: 40px; padding-top: 40px; } }
-  h1 { font-size: 34px; line-height: 1.12; font-weight: 500; letter-spacing: -0.03em; text-wrap: balance; }
-  .lede { margin-top: 12px; color: var(--text-2); font-size: 16px; max-width: 32em; }
-  .form { margin-top: 28px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
-  .form:focus-within { border-color: var(--border-2); }
-  .drop { height: 140px; display: grid; place-content: center; text-align: center; gap: 2px; color: var(--text-2); font-size: 14px; border-bottom: 1px solid var(--border); }
-  .drop small { color: var(--text-3); font-size: 12px; }
+  /* Hero */
+  .hero { display: grid; grid-template-columns: 1fr 1.05fr; gap: 56px; align-items: center; padding: 56px 0 0; }
+  @media (max-width: 880px) { .hero { grid-template-columns: 1fr; gap: 48px; padding-top: 36px; } }
+  h1 { font-size: clamp(30px, 4vw, 40px); line-height: 1.1; font-weight: 500; letter-spacing: -0.03em; text-wrap: balance; }
+  .lede { margin-top: 12px; color: var(--text-2); font-size: 16px; }
+  .form { margin-top: 26px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .drop { height: 130px; display: grid; place-content: center; justify-items: center; gap: 6px; color: var(--text-2); font-size: 14px; border-bottom: 1px solid var(--border); }
+  .drop svg { width: 22px; height: 22px; color: var(--text-3); }
   .opts { display: flex; align-items: center; gap: 16px; padding: 10px 10px 10px 14px; font-size: 13px; color: var(--text-2); flex-wrap: wrap; }
   .opts label { color: var(--text-3); margin-right: 6px; }
-  .opts select, .opts input { font: inherit; color: var(--text-1); background: none; border: 0; padding: 0; width: 7em; }
+  .opts select, .opts input { font: inherit; color: var(--text-1); background: none; border: 0; padding: 0; width: 6.5em; }
   .publish { margin-left: auto; background: var(--btn); color: var(--bg); border: 0; border-radius: 8px; padding: 8px 16px; font: 500 13px Inter, sans-serif; cursor: pointer; }
   .publish:hover, .start:hover { background: var(--btn-hover); }
   .publish:focus-visible, .opts select:focus-visible, .opts input:focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; border-radius: 6px; }
   .proof { margin-top: 12px; font-size: 13px; color: var(--text-3); } .proof b { color: var(--text-1); font-weight: 500; font-variant-numeric: tabular-nums; }
 
-  .seen-cap { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 8px; font-size: 12px; color: var(--text-3); }
-  .seen-cap .mono { color: var(--text-2); }
-  .crop { position: relative; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
-  .report { background: #fff; color: #1d2433; padding: 20px 20px 60px; font: 13px/1.5 -apple-system, 'Segoe UI', sans-serif; }
+  /* Hero visual: laptop-size page + the same page on a phone */
+  .stage { position: relative; padding-bottom: 24px; }
+  .crop { position: relative; border: 1px solid var(--border-2); border-radius: 12px; overflow: hidden; }
+  .report { background: #fff; color: #1d2433; padding: 20px 20px 56px; font: 13px/1.5 -apple-system, 'Segoe UI', sans-serif; }
   .report h4 { font-size: 15px; font-weight: 600; } .report p { color: #5a6475; font-size: 12px; }
   .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
   .kpi { border: 1px solid #e6e9ef; border-radius: 6px; padding: 10px; } .kpi b { display: block; font-size: 18px; } .kpi small { color: #0f7a4a; font-size: 11px; }
-  .bars { display: flex; align-items: flex-end; gap: 6px; height: 90px; border-bottom: 1px solid #e6e9ef; } .bars i { flex: 1; display: block; background: #3b6fe0; border-radius: 2px 2px 0 0; }
-  .rows2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; } .rows2 div { border: 1px solid #e6e9ef; border-radius: 6px; padding: 10px; font-size: 12px; color: #5a6475; } .rows2 b { color: #1d2433; }
+  .bars { display: flex; align-items: flex-end; gap: 6px; height: 96px; border-bottom: 1px solid #e6e9ef; } .bars i { flex: 1; display: block; background: #3b6fe0; border-radius: 2px 2px 0 0; }
   .badge { position: absolute; right: 12px; bottom: 12px; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 8px; border-radius: 6px;
            background: #fff; color: #333338; border: 1px solid #e0e0e4; font: 500 12px Inter, sans-serif; white-space: nowrap; }
   .badge svg { width: 12px; height: 12px; color: #5847d4; }
-  .seen-note { margin-top: 10px; font-size: 13px; color: var(--text-3); }
+  .urlchip { position: absolute; left: 16px; top: -14px; z-index: 2; display: inline-flex; align-items: center; gap: 8px; background: var(--surface-2); border: 1px solid var(--border-2);
+             border-radius: 999px; padding: 4px 6px 4px 12px; font: 12px var(--mono); color: var(--text-1); }
+  .urlchip button { font: 500 11px Inter, sans-serif; background: var(--btn); color: var(--bg); border: 0; border-radius: 999px; padding: 3px 9px; }
+  .phone { position: absolute; left: -36px; bottom: -30px; width: 112px; height: 200px; border-radius: 22px; background: #050506; border: 1px solid var(--border-2); padding: 7px; box-shadow: 0 20px 40px -16px rgba(0,0,0,.8); }
+  .phone .scr { height: 100%; border-radius: 16px; background: #fff; overflow: hidden; padding: 16px 9px 0; font: 8px/1.4 -apple-system, sans-serif; color: #1d2433; }
+  .phone b { font-size: 9px; display: block; }
+  .phone .k2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 6px 0; } .phone .k2 span { border: 1px solid #e6e9ef; border-radius: 4px; padding: 4px; }
+  .phone .bars { height: 54px; gap: 3px; }
+  @media (max-width: 880px) { .phone { left: auto; right: -8px; } }
+  @media (max-width: 520px) { .phone { display: none; } }
 
-  section.block { margin-top: 96px; }
+  section.block { margin-top: 104px; }
   h2 { font-size: 22px; font-weight: 500; letter-spacing: -0.02em; }
-  .sub { margin-top: 6px; color: var(--text-2); max-width: 36em; }
 
-  /* Who it's for: label column + description, not icon cards */
-  .who { margin-top: 20px; border-top: 1px solid var(--border); }
-  .who > div { display: grid; grid-template-columns: 240px 1fr auto; gap: 8px 32px; padding: 18px 0; border-bottom: 1px solid var(--border); align-items: baseline; }
-  @media (max-width: 720px) { .who > div { grid-template-columns: 1fr; } }
-  .who b { font-weight: 500; }
-  .who p { color: var(--text-2); }
-  .who a { font-size: 13px; color: var(--text-2); white-space: nowrap; }
-  .who code { font: 13px 'JetBrains Mono', monospace; color: var(--text-1); }
+  /* Flow: file -> publish -> link -> opened */
+  .flow { margin-top: 22px; display: grid; grid-template-columns: 1.15fr auto 0.8fr auto 1.4fr auto 1.25fr; align-items: center; gap: 12px; }
+  @media (max-width: 880px) { .flow { grid-template-columns: 1fr; } .flow .arr { transform: rotate(90deg); justify-self: center; } }
+  .step { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 13px; }
+  .step svg { width: 18px; height: 18px; flex: none; color: var(--text-3); }
+  .step .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .step small { color: var(--text-3); margin-left: auto; white-space: nowrap; }
+  .step.btnlike { justify-content: center; background: var(--btn); color: var(--bg); font-weight: 500; border-color: var(--btn); }
+  .step.live small { color: var(--ok); }
+  .arr { color: var(--border-2); font-size: 18px; }
 
-  /* Pro, side by side */
-  .pro { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  /* Gallery: what people send */
+  .gallery { margin-top: 22px; display: grid; grid-template-columns: 1.35fr 1fr; grid-template-rows: auto auto; gap: 14px; }
+  @media (max-width: 820px) { .gallery { grid-template-columns: 1fr; } }
+  .tile { display: grid; gap: 8px; }
+  .tile.big { grid-row: span 2; }
+  .tile .frame { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; position: relative; }
+  .tile .mono { font-size: 12px; color: var(--text-3); }
+  .dash { background: #f7f8fa; padding: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font: 11px -apple-system, sans-serif; color: #1d2433; min-height: 100%; }
+  .dash .card { background: #fff; border: 1px solid #e6e9ef; border-radius: 8px; padding: 10px; }
+  .dash .card b { display: block; font-size: 16px; }
+  .dash .wide { grid-column: span 2; }
+  .line { height: 120px; } .line svg { width: 100%; height: 100%; }
+  .donut { width: 84px; height: 84px; border-radius: 50%; background: conic-gradient(#3b6fe0 0 46%, #8fb1f5 0 72%, #d7e2fb 0); margin: 6px auto; position: relative; }
+  .donut::after { content: ''; position: absolute; inset: 18px; background: #fff; border-radius: 50%; }
+  .table-mini div { display: flex; justify-content: space-between; padding: 5px 0; border-top: 1px solid #eef0f4; }
+  .game { background: #0d1117; color: #c9d1d9; padding: 14px; font: 11px var(--mono); }
+  .grid { display: grid; grid-template-columns: repeat(20, 1fr); gap: 2px; margin-top: 8px; } .grid i { aspect-ratio: 1; display: block; background: #161b22; border-radius: 1px; } .grid i.s { background: #39d353; } .grid i.f { background: #f85149; }
+  .slide { aspect-ratio: 16 / 9; background: #f4efe6; color: #2a1d12; padding: 22px; display: grid; align-content: space-between; font-family: Georgia, 'Times New Roman', serif; }
+  .slide b { font-size: clamp(18px, 2.4vw, 26px); line-height: 1.1; font-weight: 700; }
+  .slide span { font: 11px -apple-system, sans-serif; color: #7a6656; display: flex; justify-content: space-between; }
+
+  /* Pro */
+  .pro { margin-top: 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; }
   @media (max-width: 820px) { .pro { grid-template-columns: 1fr; } }
-  .links { display: grid; gap: 10px; }
-  .linkrow { display: grid; grid-template-columns: 60px 1fr; gap: 12px; align-items: center; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }
-  .linkrow .mono { font-size: 14px; overflow-wrap: anywhere; min-width: 0; }
-  .linkrow.free .mono { color: var(--text-3); } .linkrow.on { border-color: var(--border-2); }
-  .links ul { list-style: none; padding: 0; margin-top: 6px; color: var(--text-2); font-size: 14px; }
-  .links li { padding: 7px 0; border-top: 1px solid var(--border); }
+  .swap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px; display: grid; gap: 14px; align-content: center; }
+  .linkrow { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; font: 14px var(--mono); overflow-wrap: anywhere; }
+  .linkrow.old { color: var(--text-3); text-decoration: line-through; text-decoration-color: var(--border-2); }
+  .linkrow.new { border-color: var(--border-2); background: var(--surface-2); }
+  .down { text-align: center; color: var(--text-3); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { font-size: 12px; color: var(--text-2); border: 1px solid var(--border-2); border-radius: 999px; padding: 3px 10px; }
   .opens { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
-  .opens-head { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 16px; border-bottom: 1px solid var(--border); }
-  .opens-head b { font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; }
-  .spark { display: flex; align-items: flex-end; gap: 3px; height: 44px; padding: 10px 16px 0; }
-  .spark i { flex: 1; display: block; background: var(--border-2); border-radius: 1px; } .spark i.hi { background: var(--text-2); }
+  .opens-head { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 16px 0; }
+  .opens-head b { font-size: 28px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .spark { display: flex; align-items: flex-end; gap: 4px; height: 70px; padding: 12px 16px 8px; }
+  .spark i { flex: 1; display: block; background: var(--border-2); border-radius: 2px; } .spark i.hi { background: var(--text-1); }
   .opens table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .opens td { padding: 9px 16px; border-top: 1px solid var(--border); color: var(--text-2); }
   .opens td:last-child { text-align: right; color: var(--text-3); white-space: nowrap; }
   .opens .new { color: var(--ok); }
 
-  /* Plans strip */
-  .strip { margin-top: 20px; display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  /* Agents: a terminal */
+  .term { margin-top: 22px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #070708; max-width: 720px; }
+  .term-bar { display: flex; justify-content: space-between; padding: 9px 14px; border-bottom: 1px solid var(--border); font: 12px var(--mono); color: var(--text-3); }
+  .term pre { margin: 0; padding: 16px; font: 13px/1.8 var(--mono); color: var(--text-2); overflow-x: auto; }
+  .term .p { color: var(--text-3); } .term .c { color: var(--text-1); } .term .ok { color: var(--ok); } .term .u { color: var(--text-1); text-decoration: underline; text-decoration-color: var(--border-2); }
+  .term-links { display: flex; gap: 18px; margin-top: 12px; font-size: 13px; color: var(--text-2); }
+
+  /* Plans */
+  .strip { margin-top: 22px; display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
   @media (max-width: 820px) { .strip { grid-template-columns: 1fr 1fr; } }
-  .strip > div { padding: 18px; background: var(--surface); display: grid; gap: 2px; align-content: start; }
-  .strip > div + div { border-left: 1px solid var(--border); }
-  @media (max-width: 820px) { .strip > div:nth-child(3) { border-left: 0; } .strip > div:nth-child(n+3) { border-top: 1px solid var(--border); } }
+  .strip > a { padding: 18px; background: var(--surface); display: grid; gap: 2px; align-content: start; }
+  .strip > a + a { border-left: 1px solid var(--border); }
+  @media (max-width: 820px) { .strip > a:nth-child(3) { border-left: 0; } .strip > a:nth-child(n+3) { border-top: 1px solid var(--border); } }
   .strip .on { background: var(--surface-2); }
   .strip h3 { font-size: 14px; font-weight: 500; display: flex; justify-content: space-between; gap: 8px; }
   .strip h3 span { font-size: 11px; color: var(--text-3); font-weight: 500; }
-  .strip .price { font-size: 24px; font-weight: 500; letter-spacing: -0.02em; margin-top: 6px; } .strip .price small { font-size: 12px; color: var(--text-2); letter-spacing: 0; font-weight: 400; }
+  .strip .price { font-size: 26px; font-weight: 500; letter-spacing: -0.02em; margin-top: 6px; } .strip .price small { font-size: 12px; color: var(--text-2); letter-spacing: 0; font-weight: 400; }
   .strip p { font-size: 13px; color: var(--text-3); }
-  .all { display: inline-block; margin-top: 12px; font-size: 14px; color: var(--text-2); }
 
-  footer { margin-top: 96px; border-top: 1px solid var(--border); padding: 32px 0 44px; }
+  footer { margin-top: 104px; border-top: 1px solid var(--border); padding: 32px 0 44px; }
   .fcols { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 24px; font-size: 13px; }
   @media (max-width: 560px) { .fcols { grid-template-columns: 1fr 1fr; } }
   .fcols div { display: grid; gap: 6px; align-content: start; color: var(--text-2); }
-  .fcols p { color: var(--text-3); font-size: 12px; max-width: 18em; }
 </style>
 </head>
 <body>
@@ -137,80 +172,116 @@
   <section class="hero">
     <div>
       <h1>Turn HTML into a link anyone can open.</h1>
-      <p class="lede">Made a report, page or game with Claude, ChatGPT or another AI tool? Paste the HTML or drop the file. You get a link to send in seconds. Free, no account.</p>
+      <p class="lede">From Claude, ChatGPT or any AI tool. Free, no account.</p>
       <div class="form" role="group" aria-label="Publish HTML">
-        <div class="drop">Paste HTML or drop a file<small>⌘V to paste · 2 MB max</small></div>
+        <div class="drop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 17v-6M9.5 13.5 12 11l2.5 2.5"/></svg>Drop an .html file or paste</div>
         <div class="opts">
           <span><label for="exp3">Expires</label><select id="exp3"><option>1 hour</option><option>1 day</option><option selected>7 days</option><option>30 days</option></select></span>
           <span><label for="pw3">Password</label><input id="pw3" placeholder="none" /></span>
           <button class="publish" type="button">Publish</button>
         </div>
       </div>
-      <p class="proof"><b>10,827</b> pages published · opened <b>102,156</b> times in 141 countries</p>
+      <p class="proof"><b>10,827</b> pages · <b>102,156</b> opens · 141 countries</p>
     </div>
-    <div>
-      <div class="seen-cap"><span>What they open</span><span class="mono">aired.sh/p/q3-northwind</span></div>
+
+    <div class="stage">
+      <span class="urlchip">aired.sh/p/q3-northwind <button type="button">Copy</button></span>
       <div class="crop"><div class="report">
         <h4>Q3 performance — Northwind Dental</h4><p>Prepared for Sam Ortiz · Oct 2026</p>
         <div class="kpis"><div class="kpi">Leads<b>1,284</b><small>+18%</small></div><div class="kpi">Calls<b>412</b><small>+9%</small></div><div class="kpi">Cost / lead<b>$21</b><small>−12%</small></div></div>
         <div class="bars"><i style="height:38%"></i><i style="height:52%"></i><i style="height:45%"></i><i style="height:61%"></i><i style="height:58%"></i><i style="height:74%"></i><i style="height:69%"></i><i style="height:88%"></i><i style="height:80%"></i><i style="height:93%"></i></div>
-        <div class="rows2"><div><b>Top channel</b><br>Google Ads, 46% of leads</div><div><b>Next step</b><br>Shift $800 to call ads</div></div>
       </div>
       <a class="badge" href="#"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>Shared with aired</a></div>
-      <p class="seen-note">Opens on any phone or laptop. They don't sign in.</p>
+      <div class="phone" aria-hidden="true"><div class="scr"><b>Q3 performance</b>Northwind Dental<div class="k2"><span>Leads<br><b>1,284</b></span><span>Calls<br><b>412</b></span></div><div class="bars"><i style="height:40%"></i><i style="height:55%"></i><i style="height:50%"></i><i style="height:70%"></i><i style="height:66%"></i><i style="height:92%"></i></div></div></div>
     </div>
   </section>
 
   <section class="block">
-    <h2>Who uses it</h2>
-    <div class="who">
-      <div><b>You made something with AI</b><p>A report, a game, a landing page from Claude, ChatGPT or Gemini. Send it to someone who doesn't use that tool.</p><a href="#">Share a Claude artifact →</a></div>
-      <div><b>You send work to clients</b><p>Monthly reports, proposals, prototypes. Put them on your own domain and see when the client opens them.</p><a href="#">Pro for client work →</a></div>
-      <div><b>Your agent or script publishes</b><p>Publish from Claude Code, Cursor or CI with <code>npx aired report.html</code>, the MCP server or the HTTP API.</p><a href="#">Developer docs →</a></div>
+    <h2>How it works</h2>
+    <div class="flow">
+      <div class="step"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg><span class="mono">q3-report.html</span><small>48 KB</small></div>
+      <span class="arr" aria-hidden="true">→</span>
+      <div class="step btnlike">Publish</div>
+      <span class="arr" aria-hidden="true">→</span>
+      <div class="step"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><span class="mono">aired.sh/p/q3-northwind</span></div>
+      <span class="arr" aria-hidden="true">→</span>
+      <div class="step live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg><span>Opened on iPhone</span><small>just now</small></div>
     </div>
   </section>
 
   <section class="block">
-    <h2>Send it under your name</h2>
-    <p class="sub">Pro swaps our link and badge for yours, and shows you who opened each page.</p>
+    <h2>What people send</h2>
+    <div class="gallery">
+      <div class="tile big">
+        <div class="frame" style="height:100%"><div class="dash">
+          <div class="card">Revenue<b>$48,210</b></div><div class="card">Orders<b>1,932</b></div>
+          <div class="card wide line"><svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true"><path d="M0 80 L30 72 L60 76 L90 60 L120 64 L150 48 L180 52 L210 34 L240 38 L270 22 L300 18 L300 100 L0 100Z" fill="#dbe6fb"/><path d="M0 80 L30 72 L60 76 L90 60 L120 64 L150 48 L180 52 L210 34 L240 38 L270 22 L300 18" fill="none" stroke="#3b6fe0" stroke-width="2"/></svg></div>
+          <div class="card">Channels<div class="donut"></div></div>
+          <div class="card table-mini">Top products<div><span>Starter kit</span><span>412</span></div><div><span>Refill pack</span><span>288</span></div><div><span>Gift box</span><span>131</span></div></div>
+        </div></div>
+        <span class="mono">aired.sh/p/shop-dashboard · client report</span>
+      </div>
+      <div class="tile"><div class="frame"><div class="game">SNAKE · score 14<div class="grid"></div></div></div><span class="mono">aired.sh/p/snake-v2 · game</span></div>
+      <div class="tile"><div class="frame"><div class="slide"><span><em>Brightline</em><em>01 / 08</em></span><b>Spring launch plan</b><span><em>Prepared with Claude</em><em>Mar 2027</em></span></div></div><span class="mono">aired.sh/p/launch-deck · deck</span></div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>Pro: your name on the link</h2>
     <div class="pro">
-      <div class="links">
-        <div class="linkrow free"><span class="cap">Free</span><span class="mono">aired.sh/p/q3-northwind</span></div>
-        <div class="linkrow on"><span class="cap">Pro</span><span class="mono">reports.youragency.com/q3-northwind</span></div>
-        <ul><li>No aired badge, or your logo in its place</li><li>Passwords and links that expire after a number of views</li><li>Pages that never expire</li></ul>
+      <div class="swap">
+        <div class="linkrow old">aired.sh/p/q3-northwind</div>
+        <div class="down" aria-hidden="true">↓</div>
+        <div class="linkrow new">reports.youragency.com/q3</div>
+        <div class="chips"><span class="chip">No badge</span><span class="chip">Passwords</span><span class="chip">Never expires</span><span class="chip">API key</span></div>
       </div>
       <div class="opens">
-        <div class="opens-head"><span class="cap">Q3 performance · last 14 days</span><b>14 opens</b></div>
-        <div class="spark" aria-hidden="true"><i style="height:10%"></i><i style="height:0%"></i><i style="height:30%"></i><i style="height:20%"></i><i style="height:0%"></i><i style="height:10%"></i><i style="height:60%"></i><i style="height:40%"></i><i style="height:10%"></i><i style="height:0%"></i><i style="height:20%"></i><i style="height:30%"></i><i style="height:50%"></i><i class="hi" style="height:100%"></i></div>
+        <div class="opens-head"><span class="cap">Opens · 14 days</span><b>14</b></div>
+        <div class="spark" aria-hidden="true"><i style="height:10%"></i><i style="height:4%"></i><i style="height:30%"></i><i style="height:20%"></i><i style="height:4%"></i><i style="height:10%"></i><i style="height:60%"></i><i style="height:40%"></i><i style="height:10%"></i><i style="height:4%"></i><i style="height:20%"></i><i style="height:30%"></i><i style="height:50%"></i><i class="hi" style="height:100%"></i></div>
         <table>
-          <tr><td class="new">Chicago, US · iPhone</td><td>12 min ago</td></tr>
-          <tr><td>Chicago, US · Mac</td><td>yesterday</td></tr>
-          <tr><td>Austin, US · Windows</td><td>Mon</td></tr>
+          <tr><td class="new">Chicago · iPhone</td><td>12 min ago</td></tr>
+          <tr><td>Chicago · Mac</td><td>yesterday</td></tr>
+          <tr><td>Austin · Windows</td><td>Mon</td></tr>
         </table>
       </div>
     </div>
   </section>
 
   <section class="block">
-    <h2>Plans</h2>
-    <p class="sub">Viewers are always free and never need an account.</p>
-    <div class="strip">
-      <div><h3>Free</h3><div class="price">$0</div><p>Unlimited pages and views, PIN, CLI and MCP</p></div>
-      <div class="on"><h3>Pro</h3><div class="price">$9 <small>/ mo</small></div><p>Your domain, no badge, who opened it</p></div>
-      <div><h3>Team <span>Waitlist</span></h3><div class="price">$12 <small>/ editor / mo</small></div><p>Shared workspace, roles, free guests</p></div>
-      <div><h3>Business <span>Talk to us</span></h3><div class="price">$20 <small>/ editor / mo</small></div><p>SSO, sharing policies, audit log</p></div>
+    <h2>Or let your agent do it</h2>
+    <div class="term">
+      <div class="term-bar"><span>Terminal</span><span>Claude Code · Cursor · CI</span></div>
+<pre><span class="p">$</span> <span class="c">npx aired report.html</span>
+<span class="ok">✓</span> Published  <span class="u">https://aired.sh/p/x7k2m9</span>
+<span class="p">  expires in 7 days · update token saved</span></pre>
     </div>
-    <a class="all" href="pricing-page.html">Compare all plans →</a>
+    <div class="term-links"><a href="#">CLI</a><a href="#">MCP server</a><a href="#">HTTP API</a><a href="#">Docs →</a></div>
+  </section>
+
+  <section class="block">
+    <h2>Plans</h2>
+    <div class="strip">
+      <a href="pricing-page.html"><h3>Free</h3><div class="price">$0</div><p>Unlimited pages and views</p></a>
+      <a href="pricing-page.html" class="on"><h3>Pro</h3><div class="price">$9 <small>/ mo</small></div><p>Your domain, no badge</p></a>
+      <a href="pricing-page.html"><h3>Team <span>Waitlist</span></h3><div class="price">$12 <small>/ editor</small></div><p>Shared workspace</p></a>
+      <a href="pricing-page.html"><h3>Business <span>Talk to us</span></h3><div class="price">$20 <small>/ editor</small></div><p>SSO and audit log</p></a>
+    </div>
   </section>
 </main>
 
 <footer><div class="wrap">
   <div class="fcols">
-    <div><a class="logo" href="#"><svg viewBox="0 0 32 32" aria-hidden="true" style="width:14px;height:14px;color:var(--mark)"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>aired</a><p>Turn HTML into a link anyone can open.</p></div>
-    <div><span class="cap">Product</span><a href="pricing-page.html">Pricing</a><a href="#">Docs</a><a href="#">Changelog</a><a href="#">Status</a></div>
+    <div><a class="logo" href="#"><svg viewBox="0 0 32 32" aria-hidden="true" style="width:14px;height:14px;color:var(--mark)"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>aired</a></div>
+    <div><span class="cap">Product</span><a href="pricing-page.html">Pricing</a><a href="#">Docs</a><a href="#">Status</a></div>
     <div><span class="cap">Guides</span><a href="#">HTML to link</a><a href="#">Share Claude artifacts</a><a href="#">Tiiny Host alternative</a></div>
-    <div><span class="cap">Company</span><a href="#">Contact</a><a href="#">Terms</a><a href="#">Privacy</a><a href="#">Report abuse</a><a href="#">GitHub</a></div>
+    <div><span class="cap">Company</span><a href="#">Contact</a><a href="#">Terms</a><a href="#">Privacy</a><a href="#">GitHub</a></div>
   </div>
 </div></footer>
+
+<script>
+  var g = document.querySelector('.grid'), s = [24,25,26,27,47,67], h = '';
+  for (var i = 0; i < 100; i++) h += '<i class="' + (s.indexOf(i) > -1 ? 's' : i === 53 ? 'f' : '') + '"></i>';
+  g.innerHTML = h;
+</script>
 </body>
 </html>
