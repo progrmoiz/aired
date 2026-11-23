@@ -6,11 +6,11 @@
 
 1. **Rank for the job, not the jargon.** People don't search "publish HTML artifacts". They search "share html file as link", "how to share claude artifact" and "tiiny host alternative". The homepage and three new guide pages now target those phrases.
 2. **Position aired for people who make things with AI, not only for developers.** New one-liner: *aired turns anything your AI makes into a link anyone can open.* Developers still reach the CLI, MCP and API through the docs and the "let your agent publish it" block.
-3. **Make money from control, not access.** Publishing, viewing and PINs stay free with no view cap, and the badge stays on. Pro ($9/mo) sells your own domain, no badge, analytics on who viewed, permanent pages without limits, and an API key for CI. Team ($10 per editor/mo) sells a shared workspace with roles and permissions. Business ($20 per editor/mo) sells what an organization's admin needs: SSO, sharing policies and an audit log.
+3. **Make money from control, not access.** Publishing, viewing and PINs stay free with no view cap, and the badge stays on. Pro ($9/mo billed yearly, $12 monthly) sells your own domain, no badge, analytics on who viewed, permanent pages without limits, and an API key for CI. Team ($12 per editor/mo billed yearly) sells a shared workspace with roles and permissions. Business ($20 per editor/mo billed yearly) sells what an organization's admin needs: SSO, sharing policies and an audit log.
 6. **Accounts are workspaces, not just logins.** Every account gets a personal workspace, and pages belong to a workspace, not to a user. That one data-model choice is what makes sharing with named people, team workspaces, roles and org admin possible later without a migration. Make it while accounts are still small (section 6, "Workspaces, sharing and permissions").
 7. **Charge for people who publish, never for people who view.** Viewers, commenters and guests are always free and don't need an aired account; they confirm their email with a one-time link. That's the gap against Claude and ChatGPT, which make every invited viewer sign in to their product, and it turns every invite into a free visit from a new person.
 4. **Free signup is the first conversion, so make it possible for non-developers.** Sign-in is GitHub-only today, which shuts out the audience this plan targets. Add Google sign-in (or an email magic link) before the Pro test.
-5. **Test Pro with a checkout or waitlist button before building it.** Build custom domains and analytics only after people pay or join.
+5. **Test Pro with a checkout or waitlist button before building it.** Build custom domains and analytics only after people pay or join. Each later stage (Pro, Team, Business) starts when the previous one passes its gate, not on a date (section 9).
 
 ---
 
@@ -60,7 +60,7 @@ Pages checked: `/`, `/docs`, `/abuse`, `/llms.txt`, `/index.md`, `/.well-known/*
 | **Share a Claude artifact** | how to share claude artifact, share claude artifact, can claude artifacts be shared, claude artifacts public, how to share html from claude | 1k–3k, rising | Solve a problem | **Easy–medium.** #1 Claude Help Center, then Reddit, send.co, Codecademy, go9x, Stacktree and Medium. Small tools already rank. | `/share-claude-artifacts` ✅ | P1 |
 | **Claude artifacts alternative** | claude artifacts alternative (+free, +reddit, +open source), claude artifacts vs chatgpt canvas | 200–700 | Compare | **Easy.** Reddit, totalum, fabricate, Medium and spacesheep. No strong owner. | Section in `/share-claude-artifacts` ✅; own page if that one ranks | P2 |
 | **Tiiny Host alternative** | tiiny host alternative(s), tiiny host vs netlify, tiiny host pricing, tiiny host reddit | 200–600 (the brand term "tiiny host" alone is much larger) | Switch / buy | **Easy.** No page on the first results is a real Tiiny alternatives page: techimply, Reddit and generic host lists. | `/tiiny-host-alternative` ✅ | P1 |
-| **Share ChatGPT HTML** | how to share chatgpt canvas, share chatgpt html, chatgpt website link | 500–2k | Solve a problem | **Easy.** Reddit #1, then binhtml, Convika, InstaPods, HummingDeck and docklet. All small. | `/share-chatgpt-html` | P1, next |
+| **Share ChatGPT HTML** | how to share chatgpt canvas, share chatgpt html, chatgpt website link (Canvas was retired in May 2026, so the query now means "Canvas is gone, how do I share this?") | 500–2k | Solve a problem | **Easy.** Reddit #1, then binhtml, Convika, InstaPods, HummingDeck and docklet. All small. | `/share-chatgpt-html` | P1, next |
 | **HTML game hosting** | host html game free, share html game, upload html game get link | 500–1.5k | Do it now | **Medium–easy.** Reddit, itch.io docs, fylo.host and PlayFeed. Games are already aired's most-viewed real pages. | `/html-game-hosting` | P2 |
 | **Free HTML hosting** | host html file free, free html hosting, publish html online free, host html online | 5k–15k | Do it now / compare | **Hard.** Netlify, GitHub Pages, Tiiny and listicles. | Homepage + `/html-to-link` (secondary) | P2 |
 | **Netlify Drop alternative** | netlify drop alternative, netlify drop url | 100–400 | Switch | **Easy.** | Section in `/tiiny-host-alternative` ✅; own page later | P3 |
@@ -81,11 +81,13 @@ Build "share [tool] HTML as a link" pages only for tools whose export steps real
 | 1 | `/html-to-link` | html to link / share html file as link | Biggest winnable cluster; tool intent matches the embedded form | Volume → anonymous publishes → free signups | **Built** |
 | 2 | `/share-claude-artifacts` | how to share claude artifact | Rising demand, small sites rank, a direct wedge against Claude's Share button | AI makers → badge removal, analytics | **Built** |
 | 3 | `/tiiny-host-alternative` | tiiny host alternative | Buyer intent, an empty SERP, and Tiiny's $13 Solo plan anchors aired Pro at $9 | Switchers → Pro | **Built** |
-| 4 | `/share-chatgpt-html` | how to share chatgpt canvas | Same pattern as #2, an easy SERP | AI makers | Next |
+| 4 | `/share-chatgpt-html` | how to share chatgpt canvas / chatgpt site | Same pattern as #2, an easy SERP, and Canvas's retirement left people searching for a new way | AI makers | Next |
+| 4a | `/password-protect-html`, `/share-html-privately`, `/share-html-with-client` | password protect html page, share html privately | The softest cluster: the results are StackOverflow threads from 2010–2021 and one modern product page (Stacktree) | Free account → Pro | Next |
+| 4b | `/publish-from-claude-code`, `/share-gemini-canvas`, `/publish-from-cursor` | per AI tool | One problem and one fix per tool, dated, with the form. Docklet ranks #2 with 8 pages built this way | AI makers, agents | December |
 | 5 | `/client-reports` | (sales page) | Agencies are the highest willingness to pay | Team plan | After pricing test |
 | 6 | `/publish-html-from-ci` | github actions html report link | The headless wedge Claude can't serve | Pro API key | Month 1 |
 | 7 | `/html-game-hosting` | host html game free | Matches the content that already gets the most views | Volume, badge impressions | Month 1 |
-| 8 | `/share-html-privately` | share html privately / share html with specific people | Matches named-people sharing; links to `/password-protect-html` intent | Free account → Pro | When named sharing ships |
+| 8 | `/share-html-privately` (upgrade) | share html with specific people | Rewrite 4a's page around named sharing once it exists | Free account → Pro | When named sharing ships |
 | 9 | `/teams` | (sales page) claude artifacts for teams, share internal reports | Claude Team keeps outside sharing off by default and makes every invitee sign in; aired doesn't | Team, Business | When Team ships |
 | 10 | `/netlify-drop-alternative`, `/password-protect-html` | — | Long tail | Volume | Later |
 
@@ -147,7 +149,7 @@ Search (guide page) ──► publish without an account (form on the page)
        (no aired account needed)    without signing up, sees "made with aired"
                                   │
                                   ▼
-       invites a colleague as an editor ──► Team workspace ($10/editor)
+       invites a colleague as an editor ──► Team workspace ($12/editor)
                                   │
                                   ▼
        IT asks for SSO, policies, audit log ──► Business ($20/editor)
@@ -171,29 +173,38 @@ Measure it with Cloudflare Web Analytics on the marketing pages (free and cookie
 
 ## 6. Plan structure
 
-### What comparable products charge (read from live pricing pages, November 2026)
+### What comparable products charge (read from live pricing pages, 2026-11-23)
 
-| Product | Free tier | First paid tier | What gets people to pay |
-|---|---|---|---|
-| Tiiny Host | 1 project, 3 MB, 5k visits/mo, banner, link kept while you log in every 3 months | Tiny $5 (no banner, analytics); Solo $13 (custom domain, password, API) | 1 project, the banner, no password |
-| Netlify | 300 credits/mo hard cap; anonymous Drop has an hour to be claimed, then is deleted | Personal $9 | Credit cap; password is Pro-only |
-| Vercel | Hobby is free but non-commercial only | Pro $20/seat | Commercial use; password costs $20 per project per month |
-| Carrd | 3 sites, branding | Pro Lite $9/**yr**; custom domain from $19/yr | Custom domain, branding |
-| Notion Sites | Unlimited sites on notion.site | Custom domain add-on $10/mo on top of a paid seat | Custom domain |
-| Gamma | Credits, badge | Plus $9 (no badge); Pro $18 (analytics, custom domains) | AI credits, then the badge |
-| Small HTML-share tools | htmltourl 1 h, binhtml 3 days, Stacktree 7–90 days | $4–19/mo; Stacktree $19 / $79 / $249 for agencies | Expiry, viewer analytics, custom domain |
+Yearly price per month first, then monthly. "Per seat" means each paying member.
+
+| Product | Free | Individual | Team | Business / SSO | Viewers |
+|---|---|---|---|---|---|
+| **aired (proposed)** | Publish, PIN, no view cap, badge | Pro $9 / $12 | $12 / $15 per editor, min 2 | $20 / $25 per editor, min 3: SSO, policies, audit log | Free, no account |
+| Tiiny Host | 1 project, 3 MB, 5k visits, banner | Tiny $5 / $9; Solo $13 / $18 (custom domain, password, API) | Pro $31 / $38 flat, about +$5 per extra member | none | Free |
+| Claude | Chat only | Pro $17 / $20 | Team $20 / $25 per seat, 2–150 | SSO on Team; audit log Enterprise only | Link viewers free; invitees need a Claude account |
+| ChatGPT | Limited | Go $8, Plus $20 | Business $20 / $25 per seat, from 2 | SSO on Business; audit and roles Enterprise only | Invitees need a ChatGPT account |
+| Notion | Personal | Plus $10 / $12 | Business $20 / $24 | SSO on Business; audit Enterprise only; custom domain $8–10 extra | Guests free (10 on Free) |
+| Gamma | Credits, badge | Plus $9 / $12; Pro $18 / $25 | — | Business $40 per seat with SSO | Free |
+| Netlify | 300 credits | Personal $9 | Pro $20 flat, unlimited members | SSO Enterprise only | Free reviewers |
+| Vercel | Hobby, non-commercial | — | Pro $20 + $20 per developer | SSO $300/mo extra; password $20 per project | Free viewer seats |
+| Figma | Starter | Pro $16 / $20 per editor | — | Organization $55 | Free viewers |
+| Framer | Free site | Basic $10 / $15; Pro $30 / $45 | Extra editors $20 / $30 | SSO Enterprise only | Free |
+| Pitch | Free | Plus $13 | Team $19 per seat | Business $25; SSO Enterprise only | Free |
+| Stacktree | — | Solo $19 | Studio $79 flat | none | Free |
 
 Patterns:
-- Entry price clusters at $4–10/mo.
-- A custom domain usually sits one tier above the cheapest paid plan.
-- Password protection is often paywalled.
-- Tools that serve agencies charge $19–249/mo for viewer analytics and white-label.
+- Entry plans cluster at $5–13 yearly and $9–20 monthly. Monthly costs 15–40% more.
+- A custom domain usually sits one tier above the cheapest plan, at $13–25.
+- Password protection is paywalled almost everywhere (Tiiny $13+, Netlify Pro, Vercel $20 per project).
+- Viewers are free almost everywhere; teams pay for people who edit.
+- SSO sits at about $20 per seat on the second paid tier for AI tools (Claude, ChatGPT) and Notion; elsewhere it's $40–55, an add-on, or Enterprise-only. No HTML-sharing tool offers it.
+- Hosting tools often price teams flat (Netlify, Tiiny, Stacktree). aired prices per editor because the value of a workspace grows with the people in it.
 
-Full notes, with source URLs: [competitor-pricing.md](competitor-pricing.md).
+Full notes, with source URLs: [research/competitor-pricing.md](research/competitor-pricing.md), and team and business plans in [research/team-pricing.md](research/team-pricing.md).
 
 ### Proposed tiers
 
-| | **No account** | **Free account** | **Pro: $9/mo ($90/yr)** | **Team: $10 per editor/mo, min 3** | **Business: $20 per editor/mo, min 5** |
+| | **No account** | **Free account** | **Pro: $9/mo yearly, $12 monthly** | **Team: $12 per editor/mo yearly, $15 monthly, min 2** | **Business: $20 per editor/mo yearly, $25 monthly, min 3** |
 |---|---|---|---|---|---|
 | Who it's for | A quick share | Anyone who wants to keep links | One person sending work to clients | A team that publishes together | An organization whose IT has rules |
 | Publish | 5/hour, 2 MB | 30/hour, 2 MB | 10 MB pages, 500/day | Same as Pro, per editor | Same as Pro, per editor |
@@ -211,10 +222,10 @@ Full notes, with source URLs: [competitor-pricing.md](competitor-pricing.md).
 | Analytics | View count | View count | Views over time, countries, referrers, who opened it | Same, per folder | Same, plus export |
 | Domain | aired.sh/p/… | aired.sh/p/… | 1 custom domain | 5 custom domains | Unlimited |
 | API | Anonymous HTTP API | Same, with your account | API key for CI and agents | Keys per member, plus workspace keys | Scoped service keys |
-| Admin | — | — | — | Invite and remove members, transfer page ownership | SSO (SAML, Okta, Google Workspace), sharing policies, audit log, data export |
+| Admin | — | — | — | Invite and remove members, transfer page ownership | SSO (SAML, Okta, Google Workspace), sharing policies, 90-day audit log, data export |
 | Self-host | MIT, free | | | | Paid support, if asked |
 
-Enterprise (custom price) is only for a deal that needs SCIM, a contract or data residency. Don't list it until one asks.
+Enterprise (custom price) is only for a deal that needs SCIM, longer audit log retention, a contract or data residency. Don't list it until one asks.
 
 ### Why each limit
 
@@ -232,7 +243,10 @@ Enterprise (custom price) is only for a deal that needs SCIM, a contract or data
 - **The API key is in Pro.** The CI and headless-agent wedge is aired's moat: Claude's own artifacts can't publish from the API, Bedrock, Vertex, the Agent SDK or CI. Teams that rely on it will pay.
 - **Five named people per page on Free.** Enough to send a page to a client and a colleague, so people learn the feature. Every invite emails someone new, which is growth. A whole email domain, or more people, is the upgrade.
 - **Seats are for editors only.** Viewers, commenters and guests never cost anything and never need an aired account. Claude and ChatGPT make every invited person sign in to their product; aired asks for an email confirmation, once. Charging for viewers would kill the invite loop and push teams back to "anyone with the link".
-- **Team at $10 per editor, minimum 3.** That's $30/mo for a small team, close to the old $29 bundle, and it grows as the team adds editors instead of stalling at a flat price. Stacktree's $79 Studio shows the ceiling is higher once client folders and white-label exist.
+- **Every price sits at the low end of its band, and monthly costs about 25% more than yearly.** Entry plans cluster at $9–13 yearly; a collaborative editor seat at $10–20; a business seat with SSO at $20–25 (Claude Team, ChatGPT Business, Notion Business). Charging more for monthly is what Tiiny, Gamma, Claude and ChatGPT all do, and it pulls people onto yearly plans, which churn less.
+- **Pro at $9 yearly / $12 monthly.** The bundle (custom domain, analytics, no badge, named sharing) is what Tiiny sells at $13 yearly / $18 monthly on Solo, and Gamma at $18 on Pro. Undercutting Tiiny Solo is the pitch on `/tiiny-host-alternative`.
+- **Team at $12 per editor yearly, $15 monthly, minimum 2.** Two editors cost $24–30/mo, close to Netlify Pro's flat $20 and below Tiiny Pro's $31–38. It sits under Pitch ($19), Figma ($16–20) and Framer ($20–30) editor seats, and grows with the team instead of stalling at a flat price. A 2-seat minimum matches Claude Team and ChatGPT Business.
+- **Business at $20 per editor yearly, $25 monthly, minimum 3.** Same price as Claude Team, ChatGPT Business and Notion Business, which are where an IT team's comparison starts. Those three keep audit logs for Enterprise; aired includes a 90-day audit log in Business because nobody small in this space offers one, and longer retention and export are what a future Enterprise tier sells.
 - **SSO, sharing policies and the audit log are Business, not Team.** Those are asked for by an IT or security team, not by the people publishing, and they come with procurement budgets. Google sign-in stays free on every tier; only SAML and Okta are gated.
 
 ### Workspaces, sharing and permissions
@@ -297,15 +311,89 @@ SSO and SCIM: use a provider such as WorkOS rather than building SAML. It costs 
 1. Add a `/pricing` page with the Free, Pro, Team and Business columns. Pro and Team buttons go to a Stripe checkout ("billing starts when the features ship, cancel anytime") or a waitlist. Business goes to a "talk to us" form that asks for team size and which of SSO, policies or the audit log they need. Link to it from the dashboard and the result card.
 2. Show the Pro features as locked items in the dashboard (custom domain, analytics, no badge, share with named people). Count clicks.
 3. Put "Invite your team" in the dashboard, leading to the Team waitlist, and ask for teammates' emails. Each email given is a signal of team intent, and of the seat count.
-4. Decision rules, each over 30 days:
-   - Build custom domains and analytics if 20 or more people pay or join for Pro, or 3% of active free accounts click a locked feature.
-   - Build team workspaces (step 3) if 10 or more teams join the Team waitlist with at least 3 emails each.
+4. Decision rules (the gates in section 9):
+   - Within 30 days: build custom domains and analytics if 20 or more people pay or join for Pro, or 3% of active free accounts click a locked feature.
+   - Within 60 days of the Pro launch: build team workspaces (step 3) if 10 or more teams join the Team waitlist with at least 3 emails each.
    - Build Business (step 5) only when 3 organizations ask for SSO or the audit log by name.
    - Otherwise rethink the bundle before writing code.
 
 ---
 
-## 7. Prioritized checklist
+## 7. Tiiny Host: the benchmark
+
+Tiiny Host is the closest business to aired: a bootstrapped HTML and PDF host for non-technical people. Every revenue number below is the founder's own post; none is independently verified. Sources are in [research/tiiny-host.md](research/tiiny-host.md).
+
+| When | Self-reported revenue | What happened around then |
+|---|---|---|
+| Aug 2019 | — | Launched as a side project |
+| Mar 2020 | First sale | Product Hunt (178 votes), Reddit promo codes, a $59 lifetime deal |
+| Feb 2021 | $500 MRR | AppSumo listing in Jan 2021 |
+| Jul 2022 | $5K MRR | SEO pages, one per task ("host html file", "pdf upload") |
+| Feb 2023 | $10K MRR | Founder goes full-time; switches from a 7-day trial to true freemium with a banner, and says traffic tripled |
+| May 2024 | $20K MRR | Cheap "Lite" plan added below $18; says conversions doubled |
+| May 2025 | $500K ARR | AI wave: says 80% of uploads are now code from ChatGPT or Claude |
+| Feb 2026 | $1M ARR (~$83K MRR) | MCP server, Claude Skill, an AI creator, pages per AI tool, about 8 staff |
+
+Traffic today: about 730K visits in October 2026 by Semrush's public estimate, roughly half direct; the top keywords are its own brand name. The sitemap has about 917 pages, including about 199 glossary pages and 63 `/deploy` pages.
+
+What that means for aired:
+- **It took Tiiny 3.5 years to reach $10K MRR and 6.5 years to $1M ARR**, most of it before the AI wave. Plan for SEO to take 6–12 months to pay off, and don't judge the guides before then.
+- **The two biggest jumps came from freemium with a banner and from a cheap plan below the main one.** aired already has both ideas in its plan: the badge on free pages and a $9 Pro.
+- **One lead feature drove growth.** PDF hosting, built in about two days, was about 40% of revenue in 2024. aired's equivalent bet is publishing from agents (CLI, MCP, API), which Tiiny is only now copying.
+- **Tiiny is moving upmarket** (SSO, security reviews, client portals) and now runs paid ads despite the "$0 on ads" story. The space has money in it; aired's opening is the AI and agent audience and free viewers.
+- **Where aired is weaker:** no domain authority, no YouTube library, no PDF or zip hosting, no team plan yet. Don't compete on file types; compete on "anything your AI makes, from any tool".
+
+---
+
+## 8. Marketing channels, ranked
+
+From the competitor study ([research/competitor-seo.md](research/competitor-seo.md)): sitemaps, 13 Google results pages and visible channels, checked 2026-11-23.
+
+| Rank | Channel | Evidence | What to do |
+|---|---|---|---|
+| 1 | **AI tool directories**: Claude's connectors directory, ChatGPT apps, MCP registries (official registry, Smithery, Glama, mcpservers.org) | Netlify and Send are in Claude's directory; Tiiny launched an MCP connector in July 2026; EdgeOne's MCP repo has 440 stars | Submit the remote MCP at `/mcp` everywhere it qualifies, with a short launch post. This is where people who make things with AI look for "publish". |
+| 2 | **SEO: one page per task, with the form on it** | `tiiny.host/host-html-file` ranks in 6 of 10 target searches; htmltourl (13 pages) and EdgeOne hold #1–2 for "html to link" | Keep building the page plan. Next: the private-sharing cluster (softest results) and one dated page per AI tool. |
+| 3 | **Reddit** | In all 10 results pages checked | Answer the threads that rank, honestly, as the founder. No fake accounts or seeded "workaround" posts. |
+| 4 | **YouTube** | In 9 of 10 results pages; one Tiiny tutorial shows up for 4 queries | One 60-second screen recording per guide ("share a Claude artifact as a link"), embedded on that guide. |
+| 5 | **The badge** | Tiiny's free-site banner brought "thousands of click-throughs a week" | `?ref=badge` first, so it can be measured; later a "made with aired" gallery of pages owners opt into. |
+| 6 | **Affiliate, 20% recurring** | Tiiny's program converted no one for its first 6 months | Start only after 20 paying customers, when there's something to promote. |
+| — | **Alternatives pages** | static.app is #1 for "tiiny host alternative"; binhtml has 36 compare pages and ranks for none of the 10 searches | Worth having, but they rank only once the domain has authority. Add slowly. |
+| — | **Skip for now** | Every 2025–26 Product Hunt launch in this space (Pagedrop, htmltourl, Docklet, Stacktree, ArtifactSend) got under 10 votes | No Product Hunt-first launch, no glossary page sets, no paid ads until a paid plan's conversion rate is known. |
+
+---
+
+## 9. Rollout: when and how
+
+Each stage starts when the previous gate passes, not on a date. Dates are the earliest each could start.
+
+| Stage | Earliest | What ships | Gate to move on |
+|---|---|---|---|
+| **0. Deploy and measure** | This week (from 2026-11-24) | This branch. Search Console and Bing, Cloudflare Web Analytics, `?ref=badge`. Submit `/mcp` to Claude's directory and the MCP registries. | Guides indexed (2–4 weeks); analytics show publishes per guide |
+| **1. Accounts for everyone, and a pricing test** | December 2026 | Google sign-in with `workspaceId` on pages and a personal workspace per account. Result-card nudge ("Sign in to keep this link"). `/pricing` with Pro checkout or waitlist, the Team waitlist and the Business form. Pages 4, 4a, 4b. First YouTube videos. | **Gate A** (30 days): 20+ Pro payers or waitlist sign-ups, or 3% of active free accounts click a locked feature |
+| **2. Pro launch** | January–February 2027 | Badge removal, API keys, analytics, custom domains (Cloudflare for SaaS). Move user pages to `aired.page`, then named sharing. Same day: the 30-day cap on anonymous pages and permanent pages for free accounts. | **Gate B** (60 days): 10+ teams on the Team waitlist with 3+ emails each |
+| **3. Team launch** | March–May 2027 | Team workspaces, roles, guests, shared folders, comments, version history. `/teams` and `/client-reports`. Affiliate program once 20 customers pay. | **Gate C**: 3 organizations ask for SSO or the audit log by name |
+| **4. Business** | Mid-2027 or later | SSO through a provider such as WorkOS, sharing policies, 90-day audit log, export. | An Enterprise deal that needs more |
+
+**How to launch Pro**
+- Stripe Checkout and the Stripe customer portal. No custom billing code.
+- The pricing page defaults to yearly. No free trial: the free tier is the trial. 7-day refunds, no questions asked.
+- Open it to the waitlist a week before everyone else. Offer the first 100 customers the yearly price on monthly billing ($9 instead of $12), locked for as long as they stay subscribed. It rewards the people who said yes during the test, and it's a real deadline.
+- Grandfather what exists today: pages already permanent stay permanent and keep working without an account.
+- Announce it to the people who'll care: the waitlist, Reddit threads you've already answered, and the MCP directory listings. Not Product Hunt first.
+
+**If a gate fails**
+- Gate A fails: don't build Pro. Ask the people who clicked a locked feature what they wanted. The usual problems are the bundle (wrong features locked) or the audience (traffic isn't reaching sharers yet). Fix the one that's wrong and retest for 30 days.
+- Gate B fails: keep Pro as the only paid plan and sell agencies Pro with a few extra seats by hand until demand shows.
+- Gate C never comes: that's fine. Business exists for buyers who bring a budget; don't build it ahead of them.
+
+**Targets for deciding whether to keep investing** (targets, not forecasts; Tiiny took 18 months to reach $500 MRR, before the AI wave)
+- End of February 2027: 30 paying customers.
+- Mid-2027: $2K MRR, and organic search clicks growing month over month in Search Console.
+- End of 2027: $5K MRR, with at least one Team customer from an agency.
+
+---
+
+## 10. Prioritized checklist
 
 ### Done on this branch (`claude/seo-growth-59c8e2`)
 - [x] `robots.txt` with `Sitemap:`; disallow `/api/`, `/auth/`, `/dashboard`, `/mcp`; `/p/` left crawlable so the noindex header is seen
@@ -328,13 +416,14 @@ SSO and SCIM: use a provider such as WorkOS rather than building SAML. It costs 
 - [ ] Badge link `?ref=badge`, and new copy for the injected OG description (`viewer.ts`)
 - [ ] Google sign-in (or an email magic link) next to GitHub, shipped together with `workspaceId` on pages and a personal workspace per account (section 6, build order step 1)
 - [ ] Result-card nudge: "Sign in to keep this link and see who opened it"
-- [ ] `/share-chatgpt-html`, then `/html-game-hosting`
+- [ ] Submit the remote MCP to Claude's connectors directory, ChatGPT apps and the MCP registries (section 8)
+- [ ] `/share-chatgpt-html`, the private-sharing pages (4a), then one page per AI tool (4b)
 - [ ] A `404.html` page, plus `not_found_handling = "404-page"` in wrangler
 - [ ] Speed: lazy-load the globe on desktop only; self-host Inter 400/500 as woff2; run Lighthouse before and after
 - [ ] Answer, honestly, the Reddit threads that rank for these queries (r/ClaudeAI, r/BuildWithClaude, r/ChatGPT, r/CodingHelp, r/godot). They sit at #1–2 on most target SERPs.
 
 ### Next 30 days
-- [ ] `/pricing` page plus the Pro and Team checkout or waitlist test, the Business "talk to us" form and the "Invite your team" waitlist, with the decision rules from section 6
+- [ ] Stage 1 of section 9: `/pricing` page plus the Pro and Team checkout or waitlist test, the Business "talk to us" form and the "Invite your team" waitlist, with the decision rules from section 6
 - [ ] Named sharing (build order step 2), with `docs/privacy.md` updated for viewer emails, then `/share-html-privately`
 - [ ] Anonymous pages capped at 30 days; permanent pages for free accounts
 - [ ] `/client-reports` sales page and `/publish-html-from-ci`
