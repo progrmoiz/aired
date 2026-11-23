@@ -6,7 +6,9 @@
 
 1. **Rank for the job, not the jargon.** People don't search "publish HTML artifacts". They search "share html file as link", "how to share claude artifact" and "tiiny host alternative". The homepage and three new guide pages now target those phrases.
 2. **Position aired for people who make things with AI, not only for developers.** New one-liner: *aired turns anything your AI makes into a link anyone can open.* Developers still reach the CLI, MCP and API through the docs and the "let your agent publish it" block.
-3. **Make money from control, not access.** Publishing, viewing and PINs stay free with no view cap, and the badge stays on. Pro ($9/mo) sells your own domain, no badge, analytics on who viewed, permanent pages without limits, and an API key for CI. Team ($29/mo) sells white-label and seats to agencies.
+3. **Make money from control, not access.** Publishing, viewing and PINs stay free with no view cap, and the badge stays on. Pro ($9/mo) sells your own domain, no badge, analytics on who viewed, permanent pages without limits, and an API key for CI. Team ($10 per editor/mo) sells a shared workspace with roles and permissions. Business ($20 per editor/mo) sells what an organization's admin needs: SSO, sharing policies and an audit log.
+6. **Accounts are workspaces, not just logins.** Every account gets a personal workspace, and pages belong to a workspace, not to a user. That one data-model choice is what makes sharing with named people, team workspaces, roles and org admin possible later without a migration. Make it while accounts are still small (section 6, "Workspaces, sharing and permissions").
+7. **Charge for people who publish, never for people who view.** Viewers, commenters and guests are always free and don't need an aired account; they confirm their email with a one-time link. That's the gap against Claude and ChatGPT, which make every invited viewer sign in to their product, and it turns every invite into a free visit from a new person.
 4. **Free signup is the first conversion, so make it possible for non-developers.** Sign-in is GitHub-only today, which shuts out the audience this plan targets. Add Google sign-in (or an email magic link) before the Pro test.
 5. **Test Pro with a checkout or waitlist button before building it.** Build custom domains and analytics only after people pay or join.
 
@@ -83,7 +85,9 @@ Build "share [tool] HTML as a link" pages only for tools whose export steps real
 | 5 | `/client-reports` | (sales page) | Agencies are the highest willingness to pay | Team plan | After pricing test |
 | 6 | `/publish-html-from-ci` | github actions html report link | The headless wedge Claude can't serve | Pro API key | Month 1 |
 | 7 | `/html-game-hosting` | host html game free | Matches the content that already gets the most views | Volume, badge impressions | Month 1 |
-| 8 | `/netlify-drop-alternative`, `/password-protect-html` | — | Long tail | Volume | Later |
+| 8 | `/share-html-privately` | share html privately / share html with specific people | Matches named-people sharing; links to `/password-protect-html` intent | Free account → Pro | When named sharing ships |
+| 9 | `/teams` | (sales page) claude artifacts for teams, share internal reports | Claude Team keeps outside sharing off by default and makes every invitee sign in; aired doesn't | Team, Business | When Team ships |
+| 10 | `/netlify-drop-alternative`, `/password-protect-html` | — | Long tail | Volume | Later |
 
 Every guide page embeds the real publish form, so a searcher can get a link without leaving the page. Each one links to the other guides and to `/docs`, and each is in the sitemap.
 
@@ -136,16 +140,30 @@ Search (guide page) ──► publish without an account (form on the page)
  (?ref=badge → new visitors)      │
                                   ▼
               upgrade moment: custom domain / remove badge /
-              who viewed / CI API key  ──►  Pro $9 · Team $29
+              who viewed / CI API key  ──►  Pro $9
+                                  │
+                                  ▼
+       share with named people ──► invitee gets an email, opens the page
+       (no aired account needed)    without signing up, sees "made with aired"
+                                  │
+                                  ▼
+       invites a colleague as an editor ──► Team workspace ($10/editor)
+                                  │
+                                  ▼
+       IT asks for SSO, policies, audit log ──► Business ($20/editor)
 ```
+
+Workspaces add a second growth loop next to the badge: every invite sends aired to someone new, and every editor added to a workspace is another paid seat. One person lands; the team expands it.
 
 | Landing page | Visitor | Upgrade moment | Plan |
 |---|---|---|---|
 | `/html-to-link` | Anyone with a file | "Keep this link" → free account; later, remove the badge before sending to a client | Free → Pro |
 | `/share-claude-artifacts`, `/share-chatgpt-html` | AI makers, consultants | Sends to a client → wants no badge, a password and to see who opened it | Pro |
 | `/tiiny-host-alternative` | Price-sensitive switchers | Custom domain and password for $9 instead of Tiiny Solo's $13 | Pro |
-| `/client-reports` | Agencies | Own domain, no aired branding, seats, per-client folders | Team |
+| `/client-reports` | Agencies | Own domain, no aired branding, seats, per-client folders, clients invited as free guests | Team |
 | `/publish-html-from-ci` | Developers, CI | Publishing beyond the anonymous rate limit needs an API key | Pro |
+| `/share-html-privately` | Anyone sharing something sensitive | Wants named people only, then a whole email domain | Free → Pro |
+| `/teams` | Teams already on Claude or ChatGPT | Shared workspace, roles, sharing outside the company without forcing guests to sign up | Team → Business |
 
 Measure it with Cloudflare Web Analytics on the marketing pages (free and cookieless). Also send a `source` field with each publish from a guide page (the page path), so you can count publishes per page, signups per page and upgrades per page.
 
@@ -175,20 +193,28 @@ Full notes, with source URLs: [competitor-pricing.md](competitor-pricing.md).
 
 ### Proposed tiers
 
-| | **No account** | **Free account** | **Pro — $9/mo ($90/yr)** | **Team — $29/mo, 3 seats (+$8/seat)** |
-|---|---|---|---|---|
-| Publish | 5/hour, 2 MB | 30/hour, 2 MB | 10 MB pages, 500 publishes/day | Same as Pro, pooled |
-| How long pages last | 1 hour to 30 days (default 7) | Permanent | Permanent | Permanent |
-| Live permanent pages | — | 50 | Unlimited | Unlimited |
-| Views | Unlimited | Unlimited | Unlimited | Unlimited |
-| PIN | Free | Free | Free, plus real passwords and links that expire after N views | Same |
-| Badge | On | On | Off, or your logo | Off; PIN page white-labelled too |
-| Analytics | View count | View count | Views over time, countries, referrers, per-recipient links ("Acme opened it Tuesday") | Same, per client folder |
-| Domain | aired.sh/p/… | aired.sh/p/… | 1 custom domain | 5 custom domains |
-| Edit at the same link | Update token | From the dashboard | Version history | Version history |
-| API | Anonymous HTTP API | Same, with your account | API key for CI and agents | Keys per member |
-| Team | — | — | — | Shared workspace, client folders, roles |
-| Self-host | MIT, free | | | Paid support later, if asked |
+| | **No account** | **Free account** | **Pro: $9/mo ($90/yr)** | **Team: $10 per editor/mo, min 3** | **Business: $20 per editor/mo, min 5** |
+|---|---|---|---|---|---|
+| Who it's for | A quick share | Anyone who wants to keep links | One person sending work to clients | A team that publishes together | An organization whose IT has rules |
+| Publish | 5/hour, 2 MB | 30/hour, 2 MB | 10 MB pages, 500/day | Same as Pro, per editor | Same as Pro, per editor |
+| How long pages last | 1 hour to 30 days (default 7) | Permanent | Permanent | Permanent | Permanent, or what the admin's retention policy sets |
+| Live permanent pages | — | 50 | Unlimited | Unlimited | Unlimited |
+| Views | Unlimited | Unlimited | Unlimited | Unlimited | Unlimited |
+| Workspace | — | Personal | Personal | Shared workspace with folders | Several workspaces under one organization |
+| Link sharing and PIN | Yes | Yes | Yes, plus real passwords and links that expire after N views | Same as Pro | Same, within the admin's policy |
+| Share with named people | — | Up to 5 people per page | Unlimited people, plus "anyone at @company.com" | Same, plus "anyone in this workspace" | Same, plus groups |
+| What a shared person can do | View | View | View or comment | View, comment or edit | View, comment or edit |
+| Workspace roles | — | — | — | Owner, admin, editor; guests free | Same, plus groups and custom roles |
+| Comments | — | — | On your pages | Threads, and agents can read and resolve them | Same |
+| Version history | Update token | Update token and dashboard | 30 days | 1 year | Unlimited, with retention rules |
+| Badge | On | On | Off, or your logo | Off | Off |
+| Analytics | View count | View count | Views over time, countries, referrers, who opened it | Same, per folder | Same, plus export |
+| Domain | aired.sh/p/… | aired.sh/p/… | 1 custom domain | 5 custom domains | Unlimited |
+| API | Anonymous HTTP API | Same, with your account | API key for CI and agents | Keys per member, plus workspace keys | Scoped service keys |
+| Admin | — | — | — | Invite and remove members, transfer page ownership | SSO (SAML, Okta, Google Workspace), sharing policies, audit log, data export |
+| Self-host | MIT, free | | | | Paid support, if asked |
+
+Enterprise (custom price) is only for a deal that needs SCIM, a contract or data residency. Don't list it until one asks.
 
 ### Why each limit
 
@@ -202,15 +228,80 @@ Full notes, with source URLs: [competitor-pricing.md](competitor-pricing.md).
 - **50 live permanent pages on a free account.** High enough that real people never hit it; it caps abuse. Expiring pages stay unlimited.
 - **The badge stays on all free pages.** Every shared page is an ad. Removing it is the cheapest thing to pay for (Gamma and Tiiny both lead with it). Link it with `?ref=badge` so you can see what it's worth.
 - **The custom domain is in Pro, not a higher tier.** At $9 it undercuts Tiiny Solo ($13) and Gamma Pro ($18), which is the pitch on `/tiiny-host-alternative`. Cloudflare for SaaS custom hostnames keep the cost low.
-- **Analytics on who viewed is the agency hook.** Per-recipient links are what Stacktree and HummingDeck charge $19–40 for. They justify Team, and they're the line in the post-publish nudge.
+- **Analytics on who viewed is the agency hook.** Per-recipient links are what Stacktree and HummingDeck charge $19–40 for. Named sharing makes this exact: you see which invited person opened the page, not just a count.
 - **The API key is in Pro.** The CI and headless-agent wedge is aired's moat: Claude's own artifacts can't publish from the API, Bedrock, Vertex, the Agent SDK or CI. Teams that rely on it will pay.
-- **Team at $29 instead of $79+.** Stacktree's $79 Studio shows agencies pay more. Start low to learn, then raise it once client folders and white-label exist.
+- **Five named people per page on Free.** Enough to send a page to a client and a colleague, so people learn the feature. Every invite emails someone new, which is growth. A whole email domain, or more people, is the upgrade.
+- **Seats are for editors only.** Viewers, commenters and guests never cost anything and never need an aired account. Claude and ChatGPT make every invited person sign in to their product; aired asks for an email confirmation, once. Charging for viewers would kill the invite loop and push teams back to "anyone with the link".
+- **Team at $10 per editor, minimum 3.** That's $30/mo for a small team, close to the old $29 bundle, and it grows as the team adds editors instead of stalling at a flat price. Stacktree's $79 Studio shows the ceiling is higher once client folders and white-label exist.
+- **SSO, sharing policies and the audit log are Business, not Team.** Those are asked for by an IT or security team, not by the people publishing, and they come with procurement budgets. Google sign-in stays free on every tier; only SAML and Okta are gated.
+
+### Workspaces, sharing and permissions
+
+What a signed-in account brings, beyond keeping a link. Build it on one model so every later feature is a setting, not a migration.
+
+**The objects**
+
+| Object | What it is |
+|---|---|
+| User | A person who signs in (Google or GitHub). Owns nothing directly. |
+| Workspace | Where pages live. Every user gets a personal workspace at first sign-in. A team workspace has members. An organization (Business) groups workspaces and holds policies. |
+| Member | A user in a workspace, with a role. |
+| Folder | A group of pages inside a workspace. The existing projects become folders. Sharing a folder shares everything in it. |
+| Page | Belongs to one workspace. Records who created it. |
+| Grant | Who can open a page or folder, and what they can do. A grant goes to an email, an email domain, a group or the whole workspace. |
+| Viewer | Someone who opens a shared page. Confirms their email once with a one-time link; no password, no aired account. |
+
+**Workspace roles**
+
+| Role | Can do | Paid seat |
+|---|---|---|
+| Owner | Everything, including billing, deleting the workspace and transferring ownership | Yes |
+| Admin | Manage members, folders and sharing settings for the whole workspace | Yes |
+| Editor | Publish, update and delete pages; share them within the workspace's rules | Yes |
+| Guest | Open, and comment on, only the pages and folders shared with them | No, free |
+
+**Access on each page.** Same idea as Google Docs, so nobody has to learn it:
+- General access, one of: only people invited; anyone in this workspace; anyone at @company.com; anyone with the link; anyone with the link and the PIN.
+- People with access, each with a level: can view, can comment, can edit.
+- Folder grants pass down to the pages in them. A page can add people but can't remove a folder grant.
+- Expiry and view limits still apply on top. They are aired's own controls, and neither Claude nor ChatGPT has them.
+
+**Organization policies (Business).** An admin can:
+- Turn off "anyone with the link" for the whole organization, or require a PIN on public links.
+- Set the longest a page may live, and how long deleted pages are kept.
+- Allow invites only to certain email domains.
+- Require SSO for members, and claim the company's email domain so new sign-ups join the organization.
+- Read the audit log: publish, update, share, unshare, delete, member changes and every view of a restricted page by a named person.
+- Export everything the organization has published.
+
+**How it fits the code today**
+- `PageMetadata.ownerId` stays as "created by". Add `workspaceId` next to it, and create a personal workspace for each existing user in the same change. Do this in the next accounts change, before anything else on this list: retrofitting it after teams exist means rewriting every ownership check.
+- The project-tagging work (`.forge/blueprints/project-tagging.md`) becomes folders inside a workspace.
+- Viewer confirmation sets a cookie on the content domain. That's one more reason to finish the `aired.page` move (`.forge/blueprints/content-domain.md`) first, so viewer cookies never sit on the domain that holds owners' sessions.
+- Viewer emails are personal data. Update `docs/privacy.md` before named sharing ships.
+
+**Build order**
+
+| # | Step | Unlocks | Size |
+|---|---|---|---|
+| 1 | Google sign-in, `workspaceId` on pages, a personal workspace for every account | Non-developers can sign up; every later step | M |
+| 2 | Named sharing: invite by email, viewer confirms with a one-time link, a list of who opened it | Free → Pro; the invite loop | M |
+| 3 | Team workspaces: members, roles, shared folders, transfer ownership, guests | Team plan | L |
+| 4 | Comments and version history (parity roadmap items 4 and 13) | Team value, agent-readable feedback | M each |
+| 5 | Business: SSO, organization policies, audit log, export | Business plan | L |
+
+SSO and SCIM: use a provider such as WorkOS rather than building SAML. It costs per connection, which Business pricing covers.
 
 ### Testing it before building
 
-1. Add a `/pricing` page with the four columns. Pro and Team buttons go to a Stripe checkout ("billing starts when the features ship, cancel anytime") or a waitlist. Link to it from the dashboard and the result card.
-2. Show the Pro features as locked items in the dashboard (custom domain, analytics, no badge). Count clicks.
-3. Decision rule: build custom domains and analytics if, within 30 days, 20 or more people pay or join or 3% of active free accounts click a locked feature. Otherwise rethink the bundle before writing code.
+1. Add a `/pricing` page with the Free, Pro, Team and Business columns. Pro and Team buttons go to a Stripe checkout ("billing starts when the features ship, cancel anytime") or a waitlist. Business goes to a "talk to us" form that asks for team size and which of SSO, policies or the audit log they need. Link to it from the dashboard and the result card.
+2. Show the Pro features as locked items in the dashboard (custom domain, analytics, no badge, share with named people). Count clicks.
+3. Put "Invite your team" in the dashboard, leading to the Team waitlist, and ask for teammates' emails. Each email given is a signal of team intent, and of the seat count.
+4. Decision rules, each over 30 days:
+   - Build custom domains and analytics if 20 or more people pay or join for Pro, or 3% of active free accounts click a locked feature.
+   - Build team workspaces (step 3) if 10 or more teams join the Team waitlist with at least 3 emails each.
+   - Build Business (step 5) only when 3 organizations ask for SSO or the audit log by name.
+   - Otherwise rethink the bundle before writing code.
 
 ---
 
@@ -235,7 +326,7 @@ Full notes, with source URLs: [competitor-pricing.md](competitor-pricing.md).
 
 ### Next 2 weeks
 - [ ] Badge link `?ref=badge`, and new copy for the injected OG description (`viewer.ts`)
-- [ ] Google sign-in (or an email magic link) next to GitHub
+- [ ] Google sign-in (or an email magic link) next to GitHub, shipped together with `workspaceId` on pages and a personal workspace per account (section 6, build order step 1)
 - [ ] Result-card nudge: "Sign in to keep this link and see who opened it"
 - [ ] `/share-chatgpt-html`, then `/html-game-hosting`
 - [ ] A `404.html` page, plus `not_found_handling = "404-page"` in wrangler
@@ -243,9 +334,11 @@ Full notes, with source URLs: [competitor-pricing.md](competitor-pricing.md).
 - [ ] Answer, honestly, the Reddit threads that rank for these queries (r/ClaudeAI, r/BuildWithClaude, r/ChatGPT, r/CodingHelp, r/godot). They sit at #1–2 on most target SERPs.
 
 ### Next 30 days
-- [ ] `/pricing` page plus the Pro and Team checkout or waitlist test, with the decision rule from section 6
+- [ ] `/pricing` page plus the Pro and Team checkout or waitlist test, the Business "talk to us" form and the "Invite your team" waitlist, with the decision rules from section 6
+- [ ] Named sharing (build order step 2), with `docs/privacy.md` updated for viewer emails, then `/share-html-privately`
 - [ ] Anonymous pages capped at 30 days; permanent pages for free accounts
 - [ ] `/client-reports` sales page and `/publish-html-from-ci`
 - [ ] Move user pages to `aired.page` (`.forge/blueprints/content-domain.md`) before owned pages scale up
 - [ ] Listings: AlternativeTo (under Tiiny Host, Netlify Drop and Claude), awesome-claude lists, a Product Hunt relaunch aimed at non-technical makers
+- [ ] Team workspaces and `/teams` only if the Team waitlist passes its decision rule; Business only when 3 organizations ask for SSO or the audit log
 - [ ] Backfill real search volumes and re-rank the page plan; after 6 weeks, check Search Console for queries in positions 8–20 and expand those pages
