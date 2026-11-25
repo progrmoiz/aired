@@ -138,8 +138,12 @@
 <pre><code>[mcp_servers.aired]
 url = "https://aired.sh/mcp"</code></pre>
 
+        <h3>Signed in: connect your account</h3>
+        <p>Add <code>https://aired.sh/mcp/account</code> as a custom connector (Claude, ChatGPT, Cursor, VS Code and any client that supports MCP sign-in). The app opens aired, you sign in and choose Allow, and the server works as your account: <code>publish_html</code> pages belong to you, and <code>list_pages</code>, <code>update_page</code>, <code>delete_page</code> and <code>get_account</code> become available. It can't see your keys or billing, or delete your account.</p>
+        <div class="snip"><code>claude mcp add aired --transport http https://aired.sh/mcp/account</code><button type="button" class="btn sm copy-snippet" data-copy="claude mcp add aired --transport http https://aired.sh/mcp/account">Copy</button></div>
+
         <h3>Signed in with an API key</h3>
-        <p>Add your <a href="#api-keys">API key</a> as a header and the remote server works as your account: <code>publish_html</code> pages belong to you, and <code>list_pages</code>, <code>update_page</code>, <code>delete_page</code> and <code>get_account</code> become available. Without a key, only anonymous <code>publish_html</code> works.</p>
+        <p>For CI or clients without MCP sign-in, add your <a href="#api-keys">API key</a> as a header instead (on <code>/mcp</code> or <code>/mcp/account</code>). Without a key or a sign-in, <code>/mcp</code> offers only anonymous <code>publish_html</code>.</p>
 <pre><code>{
   "mcpServers": {
     "aired": {

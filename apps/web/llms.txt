@@ -78,7 +78,8 @@ Agents should read the live docs at https://github.com/progrmoiz/aired before an
 - https://aired.sh/index.md — markdown homepage fallback.
 - https://aired.sh/.well-known/agent.json — agent discovery manifest.
 - https://aired.sh/.well-known/ai-plugin.json — OpenAI-style plugin manifest.
-- https://aired.sh/mcp — MCP streamable HTTP endpoint.
+- https://aired.sh/mcp — MCP streamable HTTP endpoint (anonymous, or an API key).
+- https://aired.sh/mcp/account — the same server signed in as your account (OAuth sign-in for connectors, or an API key).
 - https://github.com/progrmoiz/aired — source code, issues, docs.
 
 ## Support
