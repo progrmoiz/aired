@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HTML to link: share an HTML file online, free — aired</title>
   <meta name="description" content="Turn an HTML file into a link anyone can open. Paste the code or drop the file and get a URL in seconds. Free, no account, optional PIN." />
   <link rel="canonical" href="https://aired.sh/html-to-link" />
@@ -134,385 +134,64 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
   <link rel="icon" href="/favicon-16.png" type="image/png" sizes="16x16" />
-  <link rel="stylesheet" href="/style.css" />
   <link rel="preload" href="/fonts/inter-latin-v20.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/fonts/fonts.css" />
-  <style>
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background-color: #0a0a0b;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
-
-    /* Textarea */
-    textarea { resize: none; }
-    textarea:focus { outline: none; }
-    textarea::placeholder { color: #56565a; }
-
-    /* Number input spinners */
-    input[type="number"]::-webkit-inner-spin-button,
-    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-    input[type="number"] { -moz-appearance: textfield; }
-
-    /* Select arrow override */
-    select { background-image: none; }
-
-    /* Hidden file input */
-    #file-input { display: none; }
-
-    /* Drag state */
-    .paste-area { position: relative; }
-    .drag-hint { display: none; }
-    .paste-area.drag-over .drag-hint {
-      display: flex;
-    }
-
-    /* Subtle glow on form focus */
-    .form-container:focus-within {
-      box-shadow: 0 0 0 1px #3b3b40, 0 0 40px -12px rgba(124, 106, 239, 0.08);
-    }
-
-    /* Smooth transitions */
-    .btn-primary {
-      transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .btn-primary:not(:disabled):hover {
-      background-color: #ffffff;
-    }
-    .btn-primary:disabled {
-      opacity: 0.3;
-      cursor: not-allowed;
-    }
-
-    /* Copy button states */
-    .copy-btn {
-      transition: all 120ms cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .copy-btn:hover {
-      background-color: #18181b;
-      border-color: #3b3b40;
-    }
-    .copy-btn.copied {
-      color: #34d399;
-      border-color: rgba(52, 211, 153, 0.3);
-    }
-
-    /* Result card animation */
-    .result-card {
-      transition: opacity 200ms cubic-bezier(0.16, 1, 0.3, 1),
-                  transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    /* Install card hover */
-    .install-card {
-      transition: border-color 150ms ease, background-color 150ms ease;
-    }
-    .install-card:hover {
-      border-color: #3b3b40;
-      background-color: rgba(17, 17, 19, 0.5);
-    }
-
-    /* Keyboard shortcut badge */
-    kbd {
-      font-family: 'Inter', sans-serif;
-      font-size: 0.6875rem;
-      padding: 1px 5px;
-      border-radius: 4px;
-      border: 1px solid #222225;
-      background: #111113;
-      color: #56565a;
-    }
-
-    /* Focus ring utility */
-    .focus-ring:focus-visible {
-      outline: none;
-      box-shadow: 0 0 0 2px #0a0a0b, 0 0 0 4px rgba(124, 106, 239, 0.4);
-    }
-
-    /* Hero globe */
-    .hero-section { position: relative; overflow: visible; }
-    .hero-globe {
-      position: absolute;
-      right: -180px;
-      top: 50%;
-      transform: translateY(-55%);
-      width: 550px;
-      height: 550px;
-      opacity: 0.35;
-      pointer-events: none;
-      z-index: 0;
-      filter: saturate(1.2);
-    }
-    .hero-section::after {
-      content: '';
-      position: absolute;
-      right: -60px;
-      top: 50%;
-      transform: translateY(-55%);
-      width: 500px;
-      height: 500px;
-      background: radial-gradient(circle, rgba(124, 106, 239, 0.06) 0%, rgba(124, 106, 239, 0.02) 40%, transparent 70%);
-      pointer-events: none;
-      z-index: 0;
-    }
-    @media (max-width: 640px) {
-      .hero-globe, .hero-section::after { display: none; }
-    }
-
-    /* Form sits above globe */
-    .form-container, #air-form, .result-card, #error-msg { position: relative; z-index: 10; }
-
-    /* Marquee feed */
-    .marquee-wrapper {
-      overflow: hidden;
-      mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
-      -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
-    }
-    .marquee-track {
-      display: flex;
-      gap: 2rem;
-      white-space: nowrap;
-      animation: marquee-scroll 30s linear infinite;
-    }
-    @keyframes marquee-scroll {
-      0% { transform: translateX(0); }
-      100% { transform: translateX(-50%); }
-    }
-
-    /* Setup-copy button */
-    .setup-btn {
-      transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1), transform 120ms ease;
-    }
-    .setup-btn:hover { background-color: #ffffff; }
-    .setup-btn:active { transform: translateY(1px); }
-    .setup-btn.copied { background-color: #34d399; color: #0a0a0b; }
-    .setup-btn .setup-btn-icon { opacity: 0.7; }
-
-    /* Agent icons */
-    .agent-icon {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 24px;
-      height: 24px;
-      transition: color 150ms ease;
-    }
-    .agent-icon:hover { color: #ededef; }
-  </style>
-  <style>
-    .guide { font-size: 0.875rem; line-height: 1.5rem; }
-    .guide h2 { color: #ededef; font-size: 1.125rem; line-height: 1.75rem; font-weight: 500; letter-spacing: -0.01em; margin-top: 3rem; }
-    .guide h3 { color: #ededef; font-size: 0.875rem; font-weight: 500; margin-top: 1.5rem; }
-    .guide p { color: #8a8a8e; line-height: 1.625; margin-top: 0.75rem; }
-    .guide ul, .guide ol { color: #8a8a8e; margin-top: 0.75rem; padding-left: 1.25rem; }
-    .guide ul { list-style: disc; }
-    .guide ol { list-style: decimal; }
-    .guide li { margin-top: 0.375rem; line-height: 1.625; }
-    .guide li::marker { color: #56565a; }
-    .guide strong { color: #ededef; font-weight: 500; }
-    .guide a { color: #ededef; text-decoration: underline; text-decoration-color: #3b3b40; transition: text-decoration-color 150ms ease; }
-    .guide a:hover { text-decoration-color: #8a8a8e; }
-    .guide code { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace; font-size: 0.8125em; color: #ededef; background: #111113; border: 1px solid #222225; border-radius: 4px; padding: 1px 5px; }
-    .guide .table-wrap { margin-top: 1rem; overflow-x: auto; border: 1px solid #222225; border-radius: 12px; }
-    .guide table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; min-width: 520px; }
-    .guide th, .guide td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid #222225; }
-    .guide tr:last-child td { border-bottom: 0; }
-    .guide th { color: #8a8a8e; font-weight: 500; background: #111113; }
-    .guide td { color: #8a8a8e; }
-    .guide td:first-child { color: #ededef; }
-    .guide .note { font-size: 0.75rem; color: #56565a; margin-top: 0.5rem; }
-  </style>
+  <link rel="stylesheet" href="/site.css" />
 </head>
-<body class="min-h-screen flex flex-col text-aired-text-primary">
+<body>
+<header><div class="wrap">
+  <a class="logo" href="/" aria-label="aired home"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>aired</a>
+  <nav aria-label="Main"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link" aria-current="page" class="on">Guides</a></nav>
+  <div class="right"><a class="login" id="nav-auth" href="/auth/login?return=/dashboard">Log in</a><a class="start" href="#publish" data-publish>Start free</a></div>
+</div></header>
 
-  <!-- ─── Header ─── -->
-  <header class="w-full px-6 h-14 flex items-center justify-between max-w-2xl mx-auto">
-    <a href="/" class="text-base font-semibold tracking-tight text-aired-text-primary hover:text-white transition-colors duration-150">aired</a>
-    <nav class="flex items-center gap-5 text-sm text-aired-text-secondary">
-      <a href="/docs" class="hover:text-aired-text-primary transition-colors duration-150">Docs</a>
-      <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener"
-         class="flex items-center gap-1.5 hover:text-aired-text-primary transition-colors duration-150">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-        GitHub
-      </a>
-      <a id="nav-auth" href="/auth/login?return=/dashboard"
-         class="hidden hover:text-aired-text-primary transition-colors duration-150 focus-ring rounded-sm">sign in</a>
-    </nav>
-  </header>
-
-  <!-- ─── Main ─── -->
-  <main class="flex-1 w-full max-w-2xl mx-auto px-6">
-
-    <!-- ─── Title + Form ─── -->
-    <section class="mt-12 sm:mt-16">
-      <nav aria-label="Breadcrumb" class="mb-4 text-2xs text-aired-text-tertiary">
-        <a href="/" class="hover:text-aired-text-secondary transition-colors duration-150">aired</a>
-        <span aria-hidden="true" class="mx-1">/</span>
-        <span>HTML to link</span>
-      </nav>
-      <div class="mb-8">
-        <h1 class="text-xl font-medium tracking-tight text-aired-text-primary">Turn an HTML file into a link</h1>
-        <p class="mt-2 text-sm text-aired-text-secondary leading-relaxed">Paste the code or drop the <code class="font-mono text-aired-text-primary">.html</code> file. You get a link to send by email, Slack or WhatsApp. The person who opens it sees the page, not the code, and they don't need an account.</p>
-      </div>
-
-      <!-- Form -->
-      <form id="air-form">
-        <div class="form-container border border-aired-border rounded-lg bg-aired-surface overflow-hidden transition-shadow duration-200">
-
-          <!-- Editor area -->
-          <div class="paste-area">
-            <!-- Empty state hint (shown when textarea is empty) -->
-            <div id="empty-hint" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-[1] transition-opacity duration-150">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-aired-text-tertiary mb-2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
-              <span class="text-sm text-aired-text-tertiary">Paste HTML or drop a file</span>
-              <span class="text-2xs text-aired-text-tertiary mt-1">⌘V to paste · 2 MB max</span>
-            </div>
-            <!-- Textarea -->
-            <textarea
-              id="html-input"
-              name="html"
-              spellcheck="false"
-              autocomplete="off"
-              rows="8"
-              class="relative z-[2] w-full bg-transparent p-4 font-mono text-sm text-aired-text-primary leading-relaxed focus:outline-none"
-              aria-label="HTML content"
-            ></textarea>
-            <!-- Drag overlay -->
-            <div class="drag-hint absolute inset-0 items-center justify-center bg-aired-bg/90 border-2 border-dashed border-aired-accent/30 rounded-lg z-10">
-              <span class="text-sm text-aired-text-secondary">Drop .html file</span>
-            </div>
-          </div>
-
-          <!-- Divider -->
-          <div class="border-t border-aired-border"></div>
-
-          <!-- Options bar -->
-          <div class="flex items-center gap-3 px-3 py-2.5 text-sm">
-            <!-- Upload -->
-            <button type="button" id="upload-btn"
-                    class="flex items-center gap-1.5 px-2 py-1 rounded-sm text-aired-text-secondary hover:text-aired-text-primary hover:bg-aired-surface-hover transition-all duration-150 focus-ring"
-                    title="Upload .html file">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              <span class="hidden sm:inline">Upload</span>
-            </button>
-            <input class="hidden" id="file-input" type="file" accept=".html,.htm,text/html" />
-
-            <!-- Separator -->
-            <div class="w-px h-4 bg-aired-border"></div>
-
-            <!-- TTL -->
-            <div class="flex items-center gap-1.5">
-              <label for="ttl-select" class="text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider">TTL</label>
-              <select id="ttl-select"
-                      class="bg-transparent text-aired-text-secondary text-sm py-0.5 pl-1 pr-5 rounded-sm border-0 focus:ring-0 focus-ring cursor-pointer appearance-none hover:text-aired-text-primary transition-colors duration-150">
-                <option value="3600">1 hour</option>
-                <option value="86400">1 day</option>
-                <option value="604800" selected>7 days</option>
-                <option value="2592000">30 days</option>
-                <option value="permanent">Permanent</option>
-              </select>
-            </div>
-
-            <!-- Separator -->
-            <div class="w-px h-4 bg-aired-border"></div>
-
-            <!-- PIN -->
-            <div class="flex items-center gap-1.5 flex-1 min-w-0">
-              <label for="pin-input" class="text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider flex-shrink-0">PIN</label>
-              <input
-                type="password"
-                id="pin-input"
-                name="pin"
-                placeholder="optional"
-                maxlength="20"
-                inputmode="numeric"
-                autocomplete="new-password"
-                class="w-full min-w-0 bg-transparent text-sm text-aired-text-secondary placeholder:text-aired-text-tertiary py-0.5 border-0 focus:ring-0 focus:outline-none"
-              />
-            </div>
-
-            <!-- Spacer -->
-            <div class="flex-1"></div>
-
-            <!-- Char count -->
-            <span id="char-count" class="text-2xs text-aired-text-tertiary tabular-nums flex-shrink-0"></span>
-          </div>
+<main class="wrap">
+  <section class="hero inner" id="publish">
+    <div>
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">aired</a><span aria-hidden="true">/</span><span>HTML to link</span></nav>
+      <h1>Turn an HTML file into a link</h1>
+      <p class="lede">Paste the code or drop the <code>.html</code> file. You get a link to send by email, Slack or WhatsApp. The person who opens it sees the page, not the code, and they don't need an account.</p>
+      <form id="air-form" class="form" aria-label="Publish HTML">
+        <div class="paste-area">
+          <div id="empty-hint" class="hint" aria-hidden="true">Paste HTML or drop a file<small>⌘V to paste · 2 MB max</small></div>
+          <textarea id="html-input" name="html" spellcheck="false" autocomplete="off" aria-label="HTML content"></textarea>
+          <div class="drag-hint">Drop .html file</div>
         </div>
-
-        <!-- Submit -->
-        <button
-          type="submit"
-          id="submit-btn"
-          disabled
-          class="btn-primary mt-3 w-full h-10 flex items-center justify-center rounded-sm bg-aired-text-primary text-aired-bg text-sm font-medium focus-ring"
-        >
-          Publish
-        </button>
+        <div class="opts">
+          <button type="button" id="upload-btn" class="upl" title="Upload an .html file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg>Upload</button>
+          <input id="file-input" type="file" accept=".html,.htm,text/html" hidden />
+          <span><label for="ttl-select">Expires</label><select id="ttl-select"><option value="3600">1 hour</option><option value="86400">1 day</option><option value="604800" selected>7 days</option><option value="2592000">30 days</option><option value="permanent">Never</option></select></span>
+          <span><label for="pin-input">PIN</label><input type="password" id="pin-input" name="pin" placeholder="none" maxlength="20" inputmode="numeric" autocomplete="off" /></span>
+          <span id="char-count" class="kb"></span>
+          <button class="publish" type="submit" id="submit-btn" disabled>Publish</button>
+        </div>
       </form>
-
-      <!-- Error -->
-      <div class="hidden mt-3" id="error-msg" role="alert">
-        <p class="px-3 py-2 text-sm text-red-400 border border-red-500/20 bg-red-500/5 rounded-sm"></p>
-      </div>
-
-      <!-- ─── Result Card ─── -->
-      <div class="result-card hidden flex-col mt-6" id="result-card" aria-live="polite"
-           style="display:none; opacity:0; transform:translateY(8px);">
-
-        <div class="border border-aired-border rounded-lg bg-aired-surface overflow-hidden">
-          <!-- URL row -->
-          <div class="p-4">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider">Live URL</span>
-              <span class="flex items-center gap-1 text-2xs text-emerald-400">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                Live
-              </span>
-            </div>
-            <div class="flex items-center gap-2">
-              <a id="result-url" href="#" target="_blank"
-                 class="flex-1 font-mono text-sm text-aired-text-primary hover:text-white truncate transition-colors duration-150"></a>
-              <button type="button" id="copy-url-btn"
-                      class="copy-btn flex-shrink-0 px-2.5 py-1 text-sm text-aired-text-secondary border border-aired-border rounded-sm focus-ring">
-                Copy
-              </button>
-            </div>
-          </div>
-
-          <div class="border-t border-aired-border"></div>
-
-          <!-- Token row -->
-          <div class="p-4">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider">Update token</span>
-              <span class="text-2xs text-aired-text-tertiary" id="result-expiry"></span>
-            </div>
-            <div class="flex items-center gap-2">
-              <code id="result-token" class="flex-1 font-mono text-sm text-aired-text-tertiary truncate"></code>
-              <button type="button" id="copy-token-btn"
-                      class="copy-btn flex-shrink-0 px-2.5 py-1 text-sm text-aired-text-secondary border border-aired-border rounded-sm focus-ring">
-                Copy
-              </button>
-            </div>
-            <p class="mt-2 text-2xs text-aired-text-tertiary">Save this token — you need it to update or delete.</p>
-          </div>
+      <div id="error-msg" class="err hidden" role="alert"></div>
+      <div id="result-card" class="result" aria-live="polite" style="display:none">
+        <div class="box">
+          <div class="row2"><div class="lbl"><span>Your link</span><span class="live2">Live</span></div>
+            <div class="line"><a id="result-url" href="#" target="_blank" rel="noopener"></a><button type="button" id="copy-url-btn" class="copy-btn">Copy</button></div></div>
+          <div class="row2"><div class="lbl"><span>Update token</span><span id="result-expiry"></span></div>
+            <div class="line"><code id="result-token"></code><button type="button" id="copy-token-btn" class="copy-btn">Copy</button></div>
+            <p class="note">Save this token. You need it to update or delete the page.</p></div>
+          <div class="row2 hidden" id="result-saved"><p class="note" style="margin:0">Saved in this browser. <a href="/auth/login?return=/dashboard" style="color:var(--text-2);text-decoration:underline">Sign in</a> to keep this link and see who opened it.</p></div>
         </div>
-
-        <!-- New button -->
-        <button type="button" id="new-btn"
-                class="mt-3 w-full h-10 flex items-center justify-center rounded-sm border border-aired-border text-sm text-aired-text-secondary hover:text-aired-text-primary hover:border-aired-border-focus transition-all duration-150 focus-ring">
-          Publish another
-        </button>
+        <button type="button" id="new-btn" class="again">Publish another</button>
       </div>
+      <p class="proof"><b data-stat="publishes">10,827</b> pages published · opened <b data-stat="views">102,156</b> times</p>
+    </div>
+    <div class="side-vis">
+      <div class="seen-cap"><span>What they open</span><span class="mono">aired.sh/p/q3-northwind</span></div>
+      <div class="crop" aria-label="Example of a published page"><div class="report"><h4>Q3 performance — Northwind Dental</h4><p>Prepared for Sam Ortiz · Oct 2026</p><div class="kpis"><div class="kpi">Leads<b>1,284</b><small>+18%</small></div><div class="kpi">Calls<b>412</b><small>+9%</small></div><div class="kpi">Cost / lead<b>$21</b><small>−12%</small></div></div><div class="bars"><i style="height:38%"></i><i style="height:52%"></i><i style="height:45%"></i><i style="height:61%"></i><i style="height:58%"></i><i style="height:74%"></i><i style="height:69%"></i><i style="height:88%"></i><i style="height:80%"></i><i style="height:93%"></i></div></div><span class="badge"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>Shared with aired</span></div>
+      <ul class="ticklist side-ticks"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span><b>Free, no account.</b> Publish and send in seconds.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span><b>Opens anywhere.</b> Phone, tablet or laptop, in any browser.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span><b>Private if you want.</b> Add a PIN, pick when it expires.</span></li></ul>
+    </div>
+  </section>
 
-    </section>
-
-    <!-- ─── Guide ─── -->
-    <article class="guide mt-4 mb-20">
-
+  <div class="doc-grid">
+    <aside class="toc" aria-label="On this page"><p>On this page</p><a href="#how">How to share an HTML file as a link</a><a href="#why-not-email">Why emailing the .html file doesn't work</a><a href="#compare">Ways to share HTML, compared</a><a href="#what">What you can publish</a><a href="#faq">Questions</a></aside>
+    <article class="prose">
       <h2 id="how">How to share an HTML file as a link</h2>
-      <ol>
+      <ol class="steps">
         <li><strong>Get the HTML.</strong> Drop the file on the box above, or copy the code from Claude, ChatGPT, Gemini or your editor and paste it in.</li>
         <li><strong>Pick how long it lasts.</strong> Links last 7 days unless you change it. Choose 1 hour for something quick, or permanent for a page you want to keep.</li>
         <li><strong>Add a PIN if it's private.</strong> Visitors then type the PIN before they see the page.</li>
@@ -556,68 +235,38 @@
       <p>Each publish is one HTML page up to 2 MB. Put images in the page itself, or use the <a href="/docs#cli">command-line tool</a> to bundle a whole folder: <code>npx aired ./my-site</code>.</p>
 
       <h2 id="faq">Questions</h2>
-      <dl class="mt-4 divide-y divide-aired-border border-y border-aired-border">
-        <div class="py-4"><dt class="text-sm font-medium text-aired-text-primary">Is it free to turn HTML into a link?</dt><dd class="mt-1 text-sm text-aired-text-secondary leading-relaxed">Yes. Publishing and viewing are free, and you don't need an account.</dd></div>
-        <div class="py-4"><dt class="text-sm font-medium text-aired-text-primary">How long does the link last?</dt><dd class="mt-1 text-sm text-aired-text-secondary leading-relaxed">Seven days by default. You can pick 1 hour, 1 day, 30 days or permanent before you publish.</dd></div>
-        <div class="py-4"><dt class="text-sm font-medium text-aired-text-primary">Can I change the page after I share the link?</dt><dd class="mt-1 text-sm text-aired-text-secondary leading-relaxed">Yes. Keep the update token you get after publishing. With it, the aired CLI, the API or your AI agent can replace the page and the link stays the same.</dd></div>
-        <div class="py-4"><dt class="text-sm font-medium text-aired-text-primary">Can I keep the page private?</dt><dd class="mt-1 text-sm text-aired-text-secondary leading-relaxed">Add a PIN and only people who know it can open the page. Pages published without an account are also hidden from search engines.</dd></div>
-        <div class="py-4"><dt class="text-sm font-medium text-aired-text-primary">Does the link work on phones?</dt><dd class="mt-1 text-sm text-aired-text-secondary leading-relaxed">Yes. It is a normal web page, so it opens in any browser on any phone, tablet or computer.</dd></div>
-        <div class="py-4"><dt class="text-sm font-medium text-aired-text-primary">My page uses separate CSS, JavaScript or image files. Will it work?</dt><dd class="mt-1 text-sm text-aired-text-secondary leading-relaxed">Put everything in one HTML file, or publish the folder with <code>npx aired ./folder</code>, which inlines the files for you.</dd></div>
-      </dl>
-
-      <p class="mt-12 text-xs text-aired-text-tertiary">Updated November 2026.</p>
-    </article>
-
-  </main>
-
-  <!-- ─── Footer ─── -->
-  <footer class="w-full max-w-2xl mx-auto px-6 py-8">
-    <nav aria-label="Guides" class="mb-4 flex flex-wrap justify-center sm:justify-start gap-x-4 gap-y-1 text-2xs">
-      <a href="/html-to-link" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">HTML to link</a>
-      <a href="/share-claude-artifacts" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Share Claude artifacts</a>
-      <a href="/share-chatgpt-html" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Share ChatGPT HTML</a>
-      <a href="/password-protect-html" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Password-protect HTML</a>
-      <a href="/share-html-privately" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Share HTML privately</a>
-      <a href="/share-html-with-client" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Send HTML to a client</a>
-      <a href="/tiiny-host-alternative" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Tiiny Host alternative</a>
-      <a href="/docs" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Docs</a>
-    </nav>
-    <div class="flex flex-col sm:flex-row items-center justify-between gap-2 text-2xs text-aired-text-tertiary">
-      <p>
-        Built by <a href="https://x.com/iammoizfarooq" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">@iammoizfarooq</a>
-      </p>
-      <div class="flex items-center gap-4">
-        <a href="/abuse" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Report abuse</a>
-        <a href="/terms" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Terms</a>
-        <a href="/privacy" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Privacy</a>
-        <a href="/refunds" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Refunds</a>
-        <a href="/llms.txt" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150 font-mono">llms.txt</a>
-        <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">GitHub</a>
-        <a href="https://workers.cloudflare.com" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Cloudflare</a>
+      <div class="acc">
+        <details open><summary>Is it free to turn HTML into a link?<i></i></summary><p>Yes. Publishing and viewing are free, and you don't need an account.</p></details>
+        <details><summary>How long does the link last?<i></i></summary><p>Seven days by default. You can pick 1 hour, 1 day, 30 days or permanent before you publish.</p></details>
+        <details><summary>Can I change the page after I share the link?<i></i></summary><p>Yes. Keep the update token you get after publishing. With it, the aired CLI, the API or your AI agent can replace the page and the link stays the same.</p></details>
+        <details><summary>Can I keep the page private?<i></i></summary><p>Add a PIN and only people who know it can open the page. Pages published without an account are also hidden from search engines.</p></details>
+        <details><summary>Does the link work on phones?<i></i></summary><p>Yes. It is a normal web page, so it opens in any browser on any phone, tablet or computer.</p></details>
+        <details><summary>My page uses separate CSS, JavaScript or image files. Will it work?<i></i></summary><p>Put everything in one HTML file, or publish the folder with <code>npx aired ./folder</code>, which inlines the files for you.</p></details>
       </div>
+
+      <p class="updated">Updated November 2026.</p>
+    
+    </article>
+  </div>
+
+  <section class="more">
+    <div class="sec-head"><p class="eyebrow">Guides</p><h2>More ways to share what you made</h2></div>
+    <div class="gcards">
+      <a class="gcard" href="/share-claude-artifacts"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/></svg></span><b>Share a Claude artifact</b><span>Send what Claude made to people who don't use Claude.</span><em>Read the guide →</em></a>
+      <a class="gcard" href="/share-chatgpt-html"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></span><b>Share HTML from ChatGPT</b><span>Turn ChatGPT's code into a page people can open.</span><em>Read the guide →</em></a>
+      <a class="gcard" href="/password-protect-html"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><b>Password-protect a page</b><span>Add a PIN so only the people you tell can open it.</span><em>Read the guide →</em></a>
+      <a class="gcard" href="/share-html-privately"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 22 12s-1 2-3 4M6.6 6.6C4 8.3 2 12 2 12s3.5 7 10 7c1.7 0 3.2-.4 4.5-1"/></svg></span><b>Share a page privately</b><span>Keep a page out of search and away from strangers.</span><em>Read the guide →</em></a>
+      <a class="gcard" href="/share-html-with-client"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><b>Send a page to a client</b><span>One link that opens on their phone. No download.</span><em>Read the guide →</em></a>
+      <a class="gcard" href="/tiiny-host-alternative"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg></span><b>A Tiiny Host alternative</b><span>Quick HTML links without an email sign-up.</span><em>Read the guide →</em></a>
     </div>
-  </footer>
+    <p class="viewers" style="justify-content:flex-start">Publishing from code or an AI agent? <a href="/docs">Read the docs →</a></p>
+  </section>
+</main>
 
-  <script src="/app.js"></script>
-  <script>
-    // ── Empty state hint ──
-    (function() {
-      var textarea = document.getElementById('html-input');
-      var hint = document.getElementById('empty-hint');
-
-      function toggleHint() {
-        hint.style.opacity = textarea.value.length === 0 ? '1' : '0';
-      }
-
-      textarea.addEventListener('input', toggleHint);
-      textarea.addEventListener('focus', function() {
-        if (textarea.value.length === 0) hint.style.opacity = '0.5';
-      });
-      textarea.addEventListener('blur', function() {
-        toggleHint();
-      });
-      toggleHint();
-    })();
-  </script>
+<footer><div class="wrap">
+  <span>aired</span>
+  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
+</div></footer>
+<script src="/app.js"></script>
 </body>
 </html>

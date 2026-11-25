@@ -16,7 +16,9 @@
     var css = document.createElement('style');
     css.id = 'ak-style';
     css.textContent = [
-      '#api-keys{margin-top:48px}',
+      '#api-keys{margin-top:28px}',
+      '#api-keys.panel{padding:20px 24px}',
+      '@media (max-width:560px){#api-keys.panel{padding:16px}}',
       '#api-keys .ak-hidden{display:none}',
       '#api-keys .ak-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}',
       '#api-keys .ak-h{font-size:14px;line-height:20px;color:#ededef;font-weight:400}',
@@ -38,7 +40,7 @@
       '#api-keys .ak-link:hover:not(:disabled){color:#ededef}',
       '#api-keys .ak-btn:focus-visible,#api-keys .ak-link:focus-visible,#api-keys .ak-input:focus-visible,#api-keys .ak-h:focus-visible{outline:2px solid #7c6aef;outline-offset:2px}',
       '#api-keys .ak-error{margin-top:8px;font-size:12px;color:#f87171}',
-      '#api-keys .ak-reveal{margin-top:16px;border-radius:8px;border:1px solid #222225;background:#111113;padding:12px 16px}',
+      '#api-keys .ak-reveal{margin-top:16px;border-radius:8px;border:1px solid #222225;background:#0a0a0b;padding:12px 16px}',
       '#api-keys .ak-text{font-size:14px;color:#ededef}',
       '#api-keys .ak-key{flex:1;min-width:0;font-size:12px;color:#ededef;word-break:break-all}',
       '#api-keys .ak-list{margin-top:12px;padding:0;list-style:none}',

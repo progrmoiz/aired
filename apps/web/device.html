@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>aired — sign in the CLI</title>
   <meta name="robots" content="noindex" />
   <meta name="referrer" content="no-referrer" />
@@ -10,102 +10,58 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="preload" href="/fonts/inter-latin-v20.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/fonts/fonts.css" />
-  <!-- Own styles (DESIGN.md tokens), so the page doesn't depend on either site stylesheet. -->
+  <link rel="stylesheet" href="/site.css" />
   <style>
-    :root { color-scheme: dark; }
-    * { box-sizing: border-box; margin: 0; }
-    body {
-      min-height: 100vh; display: flex; flex-direction: column;
-      font: 15px/1.6 Inter, -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #0a0a0b; color: #ededef;
-      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
-    }
-    a { color: inherit; text-decoration: none; }
-    .wrap { width: 100%; max-width: 42rem; margin: 0 auto; padding: 0 24px; }
-    header .wrap { height: 56px; display: flex; align-items: center; justify-content: space-between; }
-    .logo { font-weight: 600; letter-spacing: -0.01em; }
-    nav { font-size: 14px; color: #a1a1a6; }
-    nav a:hover, .logo:hover { color: #fff; }
-    main { flex: 1; padding-top: 40px; padding-bottom: 40px; }
-    h1 { font-size: 20px; line-height: 28px; font-weight: 500; letter-spacing: -0.02em; }
-    h2 { font-size: 18px; line-height: 28px; font-weight: 500; }
-    .lede, .muted { margin-top: 8px; font-size: 14px; color: #a1a1a6; }
-    .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; color: #ededef; }
-    .state { margin-top: 32px; }
-    .hidden { display: none !important; }
-    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-    @keyframes skeleton-pulse { from { opacity: 1; } to { opacity: 0.4; } }
-    .skeleton { height: 16px; width: 14rem; border-radius: 2px; background: #222225; animation: skeleton-pulse 1.2s linear infinite alternate; }
-    .skeleton + .skeleton { margin-top: 12px; height: 12px; width: 8rem; }
-    form { max-width: 24rem; }
-    label { display: block; font-size: 14px; }
-    .device-code {
-      margin-top: 8px; width: 100%; border-radius: 6px; padding: 8px 12px;
-      font: 18px/28px 'JetBrains Mono', ui-monospace, Menlo, monospace; letter-spacing: 0.15em; text-transform: uppercase;
-      color: #ededef; background: #0a0a0b; border: 1px solid #222225;
-    }
-    .device-code::placeholder { color: #84848a; }
-    .note { margin-top: 12px; font-size: 12px; color: #84848a; }
-    .error { margin-top: 12px; font-size: 14px; color: #f87171; }
-    .actions { margin-top: 24px; }
-    .btn {
-      display: inline-flex; align-items: center; border: 0; border-radius: 6px; padding: 10px 16px;
-      background: #ededef; color: #0a0a0b; font: 500 14px Inter, sans-serif; cursor: pointer;
-      transition: background-color 120ms cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .btn:hover:not(:disabled) { background: #fff; }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn:focus-visible, .device-code:focus-visible, a:focus-visible, h2:focus-visible { outline: 2px solid #7c6aef; outline-offset: 2px; }
-    @media (pointer: coarse) { .btn, .device-code { min-height: 44px; } }
-    @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; opacity: 0.7; } .btn { transition: none; } }
+    .device-box { margin-top: 28px; max-width: 30rem; }
+    .device-code { margin-top: 8px; font: 500 18px/1.5 'JetBrains Mono', ui-monospace, Menlo, monospace; letter-spacing: .15em; text-transform: uppercase; }
+    .device-code::placeholder { letter-spacing: .15em; }
+    @media (pointer: coarse) { .device-code, .device-box .btn { min-height: 44px; } }
   </style>
 </head>
 <body>
-
-  <header><div class="wrap">
-    <a href="/" class="logo">aired</a>
-    <nav><a href="/docs">Docs</a></nav>
-  </div></header>
-
-  <main class="wrap">
+<header><div class="wrap">
+  <a class="logo" href="/" aria-label="aired home"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>aired</a>
+  <nav aria-label="Main"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link">Guides</a></nav>
+  <div class="right"><a class="login" id="nav-auth" href="/auth/login?return=/dashboard">Log in</a><a class="start" href="/#publish">Start free</a></div>
+</div></header>
+<main class="wrap">
+  <section style="padding-top:64px;padding-bottom:64px">
+    <p class="eyebrow">CLI sign-in</p>
     <h1>Sign in the aired CLI</h1>
-    <p class="lede">Enter the code <code class="mono">aired login --device</code> showed in your terminal.</p>
-
+    <p class="lede">Enter the code <code class="mono">aired login --device</code> showed in your terminal. Only approve a code you just got from your own terminal.</p>
     <p id="status" class="sr-only" role="status" aria-live="polite"></p>
-
-    <section id="state-loading" class="state" aria-hidden="true">
-      <div class="skeleton"></div>
-      <div class="skeleton"></div>
-    </section>
-
-    <section id="state-signed-out" class="state hidden">
-      <h2>Sign in first</h2>
-      <p class="muted">You come back here to approve the code after you sign in.</p>
-      <div class="actions">
-        <a id="sign-in" href="/auth/login?return=/device" class="btn">Sign in</a>
-      </div>
-    </section>
-
-    <section id="state-approve" class="state hidden">
-      <form id="approve-form">
-        <label for="user-code">Code</label>
-        <input id="user-code" name="user_code" type="text" inputmode="text" autocomplete="off" autocapitalize="characters"
-               spellcheck="false" maxlength="9" placeholder="BCDF-GHJK" required class="device-code"
-               aria-describedby="who approve-error" />
-        <p id="who" class="note"></p>
-        <p id="approve-error" class="error hidden" role="alert"></p>
-        <div class="actions">
-          <button id="approve" type="submit" class="btn">Approve</button>
-        </div>
-      </form>
-    </section>
-
-    <section id="state-done" class="state hidden">
-      <h2 tabindex="-1" id="done-heading">The CLI is signed in</h2>
-      <p class="muted">Go back to your terminal. You can close this tab.</p>
-    </section>
-  </main>
-
+    <div class="panel box-pad device-box">
+      <section id="state-loading" aria-hidden="true">
+        <span class="skel" style="width:14rem;height:16px"></span>
+        <span class="skel" style="width:8rem;margin-top:12px"></span>
+      </section>
+      <section id="state-signed-out" class="hidden">
+        <p class="box-title">Sign in first</p>
+        <p class="box-sub">You come back here to approve the code after you sign in.</p>
+        <div class="btns"><a id="sign-in" class="btn solid" href="/auth/login?return=/device">Sign in</a></div>
+      </section>
+      <section id="state-approve" class="hidden">
+        <form id="approve-form">
+          <label for="user-code" class="fl">Code</label>
+          <input id="user-code" name="user_code" type="text" inputmode="text" autocomplete="off" autocapitalize="characters"
+                 spellcheck="false" maxlength="9" placeholder="BCDF-GHJK" required class="field device-code"
+                 aria-describedby="who approve-error" />
+          <p id="who" class="box-sub" style="margin-top:12px"></p>
+          <p id="approve-error" class="hidden err-t" role="alert"></p>
+          <div class="btns"><button id="approve" type="submit" class="btn solid">Approve</button></div>
+        </form>
+      </section>
+      <section id="state-done" class="hidden">
+        <p class="box-title" style="color:var(--ok)" tabindex="-1" id="done-heading">The CLI is signed in</p>
+        <p class="box-sub">Go back to your terminal. You can close this tab.</p>
+      </section>
+    </div>
+  </section>
+</main>
+<footer><div class="wrap">
+  <span>aired</span>
+  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
+</div></footer>
   <script>
     (function () {
       'use strict';
@@ -137,7 +93,7 @@
         .then(function (res) { return res.status === 200 ? res.json() : null; })
         .then(function (user) {
           if (!user || !user.login) { show('state-signed-out'); return; }
-          $('who').textContent = 'The CLI will be signed in as @' + user.login + '. Only approve a code you just got from your own terminal.';
+          $('who').textContent = 'The CLI will be signed in as @' + user.login + '.';
           show('state-approve');
           input.focus();
         })
@@ -175,5 +131,6 @@
       });
     })();
   </script>
+<script src="/app.js"></script>
 </body>
 </html>
