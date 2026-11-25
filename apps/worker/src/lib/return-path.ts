@@ -17,8 +17,10 @@ const ALLOWED_RETURN_PATHS = [
 const ALLOWED_RETURN_PREFIX = '/p/';
 /** /device?code=ABCD-EFGH (the CLI device page with its code filled in). */
 const DEVICE_RETURN = /^\/device\?code=[A-Z0-9-]{1,16}$/;
+/** /authorize?… (an MCP client's OAuth request, resumed after signing in). Same path, URL-safe query. */
+const AUTHORIZE_RETURN = /^\/authorize\?[A-Za-z0-9\-._~%!$&'()*+,;=:@/?]{1,4000}$/;
 
 export function isAllowedReturn(path: string): boolean {
-  return ALLOWED_RETURN_PATHS.includes(path) || path.startsWith(ALLOWED_RETURN_PREFIX) || DEVICE_RETURN.test(path);
+  return ALLOWED_RETURN_PATHS.includes(path) || path.startsWith(ALLOWED_RETURN_PREFIX) || DEVICE_RETURN.test(path) || AUTHORIZE_RETURN.test(path);
 }
 

@@ -1,7 +1,10 @@
 name = "aired"
 main = "src/index.ts"
 compatibility_date = "2025-04-01"
-compatibility_flags = ["nodejs_compat"]
+# global_fetch_strictly_public: outbound fetches never reach this zone's own
+# origin. Required by the MCP OAuth server to fetch client metadata documents
+# (CIMD) safely.
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 workers_dev = true
 
 [assets]
@@ -21,6 +24,13 @@ bucket_name = "aired-pages"
 
 [[kv_namespaces]]
 binding = "PAGES_KV"
+id = "6388d6b3b6c04fe5ad8529ae029e723e"
+
+# The MCP OAuth grant store (routes/mcp-oauth.ts). Same namespace as PAGES_KV:
+# its keys are client:, grant:, grants:, token:, tokens: and transaction:,
+# none of which aired uses, so no new namespace is needed.
+[[kv_namespaces]]
+binding = "OAUTH_KV"
 id = "6388d6b3b6c04fe5ad8529ae029e723e"
 
 # Accounts and billing state (users, identities, subscriptions, billing_events).

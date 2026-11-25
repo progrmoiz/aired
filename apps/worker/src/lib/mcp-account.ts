@@ -9,8 +9,9 @@
 export type ToolResult = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
 
 export const SIGN_IN_REQUIRED =
-  'Sign in required: connect with an aired API key (Authorization: Bearer aired_sk_...). ' +
-  'Create one under API keys in the aired dashboard. Without a key, only publish_html works, anonymously.';
+  'Sign in required: add aired as a connector at https://aired.sh/mcp/account (you sign in with your aired account), ' +
+  'or connect with an aired API key (Authorization: Bearer aired_sk_...) from API keys in the dashboard. ' +
+  'Without either, only publish_html works, anonymously.';
 
 function text(lines: string[], isError = false): ToolResult {
   return { content: [{ type: 'text', text: lines.join('\n') }], ...(isError ? { isError: true } : {}) };

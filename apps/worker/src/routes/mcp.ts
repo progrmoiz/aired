@@ -355,7 +355,8 @@ function createAiredMcpServer(
 }
 
 /** Sends a Request through the whole app (auth, limits, routes), in-process. */
-export type AppFetch = (request: Request) => Response | Promise<Response>;
+/** Run a request through the app in-process; asUser signs it in as that account (an OAuth caller). */
+export type AppFetch = (request: Request, asUser?: number) => Response | Promise<Response>;
 
 /**
  * Handle MCP Streamable HTTP requests at /mcp.
@@ -363,16 +364,22 @@ export type AppFetch = (request: Request) => Response | Promise<Response>;
  * Only an API key signs a caller in here (never a cookie), so a cross-site
  * request can't act as anyone; everyone else gets the anonymous tools.
  */
-export async function handleMcp(c: Context<AppBindings>, appFetch: AppFetch) {
+export async function handleMcp(c: Context<AppBindings>, appFetch: AppFetch, route: "/mcp" | "/mcp/account" = "/mcp") {
   const user = c.get("user");
+  const method = c.get("authMethod");
   const authorization = c.req.header("Authorization");
+  // A key caller's calls carry their key; an OAuth caller's run as their
+  // account in-process, and the OAuth token itself is never passed on.
+  const asKey = method === "key" && authorization !== undefined;
+  const asOAuth = method === "oauth";
   const signedIn: SignedIn | null =
-    user !== null && c.get("authMethod") === "key" && authorization
+    user !== null && (asKey || asOAuth)
       ? {
           login: user.login,
           origin: new URL(c.req.url).origin,
           callApi: async (method, path, body) => {
-            const headers = new Headers({ Authorization: authorization, "User-Agent": "aired-mcp" });
+            const headers = new Headers({ "User-Agent": "aired-mcp" });
+            if (asKey) headers.set("Authorization", authorization!);
             const ip = c.req.header("CF-Connecting-IP");
             if (ip) headers.set("CF-Connecting-IP", ip);
             if (body !== undefined) headers.set("Content-Type", "application/json");
@@ -382,12 +389,13 @@ export async function handleMcp(c: Context<AppBindings>, appFetch: AppFetch) {
                 headers,
                 ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
               }),
+              asOAuth ? user!.id : undefined,
             );
             return { status: res.status, body: await res.json().catch(() => null) };
           },
         }
       : null;
   const server = createAiredMcpServer(c.env, signedIn);
-  const handler = createMcpHandler(server, { route: "/mcp" });
+  const handler = createMcpHandler(server, { route });
   return handler(c.req.raw, c.env, c.executionCtx);
 }

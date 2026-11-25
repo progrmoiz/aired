@@ -30,6 +30,10 @@ export async function authMiddleware(
   c.set('authMethod', null);
   c.set('apiKeyId', null);
 
+  // An in-process API call for an MCP tool call made with an OAuth token.
+  const mcpUser = c.env.AIRED_MCP_OAUTH_USER;
+  if (typeof mcpUser === 'number') return mcpOAuthAuth(c, next, mcpUser);
+
   // An API key (Authorization: Bearer aired_sk_…) wins over any session. A key
   // that's sent but isn't valid is a 401, never a quiet fall back to
   // anonymous: a CI job with a revoked key must not publish ownerless pages.
@@ -152,6 +156,28 @@ export async function authMiddleware(
   c.set('jti', claims.jti);
   c.set('authMethod', 'session');
 
+  await next();
+}
+
+/** Sign in as the account an MCP OAuth token was issued to (already validated by the /mcp route). */
+async function mcpOAuthAuth(c: Context<AppBindings>, next: Next, userId: number): Promise<Response | void> {
+  const raw = await c.env.PAGES_KV.get(kvKeys.user(userId));
+  type UserRecord = { login?: unknown; email?: unknown; name?: unknown };
+  let record: UserRecord | null = null;
+  try {
+    record = raw === null ? null : (JSON.parse(raw) as UserRecord);
+  } catch {
+    record = null;
+  }
+  if (record === null || typeof record.login !== 'string') return c.json({ error: 'Unauthorized' }, 401);
+  c.set('user', {
+    id: userId,
+    login: record.login,
+    email: redactNoreplyEmail(typeof record.email === 'string' ? record.email : null),
+    name: typeof record.name === 'string' ? record.name : null,
+  });
+  c.set('jti', null);
+  c.set('authMethod', 'oauth');
   await next();
 }
 

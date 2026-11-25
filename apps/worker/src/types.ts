@@ -12,6 +12,13 @@ export type Env = {
   PUBLISH_BURST?: RateLimit;
   REPORT_BURST?: RateLimit;
   DEVICE_BURST?: RateLimit;
+  /** The OAuth grant store for the remote MCP (bound to the PAGES_KV namespace). */
+  OAUTH_KV?: KVNamespace;
+  /**
+   * Set only in code, on the env of an in-process API call made for an MCP
+   * tool call that came with an OAuth token (withMcpOAuthUser). Never a var.
+   */
+  AIRED_MCP_OAUTH_USER?: number;
   PIN_GUESS?: RateLimit;
   PIN_GUESS_PAGE?: RateLimit;
   /** D1 database for accounts and billing state (wrangler.toml [[d1_databases]]). */
@@ -55,7 +62,8 @@ export type AppBindings = {
     user: { id: number; login: string; email: string | null; name: string | null } | null;
     jti: string | null;
     /** How the caller signed in: a session (cookie or CLI header), an API key, or not at all. */
-    authMethod: 'session' | 'key' | null;
+    /** 'oauth': an MCP tool call made with an OAuth token (routes/mcp-oauth.ts). */
+    authMethod: 'session' | 'key' | 'oauth' | null;
     /** The API key's id when authMethod is 'key'. */
     apiKeyId: string | null;
   };
