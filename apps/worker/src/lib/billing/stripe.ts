@@ -99,10 +99,8 @@ export async function fetchSubscription(env: StripeEnv, id: string): Promise<Nor
 
 /** The PaymentIntent behind a charge, or null (a legacy charge without one, or no such charge). */
 export async function fetchChargePaymentIntent(env: StripeEnv, chargeId: string): Promise<string | null> {
-  const { status, data } = await stripeRequest(
-    env, 'GET', `/v1/charges/${encodeURIComponent(chargeId)}`, null, [404],
-  );
-  if (status === 404) return null;
+  const data = await fetchCharge(env, chargeId);
+  if (data === null) return null;
   const pi = (data as { payment_intent?: unknown } | null)?.payment_intent;
   if (typeof pi === 'string' && pi) return pi;
   const expanded = (pi as { id?: unknown } | null)?.id;
@@ -169,8 +167,8 @@ export async function chargesForInvoice(env: StripeEnv, invoiceId: string): Prom
       const list = (res.data as { data?: unknown } | null)?.data;
       if (Array.isArray(list)) charges.push(...list);
     } else if (chargeId) {
-      const res = await stripeRequest(env, 'GET', `/v1/charges/${encodeURIComponent(chargeId)}`, null, [404]);
-      if (res.status !== 404) charges.push(res.data);
+      const charge = await fetchCharge(env, chargeId);
+      if (charge !== null) charges.push(charge);
     }
   }
   return charges;

@@ -574,3 +574,14 @@ test("isPermissionError: 401 and 403 from Stripe only", async () => {
   assert.equal(isPermissionError(err(500)), false);
   assert.equal(isPermissionError(new Error("network")), false);
 });
+
+test("isFinalRefusal: 4xx except 409 and 429", async () => {
+  const { isFinalRefusal, StripeError } = await import("../src/lib/billing/stripe-shapes.ts");
+  const err = (status: number) => new StripeError("POST", "/v1/refunds", status, { type: "invalid_request_error", code: "charge_expired_for_refund", param: null });
+  assert.equal(isFinalRefusal(err(400)), true);
+  assert.equal(isFinalRefusal(err(404)), true);
+  assert.equal(isFinalRefusal(err(409)), false);
+  assert.equal(isFinalRefusal(err(429)), false);
+  assert.equal(isFinalRefusal(err(500)), false);
+  assert.equal(isFinalRefusal(new Error("network")), false);
+});

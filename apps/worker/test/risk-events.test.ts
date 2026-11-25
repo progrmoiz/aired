@@ -375,11 +375,14 @@ test("a flagged charge is refunded unless it's already fully refunded or dispute
   assert.equal(fraudWarningRefundAction({ amount: 1200, amount_refunded: 1200, refunded: true, disputed: true }), "disputed");
 });
 
-test("billing.ts ends Pro before refunding, and a refund permission error is logged, not thrown", async () => {
+test("billing.ts ends Pro first, refunds only Pro charges, and logs refusals instead of retrying them", async () => {
   const { readFileSync } = await import("node:fs");
   const code = readFileSync(new URL("../src/routes/billing.ts", import.meta.url), "utf8");
-  assert.match(code, /await endProForRiskEvent\(c, evt\);\s*\/\/[^\n]*\n\s*if \(evt\.type === 'radar\.early_fraud_warning\.created'\) await refundFlaggedCharge\(c, evt\);/);
-  assert.match(code, /if \(!isPermissionError\(err\)\) throw err;\s*console\.error\(\{ event: 'billing_efw_refund_not_permitted'/);
+  assert.match(code, /const paidPro = await endProForRiskEvent\(c, evt\);/);
+  assert.match(code, /if \(evt\.type === 'radar\.early_fraud_warning\.created'\) \{\s*if \(paidPro\) await refundFlaggedCharge\(c, evt\);/);
+  assert.match(code, /if \(isPermissionError\(err\)\) \{\s*console\.error\(\{ event: 'billing_efw_refund_not_permitted'/);
+  assert.match(code, /if \(isFinalRefusal\(err\)\) \{/);
+  assert.match(code, /paidPro = true;/);
   const stripe = readFileSync(new URL("../src/lib/billing/stripe.ts", import.meta.url), "utf8");
   assert.match(stripe, /'Idempotency-Key': `aired-efw-refund-\$\{chargeId\}`/);
 });

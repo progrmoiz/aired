@@ -9,6 +9,7 @@ import { TIERS } from '../lib/rate-limit-tiers.js';
 import { billingEnabled, isEntitled } from '../lib/entitlements.js';
 import { verifyStripeSignature } from '../lib/billing/signature.js';
 import {
+  isFinalRefusal,
   isPermissionError,
   BillingConfigError,
   HANDLED_EVENTS,
@@ -372,9 +373,14 @@ async function webhookUid(c: Context<AppBindings>, evt: WebhookEvent, sub: Norma
  * `ent:<uid>`. An early fraud warning also refunds the charge in full.
  */
 async function handleRiskEvent(c: Context<AppBindings>, evt: WebhookEvent): Promise<void> {
-  await endProForRiskEvent(c, evt);
-  // After Pro has ended, so a refund failure can never keep Pro on.
-  if (evt.type === 'radar.early_fraud_warning.created') await refundFlaggedCharge(c, evt);
+  const paidPro = await endProForRiskEvent(c, evt);
+  // After Pro has ended, so a refund failure can never keep Pro on. Only a
+  // charge that paid for Pro is refunded; anything else on the account is
+  // left to the owner.
+  if (evt.type === 'radar.early_fraud_warning.created') {
+    if (paidPro) await refundFlaggedCharge(c, evt);
+    else console.log({ event: 'billing_efw_refund_skipped', eventId: evt.id, why: 'not_a_pro_charge' });
+  }
 }
 
 /**
@@ -404,20 +410,33 @@ async function refundFlaggedCharge(c: Context<AppBindings>, evt: WebhookEvent): 
     const refundId = await refundFraudulentCharge(c.env, chargeId);
     console.log({ event: 'billing_efw_refunded', eventId: evt.id, chargeId, refundId });
   } catch (err) {
-    if (!isPermissionError(err)) throw err;
-    console.error({ event: 'billing_efw_refund_not_permitted', eventId: evt.id, chargeId, fix: 'add Refunds: write to the restricted key' });
+    if (isPermissionError(err)) {
+      console.error({ event: 'billing_efw_refund_not_permitted', eventId: evt.id, chargeId, fix: 'add Refunds: write to the restricted key, then refund this charge by hand' });
+      return;
+    }
+    // Stripe refused for good (for example a charge too old to refund):
+    // retrying can't help and Pro has already ended. Network errors, 5xx,
+    // 409 and 429 still throw so Stripe retries.
+    if (isFinalRefusal(err)) {
+      console.error({ event: 'billing_efw_refund_refused', eventId: evt.id, chargeId, code: (err as { code?: unknown }).code ?? null });
+      return;
+    }
+    throw err;
   }
 }
 
-async function endProForRiskEvent(c: Context<AppBindings>, evt: WebhookEvent): Promise<void> {
+/** Ends Pro for a risk event. Returns whether the charge paid for a Pro subscription. */
+async function endProForRiskEvent(c: Context<AppBindings>, evt: WebhookEvent): Promise<boolean> {
   const plan = planRiskEvent(evt);
-  if (plan.action === 'ignore') return;
+  if (plan.action === 'ignore') return false;
   if (plan.action === 'log_partial_refund') {
     console.log({ event: 'billing_partial_refund', eventId: evt.id, chargeId: plan.chargeId });
-    return;
+    return false;
   }
-  const notSubscription = (why: string) =>
+  const notSubscription = (why: string): false => {
     console.log({ event: 'billing_risk_not_subscription', reason: plan.reason, eventId: evt.id, why });
+    return false;
+  };
   if (plan.action === 'no_payment_intent') return notSubscription('no_payment_intent');
 
   const paymentIntentId =
@@ -429,6 +448,7 @@ async function endProForRiskEvent(c: Context<AppBindings>, evt: WebhookEvent): P
   const paidBy = await subscriptionsForPaymentIntent(c.env, paymentIntentId);
   if (paidBy.size === 0) return notSubscription('no_invoice_payment');
 
+  let paidPro = false;
   for (const [subscriptionId, refundedInvoiceIds] of paidBy) {
     const before = await fetchSubscription(c.env, subscriptionId);
     if (!before) {
@@ -439,6 +459,7 @@ async function endProForRiskEvent(c: Context<AppBindings>, evt: WebhookEvent): P
       console.warn({ event: 'billing_risk_not_pro_price', eventId: evt.id, subscriptionId, priceId: before.priceId });
       continue;
     }
+    paidPro = true;
     // A refund ends Pro only when it refunds the payment for the current
     // period and nothing else pays for it (risk-events.ts refundEndsPro).
     // Disputes and fraud warnings always end it.
@@ -466,6 +487,7 @@ async function endProForRiskEvent(c: Context<AppBindings>, evt: WebhookEvent): P
     const uid = await storeSubscription(c, evt, after);
     console.log({ event: 'billing_pro_revoked', reason: plan.reason, eventId: evt.id, uid, subscriptionId, result });
   }
+  return paidPro;
 }
 
 // GET /upgrade?interval=year|month — sign in if needed, then go to Stripe Checkout.

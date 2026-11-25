@@ -187,6 +187,15 @@ export function isPermissionError(err: unknown): boolean {
 }
 
 /**
+ * Whether Stripe refused a request for good: a 4xx other than 409 (a
+ * concurrent request with the same idempotency key) or 429 (rate limited).
+ * Retrying the same request can't succeed.
+ */
+export function isFinalRefusal(err: unknown): boolean {
+  return err instanceof StripeError && err.status >= 400 && err.status < 500 && err.status !== 409 && err.status !== 429;
+}
+
+/**
  * Whether a Stripe call failed because the customer no longer exists (deleted
  * in the dashboard, or saved from another Stripe account or mode).
  */
