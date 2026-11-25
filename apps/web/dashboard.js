@@ -503,6 +503,263 @@
     });
   }
 
+  // ── Plan strip (shown only when billing is on) ──
+  // Free → "Get Pro" (yearly checkout); Pro → renewal date + "Manage billing".
+  // Plan state comes from /api/billing/status; only the webhook changes it.
+  var PRIMARY_BTN_CLASS = 'plan-btn plan-btn-primary flex-shrink-0 rounded px-3 py-2 text-sm font-medium bg-aired-text-primary text-aired-bg focus-ring';
+  var SECONDARY_BTN_CLASS = 'plan-btn flex-shrink-0 rounded px-3 py-2 text-sm border border-aired-border bg-aired-bg text-aired-text-secondary hover:text-aired-text-primary hover:border-aired-border-focus hover:bg-aired-surface-hover active:bg-aired-border focus-ring';
+  var UPGRADE_POLL_MS = 2000;
+  var UPGRADE_POLL_LIMIT_MS = 30000;
+
+  var plan = {
+    mode: null,      // 'checkout' | 'portal' | null (no button)
+    state: 'idle',   // idle | pending | error
+  };
+
+  var PLAN_ACTIONS = {
+    checkout: {
+      label: 'Get Pro',
+      pending: 'Opening checkout…',
+      error: 'Could not open checkout. Try again.',
+    },
+    portal: {
+      label: 'Manage billing',
+      pending: 'Opening billing…',
+      error: 'Could not open billing. Try again.',
+    },
+  };
+
+  function formatDate(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  function setText(id, text) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text || '';
+    if (text) el.classList.remove('hidden');
+    else el.classList.add('hidden');
+  }
+
+  function setPlanButton() {
+    var btn = document.getElementById('plan-action');
+    if (!btn) return;
+    if (!plan.mode) {
+      btn.className = 'hidden';
+      btn.disabled = false;
+      btn.removeAttribute('aria-busy');
+      return;
+    }
+    var action = PLAN_ACTIONS[plan.mode];
+    btn.className = plan.mode === 'checkout' ? PRIMARY_BTN_CLASS : SECONDARY_BTN_CLASS;
+    btn.disabled = plan.state === 'pending';
+    if (plan.state === 'pending') {
+      btn.setAttribute('aria-busy', 'true');
+      btn.textContent = action.pending;
+    } else {
+      btn.removeAttribute('aria-busy');
+      btn.textContent = plan.state === 'error' ? 'Try again' : action.label;
+    }
+  }
+
+  function setPlanState(next, errorText) {
+    plan.state = next;
+    setText('plan-error', next === 'error' ? errorText : '');
+    setPlanButton();
+  }
+
+  // status: the /api/billing/status body. detail overrides the helper line.
+  function renderPlan(status, detail) {
+    var strip = document.getElementById('plan-strip');
+    if (!strip) return;
+    if (!status || !status.enabled) {
+      strip.classList.add('hidden');
+      return;
+    }
+
+    var label;
+    var helper = '';
+    if (status.plan === 'pro') {
+      var date = formatDate(status.renewsAt);
+      label = 'Pro';
+      if (date) label += status.cancelAtPeriodEnd ? ' · ends ' + date : ' · renews ' + date;
+      if (status.status === 'past_due') helper = 'Last payment failed. Update your card in billing';
+      plan.mode = 'portal';
+    } else {
+      label = 'Free';
+      helper = 'Pro: no aired badge, 10 MB pages, $108/year';
+      plan.mode = 'checkout';
+    }
+
+    setText('plan-label', label);
+    setText('plan-detail', detail !== undefined ? detail : helper);
+    setPlanState('idle');
+    strip.classList.remove('hidden');
+  }
+
+  // A message-only strip (no button), used while confirming an upgrade.
+  function renderPlanMessage(label, detail) {
+    var strip = document.getElementById('plan-strip');
+    if (!strip) return;
+    plan.mode = null;
+    setText('plan-label', label);
+    setText('plan-detail', detail);
+    setPlanState('idle');
+    strip.classList.remove('hidden');
+  }
+
+  // Stripe's return URL carries ?upgraded=1. Drop it once handled so a reload
+  // doesn't poll again.
+  function clearUpgradedParam() {
+    var params = new URLSearchParams(window.location.search);
+    if (!params.has('upgraded')) return;
+    params.delete('upgraded');
+    var qs = params.toString();
+    try {
+      window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+    } catch (_e) {}
+  }
+
+  function isNavigableUrl(url) {
+    if (typeof url !== 'string') return false;
+    try {
+      var u = new URL(url);
+      return u.protocol === 'https:' || u.protocol === 'http:';
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function loadPlanStatus() {
+    return fetchJson('/api/billing/status');
+  }
+
+  function runPlanAction() {
+    var mode = plan.mode;
+    if (!mode || plan.state === 'pending') return;
+    var action = PLAN_ACTIONS[mode];
+    setPlanState('pending');
+    announce(action.pending);
+
+    var init = {
+      method: 'POST',
+      headers: { 'X-Aired-Request': '1' },
+      credentials: 'same-origin',
+    };
+    if (mode === 'checkout') {
+      init.headers['Content-Type'] = 'application/json';
+      init.body = JSON.stringify({ interval: 'year' });
+    }
+
+    fetch('/api/billing/' + mode, init).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (res.ok && data && isNavigableUrl(data.url)) {
+          // Stay pending while the browser leaves for Stripe.
+          window.location.assign(data.url);
+          return;
+        }
+        if (res.status === 401) {
+          window.location.href = '/auth/github?return=/dashboard';
+          return;
+        }
+        if (mode === 'checkout' && res.status === 409) {
+          // Already Pro (e.g. paid in another tab): show it instead of an error.
+          return loadPlanStatus().then(function (status) {
+            renderPlan(status);
+            announce("You're on Pro");
+          });
+        }
+        if (mode === 'portal' && res.status === 404) {
+          setPlanState('error', 'No billing account yet.');
+          announce('No billing account yet.');
+          return;
+        }
+        throw new Error('Request failed: ' + res.status);
+      });
+    }).catch(function () {
+      setPlanState('error', action.error);
+      announce(action.error);
+    });
+  }
+
+  // After checkout the webhook may land a few seconds later; poll until it does.
+  function pollUpgrade() {
+    var started = Date.now();
+    renderPlanMessage('Payment received', 'Confirming your plan…');
+
+    function finish(status) {
+      clearUpgradedParam();
+      if (status) {
+        renderPlan(status, "You're on Pro");
+        announce("You're on Pro");
+      } else {
+        renderPlanMessage('Payment received. Refresh in a minute.', '');
+        announce('Payment received. Refresh in a minute.');
+      }
+    }
+
+    function tick() {
+      loadPlanStatus().then(function (status) {
+        if (status && !status.enabled) {
+          clearUpgradedParam();
+          renderPlan(status);
+          return;
+        }
+        if (status && status.plan === 'pro') {
+          finish(status);
+          return;
+        }
+        next();
+      }).catch(next);
+    }
+
+    function next() {
+      if (Date.now() - started + UPGRADE_POLL_MS > UPGRADE_POLL_LIMIT_MS) {
+        finish(null);
+        return;
+      }
+      setTimeout(tick, UPGRADE_POLL_MS);
+    }
+
+    tick();
+  }
+
+  function initPlan() {
+    var btn = document.getElementById('plan-action');
+    if (btn) btn.addEventListener('click', runPlanAction);
+
+    // Back from Stripe via the bfcache: the page is restored mid-"pending".
+    window.addEventListener('pageshow', function (e) {
+      if (e.persisted && plan.state === 'pending') setPlanState('idle');
+    });
+
+    var upgraded = new URLSearchParams(window.location.search).get('upgraded') === '1';
+
+    loadPlanStatus().then(function (status) {
+      if (!status || !status.enabled) {
+        if (upgraded) clearUpgradedParam();
+        renderPlan(status);
+        return;
+      }
+      if (!upgraded) {
+        renderPlan(status);
+      } else if (status.plan === 'pro') {
+        clearUpgradedParam();
+        renderPlan(status, "You're on Pro");
+        announce("You're on Pro");
+      } else {
+        pollUpgrade();
+      }
+    }).catch(function () {
+      // Billing info is secondary: leave the strip hidden unless we were sent
+      // back from checkout, where polling keeps trying.
+      if (upgraded) pollUpgrade();
+    });
+  }
+
   // ── Init ──
   document.addEventListener('DOMContentLoaded', function () {
     init();
@@ -532,6 +789,7 @@
     var h1 = document.getElementById('user-handle');
     if (h1) h1.textContent = '@' + user.login;
 
+    initPlan();
     await loadDashboard();
 
     var signOutBtn = document.getElementById('sign-out');

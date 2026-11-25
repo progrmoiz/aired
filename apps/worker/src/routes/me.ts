@@ -24,6 +24,9 @@ import {
   bumpProjectCount,
 } from '../lib/owner-index.js';
 import { clearSessionCookie, readSessionCookie } from '../lib/cookies.js';
+import { billingEnabled, getEntitlements } from '../lib/entitlements.js';
+import { getSubscription } from '../lib/billing/store.js';
+import type { StoredSubscription } from '../lib/billing/store.js';
 import { AUTH_HEADER } from '@aired/core';
 
 const me = new Hono<AppBindings>();
@@ -54,14 +57,41 @@ me.get('/', async (c) => {
     // best-effort — createdAt may be null in response
   }
 
+  // Plan from KV (getEntitlements); billing details from D1, read only when billing is on.
+  const [ent, sub] = await Promise.all([
+    getEntitlements(c.env, user.id),
+    billingEnabled(c.env) ? readSubscription(c.env.DB, user.id) : Promise.resolve(null),
+  ]);
+
   return c.json({
     id: user.id,
     login: user.login,
     email: redactNoreplyEmail(user.email),
     name: user.name,
     createdAt,
+    plan: ent.plan,
+    limits: { maxBytes: ent.maxBytes, publishTier: ent.publishTier },
+    billing: sub
+      ? {
+          status: sub.status,
+          interval: sub.interval,
+          renewsAt: sub.currentPeriodEnd,
+          cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+        }
+      : null,
   });
 });
+
+// Best-effort: a D1 failure shows billing as null instead of failing /api/me,
+// which the dashboard needs to load at all.
+async function readSubscription(db: D1Database, uid: number): Promise<StoredSubscription | null> {
+  try {
+    return await getSubscription(db, uid);
+  } catch (err) {
+    console.error({ event: 'me_billing_read_failed', uid, error: err instanceof Error ? err.message : String(err) });
+    return null;
+  }
+}
 
 // GET /api/me/pages — list pages owned by the authenticated user.
 // Optional ?project=<name> filters to one project; ?project=__unsorted__ lists
