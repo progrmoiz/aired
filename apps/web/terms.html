@@ -66,7 +66,7 @@
       <li>You own what you publish. We only host it and show it to people with the link.</li>
       <li>Don't publish phishing, malware, spam or anything illegal. We take those pages down.</li>
       <li>Pages published without an account expire unless you make them permanent.</li>
-      <li>Pro is a paid plan, billed through Stripe. Cancel anytime. Full refund within 14 days.</li>
+      <li>Pro is a paid plan, sold to you through Link, Stripe's checkout. Cancel anytime. Full refund within 14 days.</li>
       <li><strong>We never delete your pages because a subscription ended.</strong></li>
       <li>People who open your links never need an account and never pay.</li>
     </ul>
@@ -119,9 +119,10 @@
     <h2>Paid plans and billing</h2>
     <p>Pro costs <strong>$9 a month billed yearly ($108)</strong>, or <strong>$12 billed monthly</strong>, in US dollars. Here's how billing works:</p>
     <ul>
-      <li>Stripe handles every payment. We never see or store your card number.</li>
-      <li>Your plan renews automatically at the end of each month or year until you cancel. Stripe charges the card you gave it.</li>
-      <li>Taxes: <mark class="tbd">[OWNER TO DECIDE: whether Stripe Tax is on. If on: "We add sales tax, VAT or GST at checkout where the law requires it." If off, say who handles EU/UK VAT and other taxes, or remove this line]</mark></li>
+      <li><strong>Link is the seller.</strong> We sell Pro through Stripe Managed Payments, so Link, Stripe's checkout, is the merchant of record for your purchase: it takes the payment, charges any tax and sends your receipts. Your receipt and your card statement show Link, not aired. Link's own <a href="https://link.com/terms" target="_blank" rel="noopener">terms</a> also apply to the purchase. <mark class="tbd">[OWNER TO CHECK: the exact Stripe entity that sells to customers in each region, as named in Stripe's Managed Payments terms]</mark></li>
+      <li>We never see or store your card number.</li>
+      <li>Your plan renews automatically at the end of each month or year until you cancel. Link charges the card you gave it.</li>
+      <li>Taxes: Link adds sales tax, VAT or GST at checkout where the law requires it, and may show the price in your local currency. <mark class="tbd">[OWNER TO DECIDE: tax added on top of $12/$108 (the sandbox did this) or included in it. Match this line to the prices' tax_behavior]</mark></li>
       <li>If a payment fails, Stripe tries again over the next few weeks and you keep Pro in the meantime. If every retry fails, your account goes back to Free.</li>
       <li>Some Pro features are marked "Soon" on the <a href="/pricing">pricing page</a>. If you pay before they ship, you get them at no extra cost when they do.</li>
       <li>If we raise the price of Pro, the new price is for new subscriptions. <strong>We won't raise the price of a subscription you already have.</strong></li>
@@ -136,7 +137,7 @@
       <li>New publishes follow the Free limits.</li>
       <li>If you connected your own domain, it redirects to your aired.sh links for 30 days, then disconnects.</li>
     </ul>
-    <p>Changed your mind soon after paying? You get a full refund within 14 days. See the <a href="/refunds">refund policy</a>.</p>
+    <p>Changed your mind soon after paying? You get a full refund within 14 days, and any cooling-off rights you have under the law where you live still apply. See the <a href="/refunds">refund policy</a>.</p>
 
     <h2>The service itself</h2>
     <p>We work hard to keep aired fast and online, but we can't promise it will never go down. We change and improve aired over time. If a change takes away something you pay for, we'll tell you first.</p>
@@ -153,7 +154,7 @@
     <p>When we change these terms, we update this page and the date at the top. The full history lives in the <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">public repository</a>. For changes that affect your rights or what you pay, we tell signed-in users <mark class="tbd">[OWNER TO DECIDE: how users are told, e.g. a dashboard notice or email (aired has no email sending today)]</mark> at least <mark class="tbd">[OWNER TO DECIDE: notice period, e.g. 30 days]</mark> before they take effect. If you keep using aired after that, the new terms apply. If you don't agree, stop using aired and cancel any paid plan.</p>
 
     <h2>Contact</h2>
-    <p>Questions about these terms? Email us at <mark class="tbd">[OWNER TO DECIDE: contact email. aired.sh has no email routing today, so set up an address such as legal@ or hello@aired.sh first]</mark>. To report a page, use <a href="/abuse">/abuse</a>. See also our <a href="/privacy">privacy policy</a> and <a href="/refunds">refund policy</a>.</p>
+    <p>Questions about these terms? Email us at <mark class="tbd">[OWNER TO DECIDE: support email, e.g. support@aired.sh. Required before launch: Stripe sends Managed Payments refund requests to the support email in your Stripe settings. aired.sh has no email routing today]</mark>. Questions about a payment or receipt can also go to Link support. To report a page, use <a href="/abuse">/abuse</a>. See also our <a href="/privacy">privacy policy</a> and <a href="/refunds">refund policy</a>.</p>
 
     <p class="attr">Adapted from <a href="https://github.com/basecamp/policies" target="_blank" rel="noopener">Basecamp's open-source policies</a>, available under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. This is a draft written for review by a qualified lawyer, not legal advice.</p>
   </article>
