@@ -7,6 +7,8 @@ import { readUpdateToken } from "../lib/page-token.js";
 import { TIERS } from "../lib/rate-limit-tiers.js";
 import { detectSpam, SPAM_REJECTION } from "../lib/spam.js";
 import { claimUrl } from "../lib/claim-url.js";
+import { authorizePageWrite, pageCredentials } from "../lib/claim-decision.js";
+import { deleteClaim, getClaim } from "../lib/page-claims.js";
 import { billingEnabled, getEntitlements, planLimitError, UPGRADE_URL } from "../lib/entitlements.js";
 import type { Entitlements } from "../lib/entitlements.js";
 import {
@@ -33,6 +35,17 @@ import {
 } from "../lib/owner-index.js";
 
 const api = new Hono<AppBindings>();
+
+/**
+ * The owner and token hash that count for a page. A claimed page's D1 row
+ * wins over its KV record, which can be written back stale. Throws if D1
+ * can't be read: callers fail closed rather than trust a possibly stale hash.
+ */
+async function credentialsFor(db: D1Database, id: string, metadata: PageMetadata) {
+  return pageCredentials(metadata.ownerId, metadata.tokenHash, await getClaim(db, id));
+}
+
+const CREDENTIALS_UNAVAILABLE = "Could not check this page's credentials. Please try again.";
 
 /**
  * Validate HTML against the caller's plan size limit. `response` is the error
@@ -123,7 +136,14 @@ api.post("/publish", publishRateLimit, async (c) => {
       return c.json({ error: "Page metadata is corrupted" }, 500);
     }
 
-    const valid = await verifyToken(update_token, metadata.tokenHash);
+    let creds: { ownerId: number | null; tokenHash: string };
+    try {
+      creds = await credentialsFor(c.env.DB, existingId, metadata);
+    } catch (err) {
+      console.error("page_claims lookup failed on publish update", { id: existingId, err });
+      return c.json({ error: CREDENTIALS_UNAVAILABLE }, 503);
+    }
+    const valid = await verifyToken(update_token, creds.tokenHash);
     if (!valid) {
       return c.json({ error: "Invalid update token" }, 403);
     }
@@ -140,6 +160,9 @@ api.post("/publish", publishRateLimit, async (c) => {
 
     const updated: PageMetadata = {
       ...metadata,
+      // Write the authoritative owner and hash, so a stale read can't undo a claim.
+      ownerId: creds.ownerId,
+      tokenHash: creds.tokenHash,
       title: resolvedTitle ?? metadata.title,
       size: new TextEncoder().encode(html).byteLength,
       expiresAt,
@@ -278,7 +301,7 @@ api.post("/publish", publishRateLimit, async (c) => {
 
 // PUT /api/pages/:id — update by token (body or Bearer header) or owner JWT
 api.put("/pages/:id", requireCsrfHeader, async (c) => {
-  const id = c.req.param("id");
+  const id = c.req.param("id") ?? "";
 
   let body: unknown;
   try {
@@ -320,23 +343,24 @@ api.put("/pages/:id", requireCsrfHeader, async (c) => {
 
   // Authorization: update_token (body, else Bearer header) wins (R6); else owner JWT
   const putUser = c.get('user');
-  const hasToken = update_token !== null;
-  let authorized = false;
-  let tokenValid = false;
-
-  if (hasToken) {
-    tokenValid = await verifyToken(update_token as string, metadata.tokenHash);
-    if (tokenValid) {
-      authorized = true;
-    }
+  let creds: { ownerId: number | null; tokenHash: string };
+  try {
+    creds = await credentialsFor(c.env.DB, id, metadata);
+  } catch (err) {
+    console.error("page_claims lookup failed on update", { id, err });
+    return c.json({ error: CREDENTIALS_UNAVAILABLE }, 503);
   }
+  const auth = await authorizePageWrite({
+    ownerId: creds.ownerId,
+    tokenHash: creds.tokenHash,
+    token: update_token,
+    userId: putUser?.id ?? null,
+    allowSession: true,
+    matches: (hash) => verifyToken(update_token as string, hash),
+  });
 
-  if (!authorized && putUser !== null && metadata.ownerId === putUser.id) {
-    authorized = true;
-  }
-
-  if (!authorized) {
-    if (hasToken) {
+  if (!auth.ok) {
+    if (auth.reason === "bad_token") {
       return c.json({ error: "Invalid update token" }, 403);
     }
     return c.json({ error: "update_token required" }, 400);
@@ -344,7 +368,7 @@ api.put("/pages/:id", requireCsrfHeader, async (c) => {
 
   // Anonymous pages are screened on update too, so a clean page can't be
   // swapped for spam after publishing.
-  if (metadata.ownerId === null) {
+  if (creds.ownerId === null) {
     const verdict = detectSpam(html, resolvedTitle);
     if (verdict.spam) {
       console.log({ event: "spam_rejected", route: "api_put", reason: verdict.reason });
@@ -364,6 +388,9 @@ api.put("/pages/:id", requireCsrfHeader, async (c) => {
 
   const updated: PageMetadata = {
     ...metadata,
+    // Write the authoritative owner and hash, so a stale read can't undo a claim.
+    ownerId: creds.ownerId,
+    tokenHash: creds.tokenHash,
     title: resolvedTitle ?? metadata.title,
     size: new TextEncoder().encode(html).byteLength,
     expiresAt,
@@ -377,7 +404,7 @@ api.put("/pages/:id", requireCsrfHeader, async (c) => {
 
   const origin = new URL(c.req.url).origin;
   // Return the token string back (prefer the body token; if owner-JWT path used, no token in response)
-  const returnToken = hasToken && tokenValid ? (update_token as string) : undefined;
+  const returnToken = auth.viaToken ? (update_token as string) : undefined;
 
   return c.json({
     id,
@@ -415,15 +442,22 @@ api.delete("/pages/:id", requireCsrfHeader, async (c) => {
     bodyToken = undefined;
   }
   const token = readUpdateToken(bodyToken, authHeader);
+  let creds: { ownerId: number | null; tokenHash: string };
+  try {
+    creds = await credentialsFor(c.env.DB, id, metadata);
+  } catch (err) {
+    console.error("page_claims lookup failed on delete", { id, err });
+    return c.json({ error: CREDENTIALS_UNAVAILABLE }, 503);
+  }
   if (token !== null) {
-    const valid = await verifyToken(token, metadata.tokenHash);
+    const valid = await verifyToken(token, creds.tokenHash);
     if (valid) {
       authorized = true;
     }
   }
 
   // Owner-convenience path: JWT owner match (rate-limited)
-  if (!authorized && deleteUser !== null && metadata.ownerId === deleteUser.id) {
+  if (!authorized && deleteUser !== null && creds.ownerId === deleteUser.id) {
     // Apply delete rate limit for owner-convenience path
     const deleteRateLimit = rateLimit(TIERS.delete);
     const rlResult = await deleteRateLimit(c, async () => {});
@@ -445,18 +479,23 @@ api.delete("/pages/:id", requireCsrfHeader, async (c) => {
     c.env.PAGES_BUCKET.delete(`pages/${id}/index.html`),
     c.env.PAGES_KV.delete(`page:${id}`),
   ]);
+  try {
+    await deleteClaim(c.env.DB, id);
+  } catch (err) {
+    console.error("page_claims delete failed", { id, err });
+  }
 
   // Remove from owner index (best-effort)
-  if (metadata.ownerId !== null) {
+  if (creds.ownerId !== null) {
     try {
       await removePageFromOwner(
         c.env.PAGES_KV,
-        metadata.ownerId,
+        creds.ownerId,
         id,
         metadata.createdAt,
       );
     } catch (err) {
-      console.error('owner-index delete failed', { id, ownerId: metadata.ownerId, err });
+      console.error('owner-index delete failed', { id, ownerId: creds.ownerId, err });
     }
 
     // Remove from owner+project index + decrement the manifest (best-effort)
@@ -464,14 +503,14 @@ api.delete("/pages/:id", requireCsrfHeader, async (c) => {
       try {
         await removePageFromOwnerProject(
           c.env.PAGES_KV,
-          metadata.ownerId,
+          creds.ownerId,
           metadata.project,
           id,
           metadata.createdAt,
         );
-        await bumpProjectCount(c.env.PAGES_KV, metadata.ownerId, metadata.project, -1);
+        await bumpProjectCount(c.env.PAGES_KV, creds.ownerId, metadata.project, -1);
       } catch (err) {
-        console.error('owner-project-index delete failed', { id, ownerId: metadata.ownerId, project: metadata.project, err });
+        console.error('owner-project-index delete failed', { id, ownerId: creds.ownerId, project: metadata.project, err });
       }
     }
   }

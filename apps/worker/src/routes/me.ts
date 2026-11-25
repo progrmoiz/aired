@@ -30,7 +30,9 @@ import { billingEnabled, getEntitlements, isEntitled } from '../lib/entitlements
 import { getSubscription } from '../lib/billing/store.js';
 import type { StoredSubscription } from '../lib/billing/store.js';
 import { AUTH_HEADER } from '@aired/core';
-import { decideClaim } from '../lib/claim-decision.js';
+import { addClaimResult, planClaim } from '../lib/claim-decision.js';
+import type { ClaimBatchResult } from '../lib/claim-decision.js';
+import { claimedIds, deleteClaimsForOwner, getClaim, insertClaim, replaceClaimToken } from '../lib/page-claims.js';
 
 const me = new Hono<AppBindings>();
 
@@ -156,10 +158,24 @@ me.get('/pages', async (c) => {
     project: string | null;
   }> = [];
 
-  for (const raw of rawPages) {
-    if (raw === null) continue;
-    const metadata = parseMetadata(raw);
-    if (metadata === null) continue;
+  const parsed = rawPages.map((raw) => (raw === null ? null : parseMetadata(raw)));
+
+  // A claimed page whose KV record was written back stale (ownerId null) is
+  // still this owner's: D1 page_claims says so. Best-effort; on a D1 error
+  // those pages are left out, as before.
+  let claimedHere = new Set<string>();
+  const unownedIds = parsed.flatMap((m) => (m !== null && m.ownerId === null ? [m.id] : []));
+  if (unownedIds.length > 0) {
+    try {
+      claimedHere = await claimedIds(c.env.DB, ownerId, unownedIds);
+    } catch (err) {
+      console.error('page_claims lookup failed while listing pages', { ownerId, err });
+    }
+  }
+
+  for (const found of parsed) {
+    if (found === null) continue;
+    const metadata = found.ownerId === null && claimedHere.has(found.id) ? { ...found, ownerId } : found;
     // Self-heal: filter stale index entries where ownerId doesn't match
     if (metadata.ownerId !== ownerId) continue;
     // Apply the project predicate (self-heals stale project-index entries too)
@@ -191,8 +207,8 @@ me.get('/projects', async (c) => {
 
 // POST /api/me/claim — claim a single page by id + update_token.
 // Shares the claim-batch bucket (rl:claim, 5/hour per user).
-// The response carries the page's new update_token: the one sent here stops
-// working (see lib/claim-decision.ts).
+// A first claim (or a retry of it) returns the page's new update_token, and
+// the one sent here stops working. See lib/claim-decision.ts.
 me.post('/claim', requireCsrfHeader, rateLimit(TIERS.claim_batch), async (c) => {
   const user = c.get('user')!;
 
@@ -217,7 +233,7 @@ me.post('/claim', requireCsrfHeader, rateLimit(TIERS.claim_batch), async (c) => 
     return c.json({ error: 'update_token is required' }, 400);
   }
 
-  return claimPage(c.env.PAGES_KV, user.id, id, update_token);
+  return claimPage(c.env, user.id, id, update_token);
 });
 
 // POST /api/me/claim-batch — claim multiple pages
@@ -250,11 +266,7 @@ me.post(
       return c.json({ error: 'Too many items. Maximum is 100.' }, 400);
     }
 
-    const claimed: string[] = [];
-    const failed: { id: string; reason: string }[] = [];
-    // New update token per claimed id. Kept apart from `claimed` so older
-    // clients that read `claimed` as a list of ids keep working.
-    const tokens: Record<string, string> = {};
+    const result: ClaimBatchResult = { claimed: [], failed: [], tokens: {} };
 
     for (const item of items) {
       if (
@@ -262,32 +274,26 @@ me.post(
         item === null ||
         Array.isArray(item)
       ) {
-        failed.push({ id: String((item as Record<string, unknown>)?.['id'] ?? ''), reason: 'claim failed' });
+        result.failed.push({ id: String((item as Record<string, unknown>)?.['id'] ?? ''), reason: 'claim failed' });
         continue;
       }
 
       const { id, update_token } = item as Record<string, unknown>;
 
       if (typeof id !== 'string' || typeof update_token !== 'string') {
-        failed.push({ id: typeof id === 'string' ? id : '', reason: 'claim failed' });
+        result.failed.push({ id: typeof id === 'string' ? id : '', reason: 'claim failed' });
         continue;
       }
 
       try {
-        const result = await claimPage(c.env.PAGES_KV, user.id, id, update_token);
-        const resultJson = await result.json<{ ok?: boolean; error?: string; update_token?: string }>();
-        if (resultJson.ok) {
-          claimed.push(id);
-          if (typeof resultJson.update_token === 'string') tokens[id] = resultJson.update_token;
-        } else {
-          failed.push({ id, reason: 'claim failed' });
-        }
+        const response = await claimPage(c.env, user.id, id, update_token);
+        addClaimResult(result, id, await response.json<{ ok?: boolean; update_token?: unknown }>());
       } catch {
-        failed.push({ id, reason: 'claim failed' });
+        addClaimResult(result, id, {});
       }
     }
 
-    return c.json({ claimed, failed, tokens });
+    return c.json(result);
   },
 );
 
@@ -391,6 +397,13 @@ me.delete('/', requireCsrfHeader, async (c) => {
   // Step 5: waitUntil — paginated sweep to null out ownerId on all pages
   c.executionCtx.waitUntil(
     (async () => {
+      // Claimed pages become anonymous pages again, like every other page.
+      try {
+        await deleteClaimsForOwner(c.env.DB, userId);
+      } catch (err) {
+        console.error('Failed to delete page claims during account deletion:', err);
+      }
+
       let sweepCursor: string | undefined = undefined;
 
       while (true) {
@@ -495,85 +508,109 @@ me.delete('/', requireCsrfHeader, async (c) => {
 /**
  * Internal helper: claim a single page for a user.
  * Returns a Hono Response. Both claim and claim-batch call this.
+ *
+ * D1 `page_claims` decides who owns a claimed page and which token works
+ * (lib/claim-decision.ts). The KV record is updated after it, best-effort.
  */
 async function claimPage(
-  kv: KVNamespace,
+  env: { PAGES_KV: KVNamespace; DB: D1Database },
   userId: number,
   pageId: string,
   updateToken: string,
 ): Promise<Response> {
-  // Step 1: fetch metadata
+  const kv = env.PAGES_KV;
+  const denied = () => Response.json({ error: 'claim failed' }, { status: 403 });
+
   const raw = await kv.get(kvKeys.page(pageId));
-  if (raw === null) {
-    return Response.json({ error: 'claim failed' }, { status: 403 });
-  }
-
-  // Step 2: parse
+  if (raw === null) return denied();
   const metadata = parseMetadata(raw);
-  if (metadata === null) {
-    return Response.json({ error: 'claim failed' }, { status: 403 });
-  }
+  if (metadata === null) return denied();
 
-  // Step 3: decide. Someone else's page or a wrong token is the same
-  // generic 403 (no oracle). The token is only checked for unowned pages.
-  const decision = decideClaim(
-    metadata.ownerId,
+  const matches = (hash: string) => verifyToken(updateToken, hash);
+  const now = Date.now();
+  let record = await getClaim(env.DB, pageId);
+  let plan = await planClaim({
+    kvOwnerId: metadata.ownerId,
+    kvTokenHash: metadata.tokenHash,
+    record,
     userId,
-    metadata.ownerId === null ? await verifyToken(updateToken, metadata.tokenHash) : false,
-  );
-  if (decision === 'deny') {
-    return Response.json({ error: 'claim failed' }, { status: 403 });
-  }
-
-  // Step 4: set the owner and replace the update token. Only the new hash is
-  // stored, so the token from the claim link, CLI output or a transcript is
-  // dead from here on. The owner gets the new one in the response.
-  const newToken = generateToken();
-  const updated: PageMetadata = {
-    ...metadata,
-    ownerId: userId,
-    tokenHash: await hashToken(newToken),
-  };
-  const kvOptions: KVNamespacePutOptions = {};
-  if (metadata.expiresAt !== null) {
-    kvOptions.expiration = Math.floor(Date.parse(metadata.expiresAt) / 1000);
-  }
-  await kv.put(kvKeys.page(pageId), serializeMetadata(updated), kvOptions);
-
-  const success = Response.json({
-    ok: true,
-    page: {
-      id: metadata.id,
-      title: metadata.title,
-      createdAt: metadata.createdAt,
-      expiresAt: metadata.expiresAt,
-    },
-    update_token: newToken,
+    now,
+    matches,
   });
 
-  // Already this user's page: it's in their indexes, only the token changed.
-  if (decision === 'reissue') {
-    return success;
-  }
+  const pageInfo = {
+    id: metadata.id,
+    title: metadata.title,
+    createdAt: metadata.createdAt,
+    expiresAt: metadata.expiresAt,
+  };
+  if (plan === 'deny') return denied();
+  if (plan === 'owned') return Response.json({ ok: true, page: pageInfo });
 
-  // Write owner index entry (best-effort)
-  try {
-    await addPageToOwner(kv, userId, pageId, metadata.createdAt, metadata.expiresAt);
-  } catch (err) {
-    console.error('owner-index write failed during claim', { pageId, userId, err });
-  }
+  const newToken = generateToken();
+  const newHash = await hashToken(newToken);
 
-  // Mirror create: index + count the page under its project (best-effort)
-  if (metadata.project !== null) {
-    try {
-      await addPageToOwnerProject(kv, userId, metadata.project, pageId, metadata.createdAt, metadata.expiresAt);
-      await bumpProjectCount(kv, userId, metadata.project, 1);
-    } catch (err) {
-      console.error('owner-project-index write failed during claim', { pageId, userId, project: metadata.project, err });
+  if (plan === 'claim') {
+    // Serializes claims: of two claims racing on stale KV reads, only one
+    // inserts. The loser re-plans against the row the winner wrote.
+    const inserted = await insertClaim(env.DB, pageId, {
+      ownerId: userId,
+      tokenHash: newHash,
+      prevTokenHash: metadata.tokenHash,
+      claimedAt: now,
+    });
+    if (!inserted) {
+      record = await getClaim(env.DB, pageId);
+      plan = await planClaim({
+        kvOwnerId: metadata.ownerId,
+        kvTokenHash: metadata.tokenHash,
+        record,
+        userId,
+        now,
+        matches,
+      });
+      if (plan === 'deny') return denied();
+      if (plan === 'owned') return Response.json({ ok: true, page: pageInfo });
+      if (plan === 'claim') return denied(); // a row exists, so this can't happen
     }
   }
 
-  return success;
+  if (plan === 'reissue') {
+    if (!(await replaceClaimToken(env.DB, pageId, userId, newHash))) return denied();
+  }
+
+  // Mirror the owner and hash into KV for the viewer and dashboard. D1 is
+  // the authority, so a failure here (or a later stale write-back) can't
+  // revive the old token.
+  try {
+    const updated: PageMetadata = { ...metadata, ownerId: userId, tokenHash: newHash };
+    const kvOptions: KVNamespacePutOptions = {};
+    if (metadata.expiresAt !== null) {
+      kvOptions.expiration = Math.floor(Date.parse(metadata.expiresAt) / 1000);
+    }
+    await kv.put(kvKeys.page(pageId), serializeMetadata(updated), kvOptions);
+  } catch (err) {
+    console.error('page metadata write failed during claim', { pageId, userId, err });
+  }
+
+  // Indexes only on the first claim; a reissue is the same page again.
+  if (plan === 'claim') {
+    try {
+      await addPageToOwner(kv, userId, pageId, metadata.createdAt, metadata.expiresAt);
+    } catch (err) {
+      console.error('owner-index write failed during claim', { pageId, userId, err });
+    }
+    if (metadata.project !== null) {
+      try {
+        await addPageToOwnerProject(kv, userId, metadata.project, pageId, metadata.createdAt, metadata.expiresAt);
+        await bumpProjectCount(kv, userId, metadata.project, 1);
+      } catch (err) {
+        console.error('owner-project-index write failed during claim', { pageId, userId, project: metadata.project, err });
+      }
+    }
+  }
+
+  return Response.json({ ok: true, page: pageInfo, update_token: newToken });
 }
 
 export { me };

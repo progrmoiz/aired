@@ -65,7 +65,10 @@ export function makeUpdateCommand(globalOpts: () => GlobalOpts): Command {
         }
 
         if (shouldOutputJson(opts)) {
-          process.stdout.write(JSON.stringify(result, null, 2) + '\n')
+          // Leave the token out: it's already stored, and --json output tends
+          // to end up in agent transcripts.
+          const { update_token: _token, ...shown } = result
+          process.stdout.write(JSON.stringify(shown, null, 2) + '\n')
         } else {
           process.stdout.write(pc.green('Updated!') + ' ' + pc.bold(result.url) + '\n')
           process.stdout.write(pc.dim('Expires: ') + formatExpiry(result.expiresAt) + '\n')

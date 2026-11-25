@@ -18,10 +18,13 @@ import {
   DEFAULT_TTL,
 } from "@aired/core";
 import type { PageMetadata } from "@aired/core";
+import { pageCredentials } from "../lib/claim-decision.js";
+import { getClaim } from "../lib/page-claims.js";
 
 function createAiredMcpServer(env: {
   PAGES_BUCKET: R2Bucket;
   PAGES_KV: KVNamespace;
+  DB: D1Database;
   SITE_ORIGIN?: string;
 }) {
   const server = new McpServer({
@@ -97,7 +100,23 @@ function createAiredMcpServer(env: {
           };
         }
 
-        const valid = await verifyToken(update_token, metadata.tokenHash);
+        // A claimed page's D1 row wins over its KV record, which can be
+        // written back stale. Fail closed if D1 can't be read.
+        let tokenHash: string;
+        try {
+          tokenHash = pageCredentials(
+            metadata.ownerId,
+            metadata.tokenHash,
+            await getClaim(env.DB, existingId),
+          ).tokenHash;
+        } catch (err) {
+          console.error("page_claims lookup failed on MCP update", { id: existingId, err });
+          return {
+            content: [{ type: "text" as const, text: "Could not check this page's credentials. Please try again." }],
+            isError: true,
+          };
+        }
+        const valid = await verifyToken(update_token, tokenHash);
         if (!valid) {
           return {
             content: [{ type: "text" as const, text: "Invalid update token" }],
