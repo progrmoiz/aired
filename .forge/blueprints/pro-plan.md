@@ -586,7 +586,7 @@ The `users.id` never changes, so `ownerId` in KV, owner indexes, `subscriptions`
 - **Verification:** MCP Inspector against `localhost:8787/mcp` with `Authorization: Bearer <key>`: `publish_html`, then `list_pages` shows the page; without the header, `list_pages` returns "Sign in required".
 - **Dependencies:** Task 4.2
 
-#### Task 5.2: Add OAuth to the remote MCP for connector clients — WAITING on approval to add @cloudflare/workers-oauth-provider
+#### Task 5.2: Add OAuth to the remote MCP for connector clients — DONE 8c036af (dependency e7aa615; fixes e88aef8; docs dcd31df)
 - **Size:** L
 - **Acceptance criteria:**
   - [ ] `/mcp` advertises OAuth protected-resource metadata; `@cloudflare/workers-oauth-provider` serves `/authorize` and `/token`, accepts Client ID Metadata Documents (preferred by the 2026-07-28 MCP spec) and dynamic registration (still used by older clients), and `/authorize` reuses the aired session (sign in via `/login`, then `consent.html`). API keys keep working on the same endpoint via `resolveExternalToken`.
