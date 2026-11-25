@@ -547,6 +547,9 @@
   function setPlanButton() {
     var btn = document.getElementById('plan-action');
     if (!btn) return;
+    // Auto-renewal notice next to the buy button only.
+    var renew = document.getElementById('plan-renew');
+    if (renew) renew.classList.toggle('hidden', plan.mode !== 'checkout');
     if (!plan.mode) {
       btn.className = 'hidden';
       btn.disabled = false;
