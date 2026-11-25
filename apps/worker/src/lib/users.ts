@@ -19,13 +19,35 @@ export async function findIdentityUser(
   return row?.user_id ?? null;
 }
 
-/** The account holding this verified email in D1, if exactly one does. */
-export async function findVerifiedEmailOwner(db: D1Database, email: string): Promise<number | null> {
+export type EmailOwner = { kind: 'none' } | { kind: 'one'; userId: number } | { kind: 'ambiguous' };
+
+/**
+ * Who holds this verified email in D1. "ambiguous" (two or more accounts) is
+ * its own answer, so a caller can't mistake it for "nobody" and look elsewhere.
+ */
+export async function findVerifiedEmailOwner(db: D1Database, email: string): Promise<EmailOwner> {
   const { results } = await db
-    .prepare('SELECT DISTINCT user_id FROM identities WHERE email = ? AND email_verified = 1 LIMIT 2')
-    .bind(email)
+    .prepare('SELECT DISTINCT user_id FROM identities WHERE lower(email) = ? AND email_verified = 1 LIMIT 2')
+    .bind(email.trim().toLowerCase())
     .all<{ user_id: number }>();
-  return results.length === 1 ? results[0]!.user_id : null;
+  if (results.length === 0) return { kind: 'none' };
+  if (results.length > 1) return { kind: 'ambiguous' };
+  return { kind: 'one', userId: results[0]!.user_id };
+}
+
+/** Whether D1 has any sign-in identity for this account. */
+export async function userHasIdentities(db: D1Database, userId: number): Promise<boolean> {
+  const row = await db.prepare('SELECT 1 AS x FROM identities WHERE user_id = ? LIMIT 1').bind(userId).first<{ x: number }>();
+  return row !== null;
+}
+
+/** Every email this account's identities carry (lower-cased), for account deletion. */
+export async function identityEmails(db: D1Database, userId: number): Promise<string[]> {
+  const { results } = await db
+    .prepare('SELECT DISTINCT lower(email) AS email FROM identities WHERE user_id = ? AND email IS NOT NULL')
+    .bind(userId)
+    .all<{ email: string }>();
+  return results.map((r) => r.email);
 }
 
 /** Make sure a users row exists for this id (GitHub-era accounts). */
@@ -54,18 +76,27 @@ export async function createUser(
   return row.id;
 }
 
-/** Record that this provider identity signs in as this account. Idempotent. */
+/**
+ * Record that this provider identity signs in as this account. Idempotent.
+ * Stores the email lower-cased. Returns the account the identity belongs to:
+ * when it was already linked to another account, that one, and the caller
+ * must not sign in as the account it asked for.
+ */
 export async function linkIdentity(
   db: D1Database,
   identity: { provider: IdentityProvider; subject: string; userId: number; email: string | null; emailVerified: boolean },
   now: string,
-): Promise<void> {
-  await db
+): Promise<number> {
+  const email = identity.email?.trim().toLowerCase() || null;
+  const row = await db
     .prepare(
       `INSERT INTO identities (provider, subject, user_id, email, email_verified, created_at)
        VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT (provider, subject) DO UPDATE SET email = excluded.email, email_verified = excluded.email_verified`,
+       ON CONFLICT (provider, subject) DO UPDATE SET email = excluded.email, email_verified = excluded.email_verified
+       RETURNING user_id`,
     )
-    .bind(identity.provider, identity.subject, identity.userId, identity.email, identity.emailVerified ? 1 : 0, now)
-    .run();
+    .bind(identity.provider, identity.subject, identity.userId, email, identity.emailVerified ? 1 : 0, now)
+    .first<{ user_id: number }>();
+  if (row === null) throw new Error('identities upsert returned no row');
+  return row.user_id;
 }

@@ -29,6 +29,7 @@ import { clearSessionCookie, readSessionCookie } from '../lib/cookies.js';
 import { billingEnabled, getEntitlements, isEntitled } from '../lib/entitlements.js';
 import { getCustomerId, getSubscription } from '../lib/billing/store.js';
 import { blocksAccountDeletion, deleteAccountRows } from '../lib/billing/forget.js';
+import { identityEmails } from '../lib/users.js';
 import { listActiveSubscriptions } from '../lib/billing/stripe.js';
 import { isMissingCustomer } from '../lib/billing/stripe-shapes.js';
 import type { StoredSubscription } from '../lib/billing/store.js';
@@ -343,6 +344,14 @@ me.delete('/', requireSession, requireCsrfHeader, async (c) => {
   // Billing, sign-in and API key rows in D1 go before anything else, so a
   // failure can be retried with the account intact (and no key outlives the
   // account). Link (Stripe) keeps its own record of each sale.
+  // The emails this account signed in with, read before its identities go:
+  // their email index entries go too (below) if they still point here.
+  let linkedEmails: string[] = [];
+  try {
+    linkedEmails = await identityEmails(c.env.DB, userId);
+  } catch (err) {
+    console.error('Failed to read identity emails during account deletion:', err);
+  }
   try {
     await deleteAccountRows(c.env.DB, userId);
   } catch (err) {
@@ -399,11 +408,13 @@ me.delete('/', requireSession, requireCsrfHeader, async (c) => {
     }
   }
 
-  // Step 2: Delete user record and email index
+  // Step 2: Delete user record and email index entries. An entry is deleted
+  // only while it points at this account: another account may hold it now.
   try {
     const userRaw = await c.env.PAGES_KV.get(kvKeys.user(userId));
     await c.env.PAGES_KV.delete(kvKeys.user(userId));
 
+    const emails = new Set(linkedEmails);
     if (userRaw !== null) {
       try {
         const userRecord: unknown = JSON.parse(userRaw);
@@ -412,11 +423,15 @@ me.delete('/', requireSession, requireCsrfHeader, async (c) => {
           userRecord !== null &&
           typeof (userRecord as Record<string, unknown>)['email'] === 'string'
         ) {
-          const email = (userRecord as Record<string, unknown>)['email'] as string;
-          await c.env.PAGES_KV.delete(kvKeys.emailIndex(email));
+          emails.add(((userRecord as Record<string, unknown>)['email'] as string).toLowerCase());
         }
       } catch {
         // ignore parse errors
+      }
+    }
+    for (const email of emails) {
+      if ((await c.env.PAGES_KV.get(kvKeys.emailIndex(email))) === String(userId)) {
+        await c.env.PAGES_KV.delete(kvKeys.emailIndex(email));
       }
     }
   } catch (err) {

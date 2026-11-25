@@ -5,7 +5,8 @@
  * In this order, first match wins:
  * 1. The WorkOS user already has an identity row: that account.
  * 2. They signed in with GitHub and WorkOS passed the GitHub id: the account
- *    that GitHub id already has (GitHub-era accounts use it as their id).
+ *    that GitHub id already signs in as (its identity row, else the
+ *    GitHub-era account whose id is the GitHub id).
  * 3. WorkOS says the email is verified, it isn't a GitHub noreply address,
  *    and an existing account holds the same verified email: that account.
  * 4. Otherwise a new account.
@@ -17,10 +18,8 @@
 export type LinkInput = {
   /** Account id from identities(workos, <WorkOS user id>), if any. */
   workosIdentityUserId: number | null;
-  /** The numeric GitHub id, when the sign-in was GitHub and WorkOS returned it. */
-  githubId: number | null;
-  /** Whether an aired account already uses that GitHub id. */
-  githubAccountExists: boolean;
+  /** The account that GitHub id already signs in as, if any. */
+  githubAccountUserId: number | null;
   email: string | null;
   emailVerified: boolean;
   /** The account holding this email as a verified address, if any. */
@@ -30,6 +29,14 @@ export type LinkInput = {
 export type LinkDecision =
   | { kind: 'existing'; userId: number; via: 'workos' | 'github' | 'email' }
   | { kind: 'new' };
+
+/** Ids from the users sequence start here; real GitHub ids are far below it. */
+export const NEW_ACCOUNT_ID_START = 1_000_000_000_000;
+
+/** A plausible GitHub user id: a positive integer below the new-account range. */
+export function isGithubId(id: unknown): id is number {
+  return typeof id === 'number' && Number.isSafeInteger(id) && id > 0 && id < NEW_ACCOUNT_ID_START;
+}
 
 export function isGithubNoreply(email: string | null): boolean {
   return email !== null && /@users\.noreply\.github\.com$/i.test(email.trim());
@@ -45,8 +52,8 @@ export function decideLink(input: LinkInput): LinkDecision {
   if (input.workosIdentityUserId !== null) {
     return { kind: 'existing', userId: input.workosIdentityUserId, via: 'workos' };
   }
-  if (input.githubId !== null && input.githubAccountExists) {
-    return { kind: 'existing', userId: input.githubId, via: 'github' };
+  if (input.githubAccountUserId !== null) {
+    return { kind: 'existing', userId: input.githubAccountUserId, via: 'github' };
   }
   if (
     input.emailVerified &&

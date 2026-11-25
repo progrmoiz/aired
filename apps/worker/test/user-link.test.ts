@@ -2,19 +2,30 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
-import { decideLink, isGithubNoreply, loginFor, normalizeEmail, type LinkInput } from "../src/lib/user-link.ts";
-import { createUser, ensureUserRow, findIdentityUser, findVerifiedEmailOwner, linkIdentity } from "../src/lib/users.ts";
+import { decideLink, isGithubId, isGithubNoreply, loginFor, normalizeEmail, type LinkInput } from "../src/lib/user-link.ts";
+import { createUser, ensureUserRow, findIdentityUser, findVerifiedEmailOwner, identityEmails, linkIdentity, userHasIdentities } from "../src/lib/users.ts";
 
-const base: LinkInput = { workosIdentityUserId: null, githubId: null, githubAccountExists: false, email: null, emailVerified: false, verifiedEmailOwner: null };
+const base: LinkInput = { workosIdentityUserId: null, githubAccountUserId: null, email: null, emailVerified: false, verifiedEmailOwner: null };
 
 test("a known WorkOS identity wins over everything", () => {
-  assert.deepEqual(decideLink({ ...base, workosIdentityUserId: 5, githubId: 9, githubAccountExists: true, email: "a@b.co", emailVerified: true, verifiedEmailOwner: 7 }), { kind: "existing", userId: 5, via: "workos" });
+  assert.deepEqual(decideLink({ ...base, workosIdentityUserId: 5, githubAccountUserId: 9, email: "a@b.co", emailVerified: true, verifiedEmailOwner: 7 }), { kind: "existing", userId: 5, via: "workos" });
 });
 
-test("a GitHub sign-in links to the GitHub-era account with that id", () => {
-  assert.deepEqual(decideLink({ ...base, githubId: 9001, githubAccountExists: true }), { kind: "existing", userId: 9001, via: "github" });
-  // A GitHub id with no account doesn't link on its own.
-  assert.deepEqual(decideLink({ ...base, githubId: 9001, githubAccountExists: false }), { kind: "new" });
+test("a GitHub sign-in links to the account that GitHub id signs in as", () => {
+  assert.deepEqual(decideLink({ ...base, githubAccountUserId: 9001 }), { kind: "existing", userId: 9001, via: "github" });
+  // Its identity may point at a newer account, not the GitHub id itself.
+  assert.deepEqual(decideLink({ ...base, githubAccountUserId: 1_000_000_000_007 }), { kind: "existing", userId: 1_000_000_000_007, via: "github" });
+  assert.deepEqual(decideLink({ ...base }), { kind: "new" });
+});
+
+test("only plausible GitHub ids count", () => {
+  assert.equal(isGithubId(4242), true);
+  assert.equal(isGithubId(999_999_999_999), true);
+  assert.equal(isGithubId(1_000_000_000_000), false);
+  assert.equal(isGithubId(0), false);
+  assert.equal(isGithubId(-1), false);
+  assert.equal(isGithubId(1.5), false);
+  assert.equal(isGithubId("4242"), false);
 });
 
 test("a verified email links to the account holding it", () => {
@@ -78,14 +89,28 @@ test("identities: link once, find by provider and subject, find verified email o
   await linkIdentity(db, { provider: "github", subject: "4242", userId: 4242, email: "kim@example.com", emailVerified: true }, NOW);
   assert.equal(await findIdentityUser(db, "github", "4242"), 4242);
   assert.equal(await findIdentityUser(db, "workos", "user_01"), null);
-  assert.equal(await findVerifiedEmailOwner(db, "kim@example.com"), 4242);
+  assert.deepEqual(await findVerifiedEmailOwner(db, "kim@example.com"), { kind: "one", userId: 4242 });
+  assert.equal(await userHasIdentities(db, 4242), true);
   // Unverified emails don't count.
   const other = await createUser(db, { login: "x", email: null, name: null }, NOW);
   await linkIdentity(db, { provider: "workos", subject: "user_02", userId: other, email: "spoof@example.com", emailVerified: false }, NOW);
-  assert.equal(await findVerifiedEmailOwner(db, "spoof@example.com"), null);
-  // Two accounts with the same verified email: ambiguous, so no link.
+  assert.deepEqual(await findVerifiedEmailOwner(db, "spoof@example.com"), { kind: "none" });
+  // Two accounts with the same verified email: ambiguous, its own answer.
   await linkIdentity(db, { provider: "workos", subject: "user_03", userId: other, email: "kim@example.com", emailVerified: true }, NOW);
-  assert.equal(await findVerifiedEmailOwner(db, "kim@example.com"), null);
+  assert.deepEqual(await findVerifiedEmailOwner(db, "kim@example.com"), { kind: "ambiguous" });
+  assert.deepEqual((await identityEmails(db, other)).sort(), ["kim@example.com", "spoof@example.com"]);
+});
+
+test("identities store emails lower-cased, match any case, and report who an identity already belongs to", async () => {
+  const db = d1();
+  await ensureUserRow(db, { id: 77, login: "gh", email: null, name: null }, NOW);
+  assert.equal(await linkIdentity(db, { provider: "github", subject: "77", userId: 77, email: "Kim@Example.COM", emailVerified: true }, NOW), 77);
+  assert.deepEqual(await findVerifiedEmailOwner(db, "kim@example.com"), { kind: "one", userId: 77 });
+  assert.deepEqual(await findVerifiedEmailOwner(db, "KIM@example.com"), { kind: "one", userId: 77 });
+  assert.deepEqual(await identityEmails(db, 77), ["kim@example.com"]);
+  // The same identity asked to link to a different account: the stored owner comes back.
+  assert.equal(await linkIdentity(db, { provider: "github", subject: "77", userId: 88, email: "kim@example.com", emailVerified: true }, NOW), 77);
+  assert.equal(await findIdentityUser(db, "github", "77"), 77);
 });
 
 test("migration 0007 adds auth_tokens and users.sessions_valid_since without touching existing rows", () => {

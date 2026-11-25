@@ -26,29 +26,12 @@ import { requireAuth } from '../middleware/auth.js';
 import { requireCsrfHeader } from '../middleware/csrf.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { TIERS } from '../lib/rate-limit-tiers.js';
-import { recordGithubSignIn, upsertUserRecord } from '../lib/resolve-user.js';
+import { resolveGithubSignIn } from '../lib/resolve-user.js';
 import { constantTimeEqual, finishSignIn, isAllowedReturn, type AuthState } from '../lib/sign-in.js';
 import { workosEnabled } from '../lib/workos.js';
 import { startWorkosSignIn } from './auth-workos.js';
 
 const auth = new Hono<AppBindings>();
-
-/**
- * Save a GitHub sign-in: the KV user record (as before), then the D1 identity
- * so a later WorkOS sign-in links to the same account. The D1 part is
- * best-effort: a D1 problem must never block a GitHub sign-in.
- */
-async function saveGithubUser(
-  env: AppBindings['Bindings'],
-  user: { id: number; login: string; email: string | null; name: string | null },
-): Promise<void> {
-  await upsertUserRecord(env.PAGES_KV, user, user.email !== null);
-  try {
-    await recordGithubSignIn(env, user);
-  } catch (err) {
-    console.error('Failed to record GitHub identity in D1:', err);
-  }
-}
 
 // GET /auth/github — initiate web OAuth flow
 auth.get('/github', rateLimit(TIERS.oauth_init), async (c) => {
@@ -198,11 +181,9 @@ auth.get('/callback', rateLimit(TIERS.oauth_init), async (c) => {
 
   // Apply redactNoreplyEmail defensively (fetchUser already filters, but defense-in-depth)
   const safeEmail = redactNoreplyEmail(ghUser.email);
-  const user = { ...ghUser, email: safeEmail };
-
-  // Upsert user record
+  let user;
   try {
-    await saveGithubUser(c.env, user);
+    user = await resolveGithubSignIn(c.env, { ...ghUser, email: safeEmail });
   } catch (err) {
     console.error('Failed to upsert user record:', err);
     return c.redirect('/?login_failed=1', 302);
@@ -386,10 +367,9 @@ auth.post('/device/poll', rateLimit(TIERS.oauth_init), async (c) => {
     }
 
     const safeEmail = redactNoreplyEmail(ghUser.email);
-    const user = { ...ghUser, email: safeEmail };
-
+    let user;
     try {
-      await saveGithubUser(c.env, user);
+      user = await resolveGithubSignIn(c.env, { ...ghUser, email: safeEmail });
     } catch (err) {
       console.error('Failed to upsert user on device poll:', err);
       return c.json({ error: 'server error' }, 500);

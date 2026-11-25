@@ -1,6 +1,13 @@
 import { kvKeys } from '@aired/core';
-import { decideLink, isGithubNoreply, loginFor, normalizeEmail } from './user-link.js';
-import { createUser, ensureUserRow, findIdentityUser, findVerifiedEmailOwner, linkIdentity } from './users.js';
+import { decideLink, isGithubId, isGithubNoreply, loginFor, normalizeEmail } from './user-link.js';
+import {
+  createUser,
+  ensureUserRow,
+  findIdentityUser,
+  findVerifiedEmailOwner,
+  linkIdentity,
+  userHasIdentities,
+} from './users.js';
 
 /**
  * Turn a sign-in into an aired account (blueprint Task 3.1). The decision is
@@ -39,11 +46,13 @@ export async function upsertUserRecord(
   }
 }
 
-async function kvUser(kv: KVNamespace, id: number): Promise<{ login?: string; name?: string | null } | null> {
+type UserRecord = { login?: string; email?: string | null; name?: string | null };
+
+async function kvUser(kv: KVNamespace, id: number): Promise<UserRecord | null> {
   const raw = await kv.get(kvKeys.user(id));
   if (raw === null) return null;
   try {
-    return JSON.parse(raw) as { login?: string; name?: string | null };
+    return JSON.parse(raw) as UserRecord;
   } catch {
     return null;
   }
@@ -55,36 +64,56 @@ export type WorkosProfile = {
   emailVerified: boolean;
   firstName: string | null;
   lastName: string | null;
-  /** The numeric GitHub id, when they signed in with GitHub and WorkOS passed it. */
+  /**
+   * The numeric GitHub id. Only ever from api.github.com/user, read with the
+   * provider token WorkOS returned for a GitHub sign-in; never from a field
+   * the person signing in can set.
+   */
   githubId: number | null;
 };
+
+/**
+ * The account a GitHub-era email index entry points at, if it still holds
+ * that email. The index is last-writer-wins and nothing clears it when an
+ * address changes, so an entry only counts when the account's own record
+ * still says this email and D1 doesn't know the account under other emails.
+ */
+async function indexedEmailOwner(env: Env, email: string): Promise<number | null> {
+  const indexed = Number(await env.PAGES_KV.get(kvKeys.emailIndex(email)));
+  if (!Number.isSafeInteger(indexed) || indexed <= 0) return null;
+  const record = await kvUser(env.PAGES_KV, indexed);
+  if (record === null || normalizeEmail(record.email) !== email) return null;
+  // D1 found no identity with this email; if it knows this account by others, the entry is stale.
+  if (await userHasIdentities(env.DB, indexed)) return null;
+  return indexed;
+}
 
 /** The aired account for a WorkOS sign-in, created if needed. */
 export async function resolveWorkosUser(env: Env, profile: WorkosProfile): Promise<SignedInUser> {
   const email = normalizeEmail(profile.email);
+  const verifiedEmail = profile.emailVerified && email !== null && !isGithubNoreply(email) ? email : null;
   const name = [profile.firstName, profile.lastName].filter(Boolean).join(' ') || null;
+  const githubId = isGithubId(profile.githubId) ? profile.githubId : null;
   const now = new Date().toISOString();
 
   const workosIdentityUserId = await findIdentityUser(env.DB, 'workos', profile.workosUserId);
-  let githubAccountExists = false;
-  if (workosIdentityUserId === null && profile.githubId !== null) {
-    githubAccountExists =
-      (await findIdentityUser(env.DB, 'github', String(profile.githubId))) !== null ||
-      (await env.PAGES_KV.get(kvKeys.user(profile.githubId))) !== null;
+  let githubAccountUserId: number | null = null;
+  if (workosIdentityUserId === null && githubId !== null) {
+    githubAccountUserId =
+      (await findIdentityUser(env.DB, 'github', String(githubId))) ??
+      ((await env.PAGES_KV.get(kvKeys.user(githubId))) !== null ? githubId : null);
   }
   let verifiedEmailOwner: number | null = null;
-  if (workosIdentityUserId === null && !githubAccountExists && profile.emailVerified && email !== null && !isGithubNoreply(email)) {
-    verifiedEmailOwner = await findVerifiedEmailOwner(env.DB, email);
-    if (verifiedEmailOwner === null) {
-      const indexed = Number(await env.PAGES_KV.get(kvKeys.emailIndex(email)));
-      if (Number.isSafeInteger(indexed) && indexed > 0) verifiedEmailOwner = indexed;
-    }
+  if (workosIdentityUserId === null && githubAccountUserId === null && verifiedEmail !== null) {
+    const owner = await findVerifiedEmailOwner(env.DB, verifiedEmail);
+    // Two accounts holding the address is no answer: make a new account.
+    if (owner.kind === 'one') verifiedEmailOwner = owner.userId;
+    else if (owner.kind === 'none') verifiedEmailOwner = await indexedEmailOwner(env, verifiedEmail);
   }
 
   const decision = decideLink({
     workosIdentityUserId,
-    githubId: profile.githubId,
-    githubAccountExists,
+    githubAccountUserId,
     email,
     emailVerified: profile.emailVerified,
     verifiedEmailOwner,
@@ -92,48 +121,81 @@ export async function resolveWorkosUser(env: Env, profile: WorkosProfile): Promi
 
   let user: SignedInUser;
   if (decision.kind === 'existing') {
-    // Keep an existing account's login and name (a GitHub login stays).
+    // Keep an existing account's login and name (a GitHub login stays), and
+    // its email unless WorkOS vouches for the new one.
     const existing = await kvUser(env.PAGES_KV, decision.userId);
     user = {
       id: decision.userId,
-      login: existing?.login ?? loginFor(email, name),
-      email: email ?? null,
+      login: existing?.login ?? loginFor(verifiedEmail, name),
+      email: verifiedEmail ?? existing?.email ?? null,
       name: existing?.name ?? name,
     };
     await ensureUserRow(env.DB, user, now);
   } else {
-    const login = loginFor(email, name);
-    user = { id: await createUser(env.DB, { login, email, name }, now), login, email, name };
+    // An unverified address isn't stored as the account's email.
+    const login = loginFor(verifiedEmail, name);
+    user = { id: await createUser(env.DB, { login, email: verifiedEmail, name }, now), login, email: verifiedEmail, name };
   }
 
-  await linkIdentity(
+  const linkedTo = await linkIdentity(
     env.DB,
-    { provider: 'workos', subject: profile.workosUserId, userId: user.id, email, emailVerified: profile.emailVerified },
+    { provider: 'workos', subject: profile.workosUserId, userId: user.id, email, emailVerified: verifiedEmail !== null },
     now,
   );
-  // A GitHub id seen through WorkOS also signs in the legacy GitHub way.
-  if (profile.githubId !== null && (decision.kind === 'new' || (decision.kind === 'existing' && decision.via === 'github'))) {
-    await linkIdentity(
+  // Two first sign-ins racing: the other one linked first. Fail; the retry finds it.
+  if (linkedTo !== user.id) throw new Error('WorkOS identity is linked to another account');
+  // The GitHub id now signs in as this account the legacy GitHub way too.
+  if (githubId !== null && (decision.kind === 'new' || decision.via === 'github')) {
+    const githubLinkedTo = await linkIdentity(
       env.DB,
-      { provider: 'github', subject: String(profile.githubId), userId: user.id, email, emailVerified: profile.emailVerified },
+      { provider: 'github', subject: String(githubId), userId: user.id, email, emailVerified: verifiedEmail !== null },
       now,
     );
+    if (githubLinkedTo !== user.id) throw new Error('GitHub identity is linked to another account');
   }
-  await upsertUserRecord(env.PAGES_KV, user, profile.emailVerified);
+  await upsertUserRecord(env.PAGES_KV, user, user.email !== null && user.email === verifiedEmail);
   return user;
 }
 
 /**
- * The legacy GitHub sign-in: the account id is the GitHub id. Records the
- * identity in D1 so a later WorkOS sign-in links to it. GitHub only returns a
- * verified primary email (lib/github.ts), so the email counts as verified.
+ * The legacy GitHub sign-in (web and device flow). A GitHub-era account's id
+ * is the GitHub id; but when this GitHub identity was first seen through
+ * WorkOS it belongs to a newer account, and it signs in as that one.
+ * GitHub only returns a verified email (lib/github.ts), so it counts as
+ * verified. The D1 parts are best-effort: if D1 is down, sign-in works as it
+ * did before D1 knew about identities.
  */
-export async function recordGithubSignIn(env: Env, user: SignedInUser): Promise<void> {
+export async function resolveGithubSignIn(env: Env, gh: SignedInUser): Promise<SignedInUser> {
   const now = new Date().toISOString();
-  await ensureUserRow(env.DB, user, now);
-  await linkIdentity(
-    env.DB,
-    { provider: 'github', subject: String(user.id), userId: user.id, email: user.email, emailVerified: user.email !== null },
-    now,
-  );
+  let accountId = gh.id;
+  try {
+    accountId = (await findIdentityUser(env.DB, 'github', String(gh.id))) ?? gh.id;
+  } catch (err) {
+    console.error('Failed to read GitHub identity from D1:', err);
+  }
+
+  if (accountId !== gh.id) {
+    const existing = await kvUser(env.PAGES_KV, accountId);
+    const user: SignedInUser = {
+      id: accountId,
+      login: existing?.login ?? gh.login,
+      email: existing?.email ?? gh.email,
+      name: existing?.name ?? gh.name,
+    };
+    if (existing === null) await upsertUserRecord(env.PAGES_KV, user, false);
+    return user;
+  }
+
+  await upsertUserRecord(env.PAGES_KV, gh, gh.email !== null);
+  try {
+    await ensureUserRow(env.DB, gh, now);
+    await linkIdentity(
+      env.DB,
+      { provider: 'github', subject: String(gh.id), userId: gh.id, email: gh.email, emailVerified: gh.email !== null },
+      now,
+    );
+  } catch (err) {
+    console.error('Failed to record GitHub identity in D1:', err);
+  }
+  return gh;
 }
