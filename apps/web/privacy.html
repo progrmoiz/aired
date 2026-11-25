@@ -68,13 +68,13 @@
     <ul>
       <li>You can publish without an account. Then we know almost nothing about you.</li>
       <li>If you sign in, we keep your GitHub id, username, name and email.</li>
-      <li>If you pay, Stripe handles your card. We never see the card number.</li>
+      <li>If you pay, Link (Stripe) handles your card. We never see the card number.</li>
       <li>People who open your pages don't need an account. We count views and the country they came from. We don't store their IP address.</li>
       <li>We don't put ads or trackers on your pages, and we don't sell or rent anyone's data.</li>
     </ul>
 
     <h2>Who we are</h2>
-    <p>aired is run by M&amp;S CapitalSoft LLC, 312 W 2nd St, Unit #A3467, Casper, Wyoming 82601, United States. We decide how the data on this page is used, which makes us its "controller" under data protection law. Reach us at <mark class="tbd">[OWNER TO DECIDE: privacy contact email. aired.sh has no email routing today]</mark>.</p>
+    <p>aired is run by M&amp;S CapitalSoft LLC, 312 W 2nd St, Unit #A3467, Casper, Wyoming 82601, United States. We decide how the data on this page is used, which makes us its "controller" under data protection law. Reach us at <a href="mailto:support@aired.sh">support@aired.sh</a>.</p>
     <p>One exception: publishers decide what goes on their own pages. If a page contains personal data, the person who published it is responsible for it.</p>
 
     <h2>What we collect and why</h2>
@@ -82,7 +82,7 @@
     <h3>When you publish a page</h3>
     <ul>
       <li><strong>The page itself</strong>: the HTML you send and its title. We need it to show the page to people with the link.</li>
-      <li><strong>Page settings</strong>: expiry, PIN, view limit, project, size and when you published. We keep the PIN so we can check it when someone enters it.</li>
+      <li><strong>Page settings</strong>: expiry, PIN, view limit, project, size and when you published. We store your PIN exactly as you typed it, not scrambled, so we can check it when someone enters it. A PIN keeps casual visitors out. It isn't a password, so don't reuse one you use anywhere else.</li>
       <li><strong>A scrambled copy of your update token</strong>, so we can check it when you edit or delete the page. We never keep the token itself.</li>
       <li><strong>Your account id</strong>, if you were signed in, so the page shows up in your dashboard.</li>
       <li><strong>A one-way hash of your IP address</strong>, held in memory only, to enforce publishing limits. It disappears when the limit window resets, after an hour (a day for Pro's daily limit). We never write your IP address to storage.</li>
@@ -94,56 +94,54 @@
     <ul>
       <li>Your GitHub numeric id, so your account survives a username change.</li>
       <li>Your GitHub username and display name, to show in your dashboard.</li>
-      <li>Your primary email, only if it's verified and not a GitHub "noreply" address. Otherwise we store nothing. We use it to recognize your account. <strong>We don't send marketing email.</strong></li>
+      <li>Your primary email, only if it's verified and not a GitHub "noreply" address. Otherwise we store nothing. We use it to recognize your account. <strong>We don't send marketing email.</strong> If we ever send product news, you'll have to opt in. Link sends your receipts and billing emails.</li>
       <li>Your projects and the list of pages you own.</li>
     </ul>
 
     <h3>When you pay for Pro</h3>
-    <p>Stripe collects your card details, name, email and billing address on its own checkout page. <strong>We never see or store your card number.</strong> Stripe sends us back, and we keep:</p>
+    <p>Link, Stripe's checkout, collects your card details, name, email and billing address on its own checkout page. <strong>We never see or store your card number.</strong> Stripe sends us back, and we keep:</p>
     <ul>
       <li>Your Stripe customer id and subscription id.</li>
       <li>Your plan, whether you pay monthly or yearly, its status, when the current period ends and whether it's set to cancel.</li>
     </ul>
-    <p>We need these to turn Pro on and off, and to keep the billing records tax law asks for.</p>
+    <p>We need these to turn Pro on and off, and to answer questions about a payment.</p>
 
     <h3>When you open a page</h3>
     <p>You never need an account to view a page. When you open one, we:</p>
     <ul>
       <li>Add one to that page's view count, which the publisher sees.</li>
-      <li>Add one to a site-wide count of views per country. The country comes from Cloudflare, which works it out from your connection (for example "DE").</li>
-      <li>Keep a list of the 20 most recent views across all of aired, with the page title, the country and the time, so we can see that aired is working.</li>
+      <li>Add one to a site-wide count of views per country. The country comes from Cloudflare, which works it out from your connection (for example "DE"). That count doesn't record which page you opened.</li>
     </ul>
-    <p>We don't store your IP address. We don't set a cookie unless you enter a PIN. Pro's view analytics (views over time, countries and referrers) are coming soon. <mark class="tbd">[OWNER TO DECIDE: describe exactly what Pro analytics records, e.g. referrer and where it's stored, before that feature ships]</mark></p>
+    <p>We don't store your IP address. We don't set a cookie unless you enter a PIN. Pro's view analytics aren't built yet. We'll update this policy, and tell signed-in users, before they record anything.</p>
     <p>A publisher's page can contain its own scripts, including its own analytics. Those belong to the publisher, not us. We don't add ads or trackers. The only thing we add, on Free pages, is the aired badge.</p>
 
     <h3>When you report a page</h3>
     <p>The form on <a href="/abuse">/abuse</a> sends us the page link, the reason you picked, your description, and your email if you choose to give it. We use it to review the page and, if you asked, to reply. We delete reports after 30 days.</p>
 
     <h3>On our own website</h3>
-    <p>We use Cloudflare Web Analytics to count visits to aired.sh's own pages, like the homepage, pricing and docs. It sets no cookies and doesn't track you across sites; it records things like which page was viewed, the referring site, your browser and your country. It doesn't run on pages people publish: those pages block it. Our pages load fonts from Google Fonts, which means your browser asks Google for the font files and Google sees your IP address. <mark class="tbd">[OWNER TO DECIDE: self-host the Inter and JetBrains Mono fonts to remove Google from this list, or keep this disclosure]</mark></p>
+    <p>We use Cloudflare Web Analytics to count visits to aired.sh's own pages, like the homepage, pricing and docs. It sets no cookies and doesn't track you across sites. It records things like which page was viewed, the referring site, your browser and your country. It doesn't run on pages people publish: those pages block it. Our pages load fonts from Google Fonts, which means your browser asks Google for the font files and Google sees your IP address.</p>
 
     <h2>Our legal reasons</h2>
     <p>If you're in the EU or UK, the law asks us to say why we're allowed to use your data:</p>
     <ul>
       <li><strong>To provide aired to you</strong> (a contract): publishing, your account and your Pro plan.</li>
-      <li><strong>Legitimate interests</strong>: publishing limits, handling abuse reports, view counts and keeping aired secure. You can object to these. Write to us and we'll look at your case.</li>
-      <li><strong>Legal obligations</strong>: billing records for tax and accounting, and answering lawful requests from authorities.</li>
+      <li><strong>Legitimate interests</strong>: publishing limits, handling abuse reports, view counts, counting visits to aired.sh's own pages, loading fonts for aired.sh's own pages from Google Fonts, and keeping aired secure. You can object to these. Write to us and we'll look at your case.</li>
+      <li><strong>Legal obligations</strong>: answering lawful requests from authorities.</li>
     </ul>
     <p>We don't make automated decisions about you that have legal or similar effects.</p>
 
     <h2>Where it's stored</h2>
-    <p>Everything runs on Cloudflare. Pages live in Cloudflare R2. Page settings, view counts, account records and abuse reports live in Cloudflare KV. Billing records live in Cloudflare D1. Cloudflare runs a global network, so your data is processed in many countries, including the United States. Stripe and GitHub are also based in the United States. <mark class="tbd">[OWNER TO DECIDE: confirm the transfer safeguard for each provider (EU-U.S. Data Privacy Framework or Standard Contractual Clauses), and accept each provider's data processing agreement]</mark></p>
+    <p>Everything runs on Cloudflare. Pages live in Cloudflare R2. Page settings, view counts, account records and abuse reports live in Cloudflare KV. Billing records live in Cloudflare D1. Cloudflare runs a global network, so your data is processed in many countries, including the United States. Link (Stripe), GitHub and Google are in the United States too. The person who runs aired works from outside the US and the EU, and reaches this data from there. When your data leaves the EU or UK, we rely on the EU-U.S. Data Privacy Framework where the company is certified, and on the European Commission's standard contractual clauses where it isn't.</p>
 
     <h2>Who handles your data</h2>
-    <p>These are the only companies that process personal data for us:</p>
+    <p>These companies handle personal data for aired. Link and GitHub also use it for their own purposes, under their own policies.</p>
     <div class="tablewrap">
       <table>
         <thead><tr><th>Company</th><th>What for</th><th>Privacy policy</th></tr></thead>
         <tbody>
           <tr><td>Cloudflare</td><td>Hosting, storage and delivery of every page, and cookieless visit counts on aired.sh's own pages (Cloudflare Web Analytics). Like any host, it sees visitors' IP addresses to deliver pages and block attacks.</td><td><a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener">cloudflare.com/privacypolicy</a></td></tr>
-          <tr><td>Stripe</td><td>Payments, invoices and the billing page</td><td><a href="https://stripe.com/privacy" target="_blank" rel="noopener">stripe.com/privacy</a></td></tr>
+          <tr><td>Link (Stripe)</td><td>Sells Pro to you as the merchant of record: checkout, payment, tax, receipts, refunds and disputes. Link decides how it uses that data, under its own privacy policy.</td><td><a href="https://link.com/privacy" target="_blank" rel="noopener">Link's privacy policy</a>, also linked at checkout</td></tr>
           <tr><td>GitHub</td><td>Sign-in (current)</td><td><a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener">GitHub privacy statement</a></td></tr>
-          <tr><td>WorkOS</td><td>Sign-in (planned, not in use yet)</td><td><a href="https://workos.com/legal/privacy" target="_blank" rel="noopener">workos.com/legal/privacy</a></td></tr>
           <tr><td>Google Fonts</td><td>Fonts on aired.sh's own pages, not on published pages</td><td><a href="https://policies.google.com/privacy" target="_blank" rel="noopener">policies.google.com/privacy</a></td></tr>
         </tbody>
       </table>
@@ -158,7 +156,7 @@
         <tbody>
           <tr><td><code>aired_session</code></td><td>Keeps you signed in. Your browser's scripts can't read it.</td><td>30 days, renewed as you use aired</td></tr>
           <tr><td><code>aired_oauth_state</code></td><td>Protects the GitHub sign-in step from forgery.</td><td>10 minutes</td></tr>
-          <tr><td><code>pin_&lt;page id&gt;</code></td><td>Remembers that you entered a page's PIN. Only sent to that page.</td><td>1 hour</td></tr>
+          <tr><td><code>pin_&lt;page id&gt;</code></td><td>Holds the PIN you entered for that page, so you don't have to type it again. Only sent to that page.</td><td>1 hour</td></tr>
         </tbody>
       </table>
     </div>
@@ -166,10 +164,10 @@
 
     <h2>How long we keep it</h2>
     <ul>
-      <li><strong>Pages</strong>: until they expire or you delete them. Permanent pages stay until you delete them. When a page expires, it stops being served right away. <mark class="tbd">[OWNER TO DECIDE: the HTML file of an expired page isn't deleted by code today. Add an R2 lifecycle rule and state the delay here, e.g. "deleted within 30 days"]</mark></li>
+      <li><strong>Pages</strong>: until they expire or you delete them. When a page expires, we stop serving it right away and delete its file within 30 days.</li>
       <li><strong>Deleted pages</strong>: removed from storage right away.</li>
       <li><strong>Your account</strong>: until you delete it. Deleting it ends your session and removes your account record and email at once. Your pages stay up as anonymous pages without your name. Delete them first if you want them gone.</li>
-      <li><strong>Billing records</strong>: for <mark class="tbd">[OWNER TO DECIDE: retention period for billing records, e.g. 7 years for tax. Also decide whether account deletion should clear the D1 billing rows, which it doesn't today]</mark>. Stripe keeps its own records under its own policy.</li>
+      <li><strong>Billing records</strong>: until you delete your account. Then we delete your Stripe ids and plan history too. Link keeps its own record of each sale, under its own policy.</li>
       <li><strong>Abuse reports</strong>: 30 days.</li>
       <li><strong>IP hashes for publishing limits</strong>: in memory only, gone within a day at most.</li>
       <li><strong>View counts</strong>: as long as the page exists. The site-wide country tally holds no personal data.</li>
@@ -182,18 +180,18 @@
       <li><strong>Delete a page</strong>: from your dashboard, with <code>aired delete &lt;id&gt;</code> in the CLI, or through the API with its update token.</li>
       <li><strong>Remove a page you lost the link to</strong>: use <a href="/abuse">/abuse</a> and pick "I published this and lost the link to manage it."</li>
       <li><strong>Remove a page someone else published about you</strong>: report it on <a href="/abuse">/abuse</a>.</li>
-      <li><strong>Anything else</strong>: email <mark class="tbd">[OWNER TO DECIDE: privacy contact email]</mark>. We reply within 30 days.</li>
+      <li><strong>Anything else</strong>: email <a href="mailto:support@aired.sh">support@aired.sh</a>. We reply within 30 days.</li>
     </ul>
     <p>If you're in the EU or UK and you're unhappy with how we handled your data, you can complain to your local data protection authority. If you're in California, you have the same rights to know, delete and correct. We don't sell or share personal information as California law defines it.</p>
 
     <h2>Children</h2>
-    <p>aired isn't meant for children under <mark class="tbd">[OWNER TO DECIDE: minimum age, same as the terms]</mark>. If you think a child has given us personal data, tell us and we'll delete it.</p>
+    <p>aired isn't meant for anyone under 16. If you think someone under 16 has given us personal data, email <a href="mailto:support@aired.sh">support@aired.sh</a> and we'll delete it.</p>
 
     <h2>Security</h2>
-    <p>Every connection to aired uses HTTPS. Session cookies are HttpOnly and Secure. Update tokens are stored only as hashes. GitHub sign-in asks for the smallest set of permissions. The code is open source, so anyone can check how it handles data. If we ever have a breach that puts your data at risk, we'll tell affected users and the authorities as the law requires.</p>
+    <p>Every connection to aired uses HTTPS. Session cookies are HttpOnly and Secure. Update tokens are stored only as hashes. Page PINs aren't hashed. GitHub sign-in asks for the smallest set of permissions. The code is open source, so anyone can check how it handles data. If we ever have a breach that puts your data at risk, we'll tell affected users and the authorities as the law requires.</p>
 
     <h2>Changes and questions</h2>
-    <p>When we change this policy, we update this page and the date at the top. The full history is in the <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">public repository</a>. If a change affects how we use data you already gave us, we tell signed-in users before it takes effect. Questions? Email <mark class="tbd">[OWNER TO DECIDE: privacy contact email]</mark>. See also our <a href="/terms">terms</a> and <a href="/refunds">refund policy</a>.</p>
+    <p>When we change this policy, we update this page and the date at the top. The full history is in the <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">public repository</a>. If a change affects how we use data you already gave us, we tell signed-in users before it takes effect. Questions? Email <a href="mailto:support@aired.sh">support@aired.sh</a>. See also our <a href="/terms">terms</a> and <a href="/refunds">refund policy</a>.</p>
 
     <p class="attr">Adapted from <a href="https://github.com/basecamp/policies" target="_blank" rel="noopener">Basecamp's open-source policies</a>, available under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. This is a draft written for review by a qualified lawyer, not legal advice.</p>
   </article>
