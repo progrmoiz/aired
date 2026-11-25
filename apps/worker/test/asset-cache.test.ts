@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
-import { assetCacheControl } from "../src/lib/asset-cache.ts";
+import { assetCacheControl, withAssetCache } from "../src/lib/asset-cache.ts";
 
 const web = new URL("../../web/", import.meta.url);
 
@@ -30,8 +30,26 @@ test("no page loads anything from Google Fonts, and every page that used it link
   for (const f of readdirSync(web).filter((n) => n.endsWith(".html"))) {
     const html = readFileSync(new URL(f, web), "utf8");
     assert.doesNotMatch(html, /fonts\.googleapis\.com|fonts\.gstatic\.com/, f);
-    if (/font-family:\s*'Inter'|Inter/.test(html) && html.includes("<head")) {
+    if (html.includes("<head")) {
       assert.match(html, /<link rel="stylesheet" href="\/fonts\/fonts\.css" \/>/, f);
     }
   }
+});
+
+test("withAssetCache sets the header on a font's 200 and 304, and leaves everything else alone", async () => {
+  const FONT = "/fonts/inter-latin-v20.woff2";
+  const ok = withAssetCache(new Response("woff2-bytes", { status: 200, headers: { "Content-Type": "font/woff2", ETag: '"e1"' } }), FONT);
+  assert.equal(ok.status, 200);
+  assert.equal(ok.headers.get("Cache-Control"), "public, max-age=31536000, immutable");
+  assert.equal(ok.headers.get("ETag"), '"e1"');
+  assert.equal(await ok.text(), "woff2-bytes");
+
+  const revalidated = withAssetCache(new Response(null, { status: 304, headers: { ETag: '"e1"' } }), FONT);
+  assert.equal(revalidated.status, 304);
+  assert.equal(revalidated.headers.get("Cache-Control"), "public, max-age=31536000, immutable");
+
+  const missing = new Response("not found page", { status: 404, headers: { "Cache-Control": "no-store" } });
+  assert.equal(withAssetCache(missing, FONT), missing);
+  const css = new Response("body{}", { status: 200 });
+  assert.equal(withAssetCache(css, "/style.css"), css);
 });

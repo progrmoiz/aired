@@ -6,7 +6,7 @@ The single reference for building any UI in aired. Read before writing any compo
 
 **Stack:** pnpm monorepo. Web app is vanilla HTML + JS (`apps/web/`). Tool pages (dashboard, docs, guides, abuse) use Tailwind 3 utilities against the tokens in `tailwind.config.js`. Marketing pages (homepage, `/pricing`) use plain CSS in `apps/web/site.css` with the same tokens as CSS variables. No React, no shadcn.
 **Icons:** Inline SVG, hand-picked. No library.
-**Fonts:** Inter (400, 500, 600), JetBrains Mono (400, 500). Both via Google Fonts `<link>`.
+**Fonts:** Inter (400, 500, 600), JetBrains Mono (400, 500). Both self-hosted from `apps/web/fonts/` (latin variable woff2, OFL).
 **Voice:** see §10 below
 **Audience:** Anyone who made a page with an AI tool and needs to send it: agency people sending client reports, makers sharing a game, developers whose agent publishes. Also developer mid-task. Pasted HTML from Claude, ran a script, generated an artifact — they want a shareable URL right now, then leaving in 30 seconds. Indie hackers shipping prototypes are a superset of the same need.
 **Brand keywords:** Instant. Trustworthy. Quiet.
@@ -78,11 +78,14 @@ Status colors are not in the config (intentional — aired is mostly purple-or-n
 
 ### Font stack
 
-Loaded in `apps/web/index.html` via Google Fonts. Do not import via JS or `next/font` — this is a static HTML site.
+Self-hosted in `apps/web/fonts/` (`fonts.css` has the `@font-face` rules). Every page's `<head>` has these two lines. Do not import via JS or `next/font` — this is a static HTML site. **Never link fonts.googleapis.com or fonts.gstatic.com**: the privacy policy promises no request to Google, and `apps/worker/test/asset-cache.test.ts` fails if a page does.
 
 ```html
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="preload" href="/fonts/inter-latin-v20.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="/fonts/fonts.css" />
 ```
+
+A new font file needs a new versioned name (`-v<N>.woff2`): the Worker caches those for a year.
 
 Tailwind classes:
 - `font-sans` → Inter, then `-apple-system`, `BlinkMacSystemFont`, `sans-serif`
