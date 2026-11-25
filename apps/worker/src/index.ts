@@ -172,6 +172,11 @@ app.route("/", viewer);
 // Static assets fallback — serve web/ files (index.html, style.css, app.js)
 // Cloudflare ASSETS binding handles routing to the correct file.
 app.notFound(async (c) => {
+  // The API answers in JSON, including for paths it doesn't have.
+  const path = new URL(c.req.url).pathname;
+  if (path === "/api" || path.startsWith("/api/") || path.startsWith("/oauth/")) {
+    return c.json({ error: "Not found" }, 404);
+  }
   if (c.env.ASSETS) {
     return withAssetCache(await c.env.ASSETS.fetch(c.req.raw), new URL(c.req.url).pathname);
   }

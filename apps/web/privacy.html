@@ -88,7 +88,11 @@
       <li>Your GitHub username and display name, to show in your dashboard.</li>
       <li>Your primary email, only if it's verified and not a GitHub "noreply" address. Otherwise we store nothing. We use it to recognize your account. <strong>We don't send marketing email.</strong> If we ever send product news, you'll have to opt in. Link sends your receipts and billing emails.</li>
       <li>Your projects and the list of pages you own.</li>
+      <li>Which sign-in you used (GitHub today), with the email it gave us and whether it was verified, so a later sign-in reaches the same account.</li>
+      <li>If you create API keys: a one-way hash of each key (never the key itself), its name, and when it was created and last used.</li>
+      <li>If you connect an app to aired over MCP (for example a chat assistant): which app, where it receives access, and when you approved it. Its access is stored as hashes.</li>
     </ul>
+    <p>We plan to move sign-in to WorkOS, which adds Google, Microsoft, Apple and email codes. Once that's switched on, WorkOS checks who you are and gives us your email address, whether it's verified and your name, and we keep the same things as above. This page will say when it's on.</p>
 
     <h3>When you pay for Pro</h3>
     <p>Link, Stripe's checkout, collects your card details, name, email and billing address on its own checkout page. <strong>We never see or store your card number.</strong> Stripe sends us back, and we keep:</p>
@@ -123,7 +127,7 @@
     <p>We don't make automated decisions about you that have legal or similar effects.</p>
 
     <h2>Where it's stored</h2>
-    <p>Everything runs on Cloudflare. Pages live in Cloudflare R2. Page settings, view counts, account records and abuse reports live in Cloudflare KV. Billing records live in Cloudflare D1. Cloudflare runs a global network, so your data is processed in many countries, including the United States. Link (Stripe) and GitHub are in the United States too. The person who runs aired works from outside the US and the EU, and reaches this data from there. When your data leaves the EU or UK, we rely on the EU-U.S. Data Privacy Framework where the company is certified, and on the European Commission's standard contractual clauses where it isn't.</p>
+    <p>Everything runs on Cloudflare. Pages live in Cloudflare R2. Page settings, view counts, account records, abuse reports and the records of apps you connect live in Cloudflare KV. Account and sign-in records (including the email you signed in with), API key hashes and billing records live in Cloudflare D1. Cloudflare runs a global network, so your data is processed in many countries, including the United States. Link (Stripe), GitHub and WorkOS are in the United States too. The person who runs aired works from outside the US and the EU, and reaches this data from there. When your data leaves the EU or UK, we rely on the EU-U.S. Data Privacy Framework where the company is certified, and on the European Commission's standard contractual clauses where it isn't.</p>
 
     <h2>Who handles your data</h2>
     <p>These companies handle personal data for aired. Link and GitHub also use it for their own purposes, under their own policies.</p>
@@ -134,19 +138,22 @@
           <tr><td>Cloudflare</td><td>Hosting, storage and delivery of every page, and cookieless visit counts on aired.sh's own pages (Cloudflare Web Analytics). Like any host, it sees visitors' IP addresses to deliver pages and block attacks.</td><td><a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener">cloudflare.com/privacypolicy</a></td></tr>
           <tr><td>Link (Stripe)</td><td>Sells Pro to you as the merchant of record: checkout, payment, tax, receipts, refunds and disputes. Link decides how it uses that data, under its own privacy policy.</td><td><a href="https://link.com/privacy" target="_blank" rel="noopener">Link's privacy policy</a>, also linked at checkout</td></tr>
           <tr><td>GitHub</td><td>Sign-in (current)</td><td><a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener">GitHub privacy statement</a></td></tr>
+          <tr><td>WorkOS</td><td>Sign-in with Google, GitHub, Microsoft, Apple or an email code. <strong>Not used yet</strong>: only once aired switches sign-in to it. Receives your email address and name.</td><td><a href="https://workos.com/privacy" target="_blank" rel="noopener">workos.com/privacy</a></td></tr>
         </tbody>
       </table>
     </div>
     <p>Outside this list, we share data only when the law requires it, for example a valid court order. <strong>We never sell your data, never rent it, and never use it for ads.</strong></p>
 
     <h2>Cookies</h2>
-    <p>We use three cookies. All of them are needed for aired to work, so we don't show a cookie banner.</p>
+    <p>We use these cookies. All of them are needed for aired to work, so we don't show a cookie banner.</p>
     <div class="tablewrap">
       <table>
         <thead><tr><th>Cookie</th><th>What it does</th><th>How long</th></tr></thead>
         <tbody>
           <tr><td><code>aired_session</code></td><td>Keeps you signed in. Your browser's scripts can't read it.</td><td>30 days, renewed as you use aired</td></tr>
           <tr><td><code>aired_oauth_state</code></td><td>Protects the GitHub sign-in step from forgery.</td><td>10 minutes</td></tr>
+          <tr><td><code>aired_workos_sid</code></td><td>Only once sign-in goes through WorkOS: lets signing out of aired sign you out of WorkOS too.</td><td>30 days</td></tr>
+          <tr><td><code>__Host-oauth-consent-…</code></td><td>Only while you connect an app over MCP: ties the Allow button to your browser so another site can't press it for you.</td><td>10 minutes</td></tr>
           <tr><td><code>pin_&lt;page id&gt;</code></td><td>Shows you entered that page's PIN, so you don't have to type it again. It doesn't contain the PIN. Only sent to that page.</td><td>1 hour</td></tr>
         </tbody>
       </table>
@@ -157,7 +164,7 @@
     <ul>
       <li><strong>Pages</strong>: until they expire or you delete them. When a page expires, we stop serving it right away and delete its file within 30 days. A page that reaches its view limit stops being served, but we keep it until it expires or you delete it.</li>
       <li><strong>Deleted pages</strong>: removed from storage right away.</li>
-      <li><strong>Your account</strong>: until you delete it. Deleting it ends your session and removes your account record and email at once. Your pages stay up as anonymous pages without your name. Delete them first if you want them gone.</li>
+      <li><strong>Your account</strong>: until you delete it. Deleting it ends every session (other browsers and CLI logins too), disconnects every app you connected, deletes your API keys, and removes your account record, sign-in records and email at once. Your pages stay up as anonymous pages without your name. Delete them first if you want them gone.</li>
       <li><strong>Billing records</strong>: until you delete your account. Then we delete your Stripe ids and plan history too. Link keeps its own record of each sale, under its own policy.</li>
       <li><strong>Abuse reports</strong>: 30 days.</li>
       <li><strong>IP hashes for publishing limits</strong>: in memory only, gone within a day at most.</li>
