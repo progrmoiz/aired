@@ -340,16 +340,14 @@ me.delete('/', requireSession, requireCsrfHeader, async (c) => {
     }
   }
 
-  // Billing and sign-in rows in D1 go before anything else, so a failure can
-  // be retried with the account intact. Link (Stripe) keeps its own record of
-  // each sale. Without billing on, D1 may hold nothing yet: don't block on it.
+  // Billing, sign-in and API key rows in D1 go before anything else, so a
+  // failure can be retried with the account intact (and no key outlives the
+  // account). Link (Stripe) keeps its own record of each sale.
   try {
     await deleteAccountRows(c.env.DB, userId);
   } catch (err) {
-    console.error('Failed to delete billing rows during account deletion:', err);
-    if (billingEnabled(c.env)) {
-      return c.json({ error: 'Could not delete your billing records. Please try again.' }, 503);
-    }
+    console.error('Failed to delete account rows during account deletion:', err);
+    return c.json({ error: 'Could not delete your account records. Please try again.' }, 503);
   }
   try {
     await c.env.PAGES_KV.delete(`ent:${userId}`);

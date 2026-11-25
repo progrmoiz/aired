@@ -31,12 +31,12 @@ export function normalizeKeyName(name: unknown): string | null {
 export async function findActiveKey(
   db: D1Database,
   keyHash: string,
-): Promise<{ id: string; userId: number; lastUsedAt: number | null } | null> {
+): Promise<{ id: string; userId: number; createdAt: number; lastUsedAt: number | null } | null> {
   const row = await db
-    .prepare('SELECT id, user_id, last_used_at FROM api_keys WHERE key_hash = ? AND revoked_at IS NULL')
+    .prepare('SELECT id, user_id, created_at, last_used_at FROM api_keys WHERE key_hash = ? AND revoked_at IS NULL')
     .bind(keyHash)
-    .first<{ id: string; user_id: number; last_used_at: number | null }>();
-  return row === null ? null : { id: row.id, userId: row.user_id, lastUsedAt: row.last_used_at };
+    .first<{ id: string; user_id: number; created_at: number; last_used_at: number | null }>();
+  return row === null ? null : { id: row.id, userId: row.user_id, createdAt: row.created_at, lastUsedAt: row.last_used_at };
 }
 
 /** Whether last_used_at is old enough to write again. */

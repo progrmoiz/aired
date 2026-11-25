@@ -500,6 +500,10 @@ upgrade.get('/upgrade', rateLimit(TIERS.billing), async (c) => {
     const back = `/upgrade?interval=${interval}`;
     return c.redirect(`/auth/github?return=${encodeURIComponent(back)}`, 302);
   }
+  // Billing is for a person: an API key can't start a checkout.
+  if (c.get('authMethod') !== 'session') {
+    return c.json({ error: 'Sign in to buy Pro. API keys can\'t open billing.' }, 403);
+  }
 
   const problem = configProblem(c.env);
   if (problem) {

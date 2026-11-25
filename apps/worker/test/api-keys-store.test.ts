@@ -13,7 +13,7 @@ import {
   revokeKey,
   touchKey,
 } from "../src/lib/api-keys.ts";
-import { readUpdateToken } from "../src/lib/page-token.ts";
+import { bearerToken, readUpdateToken } from "../src/lib/page-token.ts";
 import { csrfHeaderRequired } from "../src/lib/csrf-rule.ts";
 
 function d1(): D1Database {
@@ -37,7 +37,7 @@ const key = (n: number, userId = 1) => ({ id: `key_${n}`, userId, name: `k${n}`,
 test("a stored key is found by hash until it's revoked", async () => {
   const db = d1();
   assert.equal(await insertKey(db, key(1)), true);
-  assert.deepEqual(await findActiveKey(db, "h1_1"), { id: "key_1", userId: 1, lastUsedAt: null });
+  assert.deepEqual(await findActiveKey(db, "h1_1"), { id: "key_1", userId: 1, createdAt: 1001, lastUsedAt: null });
   assert.equal(await findActiveKey(db, "nope"), null);
   assert.equal(await revokeKey(db, 2, "key_1", 5000), false, "another user can't revoke it");
   assert.equal(await revokeKey(db, 1, "key_1", 5000), true);
@@ -108,4 +108,27 @@ test("wiring: keys are checked before sessions; keys can't manage keys, billing 
   assert.match(src("lib/billing/forget.ts"), /DELETE FROM api_keys WHERE user_id = \?/);
   const index = src("index.ts");
   assert.ok(index.indexOf('app.route("/api/me/keys", keys)') < index.indexOf('app.route("/api/me", me)'));
+});
+
+test("Bearer parsing is case-insensitive and tolerates spacing, so a key is never dropped to anonymous", () => {
+  const key = "aired_sk_000000000000000000000000000000002wjyrI";
+  for (const h of [`Bearer ${key}`, `bearer ${key}`, `BEARER  ${key}`, `  Bearer ${key}  `]) {
+    assert.equal(bearerToken(h), key, h);
+    assert.equal(readUpdateToken(undefined, h), null, h);
+  }
+  assert.equal(bearerToken("Basic abc"), null);
+  assert.equal(bearerToken("Bearer"), null);
+  assert.equal(bearerToken("Bearer a b"), null);
+  assert.equal(bearerToken(undefined), null);
+  assert.equal(readUpdateToken(undefined, "bearer at_x"), "at_x");
+});
+
+test("wiring: keys can't use /upgrade, can't sit in the session header, die with SESSION_VALID_SINCE, and key responses aren't stored", () => {
+  const src = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8");
+  const auth = src("middleware/auth.ts");
+  assert.match(auth, /const bearer = bearerToken\(c\.req\.header\('Authorization'\)\);\s*if \(bearer\?\.startsWith\(API_KEY_PREFIX\)\)/);
+  assert.match(auth, /if \(headerValue\?\.trim\(\)\.startsWith\(API_KEY_PREFIX\)\) \{\s*return c\.json/);
+  assert.match(auth, /if \(!isNaN\(validSince\) && found\.createdAt < validSince\) \{/);
+  assert.match(src("routes/billing.ts"), /if \(c\.get\('authMethod'\) !== 'session'\) \{\s*return c\.json\(\{ error: 'Sign in to buy Pro/);
+  assert.match(src("routes/keys.ts"), /c\.header\('Cache-Control', 'no-store'\);/);
 });

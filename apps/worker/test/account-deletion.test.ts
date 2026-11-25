@@ -81,7 +81,7 @@ test("me.ts deletes the D1 rows before responding, refusing on failure, and asks
   assert.ok(del > 0);
   assert.ok(del < code.indexOf("const response = c.json({ ok: true })"), "D1 delete must run before the response");
   assert.ok(del < code.indexOf("c.executionCtx.waitUntil("), "D1 delete must not be in the background sweep");
-  assert.match(code, /Could not delete your billing records/);
+  assert.match(code, /Could not delete your account records/);
   assert.match(code, /PAGES_KV\.delete\(`ent:\$\{userId\}`\)/);
   // Stripe is asked whenever a customer is known (a stored row or billing_customers), and a missing customer counts as none.
   assert.match(code, /const customerId = sub\?\.customerId \?\? \(await getCustomerId\(c\.env\.DB, userId\)\);/);

@@ -2,6 +2,7 @@ import type { Context, Next } from 'hono';
 import type { AppBindings } from '../types.js';
 import { API_KEY_PREFIX, AUTH_HEADER, hashToHex, kvKeys, parseApiKey, redactNoreplyEmail } from '@aired/core';
 import { findActiveKey, lastUsedDue, touchKey } from '../lib/api-keys.js';
+import { bearerToken } from '../lib/page-token.js';
 import { verifySession, signSession, shouldReissue } from '../lib/jwt.js';
 import { readSessionCookie, setSessionCookie } from '../lib/cookies.js';
 
@@ -10,6 +11,9 @@ import { readSessionCookie, setSessionCookie } from '../lib/cookies.js';
  * Reads the JWT from the session cookie OR the aired-Session header.
  * Verifies the token and populates c.get('user') and c.get('jti').
  * On invalid: sets user and jti to null. Never throws.
+ *
+ * An API key (Authorization: Bearer aired_sk_…) is checked first; a key that's
+ * sent but isn't valid answers 401 (503 if D1 is down) instead of continuing.
  *
  * Verification order:
  *   1. parse via verifySession
@@ -31,13 +35,17 @@ export async function authMiddleware(
   // anonymous: a CI job with a revoked key must not publish ownerless pages.
   // Update tokens (at_…) also arrive as Bearer; they aren't keys and are left
   // to the routes.
-  const authorization = c.req.header('Authorization');
-  if (authorization?.startsWith(`Bearer ${API_KEY_PREFIX}`)) {
-    return keyAuth(c, next, authorization.slice('Bearer '.length).trim());
+  const bearer = bearerToken(c.req.header('Authorization'));
+  if (bearer?.startsWith(API_KEY_PREFIX)) {
+    return keyAuth(c, next, bearer);
   }
 
   const cookieValue = readSessionCookie(c);
   const headerValue = c.req.header(AUTH_HEADER) ?? null;
+  // A key pasted into the session header: refuse it rather than go anonymous.
+  if (headerValue?.trim().startsWith(API_KEY_PREFIX)) {
+    return c.json({ error: 'Send API keys as Authorization: Bearer, not in the session header' }, 401);
+  }
   const isWebContext = cookieValue !== null;
   const rawToken: string | null = cookieValue ?? headerValue;
 
@@ -160,6 +168,12 @@ async function keyAuth(c: Context<AppBindings>, next: Next, presented: string): 
     return c.json({ error: 'Could not check the API key. Please try again.' }, 503);
   }
   if (found === null) return c.json({ error: 'Invalid or revoked API key' }, 401);
+
+  // "Sign out everyone" (SESSION_VALID_SINCE) also retires keys made before it.
+  const validSince = Date.parse(c.env.SESSION_VALID_SINCE ?? '');
+  if (!isNaN(validSince) && found.createdAt < validSince) {
+    return c.json({ error: 'Invalid or revoked API key' }, 401);
+  }
 
   // The account behind the key. Account deletion removes it (and the key).
   const raw = await c.env.PAGES_KV.get(kvKeys.user(found.userId));

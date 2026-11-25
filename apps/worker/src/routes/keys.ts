@@ -11,6 +11,11 @@ import { insertKey, listKeys, MAX_ACTIVE_KEYS, normalizeKeyName, revokeKey } fro
  */
 const keys = new Hono<AppBindings>();
 keys.use('*', requireSession);
+// Responses can carry a new key: never store them anywhere.
+keys.use('*', async (c, next) => {
+  await next();
+  c.header('Cache-Control', 'no-store');
+});
 
 const unavailable = 'Could not reach the key store. Please try again.';
 
