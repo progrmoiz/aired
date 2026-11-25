@@ -81,7 +81,11 @@ test("me.ts deletes the D1 rows before responding, refusing on failure, and asks
   assert.ok(del < code.indexOf("c.executionCtx.waitUntil("), "D1 delete must not be in the background sweep");
   assert.match(code, /Could not delete your billing records/);
   assert.match(code, /PAGES_KV\.delete\(`ent:\$\{userId\}`\)/);
-  assert.match(code, /blocksAccountDeletion\(await listActiveSubscriptions\(c\.env, customerId\)\)/);
+  // Stripe is asked whenever a customer is known (a stored row or billing_customers), and a missing customer counts as none.
+  assert.match(code, /const customerId = sub\?\.customerId \?\? \(await getCustomerId\(c\.env\.DB, userId\)\);/);
+  assert.match(code, /live = await listActiveSubscriptions\(c\.env, customerId\);/);
+  assert.match(code, /if \(!isMissingCustomer\(err\)\) throw err;/);
+  assert.match(code, /if \(blocksAccountDeletion\(live\)\) return blocked;/);
   const billing = readFileSync(new URL("../src/routes/billing.ts", import.meta.url), "utf8");
   assert.match(billing, /const candidate = dbUid \?\? metadataUid;/);
   assert.match(billing, /userRowExists\(c\.env\.DB, candidate\)/);

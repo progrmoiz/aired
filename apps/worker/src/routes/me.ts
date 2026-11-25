@@ -30,6 +30,7 @@ import { billingEnabled, getEntitlements, isEntitled } from '../lib/entitlements
 import { getCustomerId, getSubscription } from '../lib/billing/store.js';
 import { blocksAccountDeletion, deleteAccountRows } from '../lib/billing/forget.js';
 import { listActiveSubscriptions } from '../lib/billing/stripe.js';
+import { isMissingCustomer } from '../lib/billing/stripe-shapes.js';
 import type { StoredSubscription } from '../lib/billing/store.js';
 import { AUTH_HEADER } from '@aired/core';
 import { addClaimResult, runClaim } from '../lib/claim-decision.js';
@@ -319,18 +320,23 @@ me.delete('/', requireCsrfHeader, async (c) => {
       409,
     );
     if (sub !== null && !sub.cancelAtPeriodEnd && isEntitled(sub, new Date())) return blocked;
-    // No stored subscription, but a Stripe customer: a purchase whose webhook
-    // hasn't landed yet would otherwise slip through, and the delete below
-    // removes our only link to it. Ask Stripe.
-    if (sub === null) {
-      try {
-        const customerId = await getCustomerId(c.env.DB, userId);
-        if (customerId !== null && blocksAccountDeletion(await listActiveSubscriptions(c.env, customerId))) {
-          return blocked;
+    // D1 can lag Stripe: a new purchase or a "renew" in the portal whose
+    // webhook hasn't landed yet would slip through, and the delete below
+    // removes our only link to the customer. Whenever we know a customer, ask
+    // Stripe. A customer Stripe no longer has holds no subscriptions.
+    try {
+      const customerId = sub?.customerId ?? (await getCustomerId(c.env.DB, userId));
+      if (customerId !== null) {
+        let live: Awaited<ReturnType<typeof listActiveSubscriptions>> = [];
+        try {
+          live = await listActiveSubscriptions(c.env, customerId);
+        } catch (err) {
+          if (!isMissingCustomer(err)) throw err;
         }
-      } catch {
-        return c.json({ error: 'Could not check your subscription. Please try again.' }, 503);
+        if (blocksAccountDeletion(live)) return blocked;
       }
+    } catch {
+      return c.json({ error: 'Could not check your subscription. Please try again.' }, 503);
     }
   }
 
