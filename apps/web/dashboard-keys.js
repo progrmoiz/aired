@@ -1,8 +1,9 @@
 /*
- * Dashboard: API keys panel. Self-contained: it fills <section id="api-keys">
- * and uses only /api/me/keys, so dashboard.js and the page layout can change
- * around it. Builds every element with textContent (names are user input).
- * Uses only classes already in style.css, so no Tailwind rebuild is needed.
+ * Dashboard: API keys panel. Self-contained: it fills <section id="api-keys">,
+ * uses only /api/me/keys, and brings its own scoped styles (ak-*), so it looks
+ * the same whichever stylesheet the dashboard loads and dashboard.js and the
+ * page layout can change around it. Builds every element with textContent
+ * (names are user input).
  */
 (function () {
   'use strict';
@@ -10,10 +11,50 @@
   var root = document.getElementById('api-keys');
   if (!root) return;
 
-  // Only classes in style.css (no reliance on dashboard.html's inline styles).
-  var PRIMARY = 'flex-shrink-0 rounded px-3 py-2 text-sm font-medium bg-aired-text-primary text-aired-bg focus-ring disabled:opacity-50';
-  var SECONDARY = 'flex-shrink-0 rounded px-3 py-2 text-sm border border-aired-border bg-aired-bg text-aired-text-secondary hover:text-aired-text-primary hover:border-aired-border-focus hover:bg-aired-surface-hover active:bg-aired-border focus-ring disabled:opacity-50';
-  var SMALL = 'text-xs text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150 focus-ring rounded-sm px-1.5 py-1';
+  // Scoped styles, injected once. Colours are the DESIGN.md tokens.
+  if (!document.getElementById('ak-style')) {
+    var css = document.createElement('style');
+    css.id = 'ak-style';
+    css.textContent = [
+      '#api-keys{margin-top:48px}',
+      '#api-keys .ak-hidden{display:none}',
+      '#api-keys .ak-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}',
+      '#api-keys .ak-h{font-size:14px;line-height:20px;color:#ededef;font-weight:400}',
+      '#api-keys .ak-hint{margin-top:2px;font-size:12px;line-height:16px;color:#84848a}',
+      '#api-keys .ak-code,#api-keys .ak-key,#api-keys .ak-prefix{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace}',
+      '#api-keys .ak-code{color:#ededef}',
+      '#api-keys .ak-form,#api-keys .ak-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px}',
+      '#api-keys .ak-form{margin-top:12px}',
+      '#api-keys .ak-row{margin-top:8px}',
+      '#api-keys .ak-input{flex:1;min-width:0;border-radius:6px;padding:8px 12px;font:inherit;font-size:14px;color:#ededef;background:#0a0a0b;border:1px solid #222225}',
+      '#api-keys .ak-input::placeholder{color:#84848a}',
+      '#api-keys .ak-btn{flex-shrink:0;border-radius:6px;padding:8px 12px;font:inherit;font-size:14px;cursor:pointer;transition:background-color 120ms,border-color 120ms,color 120ms,opacity 120ms}',
+      '#api-keys .ak-btn:disabled,#api-keys .ak-input:disabled{opacity:.5;cursor:not-allowed}',
+      '#api-keys .ak-btn-primary{background:#ededef;color:#0a0a0b;border:0;font-weight:500}',
+      '#api-keys .ak-btn-primary:hover:not(:disabled){background:#fff}',
+      '#api-keys .ak-btn-secondary{background:#0a0a0b;color:#a1a1a6;border:1px solid #222225}',
+      '#api-keys .ak-btn-secondary:hover:not(:disabled){color:#ededef;border-color:#34343a;background:#18181b}',
+      '#api-keys .ak-link{background:none;border:0;border-radius:4px;padding:4px 6px;font:inherit;font-size:12px;color:#a1a1a6;cursor:pointer}',
+      '#api-keys .ak-link:hover:not(:disabled){color:#ededef}',
+      '#api-keys .ak-btn:focus-visible,#api-keys .ak-link:focus-visible,#api-keys .ak-input:focus-visible,#api-keys .ak-h:focus-visible{outline:2px solid #7c6aef;outline-offset:2px}',
+      '#api-keys .ak-error{margin-top:8px;font-size:12px;color:#f87171}',
+      '#api-keys .ak-reveal{margin-top:16px;border-radius:8px;border:1px solid #222225;background:#111113;padding:12px 16px}',
+      '#api-keys .ak-text{font-size:14px;color:#ededef}',
+      '#api-keys .ak-key{flex:1;min-width:0;font-size:12px;color:#ededef;word-break:break-all}',
+      '#api-keys .ak-list{margin-top:12px;padding:0;list-style:none}',
+      '#api-keys .ak-item{display:flex;align-items:center;gap:12px;min-height:44px;padding:12px 0;border-top:1px solid #222225}',
+      '#api-keys .ak-item:first-child{border-top:0}',
+      '#api-keys .ak-info{flex:1;min-width:0}',
+      '#api-keys .ak-name{display:block;font-size:14px;color:#ededef;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '#api-keys .ak-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:2px;font-size:12px;color:#84848a}',
+      '#api-keys .ak-empty{padding:12px 0;font-size:14px;color:#a1a1a6}',
+      '@media (prefers-reduced-motion:reduce){#api-keys .ak-btn{transition:none}}'
+    ].join('\n');
+    document.head.appendChild(css);
+  }
+  var PRIMARY = 'ak-btn ak-btn-primary';
+  var SECONDARY = 'ak-btn ak-btn-secondary';
+  var SMALL = 'ak-link';
 
   var state = { keys: [], max: 5, busy: false };
 
@@ -48,20 +89,20 @@
 
   // --- elements ---------------------------------------------------------------
 
-  var header = el('div', 'min-w-0');
-  var heading = el('h2', 'text-sm text-aired-text-primary', 'API keys');
+  var header = el('div', '');
+  var heading = el('h2', 'ak-h', 'API keys');
   heading.tabIndex = -1; // focus lands here when there's nothing else to focus
   header.appendChild(heading);
-  var hint = el('p', 'text-xs text-aired-text-tertiary mt-0.5');
+  var hint = el('p', 'ak-hint');
   hint.appendChild(document.createTextNode('For CI and agents. Set '));
-  hint.appendChild(el('code', 'font-mono text-aired-text-primary', 'AIRED_API_KEY'));
+  hint.appendChild(el('code', 'ak-code', 'AIRED_API_KEY'));
   hint.appendChild(document.createTextNode(' and pages publish to this account.'));
   header.appendChild(hint);
 
-  var form = el('form', 'mt-3 flex flex-wrap items-center gap-3');
-  var label = el('label', 'sr-only', 'Key name');
+  var form = el('form', 'ak-form');
+  var label = el('label', 'ak-sr', 'Key name');
   label.htmlFor = 'api-key-name';
-  var input = el('input', 'flex-1 min-w-0 rounded px-3 py-2 text-sm border border-aired-border bg-aired-bg text-aired-text-primary focus-ring');
+  var input = el('input', 'ak-input');
   input.id = 'api-key-name';
   input.type = 'text';
   input.maxLength = 60;
@@ -73,16 +114,15 @@
   form.appendChild(input);
   form.appendChild(create);
 
-  var error = el('p', 'hidden mt-2 text-xs text-red-400');
+  var error = el('p', 'ak-error ak-hidden');
   error.setAttribute('role', 'alert');
 
   // Shown once, right after a key is created.
-  var reveal = el('div', 'hidden mt-4 rounded-lg border border-aired-border bg-aired-surface px-4 py-3');
-  var revealText = el('p', 'text-sm text-aired-text-primary', 'Copy this key now. You won’t be able to see it again.');
-  var revealRow = el('div', 'mt-2 flex flex-wrap items-center gap-3');
+  var reveal = el('div', 'ak-reveal ak-hidden');
+  var revealText = el('p', 'ak-text', 'Copy this key now. You won’t be able to see it again.');
+  var revealRow = el('div', 'ak-row');
   // The whole key stays visible (wraps), so it can be checked or copied by hand.
-  var revealKey = el('code', 'flex-1 min-w-0 font-mono text-xs text-aired-text-primary');
-  revealKey.style.wordBreak = 'break-all';
+  var revealKey = el('code', 'ak-key');
   var copy = el('button', SECONDARY, 'Copy');
   copy.type = 'button';
   var done = el('button', SECONDARY, 'Done');
@@ -93,10 +133,10 @@
   reveal.appendChild(revealText);
   reveal.appendChild(revealRow);
 
-  var list = el('ul', 'mt-3 divide-y divide-aired-border');
+  var list = el('ul', 'ak-list');
   list.setAttribute('aria-label', 'Your API keys');
-  var empty = el('p', 'hidden text-sm text-aired-text-secondary py-3', 'No keys yet.');
-  var status = el('div', 'sr-only');
+  var empty = el('p', 'ak-empty ak-hidden', 'No keys yet.');
+  var status = el('div', 'ak-sr');
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
 
@@ -112,7 +152,7 @@
 
   function showError(text) {
     error.textContent = text || '';
-    error.classList.toggle('hidden', !text);
+    error.classList.toggle('ak-hidden', !text);
   }
 
   function announce(text) {
@@ -122,18 +162,18 @@
   function render() {
     list.textContent = '';
     state.keys.forEach(function (key) {
-      var li = el('li', 'flex items-center gap-3 min-h-[44px] py-3');
-      var info = el('div', 'flex-1 min-w-0');
-      info.appendChild(el('span', 'block text-sm text-aired-text-primary truncate', key.name));
-      var meta = el('span', 'flex items-center gap-2 mt-0.5');
-      meta.appendChild(el('span', 'font-mono text-xs text-aired-text-tertiary', key.prefix + '…'));
-      meta.appendChild(el('span', 'text-xs text-aired-text-tertiary', 'created ' + when(key.createdAt) + ' · last used ' + when(key.lastUsedAt)));
+      var li = el('li', 'ak-item');
+      var info = el('div', 'ak-info');
+      info.appendChild(el('span', 'ak-name', key.name));
+      var meta = el('span', 'ak-meta');
+      meta.appendChild(el('span', 'ak-prefix', key.prefix + '…'));
+      meta.appendChild(el('span', '', 'created ' + when(key.createdAt) + ' · last used ' + when(key.lastUsedAt)));
       info.appendChild(meta);
       li.appendChild(info);
       li.appendChild(revokeButton(key));
       list.appendChild(li);
     });
-    empty.classList.toggle('hidden', state.keys.length > 0);
+    empty.classList.toggle('ak-hidden', state.keys.length > 0);
     var full = state.keys.length >= state.max;
     create.disabled = state.busy || full;
     input.disabled = full;
@@ -199,7 +239,7 @@
       input.value = '';
       showError('');
       revealKey.textContent = res.data.key;
-      reveal.classList.remove('hidden');
+      reveal.classList.remove('ak-hidden');
       copy.focus();
       announce('Created ' + res.data.name + '. Copy the key now.');
     }).catch(function (err) {
@@ -233,7 +273,7 @@
   done.addEventListener('click', function () {
     revealKey.textContent = '';
     copy.textContent = 'Copy';
-    reveal.classList.add('hidden');
+    reveal.classList.add('ak-hidden');
     focusSomething();
   });
 
@@ -245,7 +285,7 @@
     if (res.status === 401 || res.status === 403) return;
     if (!res.ok) {
       showError(res.data.error || 'Could not load your keys. Reload to try again.');
-      form.classList.add('hidden');
+      form.classList.add('ak-hidden');
       root.classList.remove('hidden');
       return;
     }
@@ -255,7 +295,7 @@
     root.classList.remove('hidden');
   }).catch(function () {
     showError('Could not load your keys. Check your connection and reload.');
-    form.classList.add('hidden');
+    form.classList.add('ak-hidden');
     root.classList.remove('hidden');
   });
 })();

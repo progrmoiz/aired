@@ -8,86 +8,101 @@
   <meta name="referrer" content="no-referrer" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="/style.css" />
   <link rel="preload" href="/fonts/inter-latin-v20.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/fonts/fonts.css" />
+  <!-- Own styles (DESIGN.md tokens), so the page doesn't depend on either site stylesheet. -->
   <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; margin: 0; }
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background-color: #0a0a0b;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
+      min-height: 100vh; display: flex; flex-direction: column;
+      font: 15px/1.6 Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0a0a0b; color: #ededef;
+      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
     }
+    a { color: inherit; text-decoration: none; }
+    .wrap { width: 100%; max-width: 42rem; margin: 0 auto; padding: 0 24px; }
+    header .wrap { height: 56px; display: flex; align-items: center; justify-content: space-between; }
+    .logo { font-weight: 600; letter-spacing: -0.01em; }
+    nav { font-size: 14px; color: #a1a1a6; }
+    nav a:hover, .logo:hover { color: #fff; }
+    main { flex: 1; padding-top: 40px; padding-bottom: 40px; }
+    h1 { font-size: 20px; line-height: 28px; font-weight: 500; letter-spacing: -0.02em; }
+    h2 { font-size: 18px; line-height: 28px; font-weight: 500; }
+    .lede, .muted { margin-top: 8px; font-size: 14px; color: #a1a1a6; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; color: #ededef; }
+    .state { margin-top: 32px; }
+    .hidden { display: none !important; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
     @keyframes skeleton-pulse { from { opacity: 1; } to { opacity: 0.4; } }
-    .skeleton-row { animation: skeleton-pulse 1.2s linear infinite alternate; }
-    .device-btn {
-      display: inline-flex;
-      align-items: center;
-      transition: opacity 120ms cubic-bezier(0.16, 1, 0.3, 1);
+    .skeleton { height: 16px; width: 14rem; border-radius: 2px; background: #222225; animation: skeleton-pulse 1.2s linear infinite alternate; }
+    .skeleton + .skeleton { margin-top: 12px; height: 12px; width: 8rem; }
+    form { max-width: 24rem; }
+    label { display: block; font-size: 14px; }
+    .device-code {
+      margin-top: 8px; width: 100%; border-radius: 6px; padding: 8px 12px;
+      font: 18px/28px 'JetBrains Mono', ui-monospace, Menlo, monospace; letter-spacing: 0.15em; text-transform: uppercase;
+      color: #ededef; background: #0a0a0b; border: 1px solid #222225;
     }
-    .device-btn:hover:not(:disabled) { opacity: 0.9; }
-    .device-btn:active:not(:disabled) { opacity: 0.8; }
-    .device-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    @media (pointer: coarse) { .device-btn, .device-code { min-height: 44px; } }
-    @media (prefers-reduced-motion: reduce) {
-      .skeleton-row { animation: none; opacity: 0.7; }
-      .device-btn { transition: none; }
+    .device-code::placeholder { color: #84848a; }
+    .note { margin-top: 12px; font-size: 12px; color: #84848a; }
+    .error { margin-top: 12px; font-size: 14px; color: #f87171; }
+    .actions { margin-top: 24px; }
+    .btn {
+      display: inline-flex; align-items: center; border: 0; border-radius: 6px; padding: 10px 16px;
+      background: #ededef; color: #0a0a0b; font: 500 14px Inter, sans-serif; cursor: pointer;
+      transition: background-color 120ms cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .device-code { letter-spacing: 0.15em; }
-    /* Not in the committed style.css yet; same values as Tailwind's. */
-    .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
-    .max-w-sm { max-width: 24rem; }
+    .btn:hover:not(:disabled) { background: #fff; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn:focus-visible, .device-code:focus-visible, a:focus-visible, h2:focus-visible { outline: 2px solid #7c6aef; outline-offset: 2px; }
+    @media (pointer: coarse) { .btn, .device-code { min-height: 44px; } }
+    @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; opacity: 0.7; } .btn { transition: none; } }
   </style>
 </head>
-<body class="min-h-screen flex flex-col text-aired-text-primary">
+<body>
 
-  <header class="w-full px-6 h-14 flex items-center justify-between max-w-2xl mx-auto">
-    <a href="/" class="text-base font-semibold tracking-tight text-aired-text-primary hover:text-white transition-colors duration-150">aired</a>
-    <nav class="flex items-center gap-5 text-sm text-aired-text-secondary">
-      <a href="/docs" class="hover:text-aired-text-primary transition-colors duration-150">Docs</a>
-    </nav>
-  </header>
+  <header><div class="wrap">
+    <a href="/" class="logo">aired</a>
+    <nav><a href="/docs">Docs</a></nav>
+  </div></header>
 
-  <main class="flex-1 w-full max-w-2xl mx-auto px-6 py-10">
-    <h1 class="text-xl font-medium tracking-tight">Sign in the aired CLI</h1>
-    <p class="mt-2 text-sm text-aired-text-secondary">
-      Enter the code <code class="font-mono text-aired-text-primary">aired login --device</code> showed in your terminal.
-    </p>
+  <main class="wrap">
+    <h1>Sign in the aired CLI</h1>
+    <p class="lede">Enter the code <code class="mono">aired login --device</code> showed in your terminal.</p>
 
     <p id="status" class="sr-only" role="status" aria-live="polite"></p>
 
-    <section id="state-loading" class="mt-8" aria-hidden="true">
-      <div class="skeleton-row h-4 w-56 rounded-sm bg-aired-border"></div>
-      <div class="skeleton-row mt-3 h-3 w-32 rounded-sm bg-aired-border"></div>
+    <section id="state-loading" class="state" aria-hidden="true">
+      <div class="skeleton"></div>
+      <div class="skeleton"></div>
     </section>
 
-    <section id="state-signed-out" class="hidden mt-8">
-      <h2 class="text-lg font-medium">Sign in first</h2>
-      <p class="mt-2 text-sm text-aired-text-secondary">You come back here to approve the code after you sign in.</p>
-      <div class="mt-6">
-        <a id="sign-in" href="/auth/login?return=/device"
-           class="device-btn focus-ring px-4 py-2.5 rounded bg-aired-text-primary text-aired-bg text-sm font-medium">Sign in</a>
+    <section id="state-signed-out" class="state hidden">
+      <h2>Sign in first</h2>
+      <p class="muted">You come back here to approve the code after you sign in.</p>
+      <div class="actions">
+        <a id="sign-in" href="/auth/login?return=/device" class="btn">Sign in</a>
       </div>
     </section>
 
-    <section id="state-approve" class="hidden mt-8">
-      <form id="approve-form" class="max-w-sm">
-        <label for="user-code" class="block text-sm text-aired-text-primary">Code</label>
+    <section id="state-approve" class="state hidden">
+      <form id="approve-form">
+        <label for="user-code">Code</label>
         <input id="user-code" name="user_code" type="text" inputmode="text" autocomplete="off" autocapitalize="characters"
-               spellcheck="false" maxlength="9" placeholder="BCDF-GHJK" required
-               class="device-code mt-2 w-full rounded px-3 py-2 font-mono text-lg uppercase border border-aired-border bg-aired-bg text-aired-text-primary focus-ring"
+               spellcheck="false" maxlength="9" placeholder="BCDF-GHJK" required class="device-code"
                aria-describedby="who approve-error" />
-        <p id="who" class="mt-3 text-xs text-aired-text-tertiary"></p>
-        <p id="approve-error" class="hidden mt-3 text-sm text-red-400" role="alert"></p>
-        <div class="mt-6">
-          <button id="approve" type="submit" class="device-btn focus-ring px-4 py-2.5 rounded bg-aired-text-primary text-aired-bg text-sm font-medium">Approve</button>
+        <p id="who" class="note"></p>
+        <p id="approve-error" class="error hidden" role="alert"></p>
+        <div class="actions">
+          <button id="approve" type="submit" class="btn">Approve</button>
         </div>
       </form>
     </section>
 
-    <section id="state-done" class="hidden mt-8">
-      <h2 class="text-lg font-medium" tabindex="-1" id="done-heading">The CLI is signed in</h2>
-      <p class="mt-2 text-sm text-aired-text-secondary">Go back to your terminal. You can close this tab.</p>
+    <section id="state-done" class="state hidden">
+      <h2 tabindex="-1" id="done-heading">The CLI is signed in</h2>
+      <p class="muted">Go back to your terminal. You can close this tab.</p>
     </section>
   </main>
 
