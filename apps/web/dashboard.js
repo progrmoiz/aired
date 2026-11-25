@@ -1,14 +1,23 @@
-/* aired — dashboard page logic (vanilla JS, no framework) */
+/* aired — dashboard (vanilla JS, no framework).
+ * Views: #pages, #connect, #billing, #account. Pages are loaded once, then
+ * searched, filtered and grouped in the browser. Plan strip and claim banner
+ * logic is unchanged from the single-page dashboard. */
 
 (function () {
   'use strict';
 
   var UNSORTED_KEY = '__unsorted__';
   var UNSORTED_LABEL = 'Not in a project';
+  var PAGE_CAP = 1000;           // most pages the dashboard loads at once
+  var SOON_MS = 7 * 86400e3;     // "Expiring soon" = within a week
 
   var SVG_NS = 'http://www.w3.org/2000/svg';
   var ICONS = {
     doc: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
+    chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+    slides: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+    game: '<rect x="2" y="7" width="20" height="11" rx="4"/><path d="M7 11v3M5.5 12.5h3M15.5 12h.01M18 13.5h.01"/>',
+    site: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
     lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
@@ -17,6 +26,11 @@
     stop: '<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>',
     folder: '<path d="M3 7h6l2 2h10v10H3z"/>',
     chev: '<path d="m9 6 6 6-6 6"/>',
+    open: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+    more: '<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>',
+    trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+    copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/>',
+    flag: '<path d="M5 21V4M5 4h12l-2 4 2 4H5"/>',
   };
 
   // Icons are fixed strings from ICONS, never page data.
@@ -33,11 +47,18 @@
     return svg;
   }
 
-  function plural(n, word) {
-    return n + ' ' + word + (n === 1 ? '' : 's');
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
   }
 
-  // "Published 3 days ago"
+  function plural(n, word) {
+    return n.toLocaleString() + ' ' + word + (n === 1 ? '' : 's');
+  }
+
+  // "3 days ago"
   function relativeAge(isoString) {
     if (!isoString) return '';
     var diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
@@ -50,14 +71,32 @@
     return plural(Math.floor(diff / (86400 * 365)), 'year') + ' ago';
   }
 
-  // How long the page stays up, in words. Returns { text, tone, title }.
+  // ── What a page is, in words ──
+  function viewsOf(page) { return typeof page.readCount === 'number' ? page.readCount : 0; }
+  function limitReached(page) { return typeof page.reads === 'number' && page.reads > 0 && viewsOf(page) >= page.reads; }
+  function expiresMs(page) {
+    if (page.permanent || !page.expiresAt) return null;
+    var t = new Date(page.expiresAt).getTime();
+    return isNaN(t) ? null : t;
+  }
+  function isExpired(page) {
+    var t = expiresMs(page);
+    return (t !== null && t <= Date.now()) || limitReached(page);
+  }
+  function isExpiringSoon(page) {
+    var t = expiresMs(page);
+    return !isExpired(page) && t !== null && t - Date.now() < SOON_MS;
+  }
+
+  // How long the page stays up. Returns { text, tone, title }.
   function expiryWords(page) {
-    if (page.permanent || !page.expiresAt) return { text: 'Never expires', tone: 'good', title: '' };
-    var at = new Date(page.expiresAt);
-    var left = Math.floor((at.getTime() - Date.now()) / 1000);
-    var title = isNaN(at.getTime()) ? '' : 'Expires ' + at.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-    if (isNaN(left)) return { text: 'Expires soon', tone: '', title: '' };
-    if (left <= 0) return { text: 'Expired', tone: 'soon', title: title };
+    if (limitReached(page)) return { text: 'View limit reached', tone: 'soon', title: '' };
+    var t = expiresMs(page);
+    if (t === null) return { text: 'Never expires', tone: 'good', title: '' };
+    var at = new Date(t);
+    var left = Math.floor((t - Date.now()) / 1000);
+    var title = 'Expires ' + at.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    if (left <= 0) return { text: 'Expired ' + at.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }), tone: 'soon', title: title };
     if (left < 3600) return { text: 'Expires in ' + plural(Math.max(1, Math.floor(left / 60)), 'minute'), tone: 'soon', title: title };
     if (left < 86400) return { text: 'Expires in ' + plural(Math.floor(left / 3600), 'hour'), tone: 'soon', title: title };
     if (left < 86400 * 14) return { text: 'Expires in ' + plural(Math.round(left / 86400), 'day'), tone: '', title: title };
@@ -71,13 +110,22 @@
     return (bytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, '') + ' MB';
   }
 
+  // A kind icon from the title, so a list of pages is easy to scan.
+  function kindOf(page) {
+    var t = (page.title || '').toLowerCase();
+    if (/\b(deck|slides?|presentation|pitch|keynote)\b/.test(t)) return 'slides';
+    if (/\b(report|dashboard|analytics|metrics|kpis?|results|performance|stats)\b/.test(t)) return 'chart';
+    if (/\b(game|snake|tetris|quiz|puzzle|play)\b/.test(t)) return 'game';
+    if (/\b(landing|site|website|homepage|menu|portfolio)\b/.test(t)) return 'site';
+    return 'doc';
+  }
+
   function chip(iconName, text, tone, title) {
-    var el = document.createElement('span');
-    el.className = 'chip' + (tone ? ' ' + tone : '');
-    el.appendChild(icon(iconName));
-    el.appendChild(document.createTextNode(text));
-    if (title) el.title = title;
-    return el;
+    var c = el('span', 'chip' + (tone ? ' ' + tone : ''));
+    c.appendChild(icon(iconName));
+    c.appendChild(document.createTextNode(text));
+    if (title) c.title = title;
+    return c;
   }
 
   function announce(message) {
@@ -87,201 +135,71 @@
     setTimeout(function () { live.textContent = message; }, 50);
   }
 
-  // renderRow builds a single page row. onRemoved (optional) is invoked after a
-  // successful delete so the enclosing group can update its count / prune itself.
-  function renderRow(page, onRemoved) {
-    var li = document.createElement('li');
-    li.className = 'prow';
-    li.setAttribute('data-page-id', page.id);
-
-    var thumb = document.createElement('span');
-    thumb.className = 'thumb';
-    thumb.appendChild(icon(page.hasPin ? 'lock' : 'doc'));
-
-    var info = document.createElement('div');
-    info.style.minWidth = '0';
-
-    var titleLink = document.createElement('a');
-    titleLink.className = 'ttl focus-ring';
-    titleLink.href = '/p/' + page.id;
-    titleLink.target = '_blank';
-    titleLink.rel = 'noopener noreferrer';
-    titleLink.textContent = page.title || 'Untitled page';
-
-    var metaEl = document.createElement('p');
-    metaEl.className = 'sub';
-    var urlSpan = document.createElement('span');
-    urlSpan.className = 'mono';
-    urlSpan.textContent = window.location.host + '/p/' + page.id;
-    metaEl.appendChild(urlSpan);
-    if (page.createdAt) {
-      var age = relativeAge(page.createdAt);
-      if (age) metaEl.appendChild(document.createTextNode(' · Published ' + age));
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).catch(fallback);
     }
-
-    // Plain-language facts: views, expiry, who can open it, view limit, size.
-    var chips = document.createElement('div');
-    chips.className = 'chips';
-    var viewCount = typeof page.readCount === 'number' ? page.readCount : 0;
-    chips.appendChild(chip('eye', plural(viewCount, 'view')));
-    var exp = expiryWords(page);
-    chips.appendChild(chip('clock', exp.text, exp.tone, exp.title));
-    chips.appendChild(page.hasPin ? chip('lock', 'Needs a PIN') : chip('globe', 'Anyone with the link'));
-    if (typeof page.reads === 'number' && page.reads > 0) {
-      var left = Math.max(0, page.reads - viewCount);
-      chips.appendChild(chip('stop', 'Stops after ' + plural(page.reads, 'view') + ' · ' + left + ' left', left <= Math.max(1, Math.ceil(page.reads * 0.1)) ? 'soon' : ''));
-    } else {
-      chips.appendChild(chip('stop', 'No view limit'));
+    return Promise.resolve(fallback());
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch (_e) {}
+      document.body.removeChild(ta);
     }
-    var size = sizeWords(page.size);
-    if (size) chips.appendChild(chip('size', size));
+  }
 
-    info.appendChild(titleLink);
-    info.appendChild(metaEl);
-    info.appendChild(chips);
-
-    var acts = document.createElement('div');
-    acts.className = 'acts';
-
-    var copyBtn = document.createElement('button');
-    copyBtn.type = 'button';
-    var copyBaseClass = 'btn sm';
-    copyBtn.className = copyBaseClass;
-    copyBtn.setAttribute('aria-label', 'Copy link to ' + (page.title || page.id));
-    copyBtn.textContent = 'Copy link';
-
-    var copyTimer = null;
-    function setCopied() {
-      copyBtn.className = copyBaseClass + ' copied';
-      copyBtn.textContent = 'Copied';
-      announce('Copied');
-      if (copyTimer) clearTimeout(copyTimer);
-      copyTimer = setTimeout(function () {
-        copyBtn.className = copyBaseClass;
-        copyBtn.textContent = 'Copy link';
-      }, 1800);
-    }
-
-    copyBtn.addEventListener('click', function () {
-      var url = window.location.origin + '/p/' + page.id;
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(url).then(setCopied).catch(fallbackCopy);
-      } else {
-        fallbackCopy();
-      }
-      function fallbackCopy() {
-        var ta = document.createElement('textarea');
-        ta.value = url;
-        ta.style.position = 'fixed';
-        ta.style.left = '-9999px';
-        document.body.appendChild(ta);
-        ta.select();
-        try { document.execCommand('copy'); } catch (_e) {}
-        document.body.removeChild(ta);
-        setCopied();
-      }
+  // Copy buttons anywhere on the dashboard: <button data-copy="text">.
+  function initCopyButtons() {
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest && e.target.closest('[data-copy]');
+      if (!btn) return;
+      var label = btn.querySelector('[data-copy-label]') || btn;
+      var orig = label.getAttribute('data-orig') || label.textContent;
+      label.setAttribute('data-orig', orig);
+      copyText(btn.getAttribute('data-copy')).then(function () {
+        btn.classList.add('copied');
+        label.textContent = 'Copied';
+        announce('Copied');
+        setTimeout(function () { btn.classList.remove('copied'); label.textContent = orig; }, 1800);
+      });
     });
+  }
 
-    var deleteBtn = document.createElement('button');
-    deleteBtn.type = 'button';
-    var deleteBaseClass = 'btn sm ghost';
-    deleteBtn.className = deleteBaseClass;
-    deleteBtn.setAttribute('aria-label', 'Delete ' + (page.title || page.id));
-    deleteBtn.textContent = 'Delete';
+  // ── Views (#pages, #connect, #billing, #account) ──
+  var VIEWS = ['pages', 'connect', 'billing', 'account'];
+  var VIEW_TITLES = { pages: 'Pages', connect: 'Connect your AI tools', billing: 'Plan & billing', account: 'Account' };
 
-    var deleteTimer = null;
-    var deleteState = 'idle'; // idle | confirm | deleting
+  function currentView() {
+    var h = (window.location.hash || '').replace('#', '');
+    return VIEWS.indexOf(h) === -1 ? 'pages' : h;
+  }
 
-    function revertDelete() {
-      deleteState = 'idle';
-      if (deleteTimer) { clearTimeout(deleteTimer); deleteTimer = null; }
-      deleteBtn.textContent = 'Delete';
-      deleteBtn.className = deleteBaseClass;
-      deleteBtn.disabled = false;
-    }
-
-    deleteBtn.addEventListener('click', function () {
-      if (deleteState === 'idle') {
-        deleteState = 'confirm';
-        deleteBtn.textContent = 'Click to confirm';
-        deleteBtn.className = 'btn sm confirm';
-        deleteTimer = setTimeout(revertDelete, 3000);
-      } else if (deleteState === 'confirm') {
-        if (deleteTimer) { clearTimeout(deleteTimer); deleteTimer = null; }
-        deleteState = 'deleting';
-        deleteBtn.disabled = true;
-        deleteBtn.textContent = 'Deleting…';
-        deleteBtn.className = 'btn sm confirm';
-
-        fetch('/api/pages/' + page.id, {
-          method: 'DELETE',
-          headers: { 'X-Aired-Request': '1' },
-          credentials: 'same-origin',
-        }).then(function (res) {
-          if (res.ok) {
-            li.remove();
-            announce('Deleted');
-            updatePageCount(-1);
-            if (typeof onRemoved === 'function') onRemoved();
-          } else {
-            revertDelete();
-          }
-        }).catch(revertDelete);
-      }
+  function showView(name, focus) {
+    VIEWS.forEach(function (v) {
+      var sec = document.getElementById('view-' + v);
+      if (sec) sec.hidden = v !== name;
     });
-
-    acts.appendChild(copyBtn);
-    acts.appendChild(deleteBtn);
-
-    li.appendChild(thumb);
-    li.appendChild(info);
-    li.appendChild(acts);
-
-    return li;
+    document.querySelectorAll('[data-nav]').forEach(function (a) {
+      var on = a.getAttribute('data-nav') === name;
+      a.classList.toggle('on', on);
+      if (on) a.setAttribute('aria-current', 'page');
+      else a.removeAttribute('aria-current');
+    });
+    document.title = 'aired — ' + VIEW_TITLES[name].toLowerCase();
+    if (focus) {
+      var h = document.querySelector('#view-' + name + ' h1');
+      if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
+      window.scrollTo(0, 0);
+    }
   }
 
-  // ── Page count tracker (total across all groups) ──
-  var currentPageCount = null;
-  var projectCount = 0;
-
-  function setPageCount(n) {
-    currentPageCount = n;
-    renderPageCount();
-  }
-
-  function updatePageCount(delta) {
-    if (currentPageCount === null) return;
-    currentPageCount = Math.max(0, currentPageCount + delta);
-    renderPageCount();
-  }
-
-  function renderPageCount() {
-    var countEl = document.getElementById('page-count');
-    if (countEl) {
-      if (currentPageCount === null) {
-        countEl.textContent = '';
-      } else {
-        var pageLabel = ' · ' + plural(currentPageCount, 'page');
-        if (projectCount > 0) {
-          pageLabel += ' in ' + plural(projectCount, 'project');
-        }
-        countEl.textContent = pageLabel;
-      }
-    }
-
-    var heroPublish = document.getElementById('hero-publish');
-    if (heroPublish && currentPageCount !== null) {
-      heroPublish.textContent = currentPageCount === 0 ? 'Publish a page' : 'Publish another';
-    }
-
-    var emptyState = document.getElementById('empty-state');
-    if (emptyState && currentPageCount !== null) {
-      if (currentPageCount === 0) {
-        emptyState.classList.remove('hidden');
-      } else {
-        emptyState.classList.add('hidden');
-      }
-    }
+  function initViews() {
+    window.addEventListener('hashchange', function () { showView(currentView(), true); });
+    showView(currentView(), false);
   }
 
   // ── Fetch helper ──
@@ -292,291 +210,499 @@
     });
   }
 
-  // ── Collapsible project group ──
-  var groupSeq = 0;
+  // ── Pages: load everything once, then filter in the browser ──
+  var pages = {
+    all: [],          // [{...page, group}]
+    projects: [],     // names, in the order the API returned them
+    truncated: false,
+    loaded: false,
+    filter: 'all',
+    query: '',
+    collapsed: {},    // group key -> true
+  };
 
-  // group: { key, label, count (header number), prefetched (rows[]|null), cursor }
-  function renderGroup(container, group, expandInitially) {
-    var ulId = 'group-ul-' + (groupSeq++);
+  var FILTERS = [
+    { key: 'all', label: 'All', test: function () { return true; } },
+    { key: 'active', label: 'Active', test: function (p) { return !isExpired(p); } },
+    { key: 'soon', label: 'Expiring soon', test: isExpiringSoon },
+    { key: 'pin', label: 'PIN-protected', test: function (p) { return !!p.hasPin; } },
+    { key: 'expired', label: 'Expired', test: isExpired },
+  ];
 
-    var labelId = ulId + '-label';
-
-    var section = document.createElement('section');
-    section.className = 'project-group panel pgroup';
-    section.setAttribute('data-project', group.key);
-    // Give the section an accessible name so it's a meaningful landmark, not a
-    // generic unlabeled region.
-    section.setAttribute('aria-labelledby', labelId);
-
-    var header = document.createElement('button');
-    header.type = 'button';
-    header.className = 'group-header ghead';
-    header.setAttribute('aria-expanded', 'false');
-    header.setAttribute('aria-controls', ulId);
-
-    var chevron = icon('chev');
-    chevron.setAttribute('class', 'chev');
-
-    var gic = document.createElement('span');
-    gic.className = 'gic';
-    gic.appendChild(icon(group.key === UNSORTED_KEY ? 'doc' : 'folder'));
-
-    var nameEl = document.createElement('span');
-    nameEl.id = labelId;
-    nameEl.className = 'gname';
-    nameEl.textContent = group.label;
-
-    var countEl = document.createElement('span');
-    countEl.className = 'group-count gcount';
-    countEl.textContent = String(group.count);
-
-    header.appendChild(chevron);
-    header.appendChild(gic);
-    header.appendChild(nameEl);
-    header.appendChild(countEl);
-
-    var ul = document.createElement('ul');
-    ul.id = ulId;
-    ul.className = 'prows';
-    ul.hidden = true;
-
-    section.appendChild(header);
-    section.appendChild(ul);
-    container.appendChild(section);
-
-    var state = {
-      key: group.key,
-      isUnsorted: group.key === UNSORTED_KEY,
-      count: group.count,
-      countEl: countEl,
-      ul: ul,
-      cursor: group.cursor || null,
-      loaded: false,
-      loading: false,
-      expanded: false,
-    };
-
-    function setCount(n) {
-      state.count = Math.max(0, n);
-      countEl.textContent = String(state.count);
-      // Prune an emptied group entirely (once).
-      if (state.count === 0 && ul.children.length === 0 && !state.pruned) {
-        state.pruned = true;
-        section.remove();
-        // Keep the "· N projects" summary honest as named groups disappear.
-        if (!state.isUnsorted && projectCount > 0) {
-          projectCount--;
-          renderPageCount();
-        }
-      }
-    }
-
-    function onRowRemoved() {
-      setCount(state.count - 1);
-    }
-
-    function appendRows(rows) {
-      for (var i = 0; i < rows.length; i++) {
-        ul.appendChild(renderRow(rows[i], onRowRemoved));
-      }
-    }
-
-    function renderLoadMore() {
-      var existing = ul.parentNode.querySelector('[data-load-more="' + ulId + '"]');
-      if (existing) existing.remove();
-      if (!state.cursor) return;
-
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.setAttribute('data-load-more', ulId);
-      btn.className = 'loadmore';
-      btn.textContent = 'Show more pages';
-      btn.addEventListener('click', function () {
-        btn.textContent = 'Loading…';
-        btn.disabled = true;
-        loadPage(true).then(function () {
-          btn.remove();
-          renderLoadMore();
-        }).catch(function () {
-          btn.textContent = 'Show more pages';
-          btn.disabled = false;
-        });
-      });
-      ul.parentNode.insertBefore(btn, ul.nextSibling);
-    }
-
-    // Fetch one page of rows. `append` distinguishes load-more from first load.
-    function loadPage(append) {
-      if (state.loading) return Promise.resolve();
-      state.loading = true;
-      return fetchOnce(append, 0).then(function () {
-        state.loading = false;
-        renderLoadMore();
-      }).catch(function (err) {
-        state.loading = false;
-        throw err;
-      });
-    }
-
-    // The Unsorted group reads the FLAT index and post-filters project===null, so a
-    // 20-item page can yield zero rows while more remain. Follow the cursor past
-    // those empty pages (bounded) so unsorted/legacy pages stay reachable.
-    function fetchOnce(append, depth) {
-      var url = '/api/me/pages?project=' + encodeURIComponent(state.key) + '&limit=20';
-      if (append && state.cursor) {
-        url += '&cursor=' + encodeURIComponent(state.cursor);
-      }
+  // Follow a project's cursor to the end (bounded by PAGE_CAP overall).
+  function fetchGroup(key, budget) {
+    var rows = [];
+    function step(cursor, depth) {
+      var url = '/api/me/pages?project=' + encodeURIComponent(key) + '&limit=50';
+      if (cursor) url += '&cursor=' + encodeURIComponent(cursor);
       return fetchJson(url).then(function (data) {
-        var rows = data.pages || [];
-        appendRows(rows);
-        state.cursor = data.cursor || null;
-        // Named groups were already counted upfront via the manifest totals, so
-        // loading their rows must NOT add to the global count again. Only the
-        // Unsorted group's rows beyond its prefetched first page are new here.
-        if (state.isUnsorted) {
-          setCount(ul.children.length);
-          currentPageCount += rows.length;
-          renderPageCount();
-          if (rows.length === 0 && state.cursor && depth < 25) {
-            return fetchOnce(true, depth + 1);
-          }
-        }
+        var got = data.pages || [];
+        for (var i = 0; i < got.length; i++) { got[i].group = key; rows.push(got[i]); }
+        if (data.cursor && rows.length < budget && depth < 60) return step(data.cursor, depth + 1);
+        if (data.cursor) pages.truncated = true;
+        return rows;
       });
     }
-
-    function ensureLoaded() {
-      if (state.loaded) return Promise.resolve();
-      state.loaded = true;
-
-      // Unsorted may carry prefetched first-page rows from the dashboard probe.
-      if (group.prefetched && group.prefetched.length > 0) {
-        appendRows(group.prefetched);
-        renderLoadMore();
-        return Promise.resolve();
-      }
-      // No prefetched rows: load from the cursor (Unsorted, prefetch was empty but
-      // more pages remain) or from the first page (named groups, prefetched null).
-      return loadPage(group.prefetched ? true : false).catch(function () {
-        // Surface a minimal inline failure inside the group.
-        var p = document.createElement('li');
-        p.className = 'gnote';
-        p.textContent = 'Could not load these pages. Refresh to try again.';
-        ul.appendChild(p);
-      });
-    }
-
-    function setExpanded(next) {
-      state.expanded = next;
-      header.setAttribute('aria-expanded', next ? 'true' : 'false');
-      ul.hidden = !next;
-      if (next) ensureLoaded();
-    }
-
-    header.addEventListener('click', function () {
-      setExpanded(!state.expanded);
-    });
-
-    if (expandInitially) {
-      setExpanded(true);
-    }
-
-    return state;
+    return step(null, 0);
   }
 
-  // ── Error state with retry ──
+  function loadDashboard() {
+    return fetchJson('/api/me/projects').then(function (data) {
+      var projects = (data && data.projects) || [];
+      pages.projects = projects.map(function (p) { return p.name; });
+      var keys = pages.projects.concat([UNSORTED_KEY]);
+      pages.truncated = false;
+      return Promise.all(keys.map(function (k) { return fetchGroup(k, PAGE_CAP); }));
+    }).then(function (groups) {
+      var seen = {};
+      var all = [];
+      groups.forEach(function (rows) {
+        rows.forEach(function (p) {
+          if (seen[p.id] || all.length >= PAGE_CAP) return;
+          seen[p.id] = true;
+          all.push(p);
+        });
+      });
+      all.sort(function (a, b) { return (b.createdAt || '').localeCompare(a.createdAt || ''); });
+      pages.all = all;
+      pages.loaded = true;
+      renderPages();
+    }).catch(function () {
+      showLoadError();
+    });
+  }
+
   function showLoadError() {
-    var container = document.getElementById('project-groups');
-    if (!container) return;
-    container.innerHTML = '';
-
-    var emptyState = document.getElementById('empty-state');
-    if (emptyState) emptyState.classList.add('hidden');
-
-    var wrap = document.createElement('div');
+    var list = document.getElementById('page-list');
+    if (!list) return;
+    document.getElementById('pages-tools').hidden = true;
+    document.getElementById('empty-state').classList.add('hidden');
+    list.textContent = '';
+    var wrap = el('div', 'panel load-err');
     wrap.id = 'load-error';
-    wrap.className = 'panel load-err';
-
-    var msg = document.createElement('p');
-    msg.textContent = 'Could not load your pages.';
-
-    var retry = document.createElement('button');
+    wrap.appendChild(el('p', '', 'Could not load your pages.'));
+    var retry = el('button', 'btn sm', 'Try again');
     retry.type = 'button';
-    retry.className = 'btn sm';
-    retry.textContent = 'Retry';
     retry.addEventListener('click', function () {
       retry.disabled = true;
       retry.textContent = 'Loading…';
       loadDashboard();
     });
-
-    wrap.appendChild(msg);
     wrap.appendChild(retry);
-    container.appendChild(wrap);
+    list.appendChild(wrap);
   }
 
-  // ── Dashboard loader: projects + unsorted probe → grouped sections ──
-  function loadDashboard() {
-    var container = document.getElementById('project-groups');
+  // ── Summary tiles ──
+  function renderSummary() {
+    var live = 0, views = 0, soon = 0;
+    pages.all.forEach(function (p) {
+      if (!isExpired(p)) live++;
+      views += viewsOf(p);
+      if (isExpiringSoon(p)) soon++;
+    });
+    setTile('live', live.toLocaleString(), pages.truncated ? 'First ' + PAGE_CAP.toLocaleString() + ' pages' : plural(pages.all.length, 'page') + ' in total');
+    setTile('views', views.toLocaleString(), 'Across all your pages');
+    setTile('soon', soon.toLocaleString(), soon ? 'Show them' : 'Nothing expires this week');
+    var count = document.getElementById('page-count');
+    if (count) count.textContent = pages.all.length ? plural(pages.all.length, 'page') + (pages.projects.length ? ' in ' + plural(pages.projects.length, 'project') : '') : '';
+  }
 
-    return Promise.all([
-      fetchJson('/api/me/projects'),
-      // Probe unsorted: tells us whether the group exists + gives its first rows.
-      fetchJson('/api/me/pages?project=' + UNSORTED_KEY + '&limit=20'),
-    ]).then(function (results) {
-      var projects = (results[0] && results[0].projects) || [];
-      var unsortedData = results[1] || { pages: [] };
-      var unsortedRows = unsortedData.pages || [];
+  function setTile(key, value, sub) {
+    var v = document.querySelector('[data-tile="' + key + '"] b');
+    var s = document.querySelector('[data-tile="' + key + '"] small');
+    if (v) v.textContent = value;
+    if (s) s.textContent = sub;
+  }
 
-      if (!container) return;
-      container.innerHTML = '';
+  // Plan tile on the Pages view; renderPlan calls this too.
+  function setPlanTile(status) {
+    if (!status || !status.enabled) { setTile('plan', 'Free', 'Everything here is free'); return; }
+    if (status.plan === 'pro') { setTile('plan', 'Pro', status.cancelAtPeriodEnd ? 'Ends ' + formatDate(status.renewsAt) : 'Manage billing'); return; }
+    if (status.status === 'past_due' || status.status === 'unpaid') { setTile('plan', 'Free', 'Payment failed. Update card'); return; }
+    setTile('plan', 'Free', 'See what Pro adds');
+  }
 
-      projectCount = projects.length;
+  // ── Filters + search ──
+  function renderFilters() {
+    var bar = document.getElementById('page-filters');
+    if (!bar) return;
+    bar.textContent = '';
+    FILTERS.forEach(function (f) {
+      var n = pages.all.filter(f.test).length;
+      var b = el('button', 'fchip' + (pages.filter === f.key ? ' on' : ''));
+      b.type = 'button';
+      b.setAttribute('aria-pressed', pages.filter === f.key ? 'true' : 'false');
+      b.appendChild(document.createTextNode(f.label));
+      b.appendChild(el('span', 'n', String(n)));
+      b.addEventListener('click', function () {
+        pages.filter = f.key;
+        renderPages();
+      });
+      bar.appendChild(b);
+    });
+  }
 
-      var namedTotal = 0;
-      for (var i = 0; i < projects.length; i++) {
-        namedTotal += (typeof projects[i].count === 'number' ? projects[i].count : 0);
-      }
-      setPageCount(namedTotal + unsortedRows.length);
+  function visiblePages() {
+    var f = FILTERS.filter(function (x) { return x.key === pages.filter; })[0] || FILTERS[0];
+    var q = pages.query.trim().toLowerCase();
+    return pages.all.filter(function (p) {
+      if (!f.test(p)) return false;
+      if (!q) return true;
+      return ((p.title || '') + ' ' + p.id + ' ' + (p.group === UNSORTED_KEY ? '' : p.group)).toLowerCase().indexOf(q) !== -1;
+    });
+  }
 
-      // Nothing at all → empty state (renderPageCount already toggles it on 0).
-      // A non-null unsorted cursor means more pages exist further down, so it is
-      // not actually empty even when the probe's first page filtered to zero rows.
-      if (projects.length === 0 && unsortedRows.length === 0 && !unsortedData.cursor) {
+  function renderPages() {
+    var list = document.getElementById('page-list');
+    var tools = document.getElementById('pages-tools');
+    var empty = document.getElementById('empty-state');
+    var hero = document.getElementById('hero-publish');
+    if (!list) return;
+    var none = pages.all.length === 0;
+    if (hero) hero.textContent = none ? 'Publish a page' : 'Publish';
+    tools.hidden = none;
+    empty.classList.toggle('hidden', !none);
+    renderSummary();
+    list.textContent = '';
+    if (none) return;
+    renderFilters();
+
+    var shown = visiblePages();
+    if (!shown.length) {
+      var nm = el('div', 'panel nomatch');
+      nm.appendChild(el('p', '', pages.query ? 'No pages match “' + pages.query.trim() + '”.' : 'No pages here.'));
+      var clear = el('button', 'btn sm', 'Show all pages');
+      clear.type = 'button';
+      clear.addEventListener('click', function () {
+        pages.filter = 'all';
+        pages.query = '';
+        document.getElementById('page-search').value = '';
+        renderPages();
+      });
+      nm.appendChild(clear);
+      list.appendChild(nm);
+      return;
+    }
+
+    // Group by project when there are projects; otherwise one list.
+    var order = pages.projects.length ? pages.projects.concat([UNSORTED_KEY]) : [UNSORTED_KEY];
+    order.forEach(function (key) {
+      var rows = shown.filter(function (p) { return p.group === key; });
+      if (!rows.length) return;
+      list.appendChild(renderGroup(key, rows));
+    });
+    if (pages.truncated) list.appendChild(el('p', 'gfoot', 'Showing your newest ' + PAGE_CAP.toLocaleString() + ' pages.'));
+  }
+
+  function groupLabel(key) {
+    if (key !== UNSORTED_KEY) return key;
+    return pages.projects.length ? UNSORTED_LABEL : 'All pages';
+  }
+
+  function renderGroup(key, rows) {
+    var section = el('section', 'panel pgroup');
+    var id = 'g-' + Math.random().toString(36).slice(2, 8);
+    var collapsed = !!pages.collapsed[key];
+    var head = el('button', 'ghead');
+    head.type = 'button';
+    head.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    head.setAttribute('aria-controls', id);
+    var chev = icon('chev');
+    chev.setAttribute('class', 'chev');
+    var gic = el('span', 'gic');
+    gic.appendChild(icon(key === UNSORTED_KEY ? 'doc' : 'folder'));
+    var name = el('span', 'gname', groupLabel(key));
+    var count = el('span', 'gcount', String(rows.length));
+    head.appendChild(chev);
+    head.appendChild(gic);
+    head.appendChild(name);
+    head.appendChild(count);
+    var ul = el('ul', 'prows');
+    ul.id = id;
+    ul.hidden = collapsed;
+    rows.forEach(function (p) { ul.appendChild(renderRow(p)); });
+    head.addEventListener('click', function () {
+      var open = head.getAttribute('aria-expanded') !== 'true';
+      head.setAttribute('aria-expanded', open ? 'true' : 'false');
+      ul.hidden = !open;
+      pages.collapsed[key] = !open;
+    });
+    section.appendChild(head);
+    section.appendChild(ul);
+    return section;
+  }
+
+  // ── One page row ──
+  function renderRow(page) {
+    var li = el('li', 'prow' + (isExpired(page) ? ' gone' : ''));
+    li.setAttribute('data-page-id', page.id);
+    var url = window.location.origin + '/p/' + page.id;
+
+    var thumb = el('span', 'thumb k-' + kindOf(page));
+    thumb.appendChild(icon(kindOf(page)));
+    if (page.hasPin) {
+      var lock = el('span', 'tlock');
+      lock.appendChild(icon('lock'));
+      thumb.appendChild(lock);
+    }
+
+    var info = el('div', 'pinfo');
+    var title = el('a', 'ttl', page.title || 'Untitled page');
+    title.href = '/p/' + page.id;
+    title.target = '_blank';
+    title.rel = 'noopener noreferrer';
+    var sub = el('p', 'sub');
+    sub.appendChild(el('span', 'mono', window.location.host + '/p/' + page.id));
+    var age = relativeAge(page.createdAt);
+    if (age) sub.appendChild(document.createTextNode(' · Published ' + age));
+
+    var chips = el('div', 'chips');
+    var exp = expiryWords(page);
+    chips.appendChild(chip('clock', exp.text, exp.tone, exp.title));
+    chips.appendChild(page.hasPin ? chip('lock', 'Needs a PIN') : chip('globe', 'Anyone with the link'));
+    var v = viewsOf(page);
+    if (typeof page.reads === 'number' && page.reads > 0) {
+      var left = Math.max(0, page.reads - v);
+      chips.appendChild(chip('eye', plural(v, 'view') + ' of ' + page.reads.toLocaleString(), left <= Math.max(1, Math.ceil(page.reads * 0.1)) ? 'soon' : '', left + ' left before it stops opening'));
+    } else {
+      chips.appendChild(chip('eye', plural(v, 'view')));
+    }
+    var size = sizeWords(page.size);
+    if (size) chips.appendChild(chip('size', size));
+
+    info.appendChild(title);
+    info.appendChild(sub);
+    info.appendChild(chips);
+
+    // Actions: Copy link, Open, and a menu with Delete.
+    var acts = el('div', 'acts');
+    var copyBtn = el('button', 'btn sm');
+    copyBtn.type = 'button';
+    copyBtn.setAttribute('data-copy', url);
+    copyBtn.setAttribute('aria-label', 'Copy link to ' + (page.title || page.id));
+    copyBtn.appendChild(icon('copy'));
+    var copyLabel = el('span', '', 'Copy link');
+    copyLabel.setAttribute('data-copy-label', '');
+    copyBtn.appendChild(copyLabel);
+
+    var open = el('a', 'btn sm ghost iconbtn');
+    open.href = '/p/' + page.id;
+    open.target = '_blank';
+    open.rel = 'noopener noreferrer';
+    open.setAttribute('aria-label', 'Open ' + (page.title || page.id) + ' in a new tab');
+    open.title = 'Open';
+    open.appendChild(icon('open'));
+
+    acts.appendChild(copyBtn);
+    acts.appendChild(open);
+    acts.appendChild(rowMenu(page, li));
+
+    li.appendChild(thumb);
+    li.appendChild(info);
+    li.appendChild(acts);
+    return li;
+  }
+
+  // The "…" menu: Delete (two clicks), and report-a-problem.
+  var openMenu = null;
+  function closeMenu() {
+    if (!openMenu) return;
+    openMenu.panel.hidden = true;
+    openMenu.button.setAttribute('aria-expanded', 'false');
+    openMenu.reset();
+    openMenu = null;
+  }
+  document.addEventListener('click', function (e) {
+    if (openMenu && !openMenu.wrap.contains(e.target)) closeMenu();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && openMenu) { var b = openMenu.button; closeMenu(); b.focus(); }
+  });
+
+  function rowMenu(page, li) {
+    var wrap = el('div', 'menu');
+    var btn = el('button', 'btn sm ghost iconbtn');
+    btn.type = 'button';
+    btn.setAttribute('aria-haspopup', 'true');
+    btn.setAttribute('aria-expanded', 'false');
+    btn.setAttribute('aria-label', 'More for ' + (page.title || page.id));
+    btn.appendChild(icon('more'));
+    var panel = el('div', 'menu-panel');
+    panel.hidden = true;
+
+    var report = el('a', 'mitem');
+    report.href = '/abuse?id=' + encodeURIComponent(page.id);
+    report.appendChild(icon('flag'));
+    report.appendChild(document.createTextNode('Report a problem'));
+
+    var del = el('button', 'mitem danger');
+    del.type = 'button';
+    del.appendChild(icon('trash'));
+    var delLabel = el('span', '', 'Delete page');
+    del.appendChild(delLabel);
+    var state = 'idle';
+    var timer = null;
+    function reset() {
+      if (state === 'deleting') return;
+      state = 'idle';
+      if (timer) { clearTimeout(timer); timer = null; }
+      delLabel.textContent = 'Delete page';
+      del.classList.remove('confirm');
+      del.disabled = false;
+    }
+    del.addEventListener('click', function () {
+      if (state === 'idle') {
+        state = 'confirm';
+        delLabel.textContent = 'Click again to delete';
+        del.classList.add('confirm');
+        announce('Click again to delete ' + (page.title || page.id) + '. This can’t be undone.');
+        timer = setTimeout(reset, 4000);
         return;
       }
-
-      // Expand the first group so the page isn't all-collapsed on arrival.
-      var expandIndex = 0;
-      var rendered = 0;
-
-      for (var j = 0; j < projects.length; j++) {
-        renderGroup(container, {
-          key: projects[j].name,
-          label: projects[j].name,
-          count: projects[j].count,
-          prefetched: null,
-          cursor: null,
-        }, rendered === expandIndex);
-        rendered++;
-      }
-
-      // Render Unsorted when it has rows OR a cursor: a non-null cursor with zero
-      // rows means unsorted/legacy pages exist further down the flat index (the
-      // first page happened to be all project-tagged). Without this, those pages
-      // would be invisible. The group's loader follows the cursor on expand.
-      if (unsortedRows.length > 0 || unsortedData.cursor) {
-        renderGroup(container, {
-          key: UNSORTED_KEY,
-          label: projects.length ? UNSORTED_LABEL : 'All pages',
-          count: unsortedRows.length,
-          prefetched: unsortedRows,
-          cursor: unsortedData.cursor || null,
-        }, rendered === expandIndex);
-        rendered++;
-      }
-    }).catch(function () {
-      showLoadError();
+      if (state !== 'confirm') return;
+      if (timer) { clearTimeout(timer); timer = null; }
+      state = 'deleting';
+      del.disabled = true;
+      delLabel.textContent = 'Deleting…';
+      fetch('/api/pages/' + page.id, {
+        method: 'DELETE',
+        headers: { 'X-Aired-Request': '1' },
+        credentials: 'same-origin',
+      }).then(function (res) {
+        state = 'idle';
+        if (!res.ok) { reset(); delLabel.textContent = 'Could not delete. Try again'; return; }
+        closeMenu();
+        pages.all = pages.all.filter(function (p) { return p.id !== page.id; });
+        announce('Deleted');
+        renderPages();
+      }).catch(function () {
+        state = 'idle';
+        reset();
+        delLabel.textContent = 'Could not delete. Try again';
+      });
     });
+
+    panel.appendChild(report);
+    panel.appendChild(el('div', 'msep'));
+    panel.appendChild(del);
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (openMenu && openMenu.wrap === wrap) { closeMenu(); return; }
+      closeMenu();
+      panel.hidden = false;
+      btn.setAttribute('aria-expanded', 'true');
+      openMenu = { wrap: wrap, panel: panel, button: btn, reset: reset };
+      del.focus();
+    });
+    wrap.appendChild(btn);
+    wrap.appendChild(panel);
+    return wrap;
+  }
+
+  function initPagesTools() {
+    var search = document.getElementById('page-search');
+    if (search) {
+      search.addEventListener('input', function () {
+        pages.query = search.value;
+        renderPages();
+      });
+    }
+    var soonTile = document.querySelector('[data-tile="soon"]');
+    if (soonTile) soonTile.addEventListener('click', function () {
+      pages.filter = 'soon';
+      renderPages();
+      var bar = document.getElementById('page-filters');
+      if (bar) bar.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+  }
+
+  // ── Account: sign out, delete account ──
+  function initAccount(user) {
+    var initial = ((user.name || user.login || '?').trim().charAt(0) || '?').toUpperCase();
+    document.querySelectorAll('[data-initial]').forEach(function (n) { n.textContent = initial; });
+    document.querySelectorAll('[data-login]').forEach(function (n) { n.textContent = '@' + user.login; });
+    var name = document.getElementById('acct-name');
+    if (name) name.textContent = user.name || '@' + user.login;
+    var email = document.getElementById('acct-email');
+    if (email) {
+      if (user.email) { email.textContent = user.email; email.parentNode.hidden = false; }
+    }
+    var since = document.getElementById('acct-since');
+    if (since && user.createdAt) {
+      var d = new Date(user.createdAt);
+      if (!isNaN(d.getTime())) { since.textContent = d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }); since.parentNode.hidden = false; }
+    }
+
+    document.querySelectorAll('[data-sign-out]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        b.disabled = true;
+        fetch('/auth/logout', {
+          method: 'POST',
+          headers: { 'X-Aired-Request': '1' },
+          credentials: 'same-origin',
+        }).then(function (res) {
+          return res.json().catch(function () { return {}; });
+        }).then(function (data) {
+          // Signed in through AuthKit: end that session too (it comes back to /).
+          var next = data && typeof data.redirect === 'string' && /^https:\/\/api\.workos\.com\//.test(data.redirect) ? data.redirect : '/';
+          window.location.href = next;
+        }).catch(function () {
+          window.location.href = '/';
+        });
+      });
+    });
+
+    var start = document.getElementById('del-start');
+    var form = document.getElementById('del-form');
+    var input = document.getElementById('del-confirm');
+    var go = document.getElementById('del-go');
+    var cancel = document.getElementById('del-cancel');
+    var err = document.getElementById('del-error');
+    if (!start || !form) return;
+    function sync() { go.disabled = input.value.trim().toUpperCase() !== 'DELETE'; }
+    start.addEventListener('click', function () {
+      start.hidden = true;
+      form.hidden = false;
+      input.focus();
+    });
+    cancel.addEventListener('click', function () {
+      form.hidden = true;
+      start.hidden = false;
+      input.value = '';
+      err.hidden = true;
+      sync();
+      start.focus();
+    });
+    input.addEventListener('input', sync);
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (go.disabled) return;
+      go.disabled = true;
+      cancel.disabled = true;
+      go.textContent = 'Deleting…';
+      err.hidden = true;
+      fetch('/api/me', {
+        method: 'DELETE',
+        headers: { 'X-Aired-Request': '1' },
+        credentials: 'same-origin',
+      }).then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (data) {
+          if (res.ok) {
+            var next = data && typeof data.redirect === 'string' && /^https:\/\/api\.workos\.com\//.test(data.redirect) ? data.redirect : '/';
+            window.location.href = next;
+            return;
+          }
+          throw new Error((data && data.error) || 'Could not delete your account. Try again.');
+        });
+      }).catch(function (e2) {
+        err.textContent = e2.message || 'Could not delete your account. Try again.';
+        err.hidden = false;
+        go.textContent = 'Delete my account';
+        cancel.disabled = false;
+        sync();
+      });
+    });
+    sync();
   }
 
   // ── Plan strip (shown only when billing is on) ──
@@ -654,6 +780,9 @@
   function renderPlan(status, detail) {
     var strip = document.getElementById('plan-strip');
     if (!strip) return;
+    setPlanTile(status);
+    var off = document.getElementById('plan-off');
+    if (off) off.classList.toggle('hidden', !!(status && status.enabled));
     if (!status || !status.enabled) {
       strip.classList.add('hidden');
       return;
@@ -1111,6 +1240,13 @@
 
   // ── Init ──
   document.addEventListener('DOMContentLoaded', function () {
+    // Back from Stripe, or sent here after a failed payment: open Plan & billing.
+    var params = new URLSearchParams(window.location.search);
+    if ((params.get('upgraded') === '1' || params.has('billing')) && !window.location.hash) {
+      try { window.history.replaceState(null, '', window.location.pathname + window.location.search + '#billing'); } catch (_e) {}
+    }
+    initViews();
+    initCopyButtons();
     init();
   });
 
@@ -1135,32 +1271,10 @@
       return;
     }
 
-    var handle = document.getElementById('user-handle');
-    if (handle) handle.textContent = 'Signed in as @' + user.login;
-    var who = document.getElementById('nav-who');
-    if (who) who.textContent = '@' + user.login;
-
+    initAccount(user);
     initPlan();
     initClaim();
+    initPagesTools();
     await loadDashboard();
-
-    var signOutBtn = document.getElementById('sign-out');
-    if (signOutBtn) {
-      signOutBtn.addEventListener('click', function () {
-        fetch('/auth/logout', {
-          method: 'POST',
-          headers: { 'X-Aired-Request': '1' },
-          credentials: 'same-origin',
-        }).then(function (res) {
-          return res.json().catch(function () { return {}; });
-        }).then(function (data) {
-          // Signed in through AuthKit: end that session too (it comes back to /).
-          var next = data && typeof data.redirect === 'string' && /^https:\/\/api\.workos\.com\//.test(data.redirect) ? data.redirect : '/';
-          window.location.href = next;
-        }).catch(function () {
-          window.location.href = '/';
-        });
-      });
-    }
   }
 })();
