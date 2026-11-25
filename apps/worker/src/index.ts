@@ -14,6 +14,8 @@ import { publishRateLimit } from "./middleware/rate-limit.js";
 import { corsMiddleware } from "./middleware/cors.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { isMcpToolCall } from "./lib/mcp-rpc.js";
+import { sweepExpiredPages } from "./lib/expired-sweep.js";
+import type { Env } from "./types.js";
 
 const app = new Hono<AppBindings>();
 
@@ -93,4 +95,45 @@ app.notFound(async (c) => {
   return c.json({ error: "Not found" }, 404);
 });
 
-export default app;
+/**
+ * Cron Trigger (wrangler.toml [triggers]): delete the R2 files of expired
+ * pages, a batch per run (lib/expired-sweep.ts). The cursor lives in D1
+ * sweep_state, not KV, to stay clear of KV's daily write limit.
+ */
+async function runExpiredSweep(env: Env): Promise<void> {
+  const name = "expired_pages";
+  const result = await sweepExpiredPages(
+    {
+      list: async (cursor, limit) => {
+        const res = await env.PAGES_BUCKET.list({ prefix: "pages/", limit, ...(cursor ? { cursor } : {}) });
+        return {
+          objects: res.objects.map((o) => ({ key: o.key, uploaded: o.uploaded })),
+          truncated: res.truncated,
+          cursor: res.truncated ? res.cursor : null,
+        };
+      },
+      pageExists: async (id) => (await env.PAGES_KV.get(`page:${id}`)) !== null,
+      deleteKeys: (keys) => env.PAGES_BUCKET.delete(keys),
+      loadCursor: async () =>
+        (await env.DB.prepare("SELECT cursor FROM sweep_state WHERE name = ?").bind(name).first<{ cursor: string | null }>())?.cursor ?? null,
+      saveCursor: async (cursor) => {
+        await env.DB
+          .prepare(
+            "INSERT INTO sweep_state (name, cursor, updated_at) VALUES (?, ?, ?) ON CONFLICT (name) DO UPDATE SET cursor = excluded.cursor, updated_at = excluded.updated_at",
+          )
+          .bind(name, cursor, Date.now())
+          .run();
+      },
+      log: (entry) => console.warn(entry),
+    },
+    Date.now(),
+  );
+  console.log({ event: "expired_sweep", scanned: result.scanned, deleted: result.deleted.length });
+}
+
+export default {
+  fetch: app.fetch,
+  scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(runExpiredSweep(env));
+  },
+};

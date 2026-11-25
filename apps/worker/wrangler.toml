@@ -53,3 +53,9 @@ zone_name = "aired.sh"
 [[routes]]
 pattern = "aired.sh"
 zone_name = "aired.sh"
+
+# Expired-page file cleanup (src/lib/expired-sweep.ts): a small batch every
+# 30 minutes, so a full pass over the bucket takes days, well inside the
+# privacy policy's "within 30 days".
+[triggers]
+crons = ["*/30 * * * *"]
