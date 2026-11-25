@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Page not found — aired</title>
+  <meta name="description" content="This page doesn&#x27;t exist. It may have expired or been deleted." />
+  <meta name="robots" content="noindex" />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+  <link rel="icon" href="/favicon-16.png" type="image/png" sizes="16x16" />
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #0a0a0b;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Textarea */
+    textarea { resize: none; }
+    textarea:focus { outline: none; }
+    textarea::placeholder { color: #56565a; }
+
+    /* Number input spinners */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type="number"] { -moz-appearance: textfield; }
+
+    /* Select arrow override */
+    select { background-image: none; }
+
+    /* Hidden file input */
+    #file-input { display: none; }
+
+    /* Drag state */
+    .paste-area { position: relative; }
+    .drag-hint { display: none; }
+    .paste-area.drag-over .drag-hint {
+      display: flex;
+    }
+
+    /* Subtle glow on form focus */
+    .form-container:focus-within {
+      box-shadow: 0 0 0 1px #3b3b40, 0 0 40px -12px rgba(124, 106, 239, 0.08);
+    }
+
+    /* Smooth transitions */
+    .btn-primary {
+      transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .btn-primary:not(:disabled):hover {
+      background-color: #ffffff;
+    }
+    .btn-primary:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    /* Copy button states */
+    .copy-btn {
+      transition: all 120ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .copy-btn:hover {
+      background-color: #18181b;
+      border-color: #3b3b40;
+    }
+    .copy-btn.copied {
+      color: #34d399;
+      border-color: rgba(52, 211, 153, 0.3);
+    }
+
+    /* Result card animation */
+    .result-card {
+      transition: opacity 200ms cubic-bezier(0.16, 1, 0.3, 1),
+                  transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* Install card hover */
+    .install-card {
+      transition: border-color 150ms ease, background-color 150ms ease;
+    }
+    .install-card:hover {
+      border-color: #3b3b40;
+      background-color: rgba(17, 17, 19, 0.5);
+    }
+
+    /* Keyboard shortcut badge */
+    kbd {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.6875rem;
+      padding: 1px 5px;
+      border-radius: 4px;
+      border: 1px solid #222225;
+      background: #111113;
+      color: #56565a;
+    }
+
+    /* Focus ring utility */
+    .focus-ring:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px #0a0a0b, 0 0 0 4px rgba(124, 106, 239, 0.4);
+    }
+
+    /* Hero globe */
+    .hero-section { position: relative; overflow: visible; }
+    .hero-globe {
+      position: absolute;
+      right: -180px;
+      top: 50%;
+      transform: translateY(-55%);
+      width: 550px;
+      height: 550px;
+      opacity: 0.35;
+      pointer-events: none;
+      z-index: 0;
+      filter: saturate(1.2);
+    }
+    .hero-section::after {
+      content: '';
+      position: absolute;
+      right: -60px;
+      top: 50%;
+      transform: translateY(-55%);
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(124, 106, 239, 0.06) 0%, rgba(124, 106, 239, 0.02) 40%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    @media (max-width: 640px) {
+      .hero-globe, .hero-section::after { display: none; }
+    }
+
+    /* Form sits above globe */
+    .form-container, #air-form, .result-card, #error-msg { position: relative; z-index: 10; }
+
+    /* Marquee feed */
+    .marquee-wrapper {
+      overflow: hidden;
+      mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+      -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+    }
+    .marquee-track {
+      display: flex;
+      gap: 2rem;
+      white-space: nowrap;
+      animation: marquee-scroll 30s linear infinite;
+    }
+    @keyframes marquee-scroll {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    /* Setup-copy button */
+    .setup-btn {
+      transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1), transform 120ms ease;
+    }
+    .setup-btn:hover { background-color: #ffffff; }
+    .setup-btn:active { transform: translateY(1px); }
+    .setup-btn.copied { background-color: #34d399; color: #0a0a0b; }
+    .setup-btn .setup-btn-icon { opacity: 0.7; }
+
+    /* Agent icons */
+    .agent-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      transition: color 150ms ease;
+    }
+    .agent-icon:hover { color: #ededef; }
+  </style>
+  <style>
+    .guide { font-size: 0.875rem; line-height: 1.5rem; }
+    .guide h2 { color: #ededef; font-size: 1.125rem; line-height: 1.75rem; font-weight: 500; letter-spacing: -0.01em; margin-top: 3rem; }
+    .guide h3 { color: #ededef; font-size: 0.875rem; font-weight: 500; margin-top: 1.5rem; }
+    .guide p { color: #8a8a8e; line-height: 1.625; margin-top: 0.75rem; }
+    .guide ul, .guide ol { color: #8a8a8e; margin-top: 0.75rem; padding-left: 1.25rem; }
+    .guide ul { list-style: disc; }
+    .guide ol { list-style: decimal; }
+    .guide li { margin-top: 0.375rem; line-height: 1.625; }
+    .guide li::marker { color: #56565a; }
+    .guide strong { color: #ededef; font-weight: 500; }
+    .guide a { color: #ededef; text-decoration: underline; text-decoration-color: #3b3b40; transition: text-decoration-color 150ms ease; }
+    .guide a:hover { text-decoration-color: #8a8a8e; }
+    .guide code { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace; font-size: 0.8125em; color: #ededef; background: #111113; border: 1px solid #222225; border-radius: 4px; padding: 1px 5px; }
+    .guide .table-wrap { margin-top: 1rem; overflow-x: auto; border: 1px solid #222225; border-radius: 12px; }
+    .guide table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; min-width: 520px; }
+    .guide th, .guide td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid #222225; }
+    .guide tr:last-child td { border-bottom: 0; }
+    .guide th { color: #8a8a8e; font-weight: 500; background: #111113; }
+    .guide td { color: #8a8a8e; }
+    .guide td:first-child { color: #ededef; }
+    .guide .note { font-size: 0.75rem; color: #56565a; margin-top: 0.5rem; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col text-aired-text-primary">
+
+  <!-- ─── Header ─── -->
+  <header class="w-full px-6 h-14 flex items-center justify-between max-w-2xl mx-auto">
+    <a href="/" class="text-base font-semibold tracking-tight text-aired-text-primary hover:text-white transition-colors duration-150">aired</a>
+    <nav class="flex items-center gap-5 text-sm text-aired-text-secondary">
+      <a href="/docs" class="hover:text-aired-text-primary transition-colors duration-150">Docs</a>
+      <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener"
+         class="flex items-center gap-1.5 hover:text-aired-text-primary transition-colors duration-150">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+        GitHub
+      </a>
+      <a id="nav-auth" href="/auth/github?return=/dashboard"
+         class="hidden hover:text-aired-text-primary transition-colors duration-150 focus-ring rounded-sm">sign in</a>
+    </nav>
+  </header>
+
+  <!-- ─── Main ─── -->
+  <main class="flex-1 w-full max-w-2xl mx-auto px-6">
+
+    <!-- ─── Title + Form ─── -->
+    <section class="mt-12 sm:mt-16">
+      <div class="mb-8">
+        <h1 class="text-xl font-medium tracking-tight text-aired-text-primary">This page isn&#x27;t here</h1>
+        <p class="mt-2 text-sm text-aired-text-secondary leading-relaxed">The link may be mistyped, or the page expired or was deleted by the person who published it. Pages on aired last 7 days unless whoever published them chose longer.</p>
+      </div>
+
+    </section>
+
+    <!-- ─── Guide ─── -->
+    <article class="guide mt-4 mb-20">
+
+      <a href="/" class="btn-primary w-full h-10 flex items-center justify-center rounded-sm bg-aired-text-primary text-sm font-medium focus-ring" style="color:#0a0a0b;text-decoration:none">Publish your own page</a>
+      <p>Someone sent you this link? Ask them to publish it again. It takes a few seconds and the new link works the same way.</p>
+
+      <h2 id="guides">Popular guides</h2>
+      <ul>
+        <li><a href="/html-to-link">Turn an HTML file into a link</a></li>
+        <li><a href="/share-claude-artifacts">Share a Claude artifact with anyone</a></li>
+        <li><a href="/share-chatgpt-html">Share HTML that ChatGPT made</a></li>
+        <li><a href="/password-protect-html">Password-protect an HTML page</a></li>
+        <li><a href="/docs">Docs: CLI, MCP and API</a></li>
+      </ul>
+
+    </article>
+
+  </main>
+
+  <!-- ─── Footer ─── -->
+  <footer class="w-full max-w-2xl mx-auto px-6 py-8">
+    <nav aria-label="Guides" class="mb-4 flex flex-wrap justify-center sm:justify-start gap-x-4 gap-y-1 text-2xs">
+      <a href="/html-to-link" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">HTML to link</a>
+      <a href="/share-claude-artifacts" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Share Claude artifacts</a>
+      <a href="/share-chatgpt-html" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Share ChatGPT HTML</a>
+      <a href="/password-protect-html" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Password-protect HTML</a>
+      <a href="/share-html-privately" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Share HTML privately</a>
+      <a href="/share-html-with-client" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Send HTML to a client</a>
+      <a href="/tiiny-host-alternative" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Tiiny Host alternative</a>
+      <a href="/docs" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Docs</a>
+    </nav>
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-2 text-2xs text-aired-text-tertiary">
+      <p>
+        Built by <a href="https://x.com/iammoizfarooq" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">@iammoizfarooq</a>
+      </p>
+      <div class="flex items-center gap-4">
+        <a href="/abuse" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Report abuse</a>
+        <a href="/llms.txt" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150 font-mono">llms.txt</a>
+        <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">GitHub</a>
+        <a href="https://workers.cloudflare.com" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Cloudflare</a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

@@ -6,6 +6,7 @@ import { applyPageHeaders } from "../middleware/security.js";
 import { loadStats, saveStats } from "../lib/stats.js";
 import { SANDBOX_SHIM, injectEarlyScript } from "../lib/sandbox-shim.js";
 import { injectAiredBar } from "../lib/aired-bar.js";
+import { notFoundPage } from "../lib/not-found.js";
 
 const viewer = new Hono<AppBindings>();
 
@@ -15,7 +16,7 @@ viewer.get("/p/:id", async (c) => {
 
   const raw = await c.env.PAGES_KV.get(`page:${id}`);
   if (raw === null) {
-    return c.text("Page not found", 404);
+    return notFoundPage(c.env.ASSETS, c.req.url);
   }
 
   const metadata = parseMetadata(raw);
@@ -51,7 +52,7 @@ viewer.get("/p/:id", async (c) => {
   // Fetch HTML from R2
   const obj = await c.env.PAGES_BUCKET.get(`pages/${id}/index.html`);
   if (obj === null) {
-    return c.text("Page content not found", 404);
+    return notFoundPage(c.env.ASSETS, c.req.url, "Page content not found");
   }
 
   const html = await obj.text();
