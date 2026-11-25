@@ -46,8 +46,9 @@ namespace_id = "1002"
 simple = { limit = 3, period = 60 }
 
 # PIN guesses: 10 a minute per page and visitor (an IPv6 visitor counts by
-# /64), and 60 a minute per page in all (src/lib/pin-guess.ts). A 4-digit PIN
-# then takes hours to guess however many addresses are used.
+# /64), and 60 a minute per page, both counted per Cloudflare location
+# (src/lib/pin-guess.ts). The global cap is in D1: 30 wrong PINs in 15
+# minutes locks entry on that page (src/lib/pin-failures.ts).
 [[ratelimits]]
 name = "PIN_GUESS"
 namespace_id = "1003"

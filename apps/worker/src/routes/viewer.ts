@@ -12,6 +12,7 @@ import { viewWrite } from "../lib/view-write.js";
 import { hashPin, isPinHash, pinCookieValue, verifyPin, verifyPinCookie } from "../lib/pin-hash.js";
 import { underBurstLimit } from "../lib/burst-limit.js";
 import { pinGuessKeys, visitorNetwork } from "../lib/pin-guess.js";
+import { pinEntryLocked, recordPinFailure } from "../lib/pin-failures.js";
 import { hashToHex } from "@aired/core";
 
 /** How long a correct PIN entry lets the browser in. */
@@ -192,8 +193,22 @@ viewer.post("/p/:id/verify-pin", async (c) => {
     return c.json({ error: "Page is not PIN protected" }, 400);
   }
 
+  // The global cap on wrong entries (lib/pin-failures.ts). If D1 can't be
+  // read, the per-location limits above still apply.
+  const now = Date.now();
+  try {
+    if (await pinEntryLocked(c.env.DB, id, now)) {
+      return c.json({ error: "Too many wrong PINs for this page. Try again in 15 minutes." }, 429);
+    }
+  } catch (err) {
+    console.error("pin lockout check failed", { id, err });
+  }
+
   const check = await verifyPin(pin, metadata.pin);
   if (!check.ok) {
+    c.executionCtx.waitUntil(
+      recordPinFailure(c.env.DB, id, now).catch((err) => console.error("pin failure count failed", { id, err })),
+    );
     return c.json({ error: "Incorrect PIN" }, 403);
   }
 

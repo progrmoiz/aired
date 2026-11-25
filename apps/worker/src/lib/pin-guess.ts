@@ -5,8 +5,8 @@
  * - Per visitor: page id + network. An IPv6 visitor is keyed by their /64,
  *   since one connection usually controls the whole /64 and could otherwise
  *   take a fresh address for every guess.
- * - Per page: the page id alone, capping all guesses on a page whatever the
- *   number of addresses. A visitor who already entered the PIN has a cookie
+ * - Per page: the page id alone. Both are counted per Cloudflare location,
+ *   so they're cheap first filters; the global cap is lib/pin-failures.ts. A visitor who already entered the PIN has a cookie
  *   and isn't affected if someone else hits this cap.
  */
 
