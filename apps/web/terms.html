@@ -117,12 +117,12 @@
     <p>We share information about you with authorities only when the law requires it.</p>
 
     <h2>Paid plans and billing</h2>
-    <p>Pro costs <strong>$9 a month billed yearly ($108)</strong>, or <strong>$12 billed monthly</strong>, in US dollars. Here's how billing works:</p>
+    <p>Pro costs <strong>$9 a month billed yearly ($108)</strong>, or <strong>$12 billed monthly</strong>, in US dollars, plus tax where applicable. Here's how billing works:</p>
     <ul>
       <li><strong>Link is the seller.</strong> We sell Pro through Stripe Managed Payments, so Link, Stripe's checkout, is the merchant of record for your purchase: it takes the payment, charges any tax and sends your receipts. Your receipt and your card statement show Link, not aired. Link's own <a href="https://link.com/terms" target="_blank" rel="noopener">terms</a> also apply to the purchase. <mark class="tbd">[OWNER TO CHECK: the exact Stripe entity that sells to customers in each region, as named in Stripe's Managed Payments terms]</mark></li>
       <li>We never see or store your card number.</li>
       <li>Your plan renews automatically at the end of each month or year until you cancel. Link charges the card you gave it.</li>
-      <li>Taxes: Link adds sales tax, VAT or GST at checkout where the law requires it, and may show the price in your local currency. <mark class="tbd">[OWNER TO DECIDE: tax added on top of $12/$108 (the sandbox did this) or included in it. Match this line to the prices' tax_behavior]</mark></li>
+      <li>Taxes: prices are plus tax where applicable. Link adds sales tax, VAT or GST on top of the price at checkout where the law requires it, and may show the total in your local currency.</li>
       <li>If a payment fails, Stripe tries again over the next few weeks and you keep Pro in the meantime. If every retry fails, your account goes back to Free.</li>
       <li>Some Pro features are marked "Soon" on the <a href="/pricing">pricing page</a>. If you pay before they ship, you get them at no extra cost when they do.</li>
       <li>If we raise the price of Pro, the new price is for new subscriptions. <strong>We won't raise the price of a subscription you already have.</strong></li>

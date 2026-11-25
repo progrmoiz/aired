@@ -91,12 +91,11 @@ Phases 1–7 total about 12–19 working days including review and testing. Phas
 5. **When Pro lapses:** pages stay up, the badge returns, and the custom domain redirects to aired.sh links for 30 days, then disconnects.
 6. **Sign-in: WorkOS AuthKit** replaces GitHub-only login. Free up to 1M monthly active users. GitHub stays as one button; your existing accounts keep their ids and pages.
 7. **One database.** The D1 database added for billing also holds workspaces, roles, groups and the audit log later.
+8. **Tax setup.** Tax category **SaaS, business use** (`txcd_10103001`) on Aired Pro, and **tax-exclusive** prices (`tax_behavior=exclusive`): tax is added on top of $12 / $108 at checkout. The pricing page, terms and refund drafts say "plus tax where applicable". Already set in the sandbox.
 
 ## Still yours to decide
 
 - **How refunds, disputes and fraud warnings behave (built, check you agree).** A *full* refund of any invoice of a subscription cancels that subscription at once, even if you refund an earlier month as a goodwill gesture, so only fully refund when you mean to end Pro (refund part of a payment for goodwill instead). A dispute cancels Pro as soon as it opens, including an inquiry that never becomes a chargeback, and winning it doesn't restore Pro. An early fraud warning cancels Pro but doesn't refund; Stripe usually recommends refunding those to head off a dispute, which you'd do by hand.
-- **Price tax behaviour.** Set `tax_behavior` on both prices: *exclusive* (tax added on top of $12/$108) or *inclusive* (tax taken out of $12/$108). If it's left unset, Managed Payments adds tax on top, which is what the sandbox showed. The terms draft has a marked line to match your choice.
-- **Tax code.** `txcd_10103000` (SaaS, personal use; the sandbox used this) or `txcd_10103001` (SaaS, business use). Setting one is required (checklist step 1). The generic `txcd_10000000` is not the SaaS code.
 - **Stripe can refund without you.** As the seller, Stripe may refund a payment within 60 days, for example to settle a complaint. It asks your support email first; if nobody answers within 48 hours, it may refund anyway. A full refund also ends Pro automatically, the same as one you issue.
 
 - **Workspace pricing (Team, Business, Enterprise).** Recommended, not decided:
@@ -135,7 +134,7 @@ Use a separate Stripe **sandbox** for each environment (local, staging), not the
 
 | # | Where in Stripe | What |
 |---|---|---|
-| 1 | Product catalog → Add product | **Aired Pro**, two recurring prices: **$12.00 USD monthly** and **$108.00 USD yearly**. **Required: set the product tax code** to `txcd_10103000` or `txcd_10103001`; without it every checkout fails with a 400 ("product tax code is missing … required for Managed Payments"). Set `tax_behavior` on both prices. Copy both `price_…` ids. |
+| 1 | Product catalog → Add product | **Aired Pro**, two recurring prices: **$12.00 USD monthly** and **$108.00 USD yearly**. **Required: set the product tax code to `txcd_10103001`** (SaaS, business use); without it every checkout fails with a 400 ("product tax code is missing … required for Managed Payments"). **Set `tax_behavior` to `exclusive` on both prices when you create them**: Stripe won't let you change it once a price has it, so a wrong value means making new prices. Copy both `price_…` ids. |
 | 2 | Developers → Webhooks → Add endpoint | URL `https://aired.sh/api/billing/webhook`. Events: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, `invoice.payment_failed`, `charge.refunded`, `charge.dispute.created`, `radar.early_fraud_warning.created`. Copy the signing secret (`whsec_…`). |
 | 3 | Developers → API keys → Create restricted key (or edit the one you made earlier: it needs the new permissions before this version is deployed, or refund events fail for 3 days and are then dropped) | Permissions: Checkout Sessions **write**, Customer portal **write**, Customers **write**, Subscriptions **write** (cancels after a refund, dispute or fraud warning), Invoices **read** (and Invoice Payments read, if the Dashboard lists it separately), Charges **read**. Nothing else. Copy the `rk_…` key. The Worker refuses `sk_` keys. |
 | 4 | Settings → Billing → Customer portal | Allow cancel (at the end of the period), switching between the two Pro prices, updating the payment method and seeing invoices. Default return link `https://aired.sh/dashboard`. |
