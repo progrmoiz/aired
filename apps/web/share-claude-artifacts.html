@@ -137,7 +137,9 @@
   <link rel="stylesheet" href="/style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" /></noscript>
   <style>
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -562,7 +564,7 @@
       <p class="note">Claude details from Anthropic's help center article "Share artifacts", November 2026. Claude features change often.</p>
 
       <h2 id="chatgpt">The same works for ChatGPT and Gemini</h2>
-      <p>ChatGPT and Gemini can write HTML too. ChatGPT retired Canvas in May 2026, so ask it for "one self-contained HTML file" in a code block; Gemini can still build pages in Canvas. Copy the code and publish it the same way. See <a href="/html-to-link">turn an HTML file into a link</a>.</p>
+      <p>ChatGPT and Gemini can write HTML too. ChatGPT replaced Canvas with code blocks in May 2026, so ask it for "one self-contained HTML file" in a code block; Gemini can still build pages in Canvas. Copy the code and publish it the same way. See <a href="/share-chatgpt-html">share HTML from ChatGPT</a>.</p>
 
       <h2 id="faq">Questions</h2>
       <dl class="mt-4 divide-y divide-aired-border border-y border-aired-border">
@@ -584,6 +586,10 @@
     <nav aria-label="Guides" class="mb-4 flex flex-wrap justify-center sm:justify-start gap-x-4 gap-y-1 text-2xs">
       <a href="/html-to-link" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">HTML to link</a>
       <a href="/share-claude-artifacts" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Share Claude artifacts</a>
+      <a href="/share-chatgpt-html" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Share ChatGPT HTML</a>
+      <a href="/password-protect-html" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Password-protect HTML</a>
+      <a href="/share-html-privately" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Share HTML privately</a>
+      <a href="/share-html-with-client" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Send HTML to a client</a>
       <a href="/tiiny-host-alternative" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Tiiny Host alternative</a>
       <a href="/docs" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Docs</a>
     </nav>
