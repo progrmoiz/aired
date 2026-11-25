@@ -787,6 +787,248 @@
     });
   }
 
+  // ── Browser-held pages: offer to add them after sign-in ──
+  // Task 2.1 keeps signed-out publishes in localStorage["aired.pages"] as
+  // [{id, token, title, url, createdAt}]. Nothing is sent without a click.
+  var PAGES_KEY = 'aired.pages';
+  var DISMISSED_KEY = 'aired.pages.dismissed';
+  var CLAIM_CHUNK = 100;
+  // claim-batch only ever says "claim failed" today; if it starts saying the page
+  // is gone or owned elsewhere, drop the entry so it stops coming back.
+  var CLAIM_GONE_RE = /not found|no longer exist|does not exist|gone|expired|deleted|already (claimed|owned)|owned by|another (user|account)/i;
+
+  var claim = {
+    state: 'idle',   // idle | pending | partial | error
+    entries: [],
+  };
+
+  function readStoredPages() {
+    try {
+      var list = JSON.parse(window.localStorage.getItem(PAGES_KEY) || '[]');
+      return Array.isArray(list) ? list : [];
+    } catch (_e) {
+      return [];
+    }
+  }
+
+  // Valid entries only (string id + token), de-duplicated by id.
+  function readClaimEntries() {
+    var seen = {};
+    var out = [];
+    var list = readStoredPages();
+    for (var i = 0; i < list.length; i++) {
+      var e = list[i];
+      if (!e || typeof e !== 'object') continue;
+      if (typeof e.id !== 'string' || !e.id || typeof e.token !== 'string' || !e.token) continue;
+      if (seen[e.id]) continue;
+      seen[e.id] = true;
+      out.push(e);
+    }
+    return out;
+  }
+
+  function removeStoredPages(ids) {
+    if (!ids.length) return;
+    var drop = {};
+    for (var i = 0; i < ids.length; i++) drop[ids[i]] = true;
+    try {
+      var kept = readStoredPages().filter(function (e) {
+        return !(e && typeof e === 'object' && drop[e.id]);
+      });
+      window.localStorage.setItem(PAGES_KEY, JSON.stringify(kept));
+    } catch (_e) {}
+  }
+
+  function idsKey(entries) {
+    return entries.map(function (e) { return e.id; }).sort().join(',');
+  }
+
+  function readDismissed() {
+    try {
+      var raw = window.localStorage.getItem(DISMISSED_KEY) || '';
+      return raw ? raw.split(',') : [];
+    } catch (_e) {
+      return [];
+    }
+  }
+
+  function pagesPhrase(n) {
+    return n + (n === 1 ? ' page' : ' pages');
+  }
+
+  function claimTitle(entry) {
+    return (entry && typeof entry.title === 'string' && entry.title) || (entry && entry.id) || '';
+  }
+
+  function renderClaim(failures, errorText) {
+    var banner = document.getElementById('claim-banner');
+    if (!banner) return;
+    var addBtn = document.getElementById('claim-add');
+    var dismissBtn = document.getElementById('claim-dismiss');
+    var pending = claim.state === 'pending';
+    var n = claim.entries.length;
+
+    if (n > 0) {
+      setText('claim-label', pagesPhrase(n) + ' you published in this browser');
+    } else {
+      setText('claim-label', 'Some pages could not be added');
+    }
+    setText('claim-detail', n > 0 ? 'Add them to your account to manage them here.' : '');
+    setText('claim-error', errorText || '');
+
+    var list = document.getElementById('claim-failures');
+    if (list) {
+      list.innerHTML = '';
+      var items = failures || [];
+      for (var i = 0; i < items.length; i++) {
+        var li = document.createElement('li');
+        li.textContent = "Couldn't add " + items[i];
+        list.appendChild(li);
+      }
+      if (items.length) list.classList.remove('hidden');
+      else list.classList.add('hidden');
+    }
+
+    if (addBtn) {
+      if (n === 0) {
+        addBtn.classList.add('hidden');
+      } else {
+        addBtn.classList.remove('hidden');
+        addBtn.disabled = pending;
+        if (pending) addBtn.setAttribute('aria-busy', 'true');
+        else addBtn.removeAttribute('aria-busy');
+        addBtn.textContent = pending ? 'Adding…' : (claim.state === 'idle' ? 'Add to my account' : 'Try again');
+      }
+    }
+    if (dismissBtn) {
+      dismissBtn.disabled = pending;
+      dismissBtn.textContent = n === 0 ? 'Dismiss' : 'Not now';
+    }
+    banner.classList.remove('hidden');
+  }
+
+  function hideClaim() {
+    var banner = document.getElementById('claim-banner');
+    if (banner) banner.classList.add('hidden');
+    // Leave the controls idle so nothing stale shows if the banner returns.
+    var addBtn = document.getElementById('claim-add');
+    var dismissBtn = document.getElementById('claim-dismiss');
+    if (addBtn) {
+      addBtn.disabled = false;
+      addBtn.removeAttribute('aria-busy');
+      addBtn.textContent = 'Add to my account';
+    }
+    if (dismissBtn) {
+      dismissBtn.disabled = false;
+      dismissBtn.textContent = 'Not now';
+    }
+  }
+
+  function dismissClaim() {
+    if (claim.state === 'pending') return;
+    var entries = readClaimEntries();
+    if (entries.length) {
+      try { window.localStorage.setItem(DISMISSED_KEY, idsKey(entries)); } catch (_e) {}
+    }
+    hideClaim();
+  }
+
+  function postClaimChunk(chunk) {
+    return fetch('/api/me/claim-batch', {
+      method: 'POST',
+      headers: { 'X-Aired-Request': '1', 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        items: chunk.map(function (e) { return { id: e.id, update_token: e.token }; }),
+      }),
+    });
+  }
+
+  function runClaim() {
+    if (claim.state === 'pending') return;
+    var entries = readClaimEntries();
+    if (!entries.length) { hideClaim(); return; }
+
+    var byId = {};
+    for (var i = 0; i < entries.length; i++) byId[entries[i].id] = entries[i];
+
+    claim.state = 'pending';
+    claim.entries = entries;
+    renderClaim([], '');
+    announce('Adding ' + pagesPhrase(entries.length) + '…');
+
+    var added = 0;
+    var failures = [];
+    var problem = ''; // set when the run stops early (rate limit or request error)
+
+    function chunkAt(start) {
+      if (start >= entries.length || problem) return Promise.resolve();
+      var chunk = entries.slice(start, start + CLAIM_CHUNK);
+      return postClaimChunk(chunk).then(function (res) {
+        if (res.status === 429) {
+          problem = 'Try again in an hour.';
+          return;
+        }
+        if (!res.ok) throw new Error('Request failed: ' + res.status);
+        return res.json().then(function (data) {
+          var claimed = (data && Array.isArray(data.claimed)) ? data.claimed : [];
+          var failed = (data && Array.isArray(data.failed)) ? data.failed : [];
+          var drop = claimed.slice();
+          added += claimed.length;
+          for (var j = 0; j < failed.length; j++) {
+            var f = failed[j] || {};
+            failures.push(claimTitle(byId[f.id]) || (typeof f.id === 'string' ? f.id : ''));
+            if (typeof f.reason === 'string' && CLAIM_GONE_RE.test(f.reason)) drop.push(f.id);
+          }
+          // Persist per chunk so a later failure never re-sends claimed pages.
+          removeStoredPages(drop);
+        });
+      }).then(function () {
+        return chunkAt(start + CLAIM_CHUNK);
+      });
+    }
+
+    chunkAt(0).catch(function () {
+      problem = 'Could not add pages. Try again.';
+    }).then(function () {
+      claim.entries = readClaimEntries();
+      var addedText = added > 0 ? 'Added ' + pagesPhrase(added) : '';
+
+      if (added > 0) loadDashboard();
+
+      if (problem) {
+        claim.state = 'error';
+        renderClaim(failures, problem);
+        announce((addedText ? addedText + '. ' : '') + problem);
+      } else if (failures.length) {
+        claim.state = 'partial';
+        renderClaim(failures, '');
+        announce((addedText ? addedText + '. ' : '') + failures.length + ' could not be added');
+      } else {
+        claim.state = 'idle';
+        hideClaim();
+        announce(addedText || 'Nothing to add');
+      }
+    });
+  }
+
+  function initClaim() {
+    var addBtn = document.getElementById('claim-add');
+    var dismissBtn = document.getElementById('claim-dismiss');
+    if (!addBtn || !dismissBtn) return;
+    addBtn.addEventListener('click', runClaim);
+    dismissBtn.addEventListener('click', dismissClaim);
+
+    var entries = readClaimEntries();
+    if (!entries.length) return;
+    // Stay hidden if every saved page was already dismissed; new ones bring it back.
+    var dismissed = readDismissed();
+    var allDismissed = entries.every(function (e) { return dismissed.indexOf(e.id) !== -1; });
+    if (allDismissed) return;
+    claim.entries = entries;
+    renderClaim([], '');
+  }
+
   // ── Init ──
   document.addEventListener('DOMContentLoaded', function () {
     init();
@@ -817,6 +1059,7 @@
     if (h1) h1.textContent = '@' + user.login;
 
     initPlan();
+    initClaim();
     await loadDashboard();
 
     var signOutBtn = document.getElementById('sign-out');
