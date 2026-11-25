@@ -99,6 +99,6 @@ test("signing out of aired also ends the AuthKit session", () => {
   assert.equal(url.searchParams.get("return_to"), "https://aired.sh/");
   const auth = readFileSync(new URL("../src/routes/auth.ts", import.meta.url), "utf8");
   assert.match(auth, /if \(workosEnabled\(c\.env\)\) return c\.json\(\{ ok: true, redirect: workosLogoutUrl\(c\.env, workosSession\) \}\);/);
-  const dash = readFileSync(new URL("../../web/dashboard.js", import.meta.url), "utf8");
+  const dash = readFileSync(new URL("../../dashboard/src/lib/api.ts", import.meta.url), "utf8");
   assert.match(dash, /\/\^https:\\\/\\\/api\\\.workos\\\.com\\\/\/\.test\(data\.redirect\)/, "the dashboard only follows WorkOS logout URLs");
 });

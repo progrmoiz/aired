@@ -14,6 +14,10 @@
   "pnpm": {
     "patchedDependencies": {
       "@joplin/htmlpack@3.5.1": "patches/@joplin__htmlpack@3.5.1.patch"
+    },
+    "overrides": {
+      "@base-ui/react>@babel/runtime": "8.1.0",
+      "@base-ui/utils>@babel/runtime": "8.1.0"
     }
   }
 }

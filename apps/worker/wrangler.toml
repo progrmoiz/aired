@@ -7,6 +7,12 @@ compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 workers_dev = true
 
+# Build the signed-in dashboard (apps/dashboard, React + shadcn/ui) into
+# ../web/dashboard.html and ../web/dashboard-assets/ before every `wrangler dev`
+# and `wrangler deploy`, so a deploy can never ship a stale or missing dashboard.
+[build]
+command = "pnpm --filter @aired/dashboard build"
+
 [assets]
 directory = "../web"
 # Worker handles routing first; static assets accessed via env.ASSETS.fetch
