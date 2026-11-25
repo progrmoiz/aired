@@ -311,7 +311,9 @@
     });
 
     // ── Live numbers ──
-    if (document.querySelector("[data-stat]")) {
+    if (document.querySelector("[data-stat]")) loadStats();
+
+    function loadStats() {
       fetch("/api/stats")
         .then(function (r) { return r.json(); })
         .then(function (data) {
@@ -322,11 +324,181 @@
           };
           document.querySelectorAll("[data-stat]").forEach(function (el) {
             var v = values[el.getAttribute("data-stat")];
-            if (typeof v === "number" && v > 0) el.textContent = v.toLocaleString("en-US");
+            if (typeof v === "number" && v > 0) el.setAttribute("data-value", v);
+            if (!el.hasAttribute("data-count") && el.getAttribute("data-value")) el.textContent = v.toLocaleString("en-US");
           });
+          renderOpens(data.recent || []);
+          renderGeo(data.geo || {});
+          countUpWhenSeen();
         })
         .catch(function () {}); // keep the numbers already in the markup
     }
+
+    // Count the big numbers up from zero the first time the section is on screen.
+    function countUpWhenSeen() {
+      var els = document.querySelectorAll("[data-count][data-value]");
+      var box = document.getElementById("nums");
+      if (!els.length || !box) return;
+      var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      function finish() { els.forEach(function (el) { el.textContent = Number(el.getAttribute("data-value")).toLocaleString("en-US"); }); }
+      if (reduce || !("IntersectionObserver" in window)) return finish();
+      var io = new IntersectionObserver(function (entries) {
+        if (!entries[0].isIntersecting) return;
+        io.disconnect();
+        var start = performance.now(), dur = 1200;
+        (function step(now) {
+          var t = Math.min(1, (now - start) / dur), e = 1 - Math.pow(1 - t, 3);
+          els.forEach(function (el) { el.textContent = Math.round(Number(el.getAttribute("data-value")) * e).toLocaleString("en-US"); });
+          if (t < 1) requestAnimationFrame(step);
+        })(start);
+      }, { threshold: 0.4 });
+      io.observe(box);
+    }
+
+    var regionName = (function () {
+      try { var dn = new Intl.DisplayNames(["en"], { type: "region" }); return function (cc) { try { return dn.of(cc) || cc; } catch (e) { return cc; } }; }
+      catch (e) { return function (cc) { return cc; }; }
+    })();
+
+    function ago(ms) {
+      var s = Math.max(0, Math.floor(ms / 1000));
+      if (s < 60) return s + "s ago";
+      if (s < 3600) return Math.floor(s / 60) + "m ago";
+      if (s < 86400) return Math.floor(s / 3600) + "h ago";
+      return Math.floor(s / 86400) + "d ago";
+    }
+
+    // The last 20 opens on a timeline: oldest on the left, now on the right.
+    function renderOpens(recent) {
+      var box = document.getElementById("opens");
+      if (!box) return;
+      var opens = recent.filter(function (r) { return r && typeof r.ts === "number"; }).sort(function (a, b) { return a.ts - b.ts; });
+      if (!opens.length) return;
+      var now = Date.now(), first = opens[0].ts, span = Math.max(60000, now - first);
+      var from = document.getElementById("opens-from");
+      if (from) from.textContent = ago(now - first);
+      box.innerHTML = "";
+      var tip = document.createElement("span");
+      tip.className = "tip";
+      tip.hidden = true;
+      opens.forEach(function (o, i) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.setAttribute("role", "listitem");
+        var place = o.country && o.country !== "XX" ? regionName(o.country) : "Somewhere";
+        b.setAttribute("aria-label", "Opened in " + place + ", " + ago(now - o.ts));
+        b.style.left = (4 + 92 * (o.ts - first) / span) + "%";
+        var bar = document.createElement("i");
+        bar.style.height = (30 + 70 * (i + 1) / opens.length) + "%";
+        b.appendChild(bar);
+        if (i === opens.length - 1) b.classList.add("latest");
+        function show() {
+          tip.innerHTML = "";
+          tip.appendChild(document.createTextNode(place));
+          var sm = document.createElement("small");
+          sm.textContent = ago(Date.now() - o.ts);
+          tip.appendChild(sm);
+          tip.style.left = b.style.left;
+          tip.hidden = false;
+          box.querySelectorAll("button.on").forEach(function (x) { x.classList.remove("on"); });
+          b.classList.add("on");
+        }
+        function hide() { tip.hidden = true; b.classList.remove("on"); }
+        b.addEventListener("mouseenter", show);
+        b.addEventListener("focus", show);
+        b.addEventListener("click", show);
+        b.addEventListener("mouseleave", hide);
+        b.addEventListener("blur", hide);
+        box.appendChild(b);
+      });
+      box.appendChild(tip);
+
+      // "Last opened Xs ago", ticking every second.
+      var last = document.getElementById("last-open"), lastAgo = document.getElementById("last-open-ago");
+      if (last && lastAgo) {
+        var latest = opens[opens.length - 1].ts;
+        var tick = function () {
+          var d = Date.now() - latest;
+          lastAgo.textContent = ago(d);
+          last.classList.toggle("fresh", d < 5 * 60000);
+        };
+        tick();
+        last.hidden = false;
+        setInterval(tick, 1000);
+      }
+    }
+
+    // Top countries by opens, with a bar for each one's share.
+    function renderGeo(geo) {
+      var list = document.getElementById("geo");
+      if (!list) return;
+      var rows = Object.keys(geo).filter(function (cc) { return cc !== "XX"; })
+        .map(function (cc) { return [cc, geo[cc]]; })
+        .sort(function (a, b) { return b[1] - a[1]; });
+      if (!rows.length) return;
+      var total = rows.reduce(function (n, r) { return n + r[1]; }, 0), top = rows.slice(0, 5);
+      list.innerHTML = "";
+      top.forEach(function (r) {
+        var li = document.createElement("li");
+        li.tabIndex = 0;
+        var share = r[1] / total;
+        li.style.setProperty("--w", Math.max(4, Math.round(100 * r[1] / top[0][1])) + "%");
+        li.title = r[1].toLocaleString("en-US") + " opens";
+        var name = document.createElement("span");
+        name.textContent = regionName(r[0]);
+        var pct = document.createElement("b");
+        pct.textContent = (share < 0.01 ? "<1" : Math.round(share * 100)) + "%";
+        li.addEventListener("mouseenter", function () { pct.textContent = r[1].toLocaleString("en-US"); });
+        li.addEventListener("focus", function () { pct.textContent = r[1].toLocaleString("en-US"); });
+        li.addEventListener("mouseleave", function () { pct.textContent = (share < 0.01 ? "<1" : Math.round(share * 100)) + "%"; });
+        li.addEventListener("blur", function () { pct.textContent = (share < 0.01 ? "<1" : Math.round(share * 100)) + "%"; });
+        li.appendChild(name);
+        li.appendChild(pct);
+        list.appendChild(li);
+      });
+      if (rows.length > top.length) {
+        var more = document.createElement("li");
+        more.className = "more";
+        more.textContent = "+ " + (rows.length - top.length) + " more countries";
+        list.appendChild(more);
+      }
+    }
+
+    // ── Copy setup for my agent ──
+    var SETUP_PROMPT = [
+      "I'd like you to set up aired: HTML hosting for agents. Paste HTML, get a live URL, no signup.",
+      "",
+      "Install as a skill if I have npm: npx skills add progrmoiz/aired -g",
+      "",
+      "If not, do this instead: read https://aired.sh/llms.txt and use the HTTP API at https://aired.sh/api/publish."
+    ].join("\n");
+    function copyText(text, btn, done) {
+      var label = btn.querySelector("span") || btn;
+      var orig = label.textContent;
+      function ok() {
+        label.textContent = done;
+        btn.classList.add("copied");
+        setTimeout(function () { label.textContent = orig; btn.classList.remove("copied"); }, 2000);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, function () { fallback(); ok(); });
+      else { fallback(); ok(); }
+      function fallback() {
+        var ta = document.createElement("textarea");
+        ta.value = text; ta.style.position = "fixed"; ta.style.left = "-9999px";
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand("copy"); } catch (e) {}
+        document.body.removeChild(ta);
+      }
+    }
+    document.querySelectorAll("[data-setup]").forEach(function (btn) {
+      btn.addEventListener("click", function () { copyText(SETUP_PROMPT, btn, "Copied, paste it into your agent"); });
+    });
+    document.querySelectorAll("[data-code-copy]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var panel = document.querySelector("[data-code-panel]:not([hidden])");
+        if (panel) copyText(panel.getAttribute("data-copy") || panel.textContent, btn, "Copied");
+      });
+    });
 
     // ── Code card tabs (CLI / MCP / API) ──
     var codeTabs = document.querySelectorAll("[data-code]");
