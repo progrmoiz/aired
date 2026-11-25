@@ -551,7 +551,7 @@ async function claimPage(
     { kvOwnerId: metadata.ownerId, kvTokenHash: metadata.tokenHash, userId, now: Date.now() },
     {
       getClaim: () => getClaim(env.DB, pageId),
-      upsertClaim: (record) => upsertClaim(env.DB, pageId, record),
+      upsertClaim: (record, checkedHash) => upsertClaim(env.DB, pageId, record, checkedHash),
       replaceClaimToken: (hash) => replaceClaimToken(env.DB, pageId, userId, hash),
       newToken: generateToken,
       hash: hashToken,

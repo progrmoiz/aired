@@ -482,7 +482,7 @@ api.delete("/pages/:id", requireCsrfHeader, async (c) => {
   // Keep a tombstone row: a stale KV copy of the page, still readable in
   // other regions for a while, must not let its old token bring it back.
   try {
-    await tombstoneClaim(c.env.DB, id);
+    await tombstoneClaim(c.env.DB, id, Date.now());
   } catch (err) {
     console.error("page_claims tombstone failed", { id, err });
   }

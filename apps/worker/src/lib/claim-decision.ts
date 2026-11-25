@@ -93,8 +93,9 @@ export async function planClaim(input: {
 
 export type ClaimDeps = {
   getClaim: () => Promise<ClaimRecord | null>;
-  /** Insert a row or take a released one; false if someone holds the page. */
-  upsertClaim: (record: ClaimRecord & { ownerId: number }) => Promise<boolean>;
+  /** Insert a row, or take a released one still at `checkedHash`; false if
+   *  the row changed or someone holds the page. */
+  upsertClaim: (record: ClaimRecord & { ownerId: number }, checkedHash: string) => Promise<boolean>;
   /** Replace the token on the user's own row; false if it isn't theirs. */
   replaceClaimToken: (tokenHash: string) => Promise<boolean>;
   newToken: () => string;
@@ -127,18 +128,17 @@ export async function runClaim(
 
   if (plan === 'claim') {
     const prevTokenHash = pageCredentials(input.kvOwnerId, input.kvTokenHash, record).tokenHash;
-    const won = await deps.upsertClaim({
-      ownerId: input.userId,
-      tokenHash,
+    const won = await deps.upsertClaim(
+      { ownerId: input.userId, tokenHash, prevTokenHash, claimedAt: input.now },
       prevTokenHash,
-      claimedAt: input.now,
-    });
+    );
     if (!won) {
-      // Another claim got there first. Re-plan against its row. A same-user
-      // race lands on 'reissue'; treat it as 'owned' so this request doesn't
-      // retire the token the winning request just handed out.
+      // The row changed after it was read: another claim got there first.
+      // Re-plan against it. Only a page that turns out to be the user's own
+      // counts as success, and a same-user race ('reissue') returns no token
+      // so this request doesn't retire the one the winner handed out.
       plan = await planFor(await deps.getClaim());
-      return plan === 'deny' ? { ok: false } : { ok: true, token: null };
+      return plan === 'owned' || plan === 'reissue' ? { ok: true, token: null } : { ok: false };
     }
   } else if (!(await deps.replaceClaimToken(tokenHash))) {
     return { ok: false };

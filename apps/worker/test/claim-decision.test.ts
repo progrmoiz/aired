@@ -215,19 +215,26 @@ test("authoritativeCredentials reads the claim row and fails closed when it can'
 // --- runClaim ------------------------------------------------------------------
 
 /** An in-memory claim store and KV page, with a log of every side effect. */
-function fakeClaim(opts: { kvOwnerId: number | null; kvTokenHash: string; row?: ClaimRecord | null; userId: number; token: string; loseRaceTo?: ClaimRecord }) {
+function fakeClaim(opts: { kvOwnerId: number | null; kvTokenHash: string; row?: ClaimRecord | null; userId: number; token: string; loseRaceTo?: ClaimRecord; rowAfterRead?: ClaimRecord }) {
   let row: ClaimRecord | null = opts.row ?? null;
+  let reads = 0;
   const log: string[] = [];
   let n = 0;
   const deps: ClaimDeps = {
-    getClaim: async () => row,
-    upsertClaim: async (rec) => {
+    getClaim: async () => {
+      reads++;
+      const current = row;
+      // Simulate the row changing right after the first read.
+      if (reads === 1 && opts.rowAfterRead !== undefined) row = opts.rowAfterRead;
+      return current;
+    },
+    upsertClaim: async (rec, checkedHash) => {
       if (opts.loseRaceTo !== undefined && row === null) {
         row = opts.loseRaceTo;
         log.push("upsert:lost");
         return false;
       }
-      if (row !== null && (row.ownerId !== null || row.tokenHash === "deleted")) {
+      if (row !== null && (row.ownerId !== null || row.tokenHash === "deleted" || row.tokenHash !== checkedHash)) {
         log.push("upsert:held");
         return false;
       }
@@ -296,4 +303,41 @@ test("runClaim: a released row is claimed with its rotated token; the old link t
   const fresh = fakeClaim({ kvOwnerId: null, kvTokenHash: sha(OLD), row: released, userId: OTHER, token: NEW });
   assert.deepEqual(await fresh.run(), { ok: true, token: "at_issued_1" });
   assert.equal(fresh.row()?.prevTokenHash, sha(NEW));
+});
+
+test("runClaim: a reissue whose row changed hands is refused, and nothing is mirrored", async () => {
+  // Planned as a reissue, but by the time the token is replaced the row is
+  // someone else's (released and re-claimed in between).
+  const f = fakeClaim({
+    kvOwnerId: ME,
+    kvTokenHash: sha(NEW),
+    row: record(),
+    rowAfterRead: record({ ownerId: OTHER }),
+    userId: ME,
+    token: OLD,
+  });
+  assert.deepEqual(await f.run(NOW + 1000), { ok: false });
+  assert.deepEqual(f.log, []);
+});
+
+test("runClaim: losing the race to a row that re-plans as claimable is a deny, not a silent success", async () => {
+  // The insert lost to a released row whose hash the token happens to match:
+  // nothing was written for this user, so it must not report success.
+  const released = record({ ownerId: null, tokenHash: sha(OLD) });
+  const f = fakeClaim({ kvOwnerId: null, kvTokenHash: sha(OLD), userId: ME, token: OLD, loseRaceTo: released });
+  assert.deepEqual(await f.run(), { ok: false });
+});
+
+test("runClaim: a claim verified against a released row's hash fails if the row changed before the write", async () => {
+  const released = record({ ownerId: null, tokenHash: sha(NEW) });
+  const f = fakeClaim({
+    kvOwnerId: null,
+    kvTokenHash: sha(OLD),
+    row: released,
+    rowAfterRead: record({ ownerId: null, tokenHash: sha("at_someone_elses") }),
+    userId: OTHER,
+    token: NEW,
+  });
+  assert.deepEqual(await f.run(), { ok: false });
+  assert.deepEqual(f.log, ["upsert:held"]);
 });
