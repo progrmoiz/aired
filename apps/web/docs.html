@@ -387,14 +387,26 @@ url = "https://aired.sh/mcp"</code></pre>
       <section id="auth">
         <h2>Auth</h2>
         <ul>
-          <li>Publishing is anonymous — no API key required.</li>
+          <li>Publishing is anonymous — no API key required. With an <a href="#api-keys">API key</a>, pages go to your account.</li>
           <li>Every publish returns an <code>update_token</code>. It is the only credential for that page.</li>
           <li><strong>PUT</strong> takes the token in the JSON body as <code>update_token</code>, or as an <code>Authorization: Bearer &lt;token&gt;</code> header.</li>
-          <li><strong>DELETE</strong> takes the token as <code>Authorization: Bearer &lt;token&gt;</code> header.</li>
+          <li><strong>DELETE</strong> takes the token as <code>Authorization: Bearer &lt;token&gt;</code> header, or as <code>update_token</code> in a JSON body (use the body when <code>Authorization</code> carries an API key).</li>
           <li><strong>POST</strong> can act as update when <code>id</code> and <code>update_token</code> are both in the body.</li>
           <li>Lose the token and you can't mutate the page (you can still publish a fresh one).</li>
           <li>Adding a page to your account (<code>aired claim</code>, a claim link or the dashboard) replaces its token. The old token stops working everywhere it was shared, and the claim response returns the new one; the CLI stores it for you. Signed in, you can also update or delete your own pages without a token.</li>
         </ul>
+
+        <h3 id="api-keys">API keys (CI and agents)</h3>
+        <p>Create a key under <strong>API keys</strong> in your <a href="/dashboard">dashboard</a> (up to 5; each is shown once). Send it as <code>Authorization: Bearer aired_sk_…</code> and the request runs as your account: pages are yours, permanent by default, and use your plan's limits. You can update or delete your own pages with the key alone, no update token. A key can't create keys, open billing or delete the account. Revoke it from the dashboard and it stops working on the next request.</p>
+<pre><code>curl -X POST https://aired.sh/api/publish \
+  -H "Authorization: Bearer $AIRED_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"html":"&lt;h1&gt;Build report&lt;/h1&gt;"}'</code></pre>
+        <p>The CLI and the local MCP server read <code>AIRED_API_KEY</code> from the environment:</p>
+<pre><code># GitHub Actions
+- run: npx aired publish report.html
+  env:
+    AIRED_API_KEY: ${{ secrets.AIRED_API_KEY }}</code></pre>
       </section>
 
       <!-- ─── Errors ─── -->

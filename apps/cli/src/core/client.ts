@@ -3,6 +3,21 @@ import { AUTH_HEADER, CSRF_HEADER } from '@aired/core'
 import type { User } from '@aired/core'
 import type { PublishResult, PageInfo } from './types.js'
 
+/**
+ * An API key from AIRED_API_KEY (for CI and agents), or null. When set, it's
+ * sent as Authorization: Bearer and publishes go to the key's account.
+ */
+export function apiKeyFromEnv(): string | null {
+  const key = process.env['AIRED_API_KEY']?.trim()
+  return key ? key : null
+}
+
+function addApiKey(headers: Record<string, string>): Record<string, string> {
+  const key = apiKeyFromEnv()
+  if (key !== null) headers['Authorization'] = `Bearer ${key}`
+  return headers
+}
+
 export interface PublishOptions {
   title?: string
   pin?: string
@@ -116,6 +131,7 @@ export async function publishHTML(
     headers[CSRF_HEADER] = '1'
   }
 
+  addApiKey(headers)
   const resp = await fetch(`${baseUrl}/api/publish`, {
     method: 'POST',
     headers,
@@ -146,6 +162,7 @@ export async function updatePage(
     headers[CSRF_HEADER] = '1'
   }
 
+  addApiKey(headers)
   const resp = await fetch(`${baseUrl}/api/pages/${id}`, {
     method: 'PUT',
     headers,
@@ -162,7 +179,6 @@ export async function deletePage(
   jwt?: string,
 ): Promise<void> {
   const headers: Record<string, string> = {
-    'Authorization': `Bearer ${token}`,
     'User-Agent': USER_AGENT,
   }
 
@@ -171,9 +187,23 @@ export async function deletePage(
     headers[CSRF_HEADER] = '1'
   }
 
+  // With an API key, Authorization carries the key, so the update token goes
+  // in the body (the API accepts either).
+  let body: string | undefined
+  if (apiKeyFromEnv() !== null) {
+    addApiKey(headers)
+    if (token !== '') {
+      headers['Content-Type'] = 'application/json'
+      body = JSON.stringify({ update_token: token })
+    }
+  } else {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
   const resp = await fetch(`${baseUrl}/api/pages/${id}`, {
     method: 'DELETE',
     headers,
+    body,
   })
 
   await handleResponse<{ ok: boolean }>(resp, 'Delete')

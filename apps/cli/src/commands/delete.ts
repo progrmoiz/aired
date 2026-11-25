@@ -7,6 +7,7 @@ import { withSpinner } from '../lib/spinner.js'
 import { deletePage } from '../core/client.js'
 import { getToken, removeToken } from '../core/store.js'
 import { getSession } from '../core/session.js'
+import { apiKeyFromEnv } from '../core/client.js'
 
 export function makeDeleteCommand(globalOpts: () => GlobalOpts): Command {
   return new Command('delete')
@@ -20,7 +21,7 @@ export function makeDeleteCommand(globalOpts: () => GlobalOpts): Command {
       const token = getToken(id)
       const session = getSession()
 
-      if (token === null && session === null) {
+      if (token === null && session === null && apiKeyFromEnv() === null) {
         outputError({ code: 'VALIDATION', message: `No token found for page '${id}'. Run 'aired tokens' to list stored tokens.` }, opts)
         process.exit(ExitCode.VALIDATION_ERROR)
       }
