@@ -54,10 +54,10 @@ test("list_pages shows id, URL, title, views and expiry, and the next cursor", (
 });
 
 test("get_account shows plan and limits, and an upgrade link only on Free", () => {
-  const free = txt(accountResult({ login: "kim", plan: "free", limits: { maxBytes: 2_000_000, publishTier: "authenticated" }, billing: null }, "https://aired.sh/upgrade?ref=mcp"));
+  const free = txt(accountResult({ login: "kim", plan: "free", limits: { maxBytes: 2_000_000, publishTier: "authenticated" }, billing: null }, { upgradeUrl: "https://aired.sh/upgrade?ref=mcp", freePublishLimit: "30 an hour", proPublishLimit: "500 a day" }));
   assert.match(free, /Plan: Free\nLargest page: 2 MB\nPublish limit: 30 an hour/);
   assert.match(free, /upgrade_url: https:\/\/aired\.sh\/upgrade\?ref=mcp \(a person needs to open it\)/);
-  const pro = txt(accountResult({ login: "kim", plan: "pro", limits: { maxBytes: 10_000_000, publishTier: "pro" }, billing: { renewsAt: "2027-11-25T00:00:00Z", cancelAtPeriodEnd: false } }, "x"));
+  const pro = txt(accountResult({ login: "kim", plan: "pro", limits: { maxBytes: 10_000_000, publishTier: "pro" }, billing: { renewsAt: "2027-11-25T00:00:00Z", cancelAtPeriodEnd: false } }, { upgradeUrl: "https://aired.sh/upgrade?ref=mcp", freePublishLimit: "30 an hour", proPublishLimit: "500 a day" }));
   assert.match(pro, /Plan: Pro\nLargest page: 10 MB\nPublish limit: 500 a day\nRenews: 2027-11-25/);
   assert.doesNotMatch(pro, /upgrade_url/);
 });
@@ -69,5 +69,16 @@ test("wiring: only an API key signs MCP callers in, and key tool calls skip the 
     assert.match(mcp, new RegExp(`"${tool}",[\\s\\S]*?if \\(signedIn === null\\) return signInRequired\\(\\);`), tool);
   }
   const index = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
-  assert.match(index, /if \(isMcpToolCall\(body\) && c\.get\("authMethod"\) !== "key"\) return publishRateLimit\(c, next\);/);
+  assert.match(index, /return c\.get\("authMethod"\) === "key" \? rateLimit\(TIERS\.mcp_key\)\(c, next\) : publishRateLimit\(c, next\);/);
+  assert.match(index, /if \(countMcpToolCalls\(body\) > 1\) \{/);
+  assert.match(mcp, /if \(typeof update_token === "string" && typeof existingId !== "string"\) \{/);
+  assert.match(mcp, /return isTokenUpdate \? updateResult\(res\.body\) : publishResult\(res\.body, signedIn\.login\);/);
+  assert.equal((mcp.match(/if \(!PAGE_ID\.test\(id\)\) return badId\(\);/g) ?? []).length, 2);
+  const api = readFileSync(new URL("../src/routes/api.ts", import.meta.url), "utf8");
+  assert.match(api, /if \(user !== null && creds\.ownerId === null\) \{\s*const verdict = detectSpam/);
+});
+
+test("get_account hides the upgrade link when billing is off", () => {
+  const t = txt(accountResult({ login: "kim", plan: "free", limits: { maxBytes: 2_000_000, publishTier: "authenticated" } }, { upgradeUrl: null, freePublishLimit: "30 an hour", proPublishLimit: "500 a day" }));
+  assert.doesNotMatch(t, /upgrade_url/);
 });

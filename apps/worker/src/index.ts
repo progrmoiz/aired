@@ -14,7 +14,9 @@ import { keys } from "./routes/keys.js";
 import { publishRateLimit } from "./middleware/rate-limit.js";
 import { corsMiddleware } from "./middleware/cors.js";
 import { authMiddleware } from "./middleware/auth.js";
-import { isMcpToolCall } from "./lib/mcp-rpc.js";
+import { countMcpToolCalls, isMcpToolCall } from "./lib/mcp-rpc.js";
+import { rateLimit } from "./middleware/rate-limit.js";
+import { TIERS } from "./lib/rate-limit-tiers.js";
 import { sweepExpiredPages } from "./lib/expired-sweep.js";
 import { withAssetCache } from "./lib/asset-cache.js";
 import { kvKeys } from "@aired/core";
@@ -57,8 +59,19 @@ app.post(
     } catch {
       // Malformed body: let the MCP handler return the JSON-RPC error.
     }
-    // Key callers' tools go through the API, which applies its own limits.
-    if (isMcpToolCall(body) && c.get("authMethod") !== "key") return publishRateLimit(c, next);
+    // One tool call per request: limits count requests, not calls in a batch.
+    if (countMcpToolCalls(body) > 1) {
+      return c.json(
+        { jsonrpc: "2.0", id: null, error: { code: -32600, message: "Send one tool call per request." } },
+        400,
+      );
+    }
+    if (isMcpToolCall(body)) {
+      // Key callers: a per-account limit on every tool call (publishes also
+      // count against the publish limit inside the API). Everyone else: the
+      // publish limit.
+      return c.get("authMethod") === "key" ? rateLimit(TIERS.mcp_key)(c, next) : publishRateLimit(c, next);
+    }
     await next();
   },
   (c) => handleMcp(c, (req) => app.fetch(req, c.env, c.executionCtx)),

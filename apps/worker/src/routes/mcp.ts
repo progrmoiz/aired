@@ -21,7 +21,8 @@ import type { PageMetadata } from "@aired/core";
 import { authoritativeCredentials } from "../lib/claim-decision.js";
 import { getClaim } from "../lib/page-claims.js";
 import { hashPin } from "../lib/pin-hash.js";
-import { UPGRADE_URL } from "../lib/entitlements.js";
+import { UPGRADE_URL, billingEnabled } from "../lib/entitlements.js";
+import { TIERS } from "../lib/rate-limit-tiers.js";
 import {
   SIGN_IN_REQUIRED,
   accountResult,
@@ -46,12 +47,17 @@ type SignedIn = {
 
 const signInRequired = (): ToolResult => ({ content: [{ type: "text", text: SIGN_IN_REQUIRED }], isError: true });
 
+/** Page ids as generateId makes them; anything else never reaches the API path. */
+const PAGE_ID = /^[A-Za-z0-9_-]{1,64}$/;
+const badId = (): ToolResult => ({ content: [{ type: "text", text: "That isn't a page id." }], isError: true });
+
 function createAiredMcpServer(
   env: {
     PAGES_BUCKET: R2Bucket;
     PAGES_KV: KVNamespace;
     DB: D1Database;
     SITE_ORIGIN?: string;
+    BILLING_ENABLED?: string;
   },
   signedIn: SignedIn | null,
 ) {
@@ -86,12 +92,17 @@ function createAiredMcpServer(
     },
     async ({ html, title, pin, ttl_seconds, permanent, update_token, id: existingId }) => {
       if (signedIn !== null) {
+        if (typeof update_token === "string" && typeof existingId !== "string") {
+          return { content: [{ type: "text" as const, text: "When providing update_token, you must also provide the page id." }], isError: true };
+        }
+        if (typeof existingId === "string" && !PAGE_ID.test(existingId)) return badId();
         // Your own page by id: no token needed. Otherwise the API's publish,
         // which also accepts id + update_token.
         if (typeof existingId === "string" && typeof update_token !== "string") {
           const res = await signedIn.callApi("PUT", `/api/pages/${encodeURIComponent(existingId)}`, { html, title });
           return res.status === 200 ? updateResult(res.body) : apiErrorResult(res.status, res.body);
         }
+        const isTokenUpdate = typeof update_token === "string";
         const res = await signedIn.callApi("POST", "/api/publish", {
           html,
           title,
@@ -100,7 +111,9 @@ function createAiredMcpServer(
           ...(typeof permanent === "boolean" ? { permanent } : {}),
           ...(typeof update_token === "string" ? { update_token, id: existingId } : {}),
         });
-        return res.status === 200 ? publishResult(res.body, signedIn.login) : apiErrorResult(res.status, res.body);
+        if (res.status !== 200) return apiErrorResult(res.status, res.body);
+        // A token update may be of a page the caller doesn't own: don't claim it's theirs.
+        return isTokenUpdate ? updateResult(res.body) : publishResult(res.body, signedIn.login);
       }
 
       // Validate HTML
@@ -303,6 +316,7 @@ function createAiredMcpServer(
     },
     async ({ id, html, title }) => {
       if (signedIn === null) return signInRequired();
+      if (!PAGE_ID.test(id)) return badId();
       const res = await signedIn.callApi("PUT", `/api/pages/${encodeURIComponent(id)}`, { html, title });
       return res.status === 200 ? updateResult(res.body) : apiErrorResult(res.status, res.body);
     },
@@ -314,6 +328,7 @@ function createAiredMcpServer(
     { id: z.string().describe("Page id, from publish_html or list_pages") },
     async ({ id }) => {
       if (signedIn === null) return signInRequired();
+      if (!PAGE_ID.test(id)) return badId();
       const res = await signedIn.callApi("DELETE", `/api/pages/${encodeURIComponent(id)}`);
       return res.status === 200 ? deleteResult(id) : apiErrorResult(res.status, res.body);
     },
@@ -326,7 +341,13 @@ function createAiredMcpServer(
     async () => {
       if (signedIn === null) return signInRequired();
       const res = await signedIn.callApi("GET", "/api/me");
-      return res.status === 200 ? accountResult(res.body, `${UPGRADE_URL}?ref=mcp`) : apiErrorResult(res.status, res.body);
+      return res.status === 200
+        ? accountResult(res.body, {
+            upgradeUrl: billingEnabled(env) ? `${UPGRADE_URL}?ref=mcp` : null,
+            freePublishLimit: `${TIERS.authenticated.limit} an hour`,
+            proPublishLimit: `${TIERS.pro.limit} a day`,
+          })
+        : apiErrorResult(res.status, res.body);
     },
   );
 

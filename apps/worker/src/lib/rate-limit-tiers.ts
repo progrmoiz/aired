@@ -21,6 +21,9 @@ export const TIERS = {
   // OAuth init endpoints need higher limits — each sign-in attempt fires multiple
   // requests (init + callback + retries on stale browser tabs).
   oauth_init:    { bucketPrefix: 'rl:oauth',  limit: 60, windowSeconds: 3600 },
+  // Remote MCP tool calls made with an API key (per account). Publishes also
+  // count against the account's publish limit inside the API.
+  mcp_key:       { bucketPrefix: 'rl:mcpkey', limit: 120, windowSeconds: 3600 },
 } as const satisfies Record<string, RateLimitTier>;
 
 /**

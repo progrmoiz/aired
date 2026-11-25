@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { extractPageId, parseReport } from "../src/lib/report.ts";
-import { isMcpToolCall } from "../src/lib/mcp-rpc.ts";
+import { countMcpToolCalls, isMcpToolCall } from "../src/lib/mcp-rpc.ts";
 import { underBurstLimit } from "../src/lib/burst-limit.ts";
 
 test("extractPageId accepts bare IDs and page URLs", () => {
@@ -95,4 +95,12 @@ test("burst limit fails open when the binding is missing or errors", async () =>
   } finally {
     console.error = original;
   }
+});
+
+test("countMcpToolCalls counts tool calls in a single or batched body", () => {
+  assert.equal(countMcpToolCalls({ method: "tools/call" }), 1);
+  assert.equal(countMcpToolCalls({ method: "tools/list" }), 0);
+  assert.equal(countMcpToolCalls([{ method: "notifications/initialized" }, { method: "tools/call" }]), 1);
+  assert.equal(countMcpToolCalls([{ method: "tools/call" }, { method: "tools/call" }, { method: "tools/call" }]), 3);
+  assert.equal(countMcpToolCalls(null), 0);
 });

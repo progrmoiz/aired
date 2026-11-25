@@ -89,8 +89,11 @@ export function listResult(body: unknown, origin: string): ToolResult {
   return text(lines);
 }
 
-/** GET /api/me for get_account. */
-export function accountResult(body: unknown, upgradeUrl: string): ToolResult {
+/** GET /api/me for get_account. upgradeUrl is null when billing is off. */
+export function accountResult(
+  body: unknown,
+  opts: { upgradeUrl: string | null; freePublishLimit: string; proPublishLimit: string },
+): ToolResult {
   const b = (body ?? {}) as Obj;
   const limits = (b.limits ?? {}) as Obj;
   const billing = b.billing as Obj | null | undefined;
@@ -100,11 +103,11 @@ export function accountResult(body: unknown, upgradeUrl: string): ToolResult {
     `Account: @${String(b.login)}`,
     `Plan: ${plan === 'pro' ? 'Pro' : 'Free'}`,
     `Largest page: ${mb}`,
-    `Publish limit: ${limits.publishTier === 'pro' ? '500 a day' : '30 an hour'}`,
+    `Publish limit: ${limits.publishTier === 'pro' ? opts.proPublishLimit : opts.freePublishLimit}`,
   ];
   if (billing && str(billing.renewsAt)) {
     lines.push(`${billing.cancelAtPeriodEnd === true ? 'Ends' : 'Renews'}: ${String(billing.renewsAt).split('T')[0]}`);
   }
-  if (plan !== 'pro') lines.push(`upgrade_url: ${upgradeUrl} (a person needs to open it)`);
+  if (plan !== 'pro' && opts.upgradeUrl !== null) lines.push(`upgrade_url: ${opts.upgradeUrl} (a person needs to open it)`);
   return text(lines);
 }

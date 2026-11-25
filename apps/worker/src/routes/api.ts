@@ -149,6 +149,16 @@ api.post("/publish", publishRateLimit, async (c) => {
       return c.json({ error: "Invalid update token" }, 403);
     }
 
+    // An anonymous page is screened on update whoever sends it, so a clean
+    // page can't be swapped for spam (as PUT does).
+    if (user !== null && creds.ownerId === null) {
+      const verdict = detectSpam(html, resolvedTitle);
+      if (verdict.spam) {
+        console.log({ event: "spam_rejected", route: "api_publish_update", reason: verdict.reason });
+        return c.json({ error: SPAM_REJECTION }, 422);
+      }
+    }
+
     await c.env.PAGES_BUCKET.put(`pages/${existingId}/index.html`, html, {
       httpMetadata: { contentType: "text/html; charset=utf-8" },
     });
