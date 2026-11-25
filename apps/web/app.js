@@ -311,7 +311,9 @@
     });
 
     // ── Live numbers ──
-    if (document.querySelector("[data-stat]")) {
+    if (document.querySelector("[data-stat]")) loadStats();
+
+    function loadStats() {
       fetch("/api/stats")
         .then(function (r) { return r.json(); })
         .then(function (data) {
@@ -322,11 +324,121 @@
           };
           document.querySelectorAll("[data-stat]").forEach(function (el) {
             var v = values[el.getAttribute("data-stat")];
-            if (typeof v === "number" && v > 0) el.textContent = v.toLocaleString("en-US");
+            if (typeof v === "number" && v > 0) el.setAttribute("data-value", v);
+            if (!el.hasAttribute("data-count") && el.getAttribute("data-value")) el.textContent = v.toLocaleString("en-US");
           });
+          renderGeo(data.geo || {});
+          countUpWhenSeen();
         })
         .catch(function () {}); // keep the numbers already in the markup
     }
+
+    // Count the big numbers up from zero the first time the section is on screen.
+    function countUpWhenSeen() {
+      var els = document.querySelectorAll("[data-count][data-value]");
+      var box = document.getElementById("nums");
+      if (!els.length || !box) return;
+      var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      function finish() { els.forEach(function (el) { el.textContent = Number(el.getAttribute("data-value")).toLocaleString("en-US"); }); }
+      if (reduce || !("IntersectionObserver" in window)) return finish();
+      var io = new IntersectionObserver(function (entries) {
+        if (!entries[0].isIntersecting) return;
+        io.disconnect();
+        var start = performance.now(), dur = 1200;
+        (function step(now) {
+          var t = Math.min(1, (now - start) / dur), e = 1 - Math.pow(1 - t, 3);
+          els.forEach(function (el) { el.textContent = Math.round(Number(el.getAttribute("data-value")) * e).toLocaleString("en-US"); });
+          if (t < 1) requestAnimationFrame(step);
+        })(start);
+      }, { threshold: 0.4 });
+      io.observe(box);
+    }
+
+    var regionName = (function () {
+      try { var dn = new Intl.DisplayNames(["en"], { type: "region" }); return function (cc) { try { return dn.of(cc) || cc; } catch (e) { return cc; } }; }
+      catch (e) { return function (cc) { return cc; }; }
+    })();
+
+    // Top countries by opens, with a bar for each one's share.
+    function renderGeo(geo) {
+      var list = document.getElementById("geo");
+      if (!list) return;
+      var rows = Object.keys(geo).filter(function (cc) { return cc !== "XX"; })
+        .map(function (cc) { return [cc, geo[cc]]; })
+        .sort(function (a, b) { return b[1] - a[1]; });
+      if (!rows.length) return;
+      var total = rows.reduce(function (n, r) { return n + r[1]; }, 0), top = rows.slice(0, 3);
+      list.innerHTML = "";
+      top.forEach(function (r) {
+        var li = document.createElement("li");
+        li.tabIndex = 0;
+        var share = r[1] / total;
+        li.style.setProperty("--w", Math.max(4, Math.round(100 * r[1] / top[0][1])) + "%");
+        li.title = r[1].toLocaleString("en-US") + " opens";
+        var name = document.createElement("span");
+        name.className = "flag";
+        var img = document.createElement("img");
+        img.src = "https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/flags/4x3/" + r[0].toLowerCase() + ".svg";
+        img.alt = "";
+        img.width = 16;
+        img.height = 12;
+        img.loading = "lazy";
+        img.onerror = function () { img.remove(); };
+        name.appendChild(img);
+        name.appendChild(document.createTextNode(regionName(r[0])));
+        var pct = document.createElement("b");
+        pct.textContent = (share < 0.01 ? "<1" : Math.round(share * 100)) + "%";
+        li.addEventListener("mouseenter", function () { pct.textContent = r[1].toLocaleString("en-US"); });
+        li.addEventListener("focus", function () { pct.textContent = r[1].toLocaleString("en-US"); });
+        li.addEventListener("mouseleave", function () { pct.textContent = (share < 0.01 ? "<1" : Math.round(share * 100)) + "%"; });
+        li.addEventListener("blur", function () { pct.textContent = (share < 0.01 ? "<1" : Math.round(share * 100)) + "%"; });
+        li.appendChild(name);
+        li.appendChild(pct);
+        list.appendChild(li);
+      });
+      if (rows.length > top.length) {
+        var more = document.createElement("li");
+        more.className = "more";
+        more.textContent = "+ " + (rows.length - top.length) + " more countries";
+        list.appendChild(more);
+      }
+    }
+
+    // ── Copy setup for my agent ──
+    var SETUP_PROMPT = [
+      "I'd like you to set up aired: HTML hosting for agents. Paste HTML, get a live URL, no signup.",
+      "",
+      "Install as a skill if I have npm: npx skills add progrmoiz/aired -g",
+      "",
+      "If not, do this instead: read https://aired.sh/llms.txt and use the HTTP API at https://aired.sh/api/publish."
+    ].join("\n");
+    function copyText(text, btn, done) {
+      var label = btn.querySelector("span") || btn;
+      var orig = label.textContent;
+      function ok() {
+        label.textContent = done;
+        btn.classList.add("copied");
+        setTimeout(function () { label.textContent = orig; btn.classList.remove("copied"); }, 2000);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, function () { fallback(); ok(); });
+      else { fallback(); ok(); }
+      function fallback() {
+        var ta = document.createElement("textarea");
+        ta.value = text; ta.style.position = "fixed"; ta.style.left = "-9999px";
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand("copy"); } catch (e) {}
+        document.body.removeChild(ta);
+      }
+    }
+    document.querySelectorAll("[data-setup]").forEach(function (btn) {
+      btn.addEventListener("click", function () { copyText(SETUP_PROMPT, btn, "Copied, paste it into your agent"); });
+    });
+    document.querySelectorAll("[data-code-copy]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var panel = document.querySelector("[data-code-panel]:not([hidden])");
+        if (panel) copyText(panel.getAttribute("data-copy") || panel.textContent, btn, "Copied");
+      });
+    });
 
     // ── Code card tabs (CLI / MCP / API) ──
     var codeTabs = document.querySelectorAll("[data-code]");
