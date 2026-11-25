@@ -6,6 +6,7 @@ import { applyPageHeaders } from "../middleware/security.js";
 import { loadStats, saveStats } from "../lib/stats.js";
 import { SANDBOX_SHIM, injectEarlyScript } from "../lib/sandbox-shim.js";
 import { injectAiredBar } from "../lib/aired-bar.js";
+import { getEntitlements } from "../lib/entitlements.js";
 
 const viewer = new Hono<AppBindings>();
 
@@ -96,6 +97,17 @@ viewer.get("/p/:id", async (c) => {
   const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
   const pageTitle = titleMatch?.[1]?.trim() || metadata.title || "Shared page";
 
+  // Pro owners get no badge. Anonymous pages skip the lookup; if it fails,
+  // show the badge rather than break the page.
+  let badge = true;
+  if (metadata.ownerId !== null) {
+    try {
+      badge = (await getEntitlements(c.env, metadata.ownerId)).badge;
+    } catch {
+      badge = true;
+    }
+  }
+
   // The shim must run before page scripts, so it goes in after the bar's
   // own <head> injection.
   const wrappedHtml = injectEarlyScript(
@@ -103,6 +115,7 @@ viewer.get("/p/:id", async (c) => {
       id,
       title: pageTitle,
       readCount: newReadCount,
+      badge,
     }),
     SANDBOX_SHIM,
   );
