@@ -111,6 +111,8 @@ echo "<h1>Hi</h1>" | aired --json
 | `AIRED_API_URL` env var | Medium |
 | Default (`https://aired.sh`) | Lowest |
 
+`AIRED_API_KEY`: an API key (`aired_sk_…`, from **API keys** in the dashboard). When set, every publish, update and delete runs as that account, which suits CI. A set but malformed value is an error, never an anonymous publish.
+
 Token store: `~/.config/aired/tokens.json` (mode `0600`).
 
 ---

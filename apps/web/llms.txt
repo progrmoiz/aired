@@ -17,7 +17,7 @@ Agents and humans use aired for one job:
 - TTL options: 1 hour, 1 day, 7 days (default), 30 days, or permanent.
 - Optional PIN protection — visitors enter the PIN to view.
 - Update token returned with every publish — use it to update or delete the artifact later.
-- 2 MB max per publish. 5 publishes per hour per IP.
+- 2 MB max per publish on Free (10 MB on Pro). 5 publishes per hour per IP anonymously.
 
 ## Install and agent runtime
 - Skill: `npx skills add progrmoiz/aired -g` — adds a SKILL.md to your project so any AI agent (Claude Code, Cursor, Windsurf) discovers and uses aired automatically.
@@ -31,23 +31,24 @@ Agents should read the live docs at https://github.com/progrmoiz/aired before an
 - No account or API key is required to publish.
 - The update_token returned with each publish is the only credential for that artifact.
 - PUT /api/pages/:id takes the token in the JSON body as `update_token`, or as an `Authorization: Bearer <token>` header.
-- DELETE /api/pages/:id takes the token in `Authorization: Bearer <token>` header.
+- DELETE /api/pages/:id takes the token in `Authorization: Bearer <token>` header, or as `update_token` in a JSON body.
+- API keys (`aired_sk_…`, created in the dashboard) sign requests in as an account: send `Authorization: Bearer aired_sk_…`. Pages are owned by the account and permanent by default; the owner can update or delete them with the key alone. The CLI and local MCP read `AIRED_API_KEY`. On the remote MCP (`https://aired.sh/mcp`), the same header unlocks `list_pages`, `update_page`, `delete_page` and `get_account`. A key can't open billing; a plan limit returns an upgrade link a person must open.
 - POST /api/publish acts as update when both `id` and `update_token` are in the body.
 - Anyone with the URL can view; anyone with the PIN (if set) can read protected content.
 
 ## Important API endpoints
 - POST /api/publish — publish HTML and receive `{ id, url, update_token, expiresAt }`. Body fields: `html` (required), `title?`, `ttl?` (seconds), `permanent?`, `pin?`, `reads?`. Pass `id` + `update_token` in the same body to update in one call.
 - PUT /api/pages/:id — update an artifact. Pass `update_token` in the JSON body or as `Authorization: Bearer <update_token>`.
-- DELETE /api/pages/:id — delete an artifact. Pass `Authorization: Bearer <update_token>` header.
+- DELETE /api/pages/:id — delete an artifact. Pass `Authorization: Bearer <update_token>`, or `update_token` in a JSON body when Authorization carries an API key.
 - GET /api/pages/:id — public metadata: `{ id, title, size, readCount, expiresAt }`.
 - GET /api/stats — aggregate counts (publishes, views, views per country). No page titles or URLs.
 - POST /api/report — body `{ id, reason }`, no auth, flags an artifact for review.
 - POST /p/:id/verify-pin — body `{ pin }`, sets a 1-hour cookie scoped to the page.
 
 ## Pricing and limits
-- Free. No account needed; optional GitHub sign-in adds a dashboard of your pages.
-- 2 MB max per publish.
-- 5 publishes per hour per IP, or 30 per hour when signed in.
+- Free, no account needed. Signing in adds a dashboard of your pages; Pro ($12/month or $108/year) removes the aired badge and raises the limits.
+- Max page size: 2 MB on Free, 10 MB on Pro.
+- Publishes: 5 per hour per IP anonymously, 30 per hour signed in on Free, 500 per day on Pro.
 - Default TTL is 7 days. Permanent TTL available; artifacts may be removed for abuse.
 
 ## Limitations and non-goals
@@ -57,10 +58,18 @@ Agents should read the live docs at https://github.com/progrmoiz/aired before an
 - No custom domains and no team accounts. The dashboard shows view counts per page, not detailed analytics.
 
 ## Error recovery
-- Errors are JSON: `{ "error": "<message>" }`.
-- On 429 rate_limit, wait an hour or retry from a different IP.
-- On 413 payload_too_large, reduce the artifact below 2 MB or split into a directory.
-- On 401 unauthorized, the update_token is wrong or expired.
+- API errors are JSON: `{ "error": "<message>" }`, sometimes with a `code`.
+- 400: invalid body, or the page is too large (over 2 MB anonymously or when billing is off, over 10 MB on any plan). Make it smaller.
+- 401: missing credentials, or an invalid or revoked API key.
+- 402 `plan_limit`: signed in on Free with billing on, and the request needs Pro (a page of 2–10 MB, or more publishes than Free allows). Pass the `upgrade_url` to a person; agents can't pay.
+- 403: the update_token doesn't match the page, or the action needs the aired website (API keys, billing, account deletion).
+- 409: a conflict, with a `code` such as `key_limit`.
+- 422: the page looks like spam or phishing and wasn't published.
+- 429: rate limited. Wait and retry later.
+- 503: a dependency is briefly unavailable. Retry shortly.
+
+## Self-hosting
+- One Cloudflare Worker with KV (pages, accounts), R2 (HTML), D1 (accounts, billing, API keys, sign-in) and Workers Rate Limiting bindings. PAGES_KV and OAUTH_KV share one KV id; replace the aired.sh [[routes]]. Secrets: SESSION_SECRET, SESSION_VALID_SINCE (sessions, API keys and MCP connections created before it stop working), GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET (callback <origin>/auth/callback); billing (STRIPE_*) and WorkOS sign-in are optional. `npm run deploy` in apps/worker applies the D1 migrations, then deploys. Details: https://aired.sh/docs#self-host
 
 ## Discovery and reference URLs
 - https://aired.sh — homepage with a paste-and-publish form.
@@ -77,7 +86,8 @@ Agents should read the live docs at https://github.com/progrmoiz/aired before an
 - https://aired.sh/index.md — markdown homepage fallback.
 - https://aired.sh/.well-known/agent.json — agent discovery manifest.
 - https://aired.sh/.well-known/ai-plugin.json — OpenAI-style plugin manifest.
-- https://aired.sh/mcp — MCP streamable HTTP endpoint.
+- https://aired.sh/mcp — MCP streamable HTTP endpoint (anonymous, or an API key).
+- https://aired.sh/mcp/account — the same server signed in as your account (OAuth sign-in for connectors, or an API key).
 - https://github.com/progrmoiz/aired — source code, issues, docs.
 
 ## Support

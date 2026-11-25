@@ -5,6 +5,20 @@ import type { JwtClaims } from '@aired/core';
 
 const SEVEN_DAYS_SECONDS = 7 * 24 * 60 * 60;
 
+/**
+ * 'web': the website's session cookie (30 days, sliding). 'cli': a CLI token
+ * (365 days). Only a 'web' token in the cookie counts as the website
+ * (requireWebSession); a CLI token can't be promoted by sending it as a cookie.
+ */
+export type SessionKind = 'web' | 'cli';
+
+/** The session claims plus what this worker adds. */
+export type SessionClaims = JwtClaims & {
+  kind: SessionKind;
+  /** When the person actually signed in (Unix seconds), kept across reissues. Per-account revocation compares against it. */
+  authTime: number;
+};
+
 function secretKey(secret: string): Uint8Array {
   return new TextEncoder().encode(secret);
 }
@@ -17,9 +31,11 @@ export async function signSession(
   claims: Omit<JwtClaims, 'iat' | 'exp' | 'jti' | 'v'>,
   secret: string,
   maxAgeSeconds: number = SESSION_MAX_AGE_SECONDS,
+  opts: { kind?: SessionKind; authTime?: number } = {},
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const jti = generateOpaqueId();
+  const kind: SessionKind = opts.kind ?? (maxAgeSeconds > SESSION_MAX_AGE_SECONDS ? 'cli' : 'web');
 
   return new SignJWT({
     sub: String(claims.sub),
@@ -28,6 +44,8 @@ export async function signSession(
     name: claims.name,
     jti,
     v: 1,
+    kind,
+    auth_time: opts.authTime ?? now,
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt(now)
@@ -36,7 +54,7 @@ export async function signSession(
 }
 
 export type VerifyResult =
-  | { ok: true; claims: JwtClaims }
+  | { ok: true; claims: SessionClaims }
   | { ok: false; reason: string };
 
 /**
@@ -100,7 +118,15 @@ export async function verifySession(
       return { ok: false, reason: 'unsupported_version' };
     }
 
-    const claims: JwtClaims = {
+    // Tokens from before these claims: a lifetime past the web session's
+    // 30 days means a CLI token; the sign-in time is unknown, so iat stands in.
+    const rawKind = payload['kind'];
+    const kind: SessionKind =
+      rawKind === 'web' || rawKind === 'cli' ? rawKind : exp - iat > SESSION_MAX_AGE_SECONDS ? 'cli' : 'web';
+    const rawAuthTime = payload['auth_time'];
+    const authTime = typeof rawAuthTime === 'number' && rawAuthTime <= iat ? rawAuthTime : iat;
+
+    const claims: SessionClaims = {
       sub,
       login,
       email: typeof email === 'string' ? email : null,
@@ -109,6 +135,8 @@ export async function verifySession(
       exp,
       jti,
       v: 1,
+      kind,
+      authTime,
     };
 
     return { ok: true, claims };

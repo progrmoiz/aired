@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@aired/core": "workspace:*",
+    "@cloudflare/workers-oauth-provider": "1.2.4",
     "@modelcontextprotocol/sdk": "^1.28.0",
     "agents": "^0.8.7",
     "hono": "^4.7.0",

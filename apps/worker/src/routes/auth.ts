@@ -15,6 +15,8 @@ import {
   readOAuthStateCookie,
   setOAuthStateCookie,
   clearOAuthStateCookie,
+  readWorkosSessionCookie,
+  clearWorkosSessionCookie,
 } from '../lib/cookies.js';
 import {
   exchangeCode,
@@ -26,81 +28,15 @@ import { requireAuth } from '../middleware/auth.js';
 import { requireCsrfHeader } from '../middleware/csrf.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { TIERS } from '../lib/rate-limit-tiers.js';
+import { resolveGithubSignIn } from '../lib/resolve-user.js';
+import { constantTimeEqual, finishSignIn, isAllowedReturn, type AuthState } from '../lib/sign-in.js';
+import { workosEnabled, workosLogoutUrl } from '../lib/workos.js';
+import { siteOrigin } from '../lib/billing/webhook-plan.js';
+import { startWorkosSignIn } from './auth-workos.js';
+import { pollNativeDevice } from './auth-device.js';
+import { isNativeDeviceCode } from '../lib/device-code.js';
 
 const auth = new Hono<AppBindings>();
-
-// Valid return paths for post-login redirect
-const ALLOWED_RETURN_PATHS = [
-  '/dashboard',
-  '/',
-  '/upgrade',
-  '/upgrade?interval=year',
-  '/upgrade?interval=month',
-  '/claim',
-];
-const ALLOWED_RETURN_PREFIX = '/p/';
-
-function isAllowedReturn(path: string): boolean {
-  return ALLOWED_RETURN_PATHS.includes(path) || path.startsWith(ALLOWED_RETURN_PREFIX);
-}
-
-/**
- * Constant-time string comparison to prevent timing attacks.
- */
-async function constantTimeEqual(a: string, b: string): Promise<boolean> {
-  if (a.length !== b.length) {
-    // Still iterate to avoid early exit
-    let diff = 0;
-    const minLen = Math.min(a.length, b.length);
-    for (let i = 0; i < minLen; i++) {
-      diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-    }
-    return false;
-  }
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return diff === 0;
-}
-
-/**
- * Upsert user record in KV and optionally write email index.
- */
-async function upsertUser(
-  kv: KVNamespace,
-  user: { id: number; login: string; email: string | null; name: string | null },
-): Promise<void> {
-  // Fetch existing user to preserve createdAt
-  const existingRaw = await kv.get(kvKeys.user(user.id));
-  let createdAt: string;
-  if (existingRaw !== null) {
-    try {
-      const existing = JSON.parse(existingRaw) as { createdAt?: string };
-      createdAt = existing.createdAt ?? new Date().toISOString();
-    } catch {
-      createdAt = new Date().toISOString();
-    }
-  } else {
-    createdAt = new Date().toISOString();
-  }
-
-  const now = new Date().toISOString();
-  const userRecord = {
-    id: user.id,
-    login: user.login,
-    email: user.email,
-    name: user.name,
-    createdAt,
-    updatedAt: now,
-  };
-
-  await kv.put(kvKeys.user(user.id), JSON.stringify(userRecord));
-
-  if (user.email !== null) {
-    await kv.put(kvKeys.emailIndex(user.email), String(user.id));
-  }
-}
 
 // GET /auth/github — initiate web OAuth flow
 auth.get('/github', rateLimit(TIERS.oauth_init), async (c) => {
@@ -125,7 +61,8 @@ auth.get('/github', rateLimit(TIERS.oauth_init), async (c) => {
 
   const githubUrl = new URL('https://github.com/login/oauth/authorize');
   githubUrl.searchParams.set('client_id', c.env.GITHUB_CLIENT_ID);
-  githubUrl.searchParams.set('redirect_uri', 'https://aired.sh/auth/callback');
+  // The GitHub OAuth app's callback must be <SITE_ORIGIN>/auth/callback.
+  githubUrl.searchParams.set('redirect_uri', `${siteOrigin(c.env)}/auth/callback`);
   githubUrl.searchParams.set('scope', 'read:user user:email');
   githubUrl.searchParams.set('state', state);
 
@@ -147,6 +84,11 @@ auth.get('/cli', rateLimit(TIERS.oauth_init), async (c) => {
     return c.json({ error: 'port must be an integer in [1024, 65535]' }, 400);
   }
 
+  // With WorkOS on, the CLI signs in through AuthKit too (any method).
+  if (workosEnabled(c.env)) {
+    return startWorkosSignIn(c, { port: portNum, client_state: clientState });
+  }
+
   const stateWorker = generateOpaqueId();
 
   try {
@@ -164,7 +106,8 @@ auth.get('/cli', rateLimit(TIERS.oauth_init), async (c) => {
 
   const githubUrl = new URL('https://github.com/login/oauth/authorize');
   githubUrl.searchParams.set('client_id', c.env.GITHUB_CLIENT_ID);
-  githubUrl.searchParams.set('redirect_uri', 'https://aired.sh/auth/callback');
+  // The GitHub OAuth app's callback must be <SITE_ORIGIN>/auth/callback.
+  githubUrl.searchParams.set('redirect_uri', `${siteOrigin(c.env)}/auth/callback`);
   githubUrl.searchParams.set('scope', 'read:user user:email');
   githubUrl.searchParams.set('state', stateWorker);
 
@@ -193,7 +136,7 @@ auth.get('/callback', rateLimit(TIERS.oauth_init), async (c) => {
     );
   }
 
-  const statesMatch = await constantTimeEqual(urlState, cookieState);
+  const statesMatch = constantTimeEqual(urlState, cookieState);
   if (!statesMatch) {
     return new Response(
       '<!DOCTYPE html><html><body><h1>Authentication Error</h1><p>State mismatch. Please try signing in again.</p></body></html>',
@@ -212,11 +155,15 @@ auth.get('/callback', rateLimit(TIERS.oauth_init), async (c) => {
   // Delete auth_state (one-shot)
   await c.env.PAGES_KV.delete(kvKeys.authState(urlState)).catch(() => {});
 
-  let authState: { port?: number; client_state?: string; return?: string };
+  let authState: AuthState & { provider?: string };
   try {
     authState = JSON.parse(authStateRaw) as typeof authState;
   } catch {
     return c.redirect('/?login_failed=1', 302);
+  }
+  // A state minted for the WorkOS flow can't finish here.
+  if (authState.provider === 'workos') {
+    return c.redirect('/?login_failed=state', 302);
   }
 
   const code = url.searchParams.get('code');
@@ -241,60 +188,15 @@ auth.get('/callback', rateLimit(TIERS.oauth_init), async (c) => {
 
   // Apply redactNoreplyEmail defensively (fetchUser already filters, but defense-in-depth)
   const safeEmail = redactNoreplyEmail(ghUser.email);
-  const user = { ...ghUser, email: safeEmail };
-
-  // Upsert user record
+  let user;
   try {
-    await upsertUser(c.env.PAGES_KV, user);
+    user = await resolveGithubSignIn(c.env, { ...ghUser, email: safeEmail });
   } catch (err) {
     console.error('Failed to upsert user record:', err);
     return c.redirect('/?login_failed=1', 302);
   }
 
-  // CLI flow (port present) gets a long-lived, non-rotating token; the web
-  // cookie keeps the default sliding 30-day lifetime.
-  const isCliFlow = typeof authState.port === 'number';
-
-  // Mint JWT
-  let jwt: string;
-  try {
-    jwt = await signSession(
-      { sub: user.id, login: user.login, email: user.email, name: user.name },
-      c.env.SESSION_SECRET,
-      isCliFlow ? CLI_SESSION_MAX_AGE_SECONDS : undefined,
-    );
-  } catch (err) {
-    console.error('Failed to mint JWT:', err);
-    return c.redirect('/?login_failed=1', 302);
-  }
-
-  clearOAuthStateCookie(c);
-
-  // Determine flow: CLI (port present) or web
-  if (isCliFlow) {
-    // CLI flow
-    const cliCode = generateOpaqueId();
-    const clientState = authState.client_state ?? '';
-
-    try {
-      await c.env.PAGES_KV.put(
-        kvKeys.cliCode(cliCode),
-        JSON.stringify({ jwt, client_state: clientState }),
-        { expirationTtl: 60 },
-      );
-    } catch (err) {
-      console.error('Failed to write cli_code KV:', err);
-      return c.redirect('/?login_failed=1', 302);
-    }
-
-    const redirectUrl = `http://localhost:${authState.port}/?code=${encodeURIComponent(cliCode)}&state=${encodeURIComponent(clientState)}`;
-    return c.redirect(redirectUrl, 302);
-  } else {
-    // Web flow
-    setSessionCookie(c, jwt);
-    const returnPath = isAllowedReturn(authState.return ?? '') ? (authState.return ?? '/dashboard') : '/dashboard';
-    return c.redirect(returnPath, 302);
-  }
+  return finishSignIn(c, user, authState);
 });
 
 // POST /auth/cli/exchange — exchange one-time CLI code for JWT
@@ -329,7 +231,7 @@ auth.post('/cli/exchange', rateLimit(TIERS.oauth_init), async (c) => {
   }
 
   // Constant-time compare body.state to stored client_state
-  const statesMatch = await constantTimeEqual(state, cliCodeData.client_state ?? '');
+  const statesMatch = constantTimeEqual(state, cliCodeData.client_state ?? '');
   if (!statesMatch) {
     return c.json({ error: 'invalid code' }, 400);
   }
@@ -385,10 +287,17 @@ auth.post('/logout', requireAuth, requireCsrfHeader, async (c) => {
   }
 
   clearSessionCookie(c);
+  // Signed in through AuthKit: the browser also has to end the WorkOS session,
+  // or the next "Log in" signs straight back in as the same person.
+  const workosSession = readWorkosSessionCookie(c);
+  if (workosSession !== null) {
+    clearWorkosSessionCookie(c);
+    if (workosEnabled(c.env)) return c.json({ ok: true, redirect: workosLogoutUrl(c.env, workosSession) });
+  }
   return c.json({ ok: true });
 });
 
-// GET /auth/device — initiate device flow
+// GET /auth/device — GitHub's device flow, for CLI versions before aired's own (POST /auth/device)
 auth.get('/device', rateLimit(TIERS.oauth_init), async (c) => {
   let deviceResponse: Record<string, unknown>;
   try {
@@ -422,7 +331,8 @@ auth.get('/device', rateLimit(TIERS.oauth_init), async (c) => {
 });
 
 // POST /auth/device/poll — poll device flow token
-auth.post('/device/poll', rateLimit(TIERS.oauth_init), async (c) => {
+const githubPollLimit = rateLimit(TIERS.oauth_init);
+auth.post('/device/poll', async (c) => {
   let body: unknown;
   try {
     body = await c.req.json();
@@ -439,6 +349,11 @@ auth.post('/device/poll', rateLimit(TIERS.oauth_init), async (c) => {
   if (typeof device_code !== 'string') {
     return c.json({ error: 'invalid request' }, 400);
   }
+
+  // aired's own device codes (current CLIs); GitHub's for older ones.
+  if (isNativeDeviceCode(device_code)) return pollNativeDevice(c, device_code);
+  const limited = await githubPollLimit(c, async () => {});
+  if (limited) return limited;
 
   const stateRaw = await c.env.PAGES_KV.get(kvKeys.deviceCode(device_code));
   if (stateRaw === null) {
@@ -472,10 +387,9 @@ auth.post('/device/poll', rateLimit(TIERS.oauth_init), async (c) => {
     }
 
     const safeEmail = redactNoreplyEmail(ghUser.email);
-    const user = { ...ghUser, email: safeEmail };
-
+    let user;
     try {
-      await upsertUser(c.env.PAGES_KV, user);
+      user = await resolveGithubSignIn(c.env, { ...ghUser, email: safeEmail });
     } catch (err) {
       console.error('Failed to upsert user on device poll:', err);
       return c.json({ error: 'server error' }, 500);
@@ -487,6 +401,7 @@ auth.post('/device/poll', rateLimit(TIERS.oauth_init), async (c) => {
         { sub: user.id, login: user.login, email: user.email, name: user.name },
         c.env.SESSION_SECRET,
         CLI_SESSION_MAX_AGE_SECONDS,
+        { kind: 'cli' },
       );
     } catch (err) {
       console.error('Failed to mint JWT on device poll:', err);

@@ -16,3 +16,8 @@ docs/tmp/
 
 # Claude Code session artifacts
 .claude/
+
+# Dashboard build output (apps/dashboard → apps/web). Built by wrangler's
+# [build] step on dev and deploy; never committed.
+apps/web/dashboard.html
+apps/web/dashboard-assets/

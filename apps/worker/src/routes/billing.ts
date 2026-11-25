@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppBindings } from '../types.js';
 import { kvKeys } from '@aired/core';
-import { requireAuth } from '../middleware/auth.js';
+import { requireWebSession } from '../middleware/auth.js';
 import { requireCsrfHeader } from '../middleware/csrf.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { TIERS } from '../lib/rate-limit-tiers.js';
@@ -189,7 +189,7 @@ billing.get('/status', async (c) => {
 });
 
 // POST /api/billing/checkout — {interval} → {url} of a Stripe Checkout session
-billing.post('/checkout', requireAuth, requireCsrfHeader, rateLimit(TIERS.billing), async (c) => {
+billing.post('/checkout', requireWebSession, requireCsrfHeader, rateLimit(TIERS.billing), async (c) => {
   if (!billingEnabled(c.env)) return c.json({ error: BILLING_OFF }, 503);
   const user = c.get('user')!;
   const problem = configProblem(c.env);
@@ -228,7 +228,7 @@ billing.post('/checkout', requireAuth, requireCsrfHeader, rateLimit(TIERS.billin
 });
 
 // POST /api/billing/portal — {url} of a Stripe billing portal session
-billing.post('/portal', requireAuth, requireCsrfHeader, rateLimit(TIERS.billing), async (c) => {
+billing.post('/portal', requireWebSession, requireCsrfHeader, rateLimit(TIERS.billing), async (c) => {
   if (!billingEnabled(c.env)) return c.json({ error: BILLING_OFF }, 503);
   const user = c.get('user')!;
 
@@ -498,7 +498,11 @@ upgrade.get('/upgrade', rateLimit(TIERS.billing), async (c) => {
   const user = c.get('user');
   if (!user) {
     const back = `/upgrade?interval=${interval}`;
-    return c.redirect(`/auth/github?return=${encodeURIComponent(back)}`, 302);
+    return c.redirect(`/auth/login?return=${encodeURIComponent(back)}`, 302);
+  }
+  // Billing is for a person on the website: not a CLI token, an API key or a connected app.
+  if (c.get('via') !== 'cookie') {
+    return c.json({ error: 'Sign in on the aired website to buy Pro.' }, 403);
   }
 
   const problem = configProblem(c.env);

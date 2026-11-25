@@ -126,9 +126,25 @@ Phases 1–7 total about 12–19 working days including review and testing. Phas
 | Done 2026-11-25 | **Support email** `support@aired.sh` via Cloudflare Email Routing, set as Stripe's support email. Managed Payments sends refund requests there and refunds on its own after 48 hours without an answer. |
 | Before phase 1 goes live | Terms, refund and privacy drafts filled in and taken out of draft (the list above) |
 | Before the next deploy of this branch | `wrangler d1 create aired`, paste the id into `apps/worker/wrangler.toml` (a placeholder today, so `wrangler deploy` fails until it's replaced), then deploy with `npm run deploy` in `apps/worker`, which now applies the D1 migrations (0001–0005) before deploying. Updating or deleting any page now reads D1, so the database must exist and be migrated before this branch is live. The deploy also starts a Cron Trigger every 5 minutes that deletes expired pages' files from R2 (a file goes after its page has been gone for at least a day, seen twice); watch the `expired_sweep_pass_done` log, and raise the batch size if a pass ever takes more than about 14 days |
-| Before phase 3 | WorkOS account (staging first, free): turn on Google, GitHub (with "return OAuth tokens") and Magic Auth in AuthKit; redirect URI `https://aired.sh/auth/workos/callback`; `wrangler secret put WORKOS_API_KEY` and `WORKOS_CLIENT_ID` |
+| Before deploying phases 3–5 (branch `claude/api-keys-mcp`) | Nothing to create or switch on. `npm run deploy` applies migrations 0006 (API keys) and 0007 (sign-in tables); both only add tables, one index and one empty column. `wrangler.toml` gains: `DEVICE_BURST` and `OAUTH_BURST` rate limits (CLI sign-in starts, MCP client registrations), an `OAUTH_KV` binding pointing at the **existing** pages KV namespace (MCP sign-in grants, under their own key prefixes), and the `global_fetch_strictly_public` compatibility flag (needed to fetch MCP clients' metadata documents; Stripe, GitHub and WorkOS calls are unaffected). Sign-in stays GitHub until the WorkOS secrets below are set. First run `wrangler d1 execute aired --remote --command "SELECT * FROM sqlite_sequence WHERE name='users'"` and check `seq` is at least 999999999999, so new accounts get ids from 10^12. |
+| After that deploy | Signed-in MCP for connectors works at `https://aired.sh/mcp/account` with no secrets to set: add it as a custom connector in Claude or ChatGPT and sign in with GitHub. Anonymous `https://aired.sh/mcp` is unchanged. |
+| To try WorkOS locally | Put the staging API key (`sk_test_…`) in `apps/worker/.dev.vars` as `WORKOS_API_KEY`, next to `WORKOS_CLIENT_ID` (see `.dev.vars.example`). Never in a committed file. |
+| Before turning WorkOS on in production | See the WorkOS checklist below. |
 | Before phase 6 | Cloudflare API token that can read Analytics Engine |
 | Before phase 7 | Cloudflare for SaaS on aired.sh (100 hostnames free, then $0.10 each) and the content-domain routing from `.forge/blueprints/content-domain.md` |
+
+### WorkOS checklist (staging first, then production)
+
+Sign-in switches to WorkOS only when both `WORKOS_CLIENT_ID` and `WORKOS_API_KEY` are set. Until then every "Log in" goes to GitHub as today. To turn it off again, delete either secret.
+
+| # | Where | What |
+|---|---|---|
+| 1 | WorkOS → Authentication | Magic Auth on, Email + Password off. Google, GitHub, Microsoft and Apple with **aired's own** OAuth apps in production (the demo credentials are staging only). |
+| 2 | WorkOS → GitHub connection | Use aired's own GitHub OAuth app and **return the GitHub OAuth token** (WorkOS's demo credentials don't: tested 2026-11-25). aired reads the GitHub id with it to find a GitHub-era account by id. Without it, "Continue with GitHub" still reaches an account WorkOS already knows or one with the same verified email, but a GitHub-era account with no public email can't be found, and that person sees "GitHub unavailable" instead of getting a second account. |
+| 3 | WorkOS → Redirects | Add `https://aired.sh/auth/workos/callback` (staging already has the localhost ones). Also add the **sign-out redirects** `https://aired.sh/` (and `http://localhost:8799/` in staging): signing out of aired ends the AuthKit session and WorkOS sends people back there. Without them, sign-out still works but ends on a WorkOS error page. |
+| 4 | Terminal | `node apps/worker/scripts/link-report.mjs --remote` (read-only) to see how many accounts will link by email and how many only through GitHub. It prints counts and ids, never emails. |
+| 5 | Terminal | `wrangler secret put WORKOS_API_KEY` (production `sk_live_…`), then `wrangler secret put WORKOS_CLIENT_ID`. Sign-in switches over on the next request; no deploy needed. |
+| 6 | Site copy | Once it's on: "Sign in with GitHub" on the home page, claim page, `/html-to-link` and terms becomes "Sign in"; the privacy page names WorkOS as the sign-in provider and says what it receives (email, name). |
 
 ### Stripe checklist (a sandbox first, then the same in live mode)
 
@@ -160,4 +176,4 @@ Buy with card `4242 4242 4242 4242` and confirm the dashboard says "Pro". **Done
 
 - **Apex domains (`yourco.com`).** Cloudflare only supports them on Enterprise. v1 offers subdomains (`share.yourco.com`).
 - **Team plan.** Pro is per person. Team billing is per workspace (one Stripe subscription with a seat count), planned in phase 8.
-- **WorkOS on Workers.** Phase 3 starts with a short spike: does AuthKit's flow work from the Worker with plain `fetch`, and does WorkOS hand back the GitHub id so old accounts link automatically? If not, accounts link by verified email.
+- **WorkOS on Workers.** Built with plain `fetch` and tested against a stand-in for WorkOS; not yet run against the real staging environment, which needs the staging API key. GitHub-era accounts link by GitHub id (WorkOS checklist, step 2) or by verified email; an email held by two accounts, an unverified one or a GitHub noreply address never links.

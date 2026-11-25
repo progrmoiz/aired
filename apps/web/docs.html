@@ -26,7 +26,7 @@
 <header><div class="wrap">
   <a class="logo" href="/" aria-label="aired home"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>aired</a>
   <nav aria-label="Main"><a href="/pricing">Pricing</a><a href="/docs" aria-current="page" class="on">Docs</a><a href="/html-to-link">Guides</a></nav>
-  <div class="right"><a class="login" id="nav-auth" href="/auth/github?return=/dashboard">Log in</a><a class="start" href="/#publish">Start free</a></div>
+  <div class="right"><a class="login" id="nav-auth" href="/auth/login?return=/dashboard">Log in</a><a class="start" href="/#publish">Start free</a></div>
 </div></header>
 
 <main class="wrap">
@@ -138,6 +138,21 @@
 <pre><code>[mcp_servers.aired]
 url = "https://aired.sh/mcp"</code></pre>
 
+        <h3>Signed in: connect your account</h3>
+        <p>Add <code>https://aired.sh/mcp/account</code> as a custom connector (Claude, ChatGPT, Cursor, VS Code and any client that supports MCP sign-in). The app opens aired, you sign in and choose Allow, and the server works as your account: <code>publish_html</code> pages belong to you, and <code>list_pages</code>, <code>update_page</code>, <code>delete_page</code> and <code>get_account</code> become available. It can't see your keys or billing, or delete your account.</p>
+        <div class="snip"><code>claude mcp add aired --transport http https://aired.sh/mcp/account</code><button type="button" class="btn sm copy-snippet" data-copy="claude mcp add aired --transport http https://aired.sh/mcp/account">Copy</button></div>
+
+        <h3>Signed in with an API key</h3>
+        <p>For CI or clients without MCP sign-in, add your <a href="#api-keys">API key</a> as a header instead (on <code>/mcp</code> or <code>/mcp/account</code>). Without a key or a sign-in, <code>/mcp</code> offers only anonymous <code>publish_html</code>.</p>
+<pre><code>{
+  "mcpServers": {
+    "aired": {
+      "url": "https://aired.sh/mcp",
+      "headers": { "Authorization": "Bearer aired_sk_..." }
+    }
+  }
+}</code></pre>
+
         <h3>STDIO bridge (any client)</h3>
 <pre><code>{
   "mcpServers": {
@@ -171,7 +186,7 @@ url = "https://aired.sh/mcp"</code></pre>
         <p>Response:</p>
 <pre><code>{
   "url": "https://aired.sh/p/a1b2c3d4e5",
-  "update_token": "tok_...",
+  "update_token": "at_...",
   "expiresAt": "2026-05-16T12:00:00.000Z"
 }</code></pre>
       </section>
@@ -205,54 +220,71 @@ url = "https://aired.sh/mcp"</code></pre>
 
   // To update an existing page in one call, also include:
   "id": "a1b2c3d4e5",
-  "update_token": "tok_..."
+  "update_token": "at_..."
 }</code></pre>
 
         <h3>Request body — <code>PUT /api/pages/:id</code></h3>
 <pre><code>{
   "html": "&lt;!doctype html&gt;...",   // required
   "title": "Optional new title",  // optional
-  "update_token": "tok_..."       // required (or send Authorization: Bearer)
+  "update_token": "at_..."       // required (or send Authorization: Bearer)
 }</code></pre>
 
         <h3>Update via curl</h3>
 <pre><code>curl -X PUT https://aired.sh/api/pages/a1b2c3d4e5 \
   -H "Content-Type: application/json" \
-  -d '{"html":"&lt;h1&gt;v2&lt;/h1&gt;","update_token":"tok_..."}'</code></pre>
+  -d '{"html":"&lt;h1&gt;v2&lt;/h1&gt;","update_token":"at_..."}'</code></pre>
 
         <h3>Delete via curl</h3>
 <pre><code>curl -X DELETE https://aired.sh/api/pages/a1b2c3d4e5 \
-  -H "Authorization: Bearer tok_..."</code></pre>
+  -H "Authorization: Bearer at_..."</code></pre>
       </section>
 
       <!-- ─── Auth ─── -->
       <section id="auth">
         <h2>Auth</h2>
         <ul>
-          <li>Publishing is anonymous — no API key required.</li>
+          <li>Publishing is anonymous — no API key required. With an <a href="#api-keys">API key</a>, pages go to your account.</li>
           <li>Every publish returns an <code>update_token</code>. It is the only credential for that page.</li>
           <li><strong>PUT</strong> takes the token in the JSON body as <code>update_token</code>, or as an <code>Authorization: Bearer &lt;token&gt;</code> header.</li>
-          <li><strong>DELETE</strong> takes the token as <code>Authorization: Bearer &lt;token&gt;</code> header.</li>
+          <li><strong>DELETE</strong> takes the token as <code>Authorization: Bearer &lt;token&gt;</code> header, or as <code>update_token</code> in a JSON body (use the body when <code>Authorization</code> carries an API key).</li>
           <li><strong>POST</strong> can act as update when <code>id</code> and <code>update_token</code> are both in the body.</li>
           <li>Lose the token and you can't mutate the page (you can still publish a fresh one).</li>
           <li>Adding a page to your account (<code>aired claim</code>, a claim link or the dashboard) replaces its token. The old token stops working everywhere it was shared, and the claim response returns the new one; the CLI stores it for you. Signed in, you can also update or delete your own pages without a token.</li>
         </ul>
+
+        <h3 id="api-keys">API keys (CI and agents)</h3>
+        <p>Create a key under <strong>API keys</strong> in your <a href="/dashboard">dashboard</a> (up to 5; each is shown once). Send it as <code>Authorization: Bearer aired_sk_…</code> and the request runs as your account: pages are yours, permanent by default, and use your plan's limits. You can update or delete your own pages with the key alone, no update token. A key can't create keys, open billing or delete the account: those need the website. Revoke it from the dashboard and it stops working on the next request.</p>
+        <p><strong>Sign out everywhere</strong> (under Account in your <a href="/dashboard#account">dashboard</a>) ends every session of your account: other browsers, CLI logins and connected MCP apps. API keys keep working until you revoke them. Deleting your account does the same and deletes your keys.</p>
+<pre><code>curl -X POST https://aired.sh/api/publish \
+  -H "Authorization: Bearer $AIRED_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"html":"&lt;h1&gt;Build report&lt;/h1&gt;"}'</code></pre>
+        <p>The CLI and the local MCP server read <code>AIRED_API_KEY</code> from the environment:</p>
+<pre><code># GitHub Actions
+- run: npx aired publish report.html
+  env:
+    AIRED_API_KEY: ${{ secrets.AIRED_API_KEY }}</code></pre>
       </section>
 
       <!-- ─── Errors ─── -->
       <section id="errors">
         <h2>Errors</h2>
-        <p>All errors are JSON: <code>{ "error": "&lt;message&gt;" }</code>.</p>
+        <p>All errors from <code>/api/*</code> are JSON: <code>{ "error": "&lt;message&gt;" }</code>, sometimes with a machine-readable <code>code</code>.</p>
         <div class="table-wrap"><table>
           <thead><tr><th>Status</th><th>When</th></tr></thead>
           <tbody>
-            <tr><td><code>400</code></td><td>Invalid JSON body, missing <code>html</code>, validation failed.</td></tr>
-            <tr><td><code>401</code></td><td>DELETE missing <code>Authorization: Bearer</code> header.</td></tr>
-            <tr><td><code>403</code></td><td><code>update_token</code> does not match the page.</td></tr>
-            <tr><td><code>404</code></td><td>Page id does not exist, or the page expired.</td></tr>
+            <tr><td><code>400</code></td><td>Invalid JSON body, missing <code>html</code>, validation failed, or the page is too large: over 2 MB anonymously (or whenever billing is off), over 10 MB on any plan.</td></tr>
+            <tr><td><code>401</code></td><td>Missing credentials where they're required, or an API key that's invalid or revoked (a bad key is never treated as anonymous).</td></tr>
+            <tr><td><code>402</code></td><td><code>code: "plan_limit"</code>: signed in on Free with billing on, and the request needs Pro (a page of 2–10 MB, or more publishes than Free allows). Includes <code>limit</code> and an <code>upgrade_url</code> for a person to open.</td></tr>
+            <tr><td><code>403</code></td><td><code>update_token</code> does not match the page, or the action needs the website (API keys, billing and account deletion can't be done with a CLI token, an API key or a connected app).</td></tr>
+            <tr><td><code>404</code></td><td>Page id does not exist, the page expired, or the API path doesn't exist.</td></tr>
+            <tr><td><code>409</code></td><td>Conflict, with a <code>code</code>: <code>key_limit</code> (already 5 API keys), or billing state such as <code>already_pro</code>.</td></tr>
             <tr><td><code>410</code></td><td>Page reached its view limit (<code>reads</code>).</td></tr>
-            <tr><td><code>429</code></td><td>Rate limit: 5 publishes an hour per IP, or 30 an hour when signed in.</td></tr>
-            <tr><td><code>503</code></td><td>Storage write limit reached. Retry shortly.</td></tr>
+            <tr><td><code>422</code></td><td>The page looks like spam or phishing and wasn't published.</td></tr>
+            <tr><td><code>429</code></td><td>Rate limit: 5 publishes an hour per IP anonymously, 30 an hour signed in on Free (402 when billing is on), 500 a day on Pro.</td></tr>
+            <tr><td><code>500</code> / <code>502</code></td><td>Something failed on our side or at the payment provider. Retry, and report it if it persists.</td></tr>
+            <tr><td><code>503</code></td><td>A dependency is briefly unavailable (storage, the database, or a sign-in provider). Retry shortly.</td></tr>
           </tbody>
         </table></div>
       </section>
@@ -273,8 +305,8 @@ url = "https://aired.sh/mcp"</code></pre>
         <h2>Limits</h2>
         <div class="table-wrap"><table>
           <tbody>
-            <tr><td>Max artifact size</td><td>2 MB</td></tr>
-            <tr><td>Publishes per hour per IP</td><td>5</td></tr>
+            <tr><td>Max page size</td><td>2 MB (Free), 10 MB (Pro)</td></tr>
+            <tr><td>Publishes</td><td>5 an hour per IP anonymously, 30 an hour signed in on Free, 500 a day on Pro</td></tr>
             <tr><td>Default TTL</td><td>7 days</td></tr>
             <tr><td>Max TTL</td><td>permanent</td></tr>
           </tbody>
@@ -285,11 +317,12 @@ url = "https://aired.sh/mcp"</code></pre>
       <!-- ─── Self-hosting ─── -->
       <section id="self-host">
         <h2>Self-hosting</h2>
-        <p>aired runs as a single Cloudflare Worker with a KV namespace for metadata and an R2 bucket for HTML.</p>
+        <p>aired runs as one Cloudflare Worker: KV for page records and accounts, R2 for the HTML, D1 for accounts, billing, API keys and sign-in, and Workers Rate Limiting bindings for flood guards.</p>
         <ul>
-          <li>Clone <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">progrmoiz/aired</a>.</li>
-          <li>Create your own KV namespace and R2 bucket; update <code>apps/worker/wrangler.toml</code> with the IDs.</li>
-          <li><code>pnpm install &amp;&amp; pnpm run build &amp;&amp; cd apps/worker &amp;&amp; pnpm wrangler deploy</code>.</li>
+          <li>Clone <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">progrmoiz/aired</a> and run <code>pnpm install &amp;&amp; pnpm run build</code>.</li>
+          <li>Create a KV namespace, an R2 bucket and a D1 database (<code>wrangler d1 create aired</code>), and put their IDs in <code>apps/worker/wrangler.toml</code>. The KV id goes in twice: <code>PAGES_KV</code> and <code>OAUTH_KV</code> share one namespace. Replace or remove the <code>[[routes]]</code> entries for aired.sh with your own domain. The rate-limit bindings (<code>[[ratelimits]]</code>) need no setup.</li>
+          <li>Set the secrets: <code>SESSION_SECRET</code> (32+ random characters), <code>SESSION_VALID_SINCE</code> (an ISO date; sessions, API keys and MCP connections created before it stop working), <code>GITHUB_CLIENT_ID</code> and <code>GITHUB_CLIENT_SECRET</code> (a GitHub OAuth app whose callback is <code>&lt;your origin&gt;/auth/callback</code>), and <code>SITE_ORIGIN</code> if you're not on aired.sh. A few links in MCP replies still say aired.sh. Billing (<code>BILLING_ENABLED</code>, <code>STRIPE_*</code>) and WorkOS sign-in (<code>WORKOS_CLIENT_ID</code>, <code>WORKOS_API_KEY</code>) are optional and stay off until set. <code>apps/worker/.dev.vars.example</code> lists them all.</li>
+          <li><code>cd apps/worker &amp;&amp; npm run deploy</code> applies the D1 migrations, then deploys.</li>
           <li>Point a custom domain or use the default <code>workers.dev</code> subdomain.</li>
         </ul>
       </section>
@@ -304,7 +337,8 @@ url = "https://aired.sh/mcp"</code></pre>
           <li><a href="/index.md" class="mono">/index.md</a> — markdown homepage</li>
           <li><a href="/.well-known/agent.json" class="mono">/.well-known/agent.json</a> — agent discovery manifest</li>
           <li><a href="/.well-known/ai-plugin.json" class="mono">/.well-known/ai-plugin.json</a> — OpenAI plugin manifest</li>
-          <li><a href="/mcp" class="mono">/mcp</a> — MCP streamable HTTP endpoint</li>
+          <li><a href="/mcp" class="mono">/mcp</a> — MCP streamable HTTP endpoint (anonymous, or an API key)</li>
+          <li><span class="mono">/mcp/account</span> — the same server signed in as your account (connector sign-in, or an API key)</li>
         </ul>
       </section>
 

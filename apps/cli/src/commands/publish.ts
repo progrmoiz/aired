@@ -8,6 +8,7 @@ import { shouldOutputJson, outputError, ExitCode } from '../lib/output.js'
 import { withSpinner } from '../lib/spinner.js'
 import { publishHTML, validateSession } from '../core/client.js'
 import { saveToken } from '../core/store.js'
+import { apiKeyConfigured } from '../lib/api-key-env.js'
 import { getSession, clearSession } from '../core/session.js'
 import { isDirectory, bundleDirectory } from '../core/bundler.js'
 import { detectProject } from '../core/project.js'
@@ -131,7 +132,9 @@ export function makePublishCommand(globalOpts: () => GlobalOpts): Command {
       // the token, publishing with it would silently fall back to anonymous
       // (7-day expiry) — so detect that here, clear the dead session, and warn
       // loudly instead of letting the page quietly expire.
-      if (session !== null && jwt !== undefined) {
+      // With AIRED_API_KEY the key decides the account, so the session doesn't matter.
+      const usingKey = apiKeyConfigured(opts)
+      if (!usingKey && session !== null && jwt !== undefined) {
         try {
           const serverUser = await validateSession(baseUrl, jwt)
           if (serverUser === null) {
@@ -162,7 +165,7 @@ export function makePublishCommand(globalOpts: () => GlobalOpts): Command {
           process.stdout.write(JSON.stringify(result, null, 2) + '\n')
         } else {
           process.stdout.write('\n')
-          const asLogin = jwt !== undefined && session !== null ? ` as @${session.user.login}` : ''
+          const asLogin = usingKey ? ' (via AIRED_API_KEY)' : jwt !== undefined && session !== null ? ` as @${session.user.login}` : ''
           process.stdout.write(pc.green('Published!') + ' ' + pc.bold(result.url) + asLogin + '\n')
           if (result.upgrade?.url !== undefined) {
             process.stdout.write(pc.dim(`Remove the badge with Pro: ${result.upgrade.url}`) + '\n')

@@ -3,6 +3,31 @@ import { AUTH_HEADER, CSRF_HEADER } from '@aired/core'
 import type { User } from '@aired/core'
 import type { PublishResult, PageInfo } from './types.js'
 
+/**
+ * An API key from AIRED_API_KEY (for CI and agents), or null. When set, it's
+ * sent as Authorization: Bearer and publishes go to the key's account.
+ */
+export function apiKeyFromEnv(): string | null {
+  const raw = process.env['AIRED_API_KEY']
+  if (raw === undefined) return null
+  // Accept a value pasted with its "Bearer " prefix.
+  const key = raw.trim().replace(/^bearer\s+/i, '')
+  if (key === '') {
+    // An unset CI secret: refuse rather than publish anonymously.
+    throw new Error('AIRED_API_KEY is set but empty. Set it to your aired_sk_ key, or unset it to publish without one.')
+  }
+  if (!key.startsWith('aired_sk_')) {
+    throw new Error('AIRED_API_KEY must be an aired API key starting with aired_sk_ (create one under API keys in the dashboard).')
+  }
+  return key
+}
+
+function addApiKey(headers: Record<string, string>): Record<string, string> {
+  const key = apiKeyFromEnv()
+  if (key !== null) headers['Authorization'] = `Bearer ${key}`
+  return headers
+}
+
 export interface PublishOptions {
   title?: string
   pin?: string
@@ -53,6 +78,8 @@ export interface PageListResult {
 export interface DeviceCodeResult {
   user_code: string
   verification_uri: string
+  /** The verification page with the code filled in (aired's own flow). */
+  verification_uri_complete?: string
   interval: number
   device_code: string
 }
@@ -116,6 +143,7 @@ export async function publishHTML(
     headers[CSRF_HEADER] = '1'
   }
 
+  addApiKey(headers)
   const resp = await fetch(`${baseUrl}/api/publish`, {
     method: 'POST',
     headers,
@@ -146,6 +174,7 @@ export async function updatePage(
     headers[CSRF_HEADER] = '1'
   }
 
+  addApiKey(headers)
   const resp = await fetch(`${baseUrl}/api/pages/${id}`, {
     method: 'PUT',
     headers,
@@ -162,7 +191,6 @@ export async function deletePage(
   jwt?: string,
 ): Promise<void> {
   const headers: Record<string, string> = {
-    'Authorization': `Bearer ${token}`,
     'User-Agent': USER_AGENT,
   }
 
@@ -171,9 +199,23 @@ export async function deletePage(
     headers[CSRF_HEADER] = '1'
   }
 
+  // With an API key, Authorization carries the key, so the update token goes
+  // in the body (the API accepts either).
+  let body: string | undefined
+  if (apiKeyFromEnv() !== null) {
+    addApiKey(headers)
+    if (token !== '') {
+      headers['Content-Type'] = 'application/json'
+      body = JSON.stringify({ update_token: token })
+    }
+  } else {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
   const resp = await fetch(`${baseUrl}/api/pages/${id}`, {
     method: 'DELETE',
     headers,
+    body,
   })
 
   await handleResponse<{ ok: boolean }>(resp, 'Delete')
@@ -340,10 +382,21 @@ export async function cliExchangeCode(
   return handleResponse<AuthTokenResult>(resp, 'CLI exchange')
 }
 
+/**
+ * Start a device sign-in: aired's own flow (POST, any sign-in method), or
+ * GitHub's (GET) on a server that doesn't have it yet.
+ */
 export async function requestDeviceCode(baseUrl: string): Promise<DeviceCodeResult> {
   const resp = await fetch(`${baseUrl}/auth/device`, {
+    method: 'POST',
     headers: { 'User-Agent': USER_AGENT },
   })
+  if (resp.status === 404 || resp.status === 405) {
+    const legacy = await fetch(`${baseUrl}/auth/device`, {
+      headers: { 'User-Agent': USER_AGENT },
+    })
+    return handleResponse<DeviceCodeResult>(legacy, 'Request device code')
+  }
   return handleResponse<DeviceCodeResult>(resp, 'Request device code')
 }
 

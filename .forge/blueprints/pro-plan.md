@@ -494,17 +494,17 @@ The `users.id` never changes, so `ownerId` in KV, owner indexes, `subscriptions`
 
 **Phase 1 audit for GitHub-id assumptions:** nothing in Phase 1 treats `users.id` as a GitHub id (ids are opaque numbers; `ensureUser` copies the session's id; webhook placeholders use `user-<uid>`). Two sign-in redirects hard-code GitHub and are fixed in Task 3.3: `GET /upgrade` (signed out → `/auth/github?return=…`) and the signed-out `/dashboard` redirect. One gap: `GET /api/me` reads `createdAt` from KV `user:<id>`, which only GitHub sign-ins write; Task 3.1 writes it for every new user.
 
-#### Task 3.1: Resolve users across identities in D1
+#### Task 3.1: Resolve users across identities in D1 — DONE fe74b46 (fixes ed070bf, 1864c41)
 - **Size:** M
 - **Acceptance criteria:**
   - [ ] `resolveUser(env, identity)` applies the four linking steps above and returns `{id, login, email, name}`; new users get an id ≥ 10^12; `identities.provider` accepts `workos` (plus the existing `github`); a KV `user:<id>` record is written when missing.
   - [ ] The legacy GitHub callback also calls it (provider `github`, subject = GitHub id, `users.id = githubId` on first sight), so old CLI versions and the 30-day fallback route keep working.
-  - [ ] `migrations/0006_auth.sql` creates `auth_tokens` (CLI device codes, Task 3.5) and adds `users.sessions_valid_since INTEGER` (used by Phase 8).
-- **Files:** `apps/worker/src/lib/users.ts`, `apps/worker/src/lib/user-link.ts`, `apps/worker/src/routes/auth.ts`, `apps/worker/migrations/0006_auth.sql`, `apps/worker/test/user-link.test.ts`
+  - [ ] `migrations/0007_auth.sql` creates `auth_tokens` (CLI device codes, Task 3.5) and adds `users.sessions_valid_since INTEGER` (used by Phase 8).
+- **Files:** `apps/worker/src/lib/users.ts`, `apps/worker/src/lib/user-link.ts`, `apps/worker/src/routes/auth.ts`, `apps/worker/migrations/0007_auth.sql`, `apps/worker/test/user-link.test.ts`
 - **Verification:** `npm test` passes; `user-link.ts` is the pure decision (inputs: WorkOS profile, GitHub id or null, matches found) with cases: known workos identity; GitHub id match; verified email match; noreply email → new user; unverified email → new user.
 - **Dependencies:** Task 1.1
 
-#### Task 3.2: Add WorkOS AuthKit sign-in
+#### Task 3.2: Add WorkOS AuthKit sign-in — DONE faf55a9
 - **Size:** M
 - **Acceptance criteria:**
   - [ ] `GET /auth/login?return=` redirects to `https://api.workos.com/user_management/authorize` (`provider=authkit`, `client_id`, `redirect_uri=<SITE_ORIGIN>/auth/workos/callback`, `state` in a short-lived cookie); `GET /auth/workos/callback` checks `state`, exchanges the code at `POST /user_management/authenticate` with `fetch` (no SDK), calls `resolveUser`, and sets the existing session cookie.
@@ -514,7 +514,7 @@ The `users.id` never changes, so `ownerId` in KV, owner indexes, `subscriptions`
 - **Verification:** local dev with the WorkOS staging environment (free): `/auth/login?return=/dashboard` → AuthKit → sign in with Google → dashboard; `GET /api/me` returns an id ≥ 10^12. Sign in with the GitHub button as an existing GitHub user → same id as before.
 - **Dependencies:** Task 3.1
 
-#### Task 3.3: Point every "Log in" at AuthKit
+#### Task 3.3: Point every "Log in" at AuthKit — DONE 0453a34
 - **Size:** S
 - **Acceptance criteria:**
   - [ ] Nav "Log in" on marketing pages, the signed-out `/dashboard` redirect, and signed-out `GET /upgrade` all go to `/auth/login?return=…` (replacing the hard-coded `/auth/github`).
@@ -523,7 +523,7 @@ The `users.id` never changes, so `ownerId` in KV, owner indexes, `subscriptions`
 - **Verification:** signed out, visit `/dashboard` → AuthKit page; `/upgrade?interval=year` signed out → AuthKit → back to `/upgrade` → Stripe Checkout (test mode).
 - **Dependencies:** Task 3.2
 
-#### Task 3.4: Count and report GitHub users who will need manual linking
+#### Task 3.4: Count and report GitHub users who will need manual linking — DONE 3415aaf
 - **Size:** S
 - **Model:** sonnet
 - **Acceptance criteria:**
@@ -532,7 +532,7 @@ The `users.id` never changes, so `ownerId` in KV, owner indexes, `subscriptions`
 - **Verification:** `node apps/worker/scripts/link-report.mjs --local` against local KV with three fixture users prints the three counts.
 - **Dependencies:** Task 3.1
 
-#### Task 3.5: Add an aired-native device flow for the CLI
+#### Task 3.5: Add an aired-native device flow for the CLI — DONE 12a1a5d
 - **Size:** M
 - **Acceptance criteria:**
   - [ ] `POST /auth/device` returns `{device_code, user_code, verification_uri: "https://aired.sh/device", interval}`; `device.html` (after any AuthKit sign-in) approves the code; `/auth/device/poll` then returns a CLI session (365-day JWT, as today).
@@ -545,7 +545,7 @@ The `users.id` never changes, so `ownerId` in KV, owner indexes, `subscriptions`
 
 ### Phase 4: API keys — [DB] [API]
 
-#### Task 4.1: Generate and parse API keys
+#### Task 4.1: Generate and parse API keys — DONE 52ac867 (40343cb)
 - **Size:** S
 - **Acceptance criteria:**
   - [ ] `generateApiKey()` returns `aired_sk_` + 32 base62 characters + a 6-character CRC32 checksum; `parseApiKey` rejects a wrong prefix, length or checksum without a lookup.
@@ -553,17 +553,17 @@ The `users.id` never changes, so `ownerId` in KV, owner indexes, `subscriptions`
 - **Verification:** `npm test` passes (generated keys parse; one changed character fails the checksum).
 - **Dependencies:** None
 
-#### Task 4.2: Store keys and accept them in the auth middleware
+#### Task 4.2: Store keys and accept them in the auth middleware — DONE 89f2e7c (64fb8ac)
 - **Size:** M
 - **Acceptance criteria:**
-  - [ ] `migrations/0007_api_keys.sql`; `POST /api/me/keys {name}` returns the key once; `GET` lists name, prefix, created and last used; `DELETE` revokes (D1 `revoked_at`, KV `apikey:` deleted). At most 5 active keys.
+  - [ ] `migrations/0006_api_keys.sql`; `POST /api/me/keys {name}` returns the key once; `GET` lists name, prefix, created and last used; `DELETE` revokes (D1 `revoked_at`, KV `apikey:` deleted). At most 5 active keys.
   - [ ] `authMiddleware` accepts `Authorization: Bearer aired_sk_…` (checksum, then KV `apikey:<hash>`), sets `c.get('user')`, and never treats `at_` update tokens as keys. `last_used_at` updates at most hourly via `waitUntil`.
   - [ ] Key-authenticated requests need no CSRF header; this already follows from `lib/csrf-rule.ts` (no session cookie), so only a test is added.
-- **Files:** `apps/worker/migrations/0007_api_keys.sql`, `apps/worker/src/routes/keys.ts`, `apps/worker/src/middleware/auth.ts`, `apps/worker/test/api-auth.test.ts`, `apps/worker/src/index.ts`
+- **Files:** `apps/worker/migrations/0006_api_keys.sql`, `apps/worker/src/routes/keys.ts`, `apps/worker/src/middleware/auth.ts`, `apps/worker/test/api-auth.test.ts`, `apps/worker/src/index.ts`
 - **Verification:** local dev: create a key, then `curl -s -X POST localhost:8787/api/publish -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' -d '{"html":"<h1>k</h1>"}'` → the page appears in `/api/me/pages`; after revoking, `GET /api/me` with the key returns 401.
 - **Dependencies:** Task 4.1, Task 1.1
 
-#### Task 4.3: Add the API keys panel and the CLI env var
+#### Task 4.3: Add the API keys panel and the CLI env var — DONE fd805ea (2148d35, 2642645)
 - **Size:** S
 - **Acceptance criteria:**
   - [ ] Dashboard "API keys" panel: create (name), copy-once dialog, list, revoke with confirm.
@@ -576,7 +576,7 @@ The `users.id` never changes, so `ownerId` in KV, owner indexes, `subscriptions`
 
 ### Phase 5: Signed-in remote MCP — [API] [CONFIG]
 
-#### Task 5.1: Use the caller's identity in remote MCP
+#### Task 5.1: Use the caller's identity in remote MCP — DONE 25850fd (c28218e)
 - **Size:** M
 - **Acceptance criteria:**
   - [ ] `/mcp` with a valid Bearer key publishes with `ownerId` set, plan limits applied, and the spam filter skipped, like signed-in API publishes.
@@ -586,7 +586,7 @@ The `users.id` never changes, so `ownerId` in KV, owner indexes, `subscriptions`
 - **Verification:** MCP Inspector against `localhost:8787/mcp` with `Authorization: Bearer <key>`: `publish_html`, then `list_pages` shows the page; without the header, `list_pages` returns "Sign in required".
 - **Dependencies:** Task 4.2
 
-#### Task 5.2: Add OAuth to the remote MCP for connector clients
+#### Task 5.2: Add OAuth to the remote MCP for connector clients — DONE 8c036af (dependency e7aa615; fixes e88aef8; docs dcd31df)
 - **Size:** L
 - **Acceptance criteria:**
   - [ ] `/mcp` advertises OAuth protected-resource metadata; `@cloudflare/workers-oauth-provider` serves `/authorize` and `/token`, accepts Client ID Metadata Documents (preferred by the 2026-07-28 MCP spec) and dynamic registration (still used by older clients), and `/authorize` reuses the aired session (sign in via `/login`, then `consent.html`). API keys keep working on the same endpoint via `resolveExternalToken`.
@@ -671,8 +671,8 @@ Folded in from `docs/research/workspace-membership.md` (parity session, 2026-11-
 | 0003 | `0003_page_claims.sql` (Task 2.5, done) | page_claims: owner and current token hash of claimed pages; released or tombstoned, never deleted |
 | 0004 | `0004_sweep_state.sql` (legal review follow-up, done) | sweep_state, sweep_candidates: the expired-page R2 cleanup cron |
 | 0005 | `0005_pin_failures.sql` (owner follow-up, done) | pin_failures: global cap on wrong PIN entries per page |
-| 0006 | `0006_auth.sql` (Phase 3) | auth_tokens, `users.sessions_valid_since` |
-| 0007 | `0007_api_keys.sql` (Phase 4) | api_keys (with a nullable `workspace_id` from the start, no FK yet) |
+| 0006 | `0006_api_keys.sql` (Phase 4, done) | api_keys (with a nullable `workspace_id` from the start, no FK) |
+| 0007 | `0007_auth.sql` (Phase 3, done) | auth_tokens, `users.sessions_valid_since` |
 | 0008 | `0008_custom_domains.sql` (Phase 7) | custom_domains |
 | 0009 | `0009_workspaces.sql` (Phase 8) | workspaces, memberships, workspace_billing, audit_events |
 | 0010 | `0010_invites.sql` (Phase 8) | invites, invite_links |

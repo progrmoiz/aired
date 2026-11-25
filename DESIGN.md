@@ -4,7 +4,7 @@
 
 The single reference for building any UI in aired. Read before writing any component, page, or layout. Updated when patterns evolve.
 
-**Stack:** pnpm monorepo. Web app is vanilla HTML + JS (`apps/web/`). Every page (homepage, pricing, guides, docs, dashboard, claim, abuse, legal, 404) uses plain CSS in `apps/web/site.css`, with the tokens from `tailwind.config.js` as CSS variables. No page loads the Tailwind build (`style.css`) any more. No React, no shadcn.
+**Stack:** pnpm monorepo. The site is vanilla HTML + JS (`apps/web/`): every page except the dashboard (homepage, pricing, guides, docs, claim, abuse, legal, 404) uses plain CSS in `apps/web/site.css`, with the tokens from `tailwind.config.js` as CSS variables. No page loads the Tailwind 3 build (`style.css`). The signed-in dashboard is a React + shadcn/ui (Base UI) + Tailwind v4 app in `apps/dashboard/`, built into `apps/web/` (§9.4).
 **Icons:** Inline SVG, hand-picked. No library.
 **Fonts:** Inter (400, 500, 600), JetBrains Mono (400, 500). Both self-hosted from `apps/web/fonts/` (latin variable woff2, OFL).
 **Voice:** see §10 below
@@ -278,9 +278,45 @@ Built from the shared kit at the end of `site.css`. Same header, footer, cards a
 
 - **Guides:** hero with breadcrumb, H1, lede and the homepage publish form on the left; on the right "What they open" (an example page, a PIN screen or a comparison) and three ticks. Below: sticky "On this page" contents (hidden under 900px), the article in `.prose`, the first how-to list as numbered step cards (`ol.steps`), the FAQ as the homepage accordion (same text as the FAQPage JSON-LD), and cards for the other guides.
 - **Docs:** eyebrow + H1 + four path cards (Skill, CLI, MCP, API), then contents + `.prose` with code blocks and `.snip` copy rows. Developer detail lives here, one click from every page.
-- **Dashboard:** "Your pages" heading with a light Publish button; claim banner and plan strip as `.panel.strip` cards (icon, two lines, buttons); one card per project. Each page row says its facts in words as chips: views, "Expires in 5 days" / "Never expires", "Needs a PIN" / "Anyone with the link", "Stops after 20 views · 14 left" / "No view limit", size.
+- **Dashboard:** a separate React app. See §9.4.
 - **Claim, abuse, 404:** `.duo` two columns: the task on the left in a `.panel`, context on the right (where the page goes, what happens next, popular guides).
 - Buttons are `.btn` (secondary), `.btn.solid` (the one primary action), `.btn.ghost`, `.btn.sm`. Fields are `.field` inside `.fl` labels.
+
+### 9.4 Dashboard app (`apps/dashboard`, React + shadcn/ui on Base UI)
+
+The signed-in dashboard is the one page not built from `site.css`. It's a Vite + React + TypeScript app using shadcn/ui components on Base UI and Tailwind v4, scoped to `apps/dashboard`, so the marketing site's Tailwind 3 setup and `site.css` are untouched.
+
+- **Build:** `pnpm --filter @aired/dashboard build` writes `apps/web/dashboard.html` and `apps/web/dashboard-assets/`. Both are gitignored. `apps/worker/wrangler.toml` runs that build as its `[build]` command, so every `wrangler dev` and `wrangler deploy` builds a fresh dashboard. The Worker's `/dashboard` route (sign-in check, then the static file) is unchanged.
+- **Tokens:** DESIGN.md's palette under shadcn's variable names, in `apps/dashboard/src/index.css`:
+  - `--background` #0a0a0b, `--card` #111113, `--muted`/`--accent` #18181b, `--border` #222225, `--input` #34343a;
+  - `--foreground` #ededef, `--muted-foreground` #a1a1a6, plus an extra `--subtle` #84848a for the third text tier;
+  - `--primary` is the light button (#ededef on #0a0a0b);
+  - `--ring` and `--mark` are #7c6aef: focus rings, the logo mark and eyebrows only;
+  - `--destructive` is red-400, for destructive actions and errors only;
+  - `--radius` is 12px. Dark only (`<html class="dark">`).
+- **Fonts:** Inter and JetBrains Mono from `/fonts/fonts.css`, the same self-hosted files as the site. No Geist, no Google.
+- **Shell:** shadcn `Sidebar`, which becomes a drawer on phones, opened from a hamburger in the header.
+  - Sidebar: logo, **Publish a page**, Pages / Connect your AI tools / Plan & billing / Account, then Guides/Docs/Pricing and an account card showing the plan.
+  - The header and footer copy the site's: nav links, `@login`, a light **Publish** button, and the same footer links.
+  - Views live on `#pages`, `#connect`, `#billing` and `#account`. `?upgraded=1` and `?billing=…` open `#billing`.
+- **Components used:**
+  - Sidebar;
+  - Data Table (TanStack Table v8), with project group rows, sortable Page/Expires/Views columns, and cards under 768px;
+  - Card for the summary tiles;
+  - Input Group for search;
+  - Toggle Group for filters (chips with counts);
+  - Badge for status (Live / Expiring / Expired / PIN);
+  - Dropdown Menu for the row "…" menu;
+  - Alert Dialog for deleting a page, revoking a key and deleting the account;
+  - Dialog for a new key, with the key shown once;
+  - Tabs for the four tool setups;
+  - Collapsible for Developer keys;
+  - Empty for the first-page state;
+  - Sonner for toasts ("Copied", "Deleted …", "You're on Pro").
+- **Copy:** plain words. The jargon (MCP, header, `AIRED_API_KEY`) appears only inside Developer keys. Connector setup steps don't name menu paths, because those change between app versions.
+- **Accessibility:** one `<main>` (our `SidebarInset` renders a div), and focus moves to the view's H1 on navigation. Dialogs trap focus and start on Cancel. Every icon button has an `aria-label`, and touch targets are at least 24px. Lighthouse accessibility is 100 on Pages, Connect, Account and the empty state (desktop), and on Pages and Plan & billing (mobile).
+- **Generated files:** `src/components/ui/*` is shadcn's generated source and can be edited (see `sidebar.tsx`). `src/styles/shadcn-base.css` is vendored from `shadcn@4.23.0`, so the CLI isn't a runtime dependency.
+- **Dependencies:** every direct dependency is an exact version published at least two weeks before it was added. Base UI's `@babel/runtime` is overridden to 8.1.0 for the same reason.
 
 ### 9.1 Single-page tool layout (retired)
 
@@ -366,6 +402,8 @@ Append-only record of design decisions. One line per entry. Append on every nota
 2026-05-10 — Empty-state rule softened: one inline factual line allowed (required) when user has no breadcrumb to the next action; decorative cards still forbidden. Dashboard 0-pages state is the canonical example.
 2026-11-25 — Live numbers: count up on view, static charts on the totals, the top three countries from /api/stats with SVG flags from flag-icons (images, not emoji, so they render on Windows).
 2026-11-25 — Homepage and /pricing rebuilt as marketing pages (site.css): wide layout, bento and feature grids, plan cards, logo-wall CTA. Primary button is now light; purple limited to the mark, focus and eyebrows. Text tokens raised for contrast (secondary #a1a1a6, tertiary #84848a). Globe and live title ticker removed.
+2026-11-25 — Dashboard moved to React + shadcn/ui (Base UI) + Tailwind v4 in apps/dashboard, built by wrangler into apps/web. Same sections and flows as the vanilla app shell below; page list is now a shadcn Data Table, confirmations are Alert Dialogs, new keys use a Dialog. See §9.4.
+2026-11-25 — Dashboard rebuilt as an app: sidebar shell (tabs on mobile), hash views for Pages / Connect your AI tools / Plan & billing / Account, summary tiles, search and filter chips over all pages loaded at once (cap 1,000), "…" row menu, tool setup cards with developer keys collapsed, account card with typed-DELETE account deletion. Exceptions: the row menu has a drop shadow (popovers need separation), and destructive actions (Delete page, Delete my account) use red-400.
 2026-11-25 — Remaining narrow pages moved to the wide layout: 7 guides, docs, dashboard, claim, abuse, 404. Shared kit in site.css (.btn, .panel, .field, .prose, .toc, ol.steps, .gcard, .strip, .chip, .duo). Dashboard v2: plain-language chips per page, project cards, empty state with an example (exception to §8.7). Tailwind build no longer loaded. Homepage `.v` timeline rules scoped to `.vers` so they stop hitting `.row .v`.
 2026-11-21 — Guide pages added (/html-to-link, /share-claude-artifacts, /tiiny-host-alternative). They reuse the homepage form and tokens, keep 14px body and 18px h2, and exist for search traffic from non-technical visitors. Homepage H1 and button now use font-medium and "Publish" per §3 and §8.1.
 ```

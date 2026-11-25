@@ -142,7 +142,7 @@
 <header><div class="wrap">
   <a class="logo" href="/" aria-label="aired home"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>aired</a>
   <nav aria-label="Main"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link" aria-current="page" class="on">Guides</a></nav>
-  <div class="right"><a class="login" id="nav-auth" href="/auth/github?return=/dashboard">Log in</a><a class="start" href="#publish" data-publish>Start free</a></div>
+  <div class="right"><a class="login" id="nav-auth" href="/auth/login?return=/dashboard">Log in</a><a class="start" href="#publish" data-publish>Start free</a></div>
 </div></header>
 
 <main class="wrap">
@@ -174,7 +174,7 @@
           <div class="row2"><div class="lbl"><span>Update token</span><span id="result-expiry"></span></div>
             <div class="line"><code id="result-token"></code><button type="button" id="copy-token-btn" class="copy-btn">Copy</button></div>
             <p class="note">Save this token. You need it to update or delete the page.</p></div>
-          <div class="row2 hidden" id="result-saved"><p class="note" style="margin:0">Saved in this browser. <a href="/auth/github?return=/dashboard" style="color:var(--text-2);text-decoration:underline">Sign in</a> to keep this link and see who opened it.</p></div>
+          <div class="row2 hidden" id="result-saved"><p class="note" style="margin:0">Saved in this browser. <a href="/auth/login?return=/dashboard" style="color:var(--text-2);text-decoration:underline">Sign in</a> to keep this link and see who opened it.</p></div>
         </div>
         <button type="button" id="new-btn" class="again">Publish another</button>
       </div>
@@ -197,7 +197,7 @@
         <li><strong>Add a PIN if it's private.</strong> Visitors then type the PIN before they see the page.</li>
         <li><strong>Publish and send.</strong> Copy the link and share it. It opens on any phone or computer.</li>
       </ol>
-      <p>Keep the update token shown after you publish. It lets you replace or delete the page later. If you <a href="/auth/github?return=/dashboard">sign in with GitHub</a>, your pages are also listed in a dashboard where you can see views and delete them.</p>
+      <p>Keep the update token shown after you publish. It lets you replace or delete the page later. If you <a href="/auth/login?return=/dashboard">sign in with GitHub</a>, your pages are also listed in a dashboard where you can see views and delete them.</p>
 
       <h2 id="why-not-email">Why emailing the .html file doesn't work</h2>
       <p>An HTML file is a web page that needs a browser to open it. Sent as an attachment it often goes wrong:</p>

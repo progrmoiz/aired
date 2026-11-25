@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context, type Next } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { AppBindings } from "./types.js";
 import { api } from "./routes/api.js";
@@ -10,13 +10,29 @@ import { og } from "./routes/og.js";
 import { auth } from "./routes/auth.js";
 import { dashboard } from "./routes/dashboard.js";
 import { billing, upgrade } from "./routes/billing.js";
+import { keys } from "./routes/keys.js";
+import { authWorkos } from "./routes/auth-workos.js";
+import { authDevice, devicePage } from "./routes/auth-device.js";
 import { publishRateLimit } from "./middleware/rate-limit.js";
 import { corsMiddleware } from "./middleware/cors.js";
 import { authMiddleware } from "./middleware/auth.js";
-import { isMcpToolCall } from "./lib/mcp-rpc.js";
+import { countMcpToolCalls, isMcpToolCall } from "./lib/mcp-rpc.js";
+import { rateLimit } from "./middleware/rate-limit.js";
+import { TIERS } from "./lib/rate-limit-tiers.js";
 import { sweepExpiredPages } from "./lib/expired-sweep.js";
 import { withAssetCache } from "./lib/asset-cache.js";
-import { kvKeys } from "@aired/core";
+import { API_KEY_PREFIX, kvKeys } from "@aired/core";
+import { loadUserRecord, signedInUser } from "./lib/user-record.js";
+import { bearerToken } from "./lib/page-token.js";
+import {
+  MCP_SCOPE,
+  mcpChallenge,
+  mcpInsufficientScope,
+  mcpOAuth,
+  mcpResources,
+  validateMcpToken,
+  withMcpOAuthUser,
+} from "./routes/mcp-oauth.js";
 import type { Env } from "./types.js";
 
 const app = new Hono<AppBindings>();
@@ -44,35 +60,98 @@ app.use("*", authMiddleware);
 // Health check
 app.get("/health", (c) => c.json({ status: "ok" }));
 
-// MCP Streamable HTTP endpoint
+// MCP Streamable HTTP endpoints (/mcp and /mcp/account).
+// OAuth for the remote MCP: metadata, /oauth/* (token, registration) and
+// the /authorize consent page.
+app.route("/", mcpOAuth);
+
+/**
+ * Who is calling the MCP. An API key was already checked by authMiddleware.
+ * Any other bearer token must be an OAuth token for this resource (else 401
+ * with the sign-in challenge). /mcp/account also challenges callers with no
+ * credentials, which is how connector clients start signing in; /mcp lets
+ * them through as anonymous.
+ */
+function mcpCaller(which: "open" | "account") {
+  return async (c: Context<AppBindings>, next: Next): Promise<Response | void> => {
+    const resource = mcpResources(c.env)[which];
+    const bearer = bearerToken(c.req.header("Authorization"));
+    if (bearer !== null && !bearer.startsWith(API_KEY_PREFIX)) {
+      let found: Awaited<ReturnType<typeof validateMcpToken>>;
+      try {
+        found = await validateMcpToken(c.env, resource, bearer);
+      } catch (err) {
+        console.error("MCP token check failed", err);
+        return c.json({ error: "Could not check the access token. Please try again." }, 503);
+      }
+      if (found === null) return mcpChallenge(c, resource, "invalid_token");
+      if (!found.scope.includes(MCP_SCOPE)) return mcpInsufficientScope(c, resource);
+      const record = await loadUserRecord(c.env.PAGES_KV, found.userId);
+      if (record === null) return mcpChallenge(c, resource, "invalid_token");
+      // A grant can't outlive the account that approved it, even if revoking it on deletion failed.
+      const created = Date.parse(record.createdAt ?? "");
+      if (!isNaN(created) && (found.issuedAt === null || found.issuedAt * 1000 < created - 60_000)) {
+        return mcpChallenge(c, resource, "invalid_token");
+      }
+      c.set("user", signedInUser(record));
+      c.set("jti", null);
+      c.set("via", "oauth");
+    } else if (which === "account" && c.get("via") !== "key") {
+      return mcpChallenge(c, resource);
+    }
+    await next();
+  };
+}
+
 // Every JSON-RPC message is a POST, so only tool calls (publishes) are
 // rate-limited; initialize, tools/list and notifications pass through.
-app.post(
-  "/mcp",
-  async (c, next) => {
-    let body: unknown = null;
-    try {
-      body = await c.req.raw.clone().json();
-    } catch {
-      // Malformed body: let the MCP handler return the JSON-RPC error.
-    }
-    if (isMcpToolCall(body)) return publishRateLimit(c, next);
-    await next();
-  },
-  handleMcp,
-);
-app.on(["GET", "DELETE", "OPTIONS"], "/mcp", handleMcp);
+async function mcpPostLimits(c: Context<AppBindings>, next: Next): Promise<Response | void> {
+  let body: unknown = null;
+  try {
+    body = await c.req.raw.clone().json();
+  } catch {
+    // Malformed body: let the MCP handler return the JSON-RPC error.
+  }
+  // One tool call per request: limits count requests, not calls in a batch.
+  if (countMcpToolCalls(body) > 1) {
+    return c.json(
+      { jsonrpc: "2.0", id: null, error: { code: -32600, message: "Send one tool call per request." } },
+      400,
+    );
+  }
+  if (isMcpToolCall(body)) {
+    // Signed-in callers (key or OAuth): a per-account limit on every tool
+    // call (publishes also count against the publish limit inside the API).
+    // Everyone else: the publish limit.
+    const via = c.get("via");
+    return via === "key" || via === "oauth" ? rateLimit(TIERS.mcp_key)(c, next) : publishRateLimit(c, next);
+  }
+  await next();
+}
+
+const mcpFetch = (c: Context<AppBindings>) => (req: Request, asUser?: number) =>
+  app.fetch(req, asUser === undefined ? c.env : withMcpOAuthUser(c.env, asUser), c.executionCtx);
+
+for (const [path, which] of [["/mcp", "open"], ["/mcp/account", "account"]] as const) {
+  app.post(path, mcpCaller(which), mcpPostLimits, (c) => handleMcp(c, mcpFetch(c), path));
+  app.on(["GET", "DELETE"], path, mcpCaller(which), (c) => handleMcp(c, mcpFetch(c), path));
+  app.on("OPTIONS", path, (c) => handleMcp(c, mcpFetch(c), path));
+}
 
 // OG image route
 app.route("/", og);
 
-// Mount auth routes
+// Mount auth routes (WorkOS first: /auth/login and /auth/workos/callback;
+// then aired's device sign-in: POST /auth/device and /auth/device/approve)
+app.route("/auth", authWorkos);
+app.route("/auth", authDevice);
 app.route("/auth", auth);
 
 // Mount billing routes before api so /api/billing/* matches first
 app.route("/api/billing", billing);
 
-// Mount me routes before api so /api/me/* matches first
+// Mount key routes before me, and me before api, so the longer paths match first
+app.route("/api/me/keys", keys);
 app.route("/api/me", me);
 
 // Mount API routes
@@ -84,6 +163,8 @@ app.route("/", upgrade);
 
 // Mount dashboard route (authenticated HTML shell)
 app.route("/", dashboard);
+// The CLI device sign-in page (served with no-framing headers)
+app.get("/device", devicePage);
 
 // Mount viewer routes
 app.route("/", viewer);
@@ -91,6 +172,11 @@ app.route("/", viewer);
 // Static assets fallback — serve web/ files (index.html, style.css, app.js)
 // Cloudflare ASSETS binding handles routing to the correct file.
 app.notFound(async (c) => {
+  // The API answers in JSON, including for paths it doesn't have.
+  const path = new URL(c.req.url).pathname;
+  if (path === "/api" || path.startsWith("/api/") || path.startsWith("/oauth/")) {
+    return c.json({ error: "Not found" }, 404);
+  }
   if (c.env.ASSETS) {
     return withAssetCache(await c.env.ASSETS.fetch(c.req.raw), new URL(c.req.url).pathname);
   }

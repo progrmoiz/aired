@@ -1,8 +1,17 @@
 name = "aired"
 main = "src/index.ts"
 compatibility_date = "2025-04-01"
-compatibility_flags = ["nodejs_compat"]
+# global_fetch_strictly_public: outbound fetches never reach this zone's own
+# origin. Required by the MCP OAuth server to fetch client metadata documents
+# (CIMD) safely.
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 workers_dev = true
+
+# Build the signed-in dashboard (apps/dashboard, React + shadcn/ui) into
+# ../web/dashboard.html and ../web/dashboard-assets/ before every `wrangler dev`
+# and `wrangler deploy`, so a deploy can never ship a stale or missing dashboard.
+[build]
+command = "pnpm --filter @aired/dashboard build"
 
 [assets]
 directory = "../web"
@@ -21,6 +30,13 @@ bucket_name = "aired-pages"
 
 [[kv_namespaces]]
 binding = "PAGES_KV"
+id = "6388d6b3b6c04fe5ad8529ae029e723e"
+
+# The MCP OAuth grant store (routes/mcp-oauth.ts). Same namespace as PAGES_KV:
+# its keys are client:, grant:, grants:, token:, tokens: and transaction:,
+# none of which aired uses, so no new namespace is needed.
+[[kv_namespaces]]
+binding = "OAUTH_KV"
 id = "6388d6b3b6c04fe5ad8529ae029e723e"
 
 # Accounts and billing state (users, identities, subscriptions, billing_events).
@@ -58,6 +74,18 @@ simple = { limit = 10, period = 60 }
 name = "PIN_GUESS_PAGE"
 namespace_id = "1004"
 simple = { limit = 60, period = 60 }
+
+# CLI device sign-in starts (POST /auth/device): each one writes to D1.
+[[ratelimits]]
+name = "DEVICE_BURST"
+namespace_id = "1005"
+simple = { limit = 5, period = 60 }
+
+# MCP OAuth dynamic client registrations (POST /oauth/register): each writes KV.
+[[ratelimits]]
+name = "OAUTH_BURST"
+namespace_id = "1006"
+simple = { limit = 5, period = 60 }
 
 # Custom domain
 [[routes]]

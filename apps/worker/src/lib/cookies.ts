@@ -5,6 +5,8 @@ import { SESSION_MAX_AGE_SECONDS } from '@aired/core';
 
 export const SESSION_COOKIE_NAME = 'aired_session';
 export const OAUTH_STATE_COOKIE_NAME = 'aired_oauth_state';
+/** The AuthKit session id, so signing out of aired ends the WorkOS session too. */
+export const WORKOS_SESSION_COOKIE_NAME = 'aired_workos_sid';
 
 /**
  * Set the session cookie with secure attributes.
@@ -68,4 +70,22 @@ export function clearOAuthStateCookie(c: Context<AppBindings>): void {
     sameSite: 'Lax',
     path: '/',
   });
+}
+
+export function setWorkosSessionCookie(c: Context<AppBindings>, sessionId: string): void {
+  setCookie(c, WORKOS_SESSION_COOKIE_NAME, sessionId, {
+    secure: true,
+    httpOnly: true,
+    sameSite: 'Lax',
+    path: '/',
+    maxAge: 30 * 24 * 60 * 60,
+  });
+}
+
+export function readWorkosSessionCookie(c: Context<AppBindings>): string | null {
+  return getCookie(c, WORKOS_SESSION_COOKIE_NAME) ?? null;
+}
+
+export function clearWorkosSessionCookie(c: Context<AppBindings>): void {
+  deleteCookie(c, WORKOS_SESSION_COOKIE_NAME, { secure: true, path: '/' });
 }

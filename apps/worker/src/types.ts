@@ -11,6 +11,15 @@ export type Env = {
   /** Workers Rate Limiting bindings (wrangler.toml [[ratelimits]]). Optional so tests run without them. */
   PUBLISH_BURST?: RateLimit;
   REPORT_BURST?: RateLimit;
+  DEVICE_BURST?: RateLimit;
+  OAUTH_BURST?: RateLimit;
+  /** The OAuth grant store for the remote MCP (bound to the PAGES_KV namespace). */
+  OAUTH_KV?: KVNamespace;
+  /**
+   * Set only in code, on the env of an in-process API call made for an MCP
+   * tool call that came with an OAuth token (withMcpOAuthUser). Never a var.
+   */
+  AIRED_MCP_OAUTH_USER?: number;
   PIN_GUESS?: RateLimit;
   PIN_GUESS_PAGE?: RateLimit;
   /** D1 database for accounts and billing state (wrangler.toml [[d1_databases]]). */
@@ -41,6 +50,11 @@ export type Env = {
   STRIPE_API_BASE?: string;
   /** Site origin for Stripe success/cancel/portal return URLs. Default https://aired.sh; set only for local dev. */
   SITE_ORIGIN?: string;
+  /** WorkOS AuthKit sign-in: on only when both are set (lib/workos.ts). */
+  WORKOS_CLIENT_ID?: string;
+  WORKOS_API_KEY?: string;
+  /** Local tests point this at a mock. */
+  WORKOS_API_BASE?: string;
 };
 
 export type AppBindings = {
@@ -48,6 +62,17 @@ export type AppBindings = {
   Variables: {
     user: { id: number; login: string; email: string | null; name: string | null } | null;
     jti: string | null;
+    /** How the caller signed in: a session (cookie or CLI header), an API key, or not at all. */
+    /**
+     * How the caller signed in: 'cookie' (the website), 'cli' (a CLI token in
+     * the aired-Session header), 'key' (an API key) or 'oauth' (an MCP tool
+     * call made with an OAuth token). null when anonymous.
+     */
+    via: 'cookie' | 'cli' | 'key' | 'oauth' | null;
+    /** When the person signed in (Unix seconds), for 'cookie' and 'cli' callers. */
+    authTime: number | null;
+    /** The API key's id when via is 'key'. */
+    apiKeyId: string | null;
   };
 };
 

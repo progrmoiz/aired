@@ -12,7 +12,8 @@ import {
   UNSORTED_PROJECT,
 } from '@aired/core';
 import type { PageMetadata } from '@aired/core';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireWebSession } from '../middleware/auth.js';
+import { revokeAllSessions } from '../lib/revocation.js';
 import { requireCsrfHeader } from '../middleware/csrf.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { TIERS } from '../lib/rate-limit-tiers.js';
@@ -25,10 +26,13 @@ import {
   listProjectsForOwner,
   bumpProjectCount,
 } from '../lib/owner-index.js';
-import { clearSessionCookie, readSessionCookie } from '../lib/cookies.js';
+import { clearSessionCookie, readSessionCookie, readWorkosSessionCookie, clearWorkosSessionCookie } from '../lib/cookies.js';
 import { billingEnabled, getEntitlements, isEntitled } from '../lib/entitlements.js';
 import { getCustomerId, getSubscription } from '../lib/billing/store.js';
 import { blocksAccountDeletion, deleteAccountRows } from '../lib/billing/forget.js';
+import { identityEmails } from '../lib/users.js';
+import { revokeMcpGrants } from './mcp-oauth.js';
+import { workosEnabled, workosLogoutUrl } from '../lib/workos.js';
 import { listActiveSubscriptions } from '../lib/billing/stripe.js';
 import { isMissingCustomer } from '../lib/billing/stripe-shapes.js';
 import type { StoredSubscription } from '../lib/billing/store.js';
@@ -300,8 +304,30 @@ me.post(
   },
 );
 
+// POST /api/me/sign-out-everywhere — end every session of this account:
+// other browsers, CLI tokens and MCP connections. API keys keep working
+// (they're listed and revoked one by one under API keys). Website only.
+me.post('/sign-out-everywhere', requireWebSession, requireCsrfHeader, async (c) => {
+  const userId = c.get('user')!.id;
+  try {
+    await revokeAllSessions(c.env.PAGES_KV, userId);
+  } catch (err) {
+    console.error('Failed to sign out everywhere:', err);
+    return c.json({ error: 'Could not sign out everywhere. Please try again.' }, 503);
+  }
+  clearSessionCookie(c);
+  // End this browser's AuthKit session too, as sign-out does.
+  const workosSession = readWorkosSessionCookie(c);
+  if (workosSession !== null) clearWorkosSessionCookie(c);
+  return c.json(
+    workosSession !== null && workosEnabled(c.env)
+      ? { ok: true, redirect: workosLogoutUrl(c.env, workosSession) }
+      : { ok: true },
+  );
+});
+
 // DELETE /api/me — delete the authenticated user's account
-me.delete('/', requireCsrfHeader, async (c) => {
+me.delete('/', requireWebSession, requireCsrfHeader, async (c) => {
   const user = c.get('user')!;
   const userId = user.id;
   const jti = c.get('jti');
@@ -340,16 +366,34 @@ me.delete('/', requireCsrfHeader, async (c) => {
     }
   }
 
-  // Billing and sign-in rows in D1 go before anything else, so a failure can
-  // be retried with the account intact. Link (Stripe) keeps its own record of
-  // each sale. Without billing on, D1 may hold nothing yet: don't block on it.
+  // Billing, sign-in and API key rows in D1 go before anything else, so a
+  // failure can be retried with the account intact (and no key outlives the
+  // account). Link (Stripe) keeps its own record of each sale.
+  // The emails this account signed in with, read before its identities go:
+  // their email index entries go too (below) if they still point here.
+  let linkedEmails: string[] = [];
+  try {
+    linkedEmails = await identityEmails(c.env.DB, userId);
+  } catch (err) {
+    console.error('Failed to read identity emails during account deletion:', err);
+  }
+  // Every other session (other browsers, CLI tokens) and MCP connection of
+  // this account stops working, not just the one making this request. First,
+  // and fail closed: without the marker those sessions would outlive the
+  // account. Writing it again on a retry is harmless.
+  try {
+    await revokeAllSessions(c.env.PAGES_KV, userId);
+  } catch (err) {
+    console.error('Failed to set the revocation marker during account deletion:', err);
+    return c.json({ error: 'Could not delete your account. Please try again.' }, 503);
+  }
   try {
     await deleteAccountRows(c.env.DB, userId);
   } catch (err) {
-    console.error('Failed to delete billing rows during account deletion:', err);
-    if (billingEnabled(c.env)) {
-      return c.json({ error: 'Could not delete your billing records. Please try again.' }, 503);
-    }
+    console.error('Failed to delete account rows during account deletion:', err);
+    // The marker above already ended every session, this one included.
+    clearSessionCookie(c);
+    return c.json({ error: 'Could not delete your account records. Sign in again and retry.' }, 503);
   }
   try {
     await c.env.PAGES_KV.delete(`ent:${userId}`);
@@ -401,11 +445,20 @@ me.delete('/', requireCsrfHeader, async (c) => {
     }
   }
 
-  // Step 2: Delete user record and email index
+  // MCP connections the account approved stop working with it.
+  try {
+    await revokeMcpGrants(c.env, userId);
+  } catch (err) {
+    console.error('Failed to revoke MCP grants during account deletion:', err);
+  }
+
+  // Step 2: Delete user record and email index entries. An entry is deleted
+  // only while it points at this account: another account may hold it now.
   try {
     const userRaw = await c.env.PAGES_KV.get(kvKeys.user(userId));
     await c.env.PAGES_KV.delete(kvKeys.user(userId));
 
+    const emails = new Set(linkedEmails);
     if (userRaw !== null) {
       try {
         const userRecord: unknown = JSON.parse(userRaw);
@@ -414,22 +467,33 @@ me.delete('/', requireCsrfHeader, async (c) => {
           userRecord !== null &&
           typeof (userRecord as Record<string, unknown>)['email'] === 'string'
         ) {
-          const email = (userRecord as Record<string, unknown>)['email'] as string;
-          await c.env.PAGES_KV.delete(kvKeys.emailIndex(email));
+          emails.add(((userRecord as Record<string, unknown>)['email'] as string).toLowerCase());
         }
       } catch {
         // ignore parse errors
+      }
+    }
+    for (const email of emails) {
+      if ((await c.env.PAGES_KV.get(kvKeys.emailIndex(email))) === String(userId)) {
+        await c.env.PAGES_KV.delete(kvKeys.emailIndex(email));
       }
     }
   } catch (err) {
     console.error('Failed to delete user record:', err);
   }
 
-  // Step 3: Clear session cookie
+  // Step 3: Clear session cookie, and end the AuthKit session too (as sign-out
+  // does), or the next Log in in this browser signs straight back in.
   clearSessionCookie(c);
+  const workosSession = readWorkosSessionCookie(c);
+  if (workosSession !== null) clearWorkosSessionCookie(c);
 
   // Step 4: Return immediately
-  const response = c.json({ ok: true });
+  const response = c.json(
+    workosSession !== null && workosEnabled(c.env)
+      ? { ok: true, redirect: workosLogoutUrl(c.env, workosSession) }
+      : { ok: true },
+  );
 
   // Step 5: waitUntil — paginated sweep to null out ownerId on all pages
   c.executionCtx.waitUntil(

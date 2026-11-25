@@ -1,0 +1,105 @@
+/* aired dashboard. Tailwind v4 + shadcn/ui (Base UI), scoped to apps/dashboard.
+   The marketing site keeps site.css; the tokens below are DESIGN.md's palette
+   under shadcn's variable names. Dark only. Inter and JetBrains Mono come from
+   /fonts/fonts.css (self-hosted, linked in dashboard.html). */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./styles/shadcn-base.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-heading: var(--font-sans);
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    --color-mark: var(--mark);
+    --color-ok: var(--ok);
+    --color-subtle: var(--subtle);
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+    color-scheme: dark;
+    --background: #0a0a0b;          /* bg */
+    --foreground: #ededef;          /* text-primary */
+    --card: #111113;                /* surface */
+    --card-foreground: #ededef;
+    --popover: #151518;
+    --popover-foreground: #ededef;
+    --primary: #ededef;             /* light primary button, as on the site */
+    --primary-foreground: #0a0a0b;
+    --secondary: #18181b;           /* surface-hover */
+    --secondary-foreground: #ededef;
+    --muted: #18181b;
+    --muted-foreground: #a1a1a6;    /* text-secondary */
+    --subtle: #84848a;              /* text-tertiary */
+    --accent: #18181b;
+    --accent-foreground: #ededef;
+    --destructive: #f87171;         /* red-400, destructive actions and errors only */
+    --border: #222225;
+    --input: #34343a;
+    --ring: #7c6aef;                 /* purple: focus only (components use it at 50%) */
+    --mark: #7c6aef;                /* purple: logo mark and eyebrows */
+    --ok: #34d399;
+    --chart-1: #ededef;
+    --chart-2: #a1a1a6;
+    --chart-3: #84848a;
+    --chart-4: #34343a;
+    --chart-5: #222225;
+    --radius: 0.75rem;              /* cards 12px; controls use rounded-md/lg */
+    --sidebar: #0c0c0e;
+    --sidebar-foreground: #a1a1a6;
+    --sidebar-primary: #ededef;
+    --sidebar-primary-foreground: #0a0a0b;
+    --sidebar-accent: #18181b;
+    --sidebar-accent-foreground: #ededef;
+    --sidebar-border: #222225;
+    --sidebar-ring: #7c6aef;
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  html { @apply font-sans; -webkit-font-smoothing: antialiased; }
+  body { @apply bg-background text-foreground; }
+  :focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+}
