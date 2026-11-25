@@ -3,11 +3,11 @@ import type { AppBindings } from '../types.js';
 import { CLI_SESSION_MAX_AGE_SECONDS, hashToHex, kvKeys } from '@aired/core';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { TIERS } from '../lib/rate-limit-tiers.js';
-import { requireAuth, requireSession } from '../middleware/auth.js';
+import { requireAuth, requireWebSession } from '../middleware/auth.js';
 import { requireCsrfHeader } from '../middleware/csrf.js';
 import { signSession } from '../lib/jwt.js';
 import { siteOrigin } from '../lib/billing/webhook-plan.js';
-import { readSessionCookie } from '../lib/cookies.js';
+import { loadUserRecord } from '../lib/user-record.js';
 import {
   DEVICE_CODE_TTL_MS,
   DEVICE_POLL_INTERVAL,
@@ -66,19 +66,16 @@ authDevice.post('/device', rateLimit(TIERS.device_start), async (c) => {
 authDevice.post(
   '/device/approve',
   requireAuth,
-  requireSession,
+  requireWebSession,
   requireCsrfHeader,
   rateLimit(TIERS.oauth_init),
   async (c) => {
-    if (readSessionCookie(c) === null) {
-      return c.json({ error: 'Approve the code on the aired website, signed in.' }, 403);
-    }
     const body = (await c.req.json().catch(() => null)) as { user_code?: unknown } | null;
     const userCode = normalizeUserCode(body?.user_code);
     if (userCode === null) return c.json({ error: 'That isn’t a sign-in code. It looks like BCDF-GHJK.' }, 400);
     const userId = c.get('user')!.id;
     // The CLI session is minted from the account record: no record, no approval.
-    if ((await c.env.PAGES_KV.get(kvKeys.user(userId))) === null) {
+    if ((await loadUserRecord(c.env.PAGES_KV, userId)) === null) {
       return c.json({ error: 'Sign in again, then approve the code.' }, 403);
     }
     let approved: boolean;
@@ -122,18 +119,11 @@ export async function pollNativeDevice(c: Context<AppBindings>, deviceCode: stri
   // Collected by a poll that raced this one.
   if (userId === null) return c.json({ error: 'device_code_expired' }, 400);
 
-  const raw = await c.env.PAGES_KV.get(kvKeys.user(userId));
-  type UserRecord = { login?: string; email?: string | null; name?: string | null };
-  let record: UserRecord | null = null;
-  try {
-    record = raw === null ? null : (JSON.parse(raw) as UserRecord);
-  } catch {
-    record = null;
-  }
   // The account was deleted after approving.
-  if (record === null || typeof record.login !== 'string') return c.json({ error: 'access_denied' }, 400);
+  const record = await loadUserRecord(c.env.PAGES_KV, userId);
+  if (record === null) return c.json({ error: 'access_denied' }, 400);
 
-  const user = { id: userId, login: record.login, email: record.email ?? null, name: record.name ?? null };
+  const user = { id: userId, login: record.login, email: record.email, name: record.name };
   let jwt: string;
   try {
     jwt = await signSession(

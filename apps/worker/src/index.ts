@@ -22,6 +22,7 @@ import { TIERS } from "./lib/rate-limit-tiers.js";
 import { sweepExpiredPages } from "./lib/expired-sweep.js";
 import { withAssetCache } from "./lib/asset-cache.js";
 import { API_KEY_PREFIX, kvKeys } from "@aired/core";
+import { loadUserRecord, signedInUser } from "./lib/user-record.js";
 import { bearerToken } from "./lib/page-token.js";
 import {
   MCP_SCOPE,
@@ -85,29 +86,17 @@ function mcpCaller(which: "open" | "account") {
       }
       if (found === null) return mcpChallenge(c, resource, "invalid_token");
       if (!found.scope.includes(MCP_SCOPE)) return mcpInsufficientScope(c, resource);
-      const raw = await c.env.PAGES_KV.get(kvKeys.user(found.userId));
-      type UserRecord = { login?: unknown; email?: unknown; name?: unknown };
-      let record: UserRecord | null = null;
-      try {
-        record = raw === null ? null : (JSON.parse(raw) as UserRecord);
-      } catch {
-        record = null;
-      }
-      if (record === null || typeof record.login !== "string") return mcpChallenge(c, resource, "invalid_token");
+      const record = await loadUserRecord(c.env.PAGES_KV, found.userId);
+      if (record === null) return mcpChallenge(c, resource, "invalid_token");
       // A grant can't outlive the account that approved it, even if revoking it on deletion failed.
-      const created = Date.parse(typeof (record as { createdAt?: unknown }).createdAt === "string" ? (record as { createdAt: string }).createdAt : "");
+      const created = Date.parse(record.createdAt ?? "");
       if (!isNaN(created) && (found.issuedAt === null || found.issuedAt * 1000 < created - 60_000)) {
         return mcpChallenge(c, resource, "invalid_token");
       }
-      c.set("user", {
-        id: found.userId,
-        login: record.login,
-        email: typeof record.email === "string" ? record.email : null,
-        name: typeof record.name === "string" ? record.name : null,
-      });
+      c.set("user", signedInUser(record));
       c.set("jti", null);
-      c.set("authMethod", "oauth");
-    } else if (which === "account" && c.get("authMethod") !== "key") {
+      c.set("via", "oauth");
+    } else if (which === "account" && c.get("via") !== "key") {
       return mcpChallenge(c, resource);
     }
     await next();
@@ -134,8 +123,8 @@ async function mcpPostLimits(c: Context<AppBindings>, next: Next): Promise<Respo
     // Signed-in callers (key or OAuth): a per-account limit on every tool
     // call (publishes also count against the publish limit inside the API).
     // Everyone else: the publish limit.
-    const method = c.get("authMethod");
-    return method === "key" || method === "oauth" ? rateLimit(TIERS.mcp_key)(c, next) : publishRateLimit(c, next);
+    const via = c.get("via");
+    return via === "key" || via === "oauth" ? rateLimit(TIERS.mcp_key)(c, next) : publishRateLimit(c, next);
   }
   await next();
 }

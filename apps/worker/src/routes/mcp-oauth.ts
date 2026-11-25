@@ -6,10 +6,10 @@ import {
   OAuthError,
   type ConsentDescription,
 } from '@cloudflare/workers-oauth-provider';
-import { kvKeys } from '@aired/core';
 import type { AppBindings } from '../types.js';
 import { siteOrigin } from '../lib/billing/webhook-plan.js';
-import { readSessionCookie } from '../lib/cookies.js';
+import { loadUserRecord } from '../lib/user-record.js';
+import { retiredBy, sessionsValidSince } from '../lib/revocation.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { TIERS } from '../lib/rate-limit-tiers.js';
 import { consentPage, consentErrorPage } from '../lib/mcp-consent.js';
@@ -82,6 +82,8 @@ export async function validateMcpToken(env: Env, resource: string, token: string
   const userId = v.props?.userId;
   if (typeof userId !== 'number' || !Number.isSafeInteger(userId) || userId <= 0) return null;
   if (grantRetired(env, v.props?.issuedAt)) return null;
+  // Account deleted or signed out everywhere since this was approved.
+  if (retiredBy(await sessionsValidSince(env.PAGES_KV, userId), typeof v.props?.issuedAt === 'number' ? v.props.issuedAt : null)) return null;
   const issuedAt = typeof v.props?.issuedAt === 'number' ? v.props.issuedAt : null;
   return { userId, scope: v.scope, issuedAt };
 }
@@ -126,7 +128,7 @@ export function mcpInsufficientScope(c: Context<AppBindings>, resource: string):
 
 /**
  * The env an in-process API call runs with when a tool call came with an
- * OAuth token: authMiddleware signs it in as this account (authMethod
+ * OAuth token: authMiddleware signs it in as this account (via
  * 'oauth'). Only code can set it, never a request.
  */
 export function withMcpOAuthUser(env: Env, userId: number): Env {
@@ -161,12 +163,14 @@ const authServerFetch = (c: Context<AppBindings>) => mcpAuthServer(c.env).fetch(
 mcpOAuth.post('/oauth/register', rateLimit(TIERS.oauth_register), authServerFetch);
 mcpOAuth.all('/oauth/*', rateLimit(TIERS.oauth_token), authServerFetch);
 
-/** Signed in on the website (the session cookie), not with a CLI token or an API key. */
+/**
+ * Signed in on the website (the same rule as requireWebSession), with an
+ * account record: tokens are minted from it, so no record, no approval.
+ */
 async function webAccount(c: Context<AppBindings>): Promise<{ id: number; login: string } | null> {
   const user = c.get('user');
-  if (user === null || c.get('authMethod') !== 'session' || readSessionCookie(c) === null) return null;
-  // Tokens are minted from the account record: no record, no approval.
-  if ((await c.env.PAGES_KV.get(kvKeys.user(user.id))) === null) return null;
+  if (user === null || c.get('via') !== 'cookie') return null;
+  if ((await loadUserRecord(c.env.PAGES_KV, user.id)) === null) return null;
   return { id: user.id, login: user.login };
 }
 

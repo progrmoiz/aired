@@ -63,9 +63,13 @@ export type AppBindings = {
     user: { id: number; login: string; email: string | null; name: string | null } | null;
     jti: string | null;
     /** How the caller signed in: a session (cookie or CLI header), an API key, or not at all. */
-    /** 'oauth': an MCP tool call made with an OAuth token (routes/mcp-oauth.ts). */
-    authMethod: 'session' | 'key' | 'oauth' | null;
-    /** The API key's id when authMethod is 'key'. */
+    /**
+     * How the caller signed in: 'cookie' (the website), 'cli' (a CLI token in
+     * the aired-Session header), 'key' (an API key) or 'oauth' (an MCP tool
+     * call made with an OAuth token). null when anonymous.
+     */
+    via: 'cookie' | 'cli' | 'key' | 'oauth' | null;
+    /** The API key's id when via is 'key'. */
     apiKeyId: string | null;
   };
 };

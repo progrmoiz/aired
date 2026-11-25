@@ -81,10 +81,9 @@ test("wiring: the poll route sends aired codes to the native flow; approving nee
   const auth = readFileSync(new URL("../src/routes/auth.ts", import.meta.url), "utf8");
   assert.match(auth, /if \(isNativeDeviceCode\(device_code\)\) return pollNativeDevice\(c, device_code\);\s*const limited = await githubPollLimit\(c, async \(\) => \{\}\);/);
   const device = readFileSync(new URL("../src/routes/auth-device.ts", import.meta.url), "utf8");
-  assert.match(device, /'\/device\/approve',\s*requireAuth,\s*requireSession,\s*requireCsrfHeader,/);
+  assert.match(device, /'\/device\/approve',\s*requireAuth,\s*requireWebSession,\s*requireCsrfHeader,/);
   assert.match(device, /CLI_SESSION_MAX_AGE_SECONDS/);
-  // Only the web cookie approves: a CLI token can't renew itself through the device flow.
-  assert.match(device, /if \(readSessionCookie\(c\) === null\) \{\s*return c\.json\(\{ error: 'Approve the code on the aired website, signed in\.' \}, 403\);/);
+  // Only the web cookie approves (requireWebSession): a CLI token can't renew itself through the device flow.
   // Starting a sign-in writes to D1, so it has a flood guard counted by Cloudflare.
   assert.match(device, /authDevice\.post\('\/device', rateLimit\(TIERS\.device_start\)/);
   assert.match(readFileSync(new URL("../src/lib/rate-limit-tiers.ts", import.meta.url), "utf8"), /device_start: +\{[^}]*burst: 'DEVICE_BURST' \}/);

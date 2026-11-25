@@ -42,20 +42,20 @@ test("wiring: /mcp/account challenges, OAuth tokens sign in only on MCP, and the
   assert.match(index, /if \(bearer !== null && !bearer\.startsWith\(API_KEY_PREFIX\)\) \{/);
   assert.match(index, /if \(found === null\) return mcpChallenge\(c, resource, "invalid_token"\);/);
   assert.match(index, /if \(!found\.scope\.includes\(MCP_SCOPE\)\) return mcpInsufficientScope\(c, resource\);/);
-  assert.match(index, /\} else if \(which === "account" && c\.get\("authMethod"\) !== "key"\) \{\s*return mcpChallenge\(c, resource\);/);
+  assert.match(index, /\} else if \(which === "account" && c\.get\("via"\) !== "key"\) \{\s*return mcpChallenge\(c, resource\);/);
   assert.match(index, /for \(const \[path, which\] of \[\["\/mcp", "open"\], \["\/mcp\/account", "account"\]\] as const\)/);
   assert.match(index, /asUser === undefined \? c\.env : withMcpOAuthUser\(c\.env, asUser\)/);
   // Only in-process calls carry the account: a request can't set env, and vars are strings.
   const auth = src("src/middleware/auth.ts");
   assert.match(auth, /const mcpUser = c\.env\.AIRED_MCP_OAUTH_USER;\s*if \(typeof mcpUser === 'number'\) return mcpOAuthAuth\(c, next, mcpUser\);/);
-  assert.match(auth, /c\.set\('authMethod', 'oauth'\);/);
+  assert.match(auth, /c\.set\('via', 'oauth'\);/);
   // OAuth callers are not sessions: no keys, billing or account deletion.
-  assert.match(auth, /if \(c\.get\('authMethod'\) !== 'session'\) \{/);
+  assert.match(auth, /if \(c\.get\('via'\) !== 'cookie'\) \{/);
 });
 
 test("wiring: consent needs the web session, and the OAuth store and fetch flag are configured", () => {
   const oauth = src("src/routes/mcp-oauth.ts");
-  assert.match(oauth, /if \(user === null \|\| c\.get\('authMethod'\) !== 'session' \|\| readSessionCookie\(c\) === null\) return null;/);
+  assert.match(oauth, /if \(user === null \|\| c\.get\('via'\) !== 'cookie'\) return null;/);
   assert.match(oauth, /if \(err instanceof AuthorizationError && err\.redirectTo\) return Response\.redirect\(err\.redirectTo, 302\);/);
   assert.match(oauth, /clientIdMetadataDocumentEnabled: true,/);
   assert.match(oauth, /h\.set\('X-Frame-Options', 'DENY'\);/);

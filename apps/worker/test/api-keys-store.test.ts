@@ -100,11 +100,11 @@ test("wiring: keys are checked before sessions; keys can't manage keys, billing 
   assert.ok(auth.indexOf("return keyAuth(c, next,") < auth.indexOf("const cookieValue = readSessionCookie(c);"));
   assert.match(auth, /if \(!parsed\.ok\) return c\.json\(\{ error: 'Invalid API key' \}, 401\);/);
   assert.match(auth, /if \(found === null\) return c\.json\(\{ error: 'Invalid or revoked API key' \}, 401\);/);
-  assert.match(src("routes/keys.ts"), /keys\.use\('\*', requireSession\);/);
-  assert.match(src("routes/me.ts"), /me\.delete\('\/', requireSession, requireCsrfHeader,/);
+  assert.match(src("routes/keys.ts"), /keys\.use\('\*', requireWebSession\);/);
+  assert.match(src("routes/me.ts"), /me\.delete\('\/', requireWebSession, requireCsrfHeader,/);
   const billing = src("routes/billing.ts");
-  assert.match(billing, /billing\.post\('\/checkout', requireSession,/);
-  assert.match(billing, /billing\.post\('\/portal', requireSession,/);
+  assert.match(billing, /billing\.post\('\/checkout', requireWebSession,/);
+  assert.match(billing, /billing\.post\('\/portal', requireWebSession,/);
   assert.match(src("lib/billing/forget.ts"), /DELETE FROM api_keys WHERE user_id = \?/);
   const index = src("index.ts");
   assert.ok(index.indexOf('app.route("/api/me/keys", keys)') < index.indexOf('app.route("/api/me", me)'));
@@ -129,6 +129,6 @@ test("wiring: keys can't use /upgrade, can't sit in the session header, die with
   assert.match(auth, /const bearer = bearerToken\(c\.req\.header\('Authorization'\)\);\s*if \(bearer\?\.startsWith\(API_KEY_PREFIX\)\)/);
   assert.match(auth, /if \(headerValue\?\.trim\(\)\.startsWith\(API_KEY_PREFIX\)\) \{\s*return c\.json/);
   assert.match(auth, /if \(!isNaN\(validSince\) && found\.createdAt < validSince\) \{/);
-  assert.match(src("routes/billing.ts"), /if \(c\.get\('authMethod'\) !== 'session'\) \{\s*return c\.json\(\{ error: 'Sign in to buy Pro/);
+  assert.match(src("routes/billing.ts"), /if \(c\.get\('via'\) !== 'cookie'\) \{\s*return c\.json\(\{ error: 'Sign in on the aired website to buy Pro/);
   assert.match(src("routes/keys.ts"), /c\.header\('Cache-Control', 'no-store'\);/);
 });

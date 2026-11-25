@@ -64,7 +64,7 @@ test("get_account shows plan and limits, and an upgrade link only on Free", () =
 
 test("wiring: only an API key or an MCP OAuth token signs MCP callers in, and their tool calls get the per-account limit", () => {
   const mcp = readFileSync(new URL("../src/routes/mcp.ts", import.meta.url), "utf8");
-  assert.match(mcp, /const asKey = method === "key" && authorization !== undefined;\s*const asOAuth = method === "oauth";/);
+  assert.match(mcp, /const asKey = via === "key" && authorization !== undefined;\s*const asOAuth = via === "oauth";/);
   assert.match(mcp, /user !== null && \(asKey \|\| asOAuth\)/);
   // The OAuth token is never passed on: OAuth calls run as the account in-process.
   assert.match(mcp, /if \(asKey\) headers\.set\("Authorization", authorization!\);/);
@@ -72,7 +72,7 @@ test("wiring: only an API key or an MCP OAuth token signs MCP callers in, and th
     assert.match(mcp, new RegExp(`"${tool}",[\\s\\S]*?if \\(signedIn === null\\) return signInRequired\\(\\);`), tool);
   }
   const index = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
-  assert.match(index, /return method === "key" \|\| method === "oauth" \? rateLimit\(TIERS\.mcp_key\)\(c, next\) : publishRateLimit\(c, next\);/);
+  assert.match(index, /return via === "key" \|\| via === "oauth" \? rateLimit\(TIERS\.mcp_key\)\(c, next\) : publishRateLimit\(c, next\);/);
   assert.match(index, /if \(countMcpToolCalls\(body\) > 1\) \{/);
   assert.match(mcp, /if \(typeof update_token === "string" && typeof existingId !== "string"\) \{/);
   assert.match(mcp, /return isTokenUpdate \? updateResult\(res\.body\) : publishResult\(res\.body, signedIn\.login\);/);
