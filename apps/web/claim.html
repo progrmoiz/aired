@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>aired — keep a page</title>
+  <meta name="robots" content="noindex" />
+  <meta name="referrer" content="no-referrer" />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="preload" href="/fonts/inter-latin-v20.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/fonts/fonts.css" />
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #0a0a0b;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    @keyframes skeleton-pulse {
+      from { opacity: 1; }
+      to { opacity: 0.4; }
+    }
+    .skeleton-row { animation: skeleton-pulse 1.2s linear infinite alternate; }
+
+    /* Buttons: light primary (DESIGN.md §1.3, §8.1) and secondary (§8.2) */
+    .claim-btn {
+      display: inline-flex;
+      align-items: center;
+      transition: background-color 120ms cubic-bezier(0.16, 1, 0.3, 1),
+                  border-color 120ms cubic-bezier(0.16, 1, 0.3, 1),
+                  color 120ms cubic-bezier(0.16, 1, 0.3, 1),
+                  opacity 120ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .claim-btn-primary:hover:not(:disabled) { opacity: 0.9; }
+    .claim-btn-primary:active:not(:disabled) { opacity: 0.8; }
+    .claim-btn-secondary:active:not(:disabled) { opacity: 0.8; }
+    .claim-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    @media (pointer: coarse) {
+      .claim-btn { min-height: 44px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .skeleton-row { animation: none; opacity: 0.7; }
+      .claim-btn { transition: none; }
+    }
+    .claim-url { word-break: break-all; transition: color 120ms cubic-bezier(0.16, 1, 0.3, 1); }
+    .claim-url:hover {
+      text-decoration: underline;
+      text-decoration-color: #3b3b40;
+      text-underline-offset: 3px;
+    }
+    /* text-lg (tailwind.config.js) isn't in the committed style.css yet; same values until build:css regenerates it */
+    .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col text-aired-text-primary">
+
+  <header class="w-full px-6 h-14 flex items-center justify-between max-w-2xl mx-auto">
+    <a href="/" class="text-base font-semibold tracking-tight text-aired-text-primary hover:text-white transition-colors duration-150">aired</a>
+    <nav class="flex items-center gap-5 text-sm text-aired-text-secondary">
+      <a href="/docs" class="hover:text-aired-text-primary transition-colors duration-150">Docs</a>
+    </nav>
+  </header>
+
+  <main class="flex-1 w-full max-w-2xl mx-auto px-6 py-10">
+    <h1 class="text-xl font-medium tracking-tight">Keep a page</h1>
+    <p class="mt-2 text-sm text-aired-text-secondary">
+      Pages published without an account expire. Add this one to your aired account to manage it from the dashboard.
+    </p>
+
+    <p id="status" class="sr-only" role="status" aria-live="polite"></p>
+
+    <!-- Loading: checking sign-in -->
+    <section id="state-loading" class="mt-8" aria-hidden="true">
+      <div class="skeleton-row h-4 w-56 rounded-sm bg-aired-border"></div>
+      <div class="skeleton-row mt-3 h-3 w-32 rounded-sm bg-aired-border"></div>
+    </section>
+
+    <!-- Signed out -->
+    <section id="state-signed-out" class="hidden mt-8">
+      <h2 class="text-lg font-medium">Sign in to keep this page</h2>
+      <p class="mt-2 text-sm text-aired-text-secondary">After you sign in, you come back here to confirm before anything is added.</p>
+      <div class="mt-6">
+        <a id="sign-in" href="/auth/github?return=/claim"
+           class="claim-btn claim-btn-primary focus-ring px-4 py-2.5 rounded bg-aired-text-primary text-aired-bg text-sm font-medium">
+          Sign in with GitHub
+        </a>
+      </div>
+    </section>
+
+    <!-- Confirm: signed in, nothing is added until the button is pressed -->
+    <section id="state-confirm" class="hidden mt-8">
+      <h2 class="text-lg font-medium">Add this page to your account?</h2>
+      <p id="confirm-title" class="mt-2 text-sm text-aired-text-primary"></p>
+      <a id="confirm-link" href="/" target="_blank" rel="noopener" class="claim-url mt-1 block font-mono text-sm text-aired-accent focus-ring rounded-sm"></a>
+      <p class="mt-3 text-xs text-aired-text-tertiary">Only add a page you published. Anyone can send you a link to this screen.</p>
+      <div class="mt-6 flex flex-wrap items-center gap-3">
+        <button id="confirm-add" type="button" class="claim-btn claim-btn-primary focus-ring px-4 py-2.5 rounded bg-aired-text-primary text-aired-bg text-sm font-medium">Add to your account</button>
+        <button id="confirm-cancel" type="button" class="claim-btn claim-btn-secondary focus-ring px-4 py-2 rounded bg-aired-surface border border-aired-border text-aired-text-secondary text-sm hover:bg-aired-surface-hover hover:border-aired-border-focus hover:text-aired-text-primary">Cancel</button>
+      </div>
+    </section>
+
+    <!-- Claiming -->
+    <section id="state-claiming" class="hidden mt-8">
+      <p class="text-sm text-aired-text-secondary">Adding the page to your account…</p>
+      <div class="skeleton-row mt-3 h-3 w-48 rounded-sm bg-aired-border" aria-hidden="true"></div>
+    </section>
+
+    <!-- Success -->
+    <section id="state-success" class="hidden mt-8">
+      <h2 class="text-lg font-medium">Added to your account</h2>
+      <p id="success-title" class="mt-2 text-sm text-aired-text-secondary"></p>
+      <a id="success-link" href="/" class="claim-url mt-3 block font-mono text-sm text-aired-accent focus-ring rounded-sm"></a>
+      <div class="mt-6 flex flex-wrap items-center gap-3">
+        <a href="/dashboard"
+           class="claim-btn claim-btn-secondary focus-ring px-4 py-2 rounded bg-aired-surface border border-aired-border text-aired-text-secondary text-sm hover:bg-aired-surface-hover hover:border-aired-border-focus hover:text-aired-text-primary">
+          Open dashboard
+        </a>
+      </div>
+    </section>
+
+    <!-- Cancelled -->
+    <section id="state-cancelled" class="hidden mt-8">
+      <p class="text-sm text-aired-text-secondary">Nothing was added.</p>
+      <p class="mt-6 text-sm text-aired-text-secondary">
+        <a href="/dashboard" class="hover:text-aired-text-primary underline transition-colors duration-150 focus-ring rounded-sm">Go to dashboard</a>
+      </p>
+    </section>
+
+    <!-- Error -->
+    <section id="state-error" class="hidden mt-8">
+      <p id="error-message" class="text-sm text-red-400"></p>
+      <div id="error-actions" class="hidden mt-6 flex flex-wrap items-center gap-3">
+        <button id="retry" type="button"
+                class="claim-btn claim-btn-secondary focus-ring px-4 py-2 rounded bg-aired-surface border border-aired-border text-aired-text-secondary text-sm hover:bg-aired-surface-hover hover:border-aired-border-focus hover:text-aired-text-primary">
+          Try again
+        </button>
+      </div>
+      <p class="mt-6 text-sm text-aired-text-secondary">
+        <a href="/dashboard" class="hover:text-aired-text-primary underline transition-colors duration-150 focus-ring rounded-sm">Go to dashboard</a>
+      </p>
+    </section>
+  </main>
+
+  <footer class="w-full max-w-2xl mx-auto px-6 py-8">
+    <nav aria-label="Guides" class="mb-4 flex flex-wrap justify-center sm:justify-start gap-x-4 gap-y-1 text-2xs">
+      <a href="/html-to-link" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">HTML to link</a>
+      <a href="/share-claude-artifacts" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Share Claude artifacts</a>
+      <a href="/share-chatgpt-html" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Share ChatGPT HTML</a>
+      <a href="/password-protect-html" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Password-protect HTML</a>
+      <a href="/share-html-privately" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Share HTML privately</a>
+      <a href="/share-html-with-client" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Send HTML to a client</a>
+      <a href="/tiiny-host-alternative" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Tiiny Host alternative</a>
+      <a href="/docs" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Docs</a>
+    </nav>
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-2 text-2xs text-aired-text-tertiary">
+      <p>Built by <a href="https://x.com/iammoizfarooq" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">@iammoizfarooq</a></p>
+      <div class="flex items-center gap-4">
+        <a href="/terms" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Terms</a>
+        <a href="/privacy" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Privacy</a>
+        <a href="/refunds" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Refunds</a>
+        <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">GitHub</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      var STORAGE_KEY = 'aired.claim';
+      // Same shapes as apps/worker/src/lib/claim-url.ts (parseClaimFragment).
+      var ID_RE = /^[0-9A-Za-z]{6,32}$/;
+      var TOKEN_RE = /^at_[A-Za-z0-9_-]{16,128}$/;
+
+      var STATES = ['loading', 'signed-out', 'confirm', 'claiming', 'success', 'cancelled', 'error'];
+      var status = document.getElementById('status');
+      var retry = document.getElementById('retry');
+
+      function show(name, announce) {
+        STATES.forEach(function (s) {
+          document.getElementById('state-' + s).classList.toggle('hidden', s !== name);
+        });
+        status.textContent = announce || '';
+      }
+
+      function parse(raw) {
+        if (typeof raw !== 'string') return null;
+        if (raw.charAt(0) === '#') raw = raw.slice(1);
+        var dot = raw.indexOf('.');
+        if (dot === -1) return null;
+        var id = raw.slice(0, dot);
+        var token = raw.slice(dot + 1);
+        if (!ID_RE.test(id) || !TOKEN_RE.test(token)) return null;
+        return { id: id, token: token };
+      }
+
+      function store(value) {
+        try { sessionStorage.setItem(STORAGE_KEY, value); } catch (e) { /* storage off: keep it in memory */ }
+      }
+      function stored() {
+        try { return sessionStorage.getItem(STORAGE_KEY); } catch (e) { return null; }
+      }
+      function forget() {
+        try { sessionStorage.removeItem(STORAGE_KEY); } catch (e) { /* nothing to clear */ }
+      }
+
+      function fail(message, canRetry) {
+        document.getElementById('error-message').textContent = message;
+        document.getElementById('error-actions').classList.toggle('hidden', !canRetry);
+        retry.disabled = false;
+        show('error', message);
+      }
+
+      // Take the claim out of the address bar first, so it isn't left in
+      // history, bookmarks or a copied URL. Returns null (and shows why)
+      // when there is nothing usable.
+      function readClaim() {
+        var hash = location.hash;
+        if (hash && hash.length > 1) {
+          history.replaceState(null, '', location.pathname + location.search);
+          var fromHash = parse(hash);
+          if (fromHash === null) {
+            fail('This claim link is incomplete. Copy the whole link and open it again.', false);
+            return null;
+          }
+          store(fromHash.id + '.' + fromHash.token);
+          return fromHash;
+        }
+        var fromStorage = parse(stored());
+        if (fromStorage === null) {
+          forget();
+          fail('There is no page to keep here. Open the claim link from your publish output.', false);
+        }
+        return fromStorage;
+      }
+
+      var claim = null;
+      var login = null;
+      // Bumped on every new claim, so a late response for an older link is ignored.
+      var run = 0;
+
+      var confirmAdd = document.getElementById('confirm-add');
+      var confirmCancel = document.getElementById('confirm-cancel');
+
+      function pageHref(id) { return '/p/' + encodeURIComponent(id); }
+
+      // Show what would be added and wait for a click. Never POSTs by itself:
+      // any site can send a signed-in visitor to /claim#<id>.<token>.
+      function confirmClaim(current) {
+        var href = pageHref(claim.id);
+        var link = document.getElementById('confirm-link');
+        link.href = href;
+        link.textContent = location.host + href;
+        document.getElementById('confirm-title').textContent = 'Untitled page';
+        confirmAdd.textContent = login ? 'Add to @' + login : 'Add to your account';
+        confirmAdd.disabled = false;
+        confirmCancel.disabled = false;
+        show('confirm', 'Add this page to your account?');
+
+        // Public metadata, for the title only. A 404 means there is nothing to add.
+        fetch('/api/pages/' + encodeURIComponent(claim.id), { credentials: 'omit' }).then(function (res) {
+          if (current !== run) return;
+          if (res.status === 404) {
+            forget();
+            fail('This link has already been used, or the page is gone.', false);
+            return;
+          }
+          if (!res.ok) return;
+          return res.json().then(function (data) {
+            if (current !== run) return;
+            if (data && typeof data.title === 'string' && data.title) {
+              document.getElementById('confirm-title').textContent = data.title;
+            }
+          });
+        }).catch(function () { /* title is optional */ });
+      }
+
+      function claimPage(current) {
+        show('claiming', 'Adding the page to your account');
+        fetch('/api/me/claim', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'X-Aired-Request': '1' },
+          body: JSON.stringify({ id: claim.id, update_token: claim.token })
+        }).then(function (res) {
+          if (current !== run) return;
+          if (res.status === 401) {
+            show('signed-out', 'Sign in to keep this page');
+            return;
+          }
+          if (res.status === 429) {
+            fail('Too many attempts. Try again in an hour.', false);
+            return;
+          }
+          return res.json().catch(function () { return {}; }).then(function (data) {
+            if (current !== run) return;
+            if (res.ok && data && data.ok) {
+              forget();
+              var page = data.page || {};
+              var href = pageHref(claim.id);
+              var link = document.getElementById('success-link');
+              link.href = href;
+              link.textContent = location.host + href;
+              document.getElementById('success-title').textContent =
+                typeof page.title === 'string' && page.title ? page.title : 'Untitled page';
+              show('success', 'Added to your account');
+            } else if (res.status === 400 || res.status === 403 || res.status === 404) {
+              forget();
+              fail('This link has already been used, or the page is gone.', false);
+            } else {
+              fail('Could not add the page. Try again.', true);
+            }
+          });
+        }).catch(function () {
+          if (current !== run) return;
+          fail('Could not reach aired. Check your connection and try again.', true);
+        });
+      }
+
+      // Check sign-in, then ask. "Try again" also lands here, so a retry asks again too.
+      function start() {
+        var current = ++run;
+        show('loading', '');
+        fetch('/api/me', { credentials: 'same-origin' }).then(function (res) {
+          if (current !== run) return;
+          if (res.status === 401) {
+            show('signed-out', 'Sign in to keep this page');
+            return;
+          }
+          if (!res.ok) {
+            fail('Could not check your sign-in. Try again.', true);
+            return;
+          }
+          return res.json().catch(function () { return {}; }).then(function (me) {
+            if (current !== run) return;
+            login = me && typeof me.login === 'string' && me.login ? me.login : null;
+            confirmClaim(current);
+          });
+        }).catch(function () {
+          if (current !== run) return;
+          fail('Could not reach aired. Check your connection and try again.', true);
+        });
+      }
+
+      function init() {
+        run++;
+        claim = readClaim();
+        if (claim !== null) start();
+      }
+
+      confirmAdd.addEventListener('click', function () {
+        if (claim === null) return;
+        confirmAdd.disabled = true;
+        confirmCancel.disabled = true;
+        claimPage(++run);
+      });
+
+      confirmCancel.addEventListener('click', function () {
+        run++;
+        forget();
+        claim = null;
+        show('cancelled', 'Nothing was added');
+      });
+
+      retry.addEventListener('click', function () {
+        retry.disabled = true;
+        start();
+      });
+
+      // Opening another claim link while this page is open only changes the hash.
+      window.addEventListener('hashchange', init);
+
+      init();
+    })();
+  </script>
+</body>
+</html>

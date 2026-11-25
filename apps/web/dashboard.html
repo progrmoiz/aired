@@ -10,9 +10,8 @@
   <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
   <link rel="icon" href="/favicon-16.png" type="image/png" sizes="16x16" />
   <link rel="stylesheet" href="/style.css" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="preload" href="/fonts/inter-latin-v20.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/fonts/fonts.css" />
   <style>
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -70,6 +69,23 @@
       .group-chevron { transition: none; }
     }
 
+    /* Plan strip buttons: light primary (DESIGN.md §8.1) and secondary (§8.2) */
+    .plan-btn {
+      transition: background-color 120ms cubic-bezier(0.16, 1, 0.3, 1),
+                  border-color 120ms cubic-bezier(0.16, 1, 0.3, 1),
+                  color 120ms cubic-bezier(0.16, 1, 0.3, 1),
+                  opacity 120ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .plan-btn-primary:hover:not(:disabled) { opacity: 0.9; }
+    .plan-btn-primary:active:not(:disabled) { opacity: 0.8; }
+    .plan-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    @media (pointer: coarse) {
+      .plan-btn { min-height: 44px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .plan-btn { transition: none; }
+    }
+
     .sr-only {
       position: absolute;
       width: 1px;
@@ -101,14 +117,43 @@
 
   <main class="max-w-2xl mx-auto px-6 py-12">
 
-    <!-- hero: handle + count + publish link -->
-    <section class="mb-10 flex items-end justify-between gap-4">
-      <div class="min-w-0">
-        <h1 id="user-handle" class="text-xl font-medium tracking-tight text-aired-text-primary truncate">@</h1>
-        <p id="page-count" class="text-sm text-aired-text-secondary mt-1" aria-live="polite">&nbsp;</p>
-      </div>
-      <a id="hero-publish" href="/" class="text-sm text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150 focus-ring rounded-sm whitespace-nowrap">Publish another →</a>
-    </section>
+    <div class="mb-10">
+      <!-- hero: handle + count + publish link -->
+      <section class="flex items-end justify-between gap-4">
+        <div class="min-w-0">
+          <h1 id="user-handle" class="text-xl font-medium tracking-tight text-aired-text-primary truncate">@</h1>
+          <p id="page-count" class="text-sm text-aired-text-secondary mt-1" aria-live="polite">&nbsp;</p>
+        </div>
+        <a id="hero-publish" href="/" class="text-sm text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150 focus-ring rounded-sm whitespace-nowrap">Publish another →</a>
+      </section>
+
+      <!-- plan strip: shown only when billing is on (filled by dashboard.js) -->
+      <section id="plan-strip" class="hidden mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-aired-border bg-aired-surface px-4 py-3" aria-label="Plan">
+        <div class="min-w-0">
+          <p id="plan-label" class="text-sm text-aired-text-primary"></p>
+          <p id="plan-detail" class="hidden text-xs text-aired-text-tertiary mt-0.5"></p>
+        </div>
+        <button id="plan-action" type="button" class="hidden"></button>
+        <p id="plan-renew" class="hidden w-full text-xs text-aired-text-tertiary">Renews automatically until you cancel. Cancel anytime in Manage billing.</p>
+        <p id="plan-error" class="hidden w-full text-xs text-red-400"></p>
+      </section>
+
+      <!-- browser-held pages offer: shown when aired.pages has entries (filled by dashboard.js) -->
+      <section id="claim-banner" class="hidden mt-4 rounded-lg border border-aired-border bg-aired-surface px-4 py-3" aria-label="Pages published in this browser">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="min-w-0">
+            <p id="claim-label" class="text-sm text-aired-text-primary"></p>
+            <p id="claim-detail" class="text-xs text-aired-text-tertiary mt-0.5">Add them to your account to manage them here.</p>
+          </div>
+          <div class="flex flex-shrink-0 items-center gap-2">
+            <button id="claim-add" type="button" class="plan-btn plan-btn-primary flex-shrink-0 rounded px-3 py-2 text-sm font-medium bg-aired-text-primary text-aired-bg focus-ring">Add to my account</button>
+            <button id="claim-dismiss" type="button" class="plan-btn flex-shrink-0 rounded px-3 py-2 text-sm border border-aired-border bg-aired-bg text-aired-text-secondary hover:text-aired-text-primary hover:border-aired-border-focus hover:bg-aired-surface-hover active:bg-aired-border focus-ring">Not now</button>
+          </div>
+        </div>
+        <p id="claim-error" class="hidden mt-2 text-xs text-red-400"></p>
+        <ul id="claim-failures" class="hidden mt-2 space-y-1 text-xs text-red-400"></ul>
+      </section>
+    </div>
 
     <!-- page list, grouped by project (filled by dashboard.js) -->
     <div id="project-groups" aria-label="Published pages grouped by project">
@@ -149,7 +194,7 @@
       Nothing aired yet. Publish from <a href="/" class="text-aired-text-primary hover:text-white underline decoration-aired-border hover:decoration-aired-text-secondary transition-colors duration-150">the homepage</a> or run <code class="font-mono text-aired-text-primary">aired publish file.html</code>.
     </p>
 
-    <!-- live region for action results (Copied, Deleted) -->
+    <!-- live region for action results (Copied, Deleted, plan changes, added pages) -->
     <div id="action-status" class="sr-only" role="status" aria-live="polite"></div>
 
   </main>

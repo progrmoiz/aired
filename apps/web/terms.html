@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>aired — terms of service</title>
+  <meta name="description" content="The terms for using aired: what you can publish, who owns it, how anonymous pages expire, how Pro billing works and what happens when you cancel." />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="canonical" href="https://aired.sh/terms" />
+  <meta property="og:site_name" content="aired" />
+  <meta property="og:url" content="https://aired.sh/terms" />
+  <meta property="og:title" content="aired — terms of service" />
+  <meta property="og:description" content="The terms for using aired, in plain language." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://aired.sh/og.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+  <link rel="icon" href="/favicon-16.png" type="image/png" sizes="16x16" />
+  <link rel="preload" href="/fonts/inter-latin-v20.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/fonts/fonts.css" />
+  <link rel="stylesheet" href="/site.css" />
+  <style>
+    .legal { max-width: 44em; margin: 0 auto; padding: 48px 0 0; }
+    .legal h1 { margin-top: 8px; }
+    .legal .intro { color: var(--text-2); font-size: 16px; margin-top: 14px; }
+    .legal h2 { font-size: 20px; font-weight: 500; letter-spacing: -0.01em; margin-top: 44px; }
+    .legal p, .legal ul, .legal .tablewrap { margin-top: 12px; color: var(--text-2); }
+    .legal ul { padding-left: 20px; }
+    .legal li + li { margin-top: 6px; }
+    .legal strong { color: var(--text-1); font-weight: 600; }
+    .legal a { color: var(--text-1); text-decoration: underline; text-decoration-color: var(--border-2); text-underline-offset: 3px; }
+    .legal a:hover { text-decoration-color: var(--text-1); }
+    .legal code { font-family: var(--mono); font-size: 13px; color: var(--text-1); }
+    .draft { margin-bottom: 32px; border: 1px solid #5c4a12; background: #1c170a; border-radius: 10px; padding: 14px 16px; color: #f5d97a; font-size: 14px; }
+    .draft p { margin: 0; color: inherit; }
+    .draft p + p { margin-top: 4px; color: #c9b46a; }
+    mark.tbd { background: #2a2108; color: #fbbf24; border: 1px solid #5c4a12; border-radius: 4px; padding: 0 5px; font: 500 12.5px/1.8 var(--mono); }
+    .legal .attr { margin-top: 56px; font-size: 13px; color: var(--text-3); }
+  </style>
+</head>
+<body>
+<header><div class="wrap">
+  <a class="logo" href="/" aria-label="aired home"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>aired</a>
+  <nav aria-label="Main"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link">Guides</a></nav>
+  <div class="right"><a class="login" id="nav-auth" href="/auth/github?return=/dashboard">Log in</a><a class="start" href="/#publish">Start free</a></div>
+</div></header>
+
+<main class="wrap">
+  <article class="legal">
+    <div class="draft" role="note">
+      <p><strong>Draft for review. This page is not in effect yet.</strong></p>
+      <p>Last updated: November 25, 2026</p>
+    </div>
+
+    <p class="eyebrow">Legal</p>
+    <h1>Terms of service</h1>
+    <p class="intro">Thanks for using aired. These terms are the deal between you and us whenever you use aired.sh: from the web form, the CLI, the MCP server or the HTTP API, or just by opening a page someone sent you. We kept them short so you can actually read them.</p>
+
+    <p>"We" and "us" means M&amp;S CapitalSoft LLC, a Wyoming limited liability company, of 312 W 2nd St, Unit #A3467, Casper, Wyoming 82601, United States. "You" means the person using aired, or the company you use it for. If you use aired for a company, you confirm you're allowed to accept these terms for it.</p>
+
+    <h2>The short version</h2>
+    <ul>
+      <li>You own what you publish. We only host it and show it to people with the link.</li>
+      <li>Don't publish phishing, malware, spam or anything illegal. We take those pages down.</li>
+      <li>Pages published without an account expire unless you make them permanent.</li>
+      <li>Pro is a paid plan, sold to you through Link, Stripe's checkout. Cancel anytime. Full refund within 14 days.</li>
+      <li><strong>We never delete your pages because a subscription ended.</strong></li>
+      <li>People who open your links never need an account and never pay.</li>
+    </ul>
+
+    <h2>Who can use aired</h2>
+    <p>You must be at least 16 to publish on aired or create an account. To buy Pro, you must be an adult where you live, or have a parent or guardian buy it for you. Anyone can open a published page.</p>
+
+    <h2>Publishing without an account</h2>
+    <p>Anyone can publish a page without signing up. Here's how those pages work:</p>
+    <ul>
+      <li>A page expires after 7 days unless you pick another time (from 1 hour to 30 days) or make it permanent. Once it expires, the link stops working.</li>
+      <li>Anyone with the link can open the page, unless you set a PIN or a view limit.</li>
+      <li>We ask search engines not to index pages published without an account.</li>
+      <li>When you publish, you get an update token. It's the only key to edit or delete that page. Keep it safe. We store only a scrambled version of it, so we can't send it back to you.</li>
+      <li>Lost the token? Ask us to remove the page with the form on <a href="/abuse">/abuse</a>. We check the request first. <strong>We never move a page into someone else's account without its update token.</strong></li>
+    </ul>
+
+    <h2>Accounts</h2>
+    <p>You can sign in with GitHub to keep your pages in a dashboard and group them into projects. Pages you publish while signed in are permanent by default, and search engines can index them.</p>
+    <ul>
+      <li>You're responsible for everything published from your account. That includes publishes from your CLI session, your API keys and any agent you give them to.</li>
+      <li>Keep your sessions, tokens and keys secret. If you think someone else has them, sign out everywhere and tell us.</li>
+      <li>You can delete your account at any time from the dashboard. Pages you published stay up, with no owner and without your name, until they expire. You can't manage them from aired after that. Delete them first, or ask later through <a href="/abuse">/abuse</a>.</li>
+      <li>If you have Pro and it's set to renew, cancel it before you delete your account. We block the delete until you do, so you don't keep paying for an account that no longer exists.</li>
+    </ul>
+
+    <h2>Your content</h2>
+    <p><strong>What you publish is yours.</strong> We don't claim ownership of it, and we don't sell it. We don't use your pages to train AI models, and we don't sell or license them to anyone who does. Pages are open to anyone with the link, so we can't stop others from copying them.</p>
+    <p>To run aired, we need your permission to do a few things with it. By publishing, you give us a worldwide, non-exclusive, royalty-free license to store, copy, cache and serve your page to anyone who opens the link, to make a title and preview image for link previews, and to add the aired badge to pages on the Free plan. This license ends when your page is deleted or expires, apart from copies that sit in caches for a short time after.</p>
+    <p>You promise you have the right to publish what you publish. If your page uses someone else's text, images, code or trademarks, make sure you're allowed to.</p>
+    <p>If you open a page on aired, remember that a publisher made it, not us. We don't check pages before they go live. Be careful with pages from people you don't know. Never type a password for another service into a page hosted on aired.</p>
+
+    <h2>What you can't do</h2>
+    <p>aired is open to anyone, so a few people will try to misuse it. Don't use aired to:</p>
+    <ul>
+      <li>Phish, impersonate a person or brand, or trick people into giving up passwords, payment details or personal data.</li>
+      <li>Spread malware, scam downloads, or scripts that mine crypto or attack the browsers of people who open your page.</li>
+      <li>Send spam or build SEO link farms, doorway pages or redirect chains.</li>
+      <li>Publish anything illegal where you live or where we operate. That includes child sexual abuse material, which we report to the authorities.</li>
+      <li>Infringe someone's copyright, trademark or other rights.</li>
+      <li>Harass or threaten people, or publish someone's private information without their consent.</li>
+      <li>Attack, overload or probe aired or anyone else's systems, or get around our rate limits, size limits, PINs or view limits.</li>
+    </ul>
+    <p>If you see a page that breaks these rules, report it on <a href="/abuse">/abuse</a>. Copyright owners, see <a href="#copyright">copyright complaints</a> below.</p>
+
+    <h2>How we handle problems</h2>
+    <p>We review every report. When a page breaks these terms, we remove it. For serious abuse, like phishing or malware, we remove it right away and without notice, because every hour it stays up hurts someone. We also suspend accounts, revoke keys and block publishing from a source that keeps abusing aired. If we close a paid account for serious abuse, like phishing, malware or illegal content, we don't refund it. If we close it for any other reason, we refund the unused part.</p>
+    <p>When we remove a page or close an account, we tell you why if we have a way to reach you. If you think we got it wrong, reply to <a href="mailto:support@aired.sh">support@aired.sh</a> and a person will look again.</p>
+    <p>We share information about you with authorities only when the law requires it.</p>
+
+    <h2 id="copyright">Copyright complaints</h2>
+    <p>If you think a page copies your work, email our copyright agent at <a href="mailto:support@aired.sh">support@aired.sh</a>, or write to M&amp;S CapitalSoft LLC, 312 W 2nd St, Unit #A3467, Casper, Wyoming 82601. Include the page link, the work it copies, and your contact details. Also include a statement that you believe in good faith the use isn't allowed, and a statement, under penalty of perjury, that your notice is accurate and you own the work or can act for the owner. Sign it (a typed name is fine). We remove the page and tell the publisher if we can reach them. If you published the page and think we got it wrong, send us a counter-notice. We close accounts that keep infringing.</p>
+
+    <h2>Paid plans and billing</h2>
+    <p>Pro costs <strong>$108 a year</strong> (that's $9 a month) or <strong>$12 a month</strong>, in US dollars, plus tax where applicable. Here's how billing works:</p>
+    <ul>
+      <li><strong>Link is the seller.</strong> We sell Pro through Stripe Managed Payments, so Link, Stripe's checkout, is the merchant of record for your purchase: it takes the payment, charges any tax and sends your receipts. Your receipt and your card statement show Link, not aired. Link is a Stripe service. The Stripe company that sells to you depends on where you live, and it's named on your receipt. <a href="https://link.com/terms" target="_blank" rel="noopener">Link's terms</a> apply to the purchase.</li>
+      <li>We never see or store your card number.</li>
+      <li>Your plan renews automatically at the end of each month or year until you cancel. Link charges the card you gave it. For yearly plans, Link emails you a reminder before each renewal, with the price and how to cancel.</li>
+      <li>Taxes: prices are plus tax where applicable. Link adds sales tax, VAT or GST on top of the price at checkout where the law requires it, and may show the total in your local currency.</li>
+      <li>If a payment fails, Stripe tries again over the next few weeks and you keep Pro in the meantime. If every retry fails, your account goes back to Free.</li>
+      <li>If you dispute a payment with your bank, or Link or your bank flags a payment as possible fraud, Pro ends right away. Your pages stay up. If a payment is flagged as fraud, we refund it in full. If a fraud flag was a mistake, email <a href="mailto:support@aired.sh">support@aired.sh</a> and we'll sort it out.</li>
+      <li>Some Pro features are marked "Soon" on the <a href="/pricing">pricing page</a>. They aren't part of what you pay for today, and we don't promise a date. When they ship in Pro, you get them at no extra cost.</li>
+      <li>If we raise the price of Pro, you keep your current price as long as your subscription stays active on the same billing period. If you cancel, or switch between monthly and yearly, the current price applies.</li>
+    </ul>
+
+    <h2>Cancelling</h2>
+    <p>Cancel anytime from <strong>Manage billing</strong> in your dashboard. That opens Stripe's billing page, where you can also switch between monthly and yearly, change your card and download invoices.</p>
+    <p>When you cancel, you keep Pro until the end of the period you already paid for. After that:</p>
+    <ul>
+      <li>Your pages stay up, at the same links.</li>
+      <li>The aired badge comes back on your pages.</li>
+      <li>New publishes follow the Free limits.</li>
+    </ul>
+    <p>Changed your mind soon after paying? You get a full refund within 14 days, and any cooling-off rights you have under the law where you live still apply. See the <a href="/refunds">refund policy</a>.</p>
+
+    <h2>The service itself</h2>
+    <p>We work hard to keep aired fast and online, but we can't promise it will never go down. We change and improve aired over time. If a change takes away something you pay for, we'll tell you first, and you can cancel and get the unused part back.</p>
+    <p>aired isn't a backup. Pages that expire are gone, so keep your own copy of anything that matters.</p>
+    <p>The aired code is open source under the MIT license. These terms cover the service we run at aired.sh. If you host your own copy, you run that service and these terms don't apply to it.</p>
+
+    <h2>Liability</h2>
+    <p>We provide aired "as is", without warranties of any kind, to the extent the law allows. <strong>We aren't liable for indirect or consequential losses</strong>, like lost profits, lost data or lost business, that come from using aired or not being able to use it. <strong>Our total liability to you for all claims about aired is limited to the greater of what you paid for Pro in the 12 months before the claim, or $50.</strong> This doesn't limit our liability for fraud, for gross negligence, or for death or personal injury we cause by negligence, or anything else the law doesn't let us limit. If someone makes a claim against us because of a page you published or because you broke these terms, you cover our reasonable costs of dealing with it. Nothing here limits rights you have under consumer law that can't be waived.</p>
+
+    <h2>Governing law</h2>
+    <p>These terms are governed by the laws of the State of Wyoming, United States, without regard to its conflict-of-law rules. Before you file a claim, email <a href="mailto:support@aired.sh">support@aired.sh</a> and give us 30 days to fix it. Any dispute goes to the state courts in Natrona County, Wyoming, or the federal court for the District of Wyoming. If you're a consumer in the EU or UK, you also keep the protections of the law where you live, and you can bring a claim in your local courts.</p>
+
+    <h2>Changes to these terms</h2>
+    <p>When we change these terms, we update this page and the date at the top. The full history lives in the <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">public repository</a>. For changes that affect your rights or what you pay, we show a notice in your dashboard and update this page at least 30 days before they take effect. If you have Pro, we also email you. If you keep using aired after that, the new terms apply. If you don't agree, cancel before the change takes effect and we'll refund the unused part of a yearly plan.</p>
+
+    <h2>Contact</h2>
+    <p>Questions about these terms? Email <a href="mailto:support@aired.sh">support@aired.sh</a>. Questions about a payment or receipt can also go to Link support. To report a page, use <a href="/abuse">/abuse</a>. See also our <a href="/privacy">privacy policy</a> and <a href="/refunds">refund policy</a>.</p>
+
+    <p class="attr">Adapted from <a href="https://github.com/basecamp/policies" target="_blank" rel="noopener">Basecamp's open-source policies</a>, available under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. This is a draft written for review by a qualified lawyer, not legal advice.</p>
+  </article>
+</main>
+
+<footer><div class="wrap">
+  <span>aired</span>
+  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
+</div></footer>
+<script src="/app.js"></script>
+</body>
+</html>

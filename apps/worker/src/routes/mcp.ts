@@ -5,6 +5,7 @@ import type { Context } from "hono";
 import type { AppBindings } from "../types.js";
 import { loadStats, saveStats } from "../lib/stats.js";
 import { detectSpam, SPAM_REJECTION } from "../lib/spam.js";
+import { claimUrl } from "../lib/claim-url.js";
 import {
   generateId,
   generateToken,
@@ -17,10 +18,15 @@ import {
   DEFAULT_TTL,
 } from "@aired/core";
 import type { PageMetadata } from "@aired/core";
+import { authoritativeCredentials } from "../lib/claim-decision.js";
+import { getClaim } from "../lib/page-claims.js";
+import { hashPin } from "../lib/pin-hash.js";
 
 function createAiredMcpServer(env: {
   PAGES_BUCKET: R2Bucket;
   PAGES_KV: KVNamespace;
+  DB: D1Database;
+  SITE_ORIGIN?: string;
 }) {
   const server = new McpServer({
     name: "aired",
@@ -95,7 +101,25 @@ function createAiredMcpServer(env: {
           };
         }
 
-        const valid = await verifyToken(update_token, metadata.tokenHash);
+        // A claimed page's D1 row wins over its KV record, which can be
+        // written back stale. Fail closed if D1 can't be read.
+        let tokenHash: string;
+        try {
+          tokenHash = (
+            await authoritativeCredentials(
+              () => getClaim(env.DB, existingId),
+              metadata.ownerId,
+              metadata.tokenHash,
+            )
+          ).tokenHash;
+        } catch (err) {
+          console.error("page_claims lookup failed on MCP update", { id: existingId, err });
+          return {
+            content: [{ type: "text" as const, text: "Could not check this page's credentials. Please try again." }],
+            isError: true,
+          };
+        }
+        const valid = await verifyToken(update_token, tokenHash);
         if (!valid) {
           return {
             content: [{ type: "text" as const, text: "Invalid update token" }],
@@ -153,7 +177,8 @@ function createAiredMcpServer(env: {
         title: resolvedTitle,
         size: new TextEncoder().encode(html).byteLength,
         tokenHash,
-        pin: typeof pin === "string" && pin.length > 0 ? pin : null,
+        // Stored as a salted PBKDF2 hash (lib/pin-hash.ts), never as typed.
+        pin: typeof pin === "string" && pin.length > 0 ? await hashPin(pin) : null,
         reads: null,
         readCount: 0,
         permanent: isPermanent,
@@ -195,6 +220,7 @@ function createAiredMcpServer(env: {
           : "Expires: never (permanent)",
         "",
         "Pass update_token and id to update the same URL.",
+        `To keep this page in an aired account, open: ${claimUrl(env.SITE_ORIGIN, pageId, token)}`,
       ];
 
       return {

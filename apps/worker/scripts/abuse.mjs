@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Review abuse reports and take pages down.
 //
-//   node scripts/abuse.mjs list              reports grouped by page, newest first
+//   node scripts/abuse.mjs list              reports grouped by page; owner removal requests first
 //   node scripts/abuse.mjs takedown <id>     delete the page and its reports
 //   node scripts/abuse.mjs dismiss <id>      keep the page, clear its reports
 //
@@ -68,20 +68,25 @@ function list() {
     if (!byPage.has(pageId)) byPage.set(pageId, []);
     byPage.get(pageId).push(report);
   }
+  // Owner removal requests ("I lost my update token") come first, then the most reported.
+  const isOwnerRemoval = (reports) => reports.some((r) => r.category === "owner_removal");
   const pages = [...byPage.entries()].sort(
-    (a, b) => b[1].length - a[1].length,
+    (a, b) => Number(isOwnerRemoval(b[1])) - Number(isOwnerRemoval(a[1])) || b[1].length - a[1].length,
   );
   for (const [pageId, reports] of pages) {
     const meta = parseJson(getValue(`page:${pageId}`));
     const owner = meta === null ? "already gone" : meta.ownerId === null ? "anonymous" : `owner ${meta.ownerId}`;
-    console.log(`\n${pageId}  ${reports.length} report${reports.length === 1 ? "" : "s"}  (${owner})`);
+    const flag = isOwnerRemoval(reports) ? "OWNER REMOVAL REQUEST  " : "";
+    console.log(`\n${flag}${pageId}  ${reports.length} report${reports.length === 1 ? "" : "s"}  (${owner})`);
     if (meta) console.log(`  ${meta.title ?? "(untitled)"}  https://aired.sh/p/${pageId}  views: ${meta.readCount}`);
     for (const r of reports) {
       const contact = r.contact ? `  contact: ${r.contact}` : "";
-      console.log(`  - ${r.reportedAt?.slice(0, 16) ?? "?"}  [${r.category ?? "other"}] ${r.reason}${contact}`);
+      const label = r.category === "owner_removal" ? "owner_removal: publisher lost the update token" : (r.category ?? "other");
+      console.log(`  - ${r.reportedAt?.slice(0, 16) ?? "?"}  [${label}] ${r.reason}${contact}`);
     }
   }
   console.log(`\n${pages.length} page(s). takedown <id> removes a page, dismiss <id> clears its reports.`);
+  console.log("Owner removal requests: confirm the page matches what they describe, then takedown. Never hand a page to another account without its update token.");
 }
 
 function clearReports(pageId) {

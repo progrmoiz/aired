@@ -14,6 +14,15 @@ export interface PublishOptions {
   id?: string
 }
 
+/** Offer the server attaches to a publish/update response for free-plan accounts. */
+export interface UpgradeHint {
+  reason: string
+  url: string
+}
+
+/** `claim_url` comes back on anonymous creates only: open it signed in to keep the page. */
+export type PublishResponse = PublishResult & { upgrade?: UpgradeHint; claim_url?: string }
+
 export interface MeResult {
   id: number
   login: string
@@ -25,7 +34,15 @@ export interface MeResult {
 
 export interface ClaimResult {
   ok: boolean
-  id: string
+  /** The page's new update token. Claiming retires the token that was sent. */
+  update_token?: string
+}
+
+export interface ClaimBatchResult {
+  claimed: string[]
+  failed: Array<{ id: string; reason: string }>
+  /** New update token per claimed id (absent from servers before rotation). */
+  tokens?: Record<string, string>
 }
 
 export interface PageListResult {
@@ -77,7 +94,7 @@ export async function publishHTML(
   html: string,
   options: PublishOptions = {},
   jwt?: string,
-): Promise<PublishResult> {
+): Promise<PublishResponse> {
   const body: Record<string, unknown> = { html }
 
   if (options.title !== undefined) body['title'] = options.title
@@ -105,7 +122,7 @@ export async function publishHTML(
     body: JSON.stringify(body),
   })
 
-  return handleResponse<PublishResult>(resp, 'Publish')
+  return handleResponse<PublishResponse>(resp, 'Publish')
 }
 
 export async function updatePage(
@@ -261,7 +278,7 @@ export async function claimBatch(
   baseUrl: string,
   jwt: string,
   items: Array<{ id: string; update_token: string }>,
-): Promise<{ claimed: string[]; failed: string[] }> {
+): Promise<ClaimBatchResult> {
   const resp = await fetch(`${baseUrl}/api/me/claim-batch`, {
     method: 'POST',
     headers: {
@@ -272,7 +289,7 @@ export async function claimBatch(
     },
     body: JSON.stringify({ items }),
   })
-  return handleResponse<{ claimed: string[]; failed: string[] }>(resp, 'Claim batch')
+  return handleResponse<ClaimBatchResult>(resp, 'Claim batch')
 }
 
 export async function listMyPages(

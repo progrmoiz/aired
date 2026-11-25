@@ -35,6 +35,32 @@ test("parseReport validates category, reason and contact", () => {
   assert.equal(r.report.contact, "me@example.com");
 });
 
+test("parseReport accepts the owner_removal category and keeps the details", () => {
+  const r = parseReport({
+    id: "https://aired.sh/p/abc123XYZ0",
+    category: "owner_removal",
+    reason: "I published this and lost the link",
+    contact: "me@example.com",
+  });
+  assert.deepEqual(r, {
+    ok: true,
+    report: {
+      pageId: "abc123XYZ0",
+      category: "owner_removal",
+      reason: "I published this and lost the link",
+      contact: "me@example.com",
+    },
+  });
+});
+
+test("parseReport stays strict about categories after adding owner_removal", () => {
+  assert.equal(parseReport({ id: "abc123XYZ0", category: "owner-removal", reason: "x" }).ok, false);
+  assert.equal(parseReport({ id: "abc123XYZ0", category: "OWNER_REMOVAL", reason: "x" }).ok, false);
+  assert.equal(parseReport({ id: "abc123XYZ0", category: "owner_removal", reason: "  " }).ok, false);
+  assert.equal(parseReport({ id: "abc123XYZ0", category: "takedown", reason: "x" }).ok, false);
+  assert.equal(parseReport({ id: "abc123XYZ0", category: 7, reason: "x" }).ok, false);
+});
+
 test("only MCP tool calls count toward the publish limit", () => {
   assert.equal(isMcpToolCall({ jsonrpc: "2.0", id: 1, method: "tools/call", params: {} }), true);
   assert.equal(isMcpToolCall([{ method: "notifications/initialized" }, { method: "tools/call" }]), true);

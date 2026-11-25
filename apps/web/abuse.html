@@ -9,11 +9,8 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/style.css" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
-  <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" /></noscript>
+  <link rel="preload" href="/fonts/inter-latin-v20.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/fonts/fonts.css" />
   <style>
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -66,8 +63,13 @@
           <option value="malware">Malware or a scam download</option>
           <option value="illegal">Illegal content</option>
           <option value="other">Something else</option>
+          <option value="owner_removal">I published this and lost the link to manage it</option>
         </select>
       </label>
+
+      <p id="owner-note" class="hidden text-sm text-aired-text-secondary border border-aired-border rounded-lg px-3 py-2.5" role="note">
+        We remove pages on request after a quick check. We never move a page to someone else's account without its update token.
+      </p>
 
       <label class="flex flex-col gap-1.5">
         <span class="text-sm font-medium">Details</span>
@@ -103,7 +105,12 @@
     </nav>
     <div class="flex flex-col sm:flex-row items-center justify-between gap-2 text-2xs text-aired-text-tertiary">
       <p>Built by <a href="https://x.com/iammoizfarooq" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">@iammoizfarooq</a></p>
-      <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">GitHub</a>
+      <div class="flex items-center gap-4">
+        <a href="/terms" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Terms</a>
+        <a href="/privacy" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Privacy</a>
+        <a href="/refunds" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Refunds</a>
+        <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">GitHub</a>
+      </div>
     </div>
   </footer>
 
@@ -113,6 +120,20 @@
       var page = document.getElementById('page');
       var status = document.getElementById('status');
       var submit = document.getElementById('submit');
+
+      var category = document.getElementById('category');
+      var ownerNote = document.getElementById('owner-note');
+      var reasonBox = document.getElementById('reason');
+      var defaultPlaceholder = reasonBox.placeholder;
+      function syncCategory() {
+        var owner = category.value === 'owner_removal';
+        ownerNote.classList.toggle('hidden', !owner);
+        reasonBox.placeholder = owner
+          ? 'What is the page, and when did you publish it? Add your email below so we can reply.'
+          : defaultPlaceholder;
+      }
+      category.addEventListener('change', syncCategory);
+      syncCategory();
 
       var preset = new URLSearchParams(location.search).get('id');
       if (preset) page.value = 'https://aired.sh/p/' + preset;
@@ -139,6 +160,7 @@
           return res.json().catch(function () { return {}; }).then(function (data) {
             if (res.ok) {
               form.reset();
+              syncCategory();
               status.textContent = 'Thanks. We got your report and will review it.';
             } else {
               status.textContent = data.error || 'Could not send the report. Try again.';

@@ -23,6 +23,7 @@
   const resultToken = document.getElementById("result-token");
   const copyTokenBtn = document.getElementById("copy-token-btn");
   const resultExpiry = document.getElementById("result-expiry");
+  const savedRow = document.getElementById("result-saved");
   const newBtn = document.getElementById("new-btn");
   const pasteArea = document.querySelector(".paste-area");
   const dragHint = document.querySelector(".drag-hint");
@@ -151,6 +152,7 @@
       currentUrl = data.url;
       currentToken = data.update_token || "";
       showResult(data);
+      rememberPublish(data, html);
     } catch (err) {
       showError(err.message || "Network error. Please try again.");
     } finally {
@@ -161,6 +163,7 @@
   // ── Result display ──
   function showResult(data) {
     // Populate
+    if (savedRow) savedRow.classList.add("hidden");
     resultUrl.href = data.url;
     resultUrl.textContent = data.url;
     resultToken.textContent = data.update_token || "";
@@ -184,6 +187,56 @@
 
     // Scroll to result
     resultCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  // ── Keep the update token in this browser for signed-out publishers ──
+  var PAGES_KEY = "aired.pages";
+  var PAGES_CAP = 200;
+
+  function pageIdFrom(data) {
+    if (data && typeof data.id === "string" && data.id) return data.id;
+    try {
+      var m = new URL(data.url, location.href).pathname.match(/^\/p\/([^/]+)\/?$/);
+      return m ? decodeURIComponent(m[1]) : "";
+    } catch (e) { return ""; }
+  }
+
+  function pageTitleFrom(html) {
+    var m = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html || "");
+    return m ? m[1].replace(/\s+/g, " ").trim().slice(0, 120) : "";
+  }
+
+  function isSignedIn() {
+    return fetch("/api/me", { credentials: "same-origin" })
+      .then(function (res) { return res.status === 200; })
+      .catch(function () { return false; });
+  }
+
+  function rememberPublish(data, html) {
+    var id = pageIdFrom(data);
+    var token = data.update_token || "";
+    isSignedIn().then(function (signedIn) {
+      // Signed-in publishers' pages are already owned; nothing to keep.
+      if (signedIn || !savedRow) return;
+      if (!id || !token) return;
+      try {
+        var list = [];
+        try {
+          var parsed = JSON.parse(localStorage.getItem(PAGES_KEY) || "[]");
+          if (Array.isArray(parsed)) list = parsed;
+        } catch (e) { list = []; }
+        list = list.filter(function (p) { return p && p.id !== id; });
+        list.unshift({
+          id: id,
+          token: token,
+          title: pageTitleFrom(html),
+          url: data.url,
+          createdAt: new Date().toISOString(),
+        });
+        localStorage.setItem(PAGES_KEY, JSON.stringify(list.slice(0, PAGES_CAP)));
+        savedRow.classList.remove("hidden");
+      } catch (e) { /* private mode or quota: publishing already succeeded */ }
+    });
   }
 
   function hideResult() {
@@ -463,9 +516,12 @@
 
     // ── Yearly / monthly price toggle (homepage plans and /pricing) ──
     var billBtns = document.querySelectorAll("[data-bill]");
+    var billMode = "y";
     billBtns.forEach(function (b) {
       b.addEventListener("click", function () {
         var mode = b.getAttribute("data-bill");
+        billMode = mode;
+        syncProLink();
         billBtns.forEach(function (x) {
           x.classList.toggle("on", x === b);
           x.setAttribute("aria-pressed", String(x === b));
@@ -475,6 +531,36 @@
         });
       });
     });
+
+    // ── Pro button: "Coming soon" until billing is on ──
+    // The static HTML says "Coming soon"; this only upgrades it when the server says billing is live.
+    var proGo = document.querySelector("[data-pro-go]");
+    var proPlan = null; // "pro" once we know the visitor already has Pro
+    function syncProLink() {
+      if (!proGo || proGo.tagName !== "A" || proPlan === "pro") return;
+      proGo.href = "/upgrade?interval=" + (billMode === "m" ? "month" : "year");
+    }
+    if (proGo) {
+      fetch("/api/billing/status", { credentials: "same-origin" })
+        .then(function (res) { return res.ok ? res.json() : null; })
+        .then(function (status) {
+          if (!status || status.enabled !== true) return;
+          var a = document.createElement("a");
+          a.className = proGo.className.replace(/\bsoon\b/, "").trim();
+          a.setAttribute("data-pro-go", "");
+          if (status.plan === "pro") {
+            proPlan = "pro";
+            a.href = "/dashboard";
+            a.textContent = "Manage in dashboard";
+          } else {
+            a.textContent = "Get Pro";
+          }
+          proGo.replaceWith(a);
+          proGo = a;
+          syncProLink();
+        })
+        .catch(function () {}); // keep "Coming soon"
+    }
 
     // ── Animated beam: curved path from each node to the hub ──
     var box = document.getElementById("beam");

@@ -17,9 +17,8 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
   <link rel="icon" href="/favicon-16.png" type="image/png" sizes="16x16" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="preload" href="/fonts/inter-latin-v20.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/fonts/fonts.css" />
   <link rel="stylesheet" href="/site.css" />
 </head>
 <body>
@@ -34,21 +33,21 @@
     <div>
       <p class="eyebrow">Pricing</p>
       <h1>Free to share. Pay for your name on it.</h1>
-      <p>Publishing and viewing are free, with no cap on views. Paid plans add your own domain, open tracking and team features. They open soon.</p>
+      <p>Publishing and viewing are free, with no cap on views. Pro removes the badge, takes bigger pages and adds your own domain and view analytics. Team and Business open later.</p>
     </div>
     <div class="billing"><div role="group" aria-label="Billing period"><button type="button" class="on" aria-pressed="true" data-bill="y">Yearly <small>−25%</small></button><button type="button" aria-pressed="false" data-bill="m">Monthly</button></div></div>
   </section>
     <div class="plans">
       <div class="plan"><h3>Free</h3><p>A quick share, or a place to keep your links.</p><div class="price">$0</div><p class="per">No account needed to start</p><a class="go" href="/#publish">Publish a page</a>
-        <ul><li class="lead">Works today</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Unlimited views</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Password on any page</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Links from 1 hour to never</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Projects and a dashboard with GitHub sign-in</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>CLI, MCP and HTTP API</span></li></ul></div>
-      <div class="plan pro"><h3>Pro <span>For client work</span></h3><p>One person sending work to clients.</p><div class="price"><span data-y="$9" data-m="$12">$9</span> <small>/ month</small></div><p class="per" data-y="Billed yearly, $108" data-m="Billed monthly">Billed yearly, $108</p><span class="go soon">Coming soon</span>
-        <ul><li class="lead">Everything in Free, plus</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Your own domain</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>No aired badge, or your logo</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Who opened it, and when</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Bigger pages, up to 10 MB</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>API key for CI and agents</span></li></ul></div>
+        <ul><li class="lead">Works today</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Unlimited views</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Password on any page</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Links from 1 hour to never</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Projects and a dashboard with GitHub sign-in</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>CLI, MCP and HTTP API</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>API keys for agents and CI</span></li></ul></div>
+      <div class="plan pro"><h3>Pro <span>For client work</span></h3><p>Send work under your own name.</p><div class="price"><span data-y="$9" data-m="$12">$9</span> <small>/ month</small></div><p class="per"><span data-y="Billed yearly, $108" data-m="Billed monthly">Billed yearly, $108</span><br>Plus tax where applicable</p><span class="go soon" data-pro-go>Coming soon</span><p class="renew">Renews automatically until you cancel. Cancel anytime in Manage billing.</p>
+        <ul><li class="lead">Everything in Free, plus</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>No aired badge on your pages</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Pages up to 10 MB</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>500 publishes a day</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Views over time, countries and referrers <span class="pro-tag">Soon</span></span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Your own domain, like share.yourco.com <span class="pro-tag">Soon</span></span></li></ul></div>
       <div class="plan"><h3>Team</h3><p>A team that publishes together.</p><div class="price"><span data-y="$12" data-m="$15">$12</span> <small>/ editor / mo</small></div><p class="per">Min 2 editors · guests free</p><span class="go soon">Coming soon</span>
         <ul><li class="lead">Everything in Pro, plus</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Shared workspace and folders</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Owner, admin and editor roles</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Comments and version history</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>5 custom domains</span></li></ul></div>
       <div class="plan"><h3>Business</h3><p>An organization whose IT has rules.</p><div class="price"><span data-y="$20" data-m="$25">$20</span> <small>/ editor / mo</small></div><p class="per">Min 3 editors</p><span class="go soon">Coming soon</span>
         <ul><li class="lead">Everything in Team, plus</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>SSO: SAML, Okta, Google</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Sharing policies</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Audit log and export</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Unlimited custom domains</span></li></ul></div>
     </div>
-  <p class="viewers">People you send links to never pay. Prices in USD.</p>
+  <p class="viewers">People you send links to never pay. Cancel anytime. <a href="/refunds">14-day refund</a>. Prices in USD; tax added at checkout where it applies. <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></p>
 
   <section class="sec pg-compare">
     <h2>Compare plans</h2>
@@ -61,19 +60,19 @@
         <tr><td>How long pages last</td><td>1 hour to never</td><td>Never expire</td><td>Never expire</td><td>Never expire, or your retention policy</td></tr>
         <tr><td>Views</td><td>Unlimited</td><td>Unlimited</td><td>Unlimited</td><td>Unlimited</td></tr>
         <tr class="group"><td colspan="5">Sharing</td></tr>
-        <tr><td>Link and password</td><td>Yes</td><td>Plus view-limited links</td><td>Same as Pro</td><td>Within admin policy</td></tr>
-        <tr><td>Hidden from search</td><td>Pages published without an account</td><td>Your choice per page</td><td>Your choice per page</td><td>Set by admin</td></tr>
+        <tr><td>Link and password</td><td>Yes</td><td>Same as Free</td><td>Same as Pro</td><td>Within admin policy</td></tr>
+        <tr><td>Hidden from search</td><td>Pages published without an account</td><td class="no">—</td><td>Your choice per page</td><td>Set by admin</td></tr>
         <tr class="group"><td colspan="5">Your brand</td></tr>
-        <tr><td>aired badge</td><td>Shown</td><td>Off, or your logo</td><td>Off</td><td>Off</td></tr>
-        <tr><td>Custom domains</td><td class="no">—</td><td>1</td><td>5</td><td>Unlimited</td></tr>
+        <tr><td>aired badge</td><td>Shown</td><td>Off</td><td>Off</td><td>Off</td></tr>
+        <tr><td>Custom domains</td><td class="no">—</td><td>1 (soon)</td><td>5</td><td>Unlimited</td></tr>
         <tr class="group"><td colspan="5">Analytics</td></tr>
-        <tr><td>What you see</td><td>View count</td><td>Opens over time, countries, devices</td><td>Same, per folder</td><td>Same, plus export</td></tr>
+        <tr><td>What you see</td><td>View count</td><td>Views over time, countries, referrers (soon)</td><td>Same, per folder</td><td>Same, plus export</td></tr>
         <tr class="group"><td colspan="5">Team and admin</td></tr>
         <tr><td>Workspace</td><td>Personal, with projects</td><td>Personal</td><td>Shared, with folders</td><td>Several, under one organization</td></tr>
         <tr><td>Roles</td><td class="no">—</td><td class="no">—</td><td>Owner, admin, editor; guests free</td><td>Plus groups and custom roles</td></tr>
         <tr><td>SSO, policies, audit log</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td>Yes</td></tr>
         <tr class="group"><td colspan="5">Developers</td></tr>
-        <tr><td>API</td><td>Anonymous HTTP API, CLI, MCP</td><td>API key for CI and agents</td><td>Keys per member</td><td>Scoped service keys</td></tr>
+        <tr><td>API</td><td>HTTP API, CLI, MCP and API keys</td><td>Higher limits</td><td>Keys per member</td><td>Scoped service keys</td></tr>
         <tr><td>Self-host</td><td>MIT licence, free</td><td></td><td></td><td>Paid support on request</td></tr>
         </tbody>
       </table>
@@ -85,8 +84,11 @@
       <a class="ask" href="/docs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h12a4 4 0 0 1 4 4v12H8a4 4 0 0 1-4-4z"/><path d="M8 9h8M8 13h6"/></svg>Read the docs</a></div>
     <div class="acc">
       <details open><summary>Do the people I share with need to pay or sign up?<i></i></summary><p>No. People you send a link to never pay and never need an aired account.</p></details>
-      <details><summary>When do Pro, Team and Business open?<i></i></summary><p>They're being built now. Free works today and stays free; publishing and viewing will never need a paid plan.</p></details>
+      <details><summary>When do the paid plans open?<i></i></summary><p>Pro opens first; the button above turns on when it does. Team and Business are being built now. Free works today and stays free; publishing and viewing will never need a paid plan.</p></details>
       <details><summary>Will the prices change?<i></i></summary><p>These are the planned prices. If they change before launch, this page changes first.</p></details>
+      <details><summary>What happens if I cancel?<i></i></summary><p>You keep Pro until the end of the period you paid for. After that your pages stay up, the badge comes back, and your own domain points back to aired.sh links.</p></details>
+      <details><summary>Can I get a refund?<i></i></summary><p>Yes, a full refund within 14 days of paying. See the <a href="/refunds">refund policy</a>.</p></details>
+      <details><summary>Do my agents need Pro?<i></i></summary><p>No. Agents can publish with a free API key. Pro raises the limits and removes the badge.</p></details>
       <details><summary>Can I host aired myself?<i></i></summary><p>Yes. The code is open source under the MIT licence.</p></details>
     </div>
   </section>
@@ -94,7 +96,7 @@
 
 <footer><div class="wrap">
   <span>aired</span>
-  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
+  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
 </div></footer>
 <script src="/app.js"></script>
 </body>

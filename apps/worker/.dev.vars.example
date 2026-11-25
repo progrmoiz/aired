@@ -5,3 +5,20 @@ GITHUB_CLIENT_ID=your_dev_client_id
 GITHUB_CLIENT_SECRET=your_dev_client_secret
 SESSION_SECRET=generate_with_openssl_rand_base64_32
 SESSION_VALID_SINCE=1970-01-01T00:00:00Z
+
+# Billing (Stripe test mode only in dev). Leave BILLING_ENABLED empty to keep billing off; "1" turns it on.
+BILLING_ENABLED=
+STRIPE_SECRET_KEY=rk_test_your_restricted_key
+STRIPE_WEBHOOK_SECRET=whsec_from_stripe_listen
+STRIPE_PRICE_MONTHLY=price_monthly_test_id
+STRIPE_PRICE_YEARLY=price_yearly_test_id
+# Optional: older Pro price ids that still grant Pro, comma-separated.
+# STRIPE_LEGACY_PRICE_IDS=price_old_monthly,price_old_yearly
+# "1" turns on Stripe automatic tax in checkout; empty = off.
+STRIPE_AUTOMATIC_TAX=
+# "1" turns on Stripe Managed Payments (merchant of record; handles tax). Not with STRIPE_AUTOMATIC_TAX.
+# STRIPE_MANAGED_PAYMENTS=1
+# Optional: point at a local Stripe mock. Default https://api.stripe.com.
+# STRIPE_API_BASE=http://localhost:12111
+# Optional, local dev only: where Stripe sends the user back. Default https://aired.sh.
+# SITE_ORIGIN=http://localhost:8787

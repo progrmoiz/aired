@@ -503,6 +503,535 @@
     });
   }
 
+  // ── Plan strip (shown only when billing is on) ──
+  // Free → "Get Pro" (yearly checkout); Pro → renewal date + "Manage billing".
+  // Plan state comes from /api/billing/status; only the webhook changes it.
+  var PRIMARY_BTN_CLASS = 'plan-btn plan-btn-primary flex-shrink-0 rounded px-3 py-2 text-sm font-medium bg-aired-text-primary text-aired-bg focus-ring';
+  var SECONDARY_BTN_CLASS = 'plan-btn flex-shrink-0 rounded px-3 py-2 text-sm border border-aired-border bg-aired-bg text-aired-text-secondary hover:text-aired-text-primary hover:border-aired-border-focus hover:bg-aired-surface-hover active:bg-aired-border focus-ring';
+  var UPGRADE_POLL_MS = 2000;
+  var UPGRADE_POLL_LIMIT_MS = 30000;
+
+  var plan = {
+    mode: null,      // 'checkout' | 'portal' | null (no button)
+    state: 'idle',   // idle | pending | error
+  };
+
+  var PLAN_ACTIONS = {
+    checkout: {
+      label: 'Get Pro',
+      pending: 'Opening checkout…',
+      error: 'Could not open checkout. Try again.',
+    },
+    portal: {
+      label: 'Manage billing',
+      pending: 'Opening billing…',
+      error: 'Could not open billing. Try again.',
+    },
+  };
+
+  function formatDate(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  function setText(id, text) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text || '';
+    if (text) el.classList.remove('hidden');
+    else el.classList.add('hidden');
+  }
+
+  function setPlanButton() {
+    var btn = document.getElementById('plan-action');
+    if (!btn) return;
+    // Auto-renewal notice next to the buy button only.
+    var renew = document.getElementById('plan-renew');
+    if (renew) renew.classList.toggle('hidden', plan.mode !== 'checkout');
+    if (!plan.mode) {
+      btn.className = 'hidden';
+      btn.disabled = false;
+      btn.removeAttribute('aria-busy');
+      return;
+    }
+    var action = PLAN_ACTIONS[plan.mode];
+    btn.className = plan.mode === 'checkout' ? PRIMARY_BTN_CLASS : SECONDARY_BTN_CLASS;
+    btn.disabled = plan.state === 'pending';
+    if (plan.state === 'pending') {
+      btn.setAttribute('aria-busy', 'true');
+      btn.textContent = action.pending;
+    } else {
+      btn.removeAttribute('aria-busy');
+      btn.textContent = plan.state === 'error' ? 'Try again' : action.label;
+    }
+  }
+
+  function setPlanState(next, errorText) {
+    plan.state = next;
+    setText('plan-error', next === 'error' ? errorText : '');
+    setPlanButton();
+  }
+
+  // status: the /api/billing/status body. detail overrides the helper line.
+  function renderPlan(status, detail) {
+    var strip = document.getElementById('plan-strip');
+    if (!strip) return;
+    if (!status || !status.enabled) {
+      strip.classList.add('hidden');
+      return;
+    }
+
+    var label;
+    var helper = '';
+    if (status.plan === 'pro') {
+      var date = formatDate(status.renewsAt);
+      label = 'Pro';
+      if (date) label += status.cancelAtPeriodEnd ? ' · ends ' + date : ' · renews ' + date;
+      if (status.status === 'past_due') helper = 'Last payment failed. Update your card in billing';
+      plan.mode = 'portal';
+    } else if (status.status === 'past_due' || status.status === 'unpaid') {
+      // Pro lapsed because a payment failed: the fix is the card, not a new checkout.
+      label = 'Free';
+      helper = 'Your last payment failed. Update your card to get Pro back.';
+      plan.mode = 'portal';
+    } else {
+      label = 'Free';
+      helper = 'Pro: no aired badge, 10 MB pages, $108/year';
+      plan.mode = 'checkout';
+    }
+
+    setText('plan-label', label);
+    setText('plan-detail', detail !== undefined ? detail : helper);
+    setPlanState('idle');
+    strip.classList.remove('hidden');
+  }
+
+  // A message-only strip (no button), used while confirming an upgrade.
+  function renderPlanMessage(label, detail) {
+    var strip = document.getElementById('plan-strip');
+    if (!strip) return;
+    plan.mode = null;
+    setText('plan-label', label);
+    setText('plan-detail', detail);
+    setPlanState('idle');
+    strip.classList.remove('hidden');
+  }
+
+  // Stripe's return URL carries ?upgraded=1. Drop it once handled so a reload
+  // doesn't poll again.
+  function clearUpgradedParam() {
+    var params = new URLSearchParams(window.location.search);
+    if (!params.has('upgraded')) return;
+    params.delete('upgraded');
+    var qs = params.toString();
+    try {
+      window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+    } catch (_e) {}
+  }
+
+  function isNavigableUrl(url) {
+    if (typeof url !== 'string') return false;
+    try {
+      var u = new URL(url);
+      return u.protocol === 'https:' || u.protocol === 'http:';
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function loadPlanStatus() {
+    return fetchJson('/api/billing/status');
+  }
+
+  function runPlanAction() {
+    var mode = plan.mode;
+    if (!mode || plan.state === 'pending') return;
+    var action = PLAN_ACTIONS[mode];
+    setPlanState('pending');
+    announce(action.pending);
+
+    var init = {
+      method: 'POST',
+      headers: { 'X-Aired-Request': '1' },
+      credentials: 'same-origin',
+    };
+    if (mode === 'checkout') {
+      init.headers['Content-Type'] = 'application/json';
+      init.body = JSON.stringify({ interval: 'year' });
+    }
+
+    fetch('/api/billing/' + mode, init).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (res.ok && data && isNavigableUrl(data.url)) {
+          // Stay pending while the browser leaves for Stripe.
+          window.location.assign(data.url);
+          return;
+        }
+        if (res.status === 401) {
+          window.location.href = '/auth/github?return=/dashboard';
+          return;
+        }
+        if (mode === 'checkout' && res.status === 409) {
+          // Checkout was refused because a subscription already exists. Show the
+          // real state rather than an error; only claim Pro when it is Pro.
+          var message = (data && typeof data.error === 'string') ? data.error : '';
+          return loadPlanStatus().then(function (status) {
+            if (data && data.code === 'payment_failed') {
+              renderPlan(status, message);
+              if (plan.mode !== 'portal') { plan.mode = 'portal'; setPlanButton(); }
+              announce(message);
+            } else if (status && status.plan === 'pro') {
+              renderPlan(status);
+              announce("You're on Pro");
+            } else {
+              renderPlan(status, message);
+              announce(message);
+            }
+          });
+        }
+        if (mode === 'portal' && res.status === 404) {
+          setPlanState('error', 'No billing account yet.');
+          announce('No billing account yet.');
+          return;
+        }
+        throw new Error('Request failed: ' + res.status);
+      });
+    }).catch(function () {
+      setPlanState('error', action.error);
+      announce(action.error);
+    });
+  }
+
+  // After checkout the webhook may land a few seconds later; poll until it does.
+  function pollUpgrade() {
+    var started = Date.now();
+    renderPlanMessage('Payment received', 'Confirming your plan…');
+
+    function finish(status) {
+      clearUpgradedParam();
+      if (status) {
+        renderPlan(status, "You're on Pro");
+        announce("You're on Pro");
+      } else {
+        renderPlanMessage('Payment received. Refresh in a minute.', '');
+        announce('Payment received. Refresh in a minute.');
+      }
+    }
+
+    function tick() {
+      loadPlanStatus().then(function (status) {
+        if (status && !status.enabled) {
+          clearUpgradedParam();
+          renderPlan(status);
+          return;
+        }
+        if (status && status.plan === 'pro') {
+          finish(status);
+          return;
+        }
+        next();
+      }).catch(next);
+    }
+
+    function next() {
+      if (Date.now() - started + UPGRADE_POLL_MS > UPGRADE_POLL_LIMIT_MS) {
+        finish(null);
+        return;
+      }
+      setTimeout(tick, UPGRADE_POLL_MS);
+    }
+
+    tick();
+  }
+
+  function initPlan() {
+    var btn = document.getElementById('plan-action');
+    if (btn) btn.addEventListener('click', runPlanAction);
+
+    // Back from Stripe via the bfcache: the page is restored mid-"pending".
+    window.addEventListener('pageshow', function (e) {
+      if (e.persisted && plan.state === 'pending') setPlanState('idle');
+    });
+
+    var upgraded = new URLSearchParams(window.location.search).get('upgraded') === '1';
+
+    loadPlanStatus().then(function (status) {
+      if (!status || !status.enabled) {
+        if (upgraded) clearUpgradedParam();
+        renderPlan(status);
+        return;
+      }
+      if (!upgraded) {
+        renderPlan(status);
+        // /upgrade sends a user whose payment failed here with ?billing=payment_failed.
+        var params = new URLSearchParams(window.location.search);
+        if (params.get('billing') === 'payment_failed') {
+          if (plan.mode !== 'portal') { plan.mode = 'portal'; setPlanButton(); }
+          setText('plan-detail', 'Your last payment failed. Update your card in Manage billing.');
+          params.delete('billing');
+          var qs = params.toString();
+          try {
+            window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+          } catch (_e) {}
+        }
+      } else if (status.plan === 'pro') {
+        clearUpgradedParam();
+        renderPlan(status, "You're on Pro");
+        announce("You're on Pro");
+      } else {
+        pollUpgrade();
+      }
+    }).catch(function () {
+      // Billing info is secondary: leave the strip hidden unless we were sent
+      // back from checkout, where polling keeps trying.
+      if (upgraded) pollUpgrade();
+    });
+  }
+
+  // ── Browser-held pages: offer to add them after sign-in ──
+  // Task 2.1 keeps signed-out publishes in localStorage["aired.pages"] as
+  // [{id, token, title, url, createdAt}]. Nothing is sent without a click.
+  var PAGES_KEY = 'aired.pages';
+  var DISMISSED_KEY = 'aired.pages.dismissed';
+  var CLAIM_CHUNK = 100;
+  // claim-batch only ever says "claim failed" today; if it starts saying the page
+  // is gone or owned elsewhere, drop the entry so it stops coming back.
+  var CLAIM_GONE_RE = /not found|no longer exist|does not exist|gone|expired|deleted|already (claimed|owned)|owned by|another (user|account)/i;
+
+  var claim = {
+    state: 'idle',   // idle | pending | partial | error
+    entries: [],
+  };
+
+  function readStoredPages() {
+    try {
+      var list = JSON.parse(window.localStorage.getItem(PAGES_KEY) || '[]');
+      return Array.isArray(list) ? list : [];
+    } catch (_e) {
+      return [];
+    }
+  }
+
+  // Valid entries only (string id + token), de-duplicated by id.
+  function readClaimEntries() {
+    var seen = {};
+    var out = [];
+    var list = readStoredPages();
+    for (var i = 0; i < list.length; i++) {
+      var e = list[i];
+      if (!e || typeof e !== 'object') continue;
+      if (typeof e.id !== 'string' || !e.id || typeof e.token !== 'string' || !e.token) continue;
+      if (seen[e.id]) continue;
+      seen[e.id] = true;
+      out.push(e);
+    }
+    return out;
+  }
+
+  function removeStoredPages(ids) {
+    if (!ids.length) return;
+    var drop = {};
+    for (var i = 0; i < ids.length; i++) drop[ids[i]] = true;
+    try {
+      var kept = readStoredPages().filter(function (e) {
+        return !(e && typeof e === 'object' && drop[e.id]);
+      });
+      window.localStorage.setItem(PAGES_KEY, JSON.stringify(kept));
+    } catch (_e) {}
+  }
+
+  function idsKey(entries) {
+    return entries.map(function (e) { return e.id; }).sort().join(',');
+  }
+
+  function readDismissed() {
+    try {
+      var raw = window.localStorage.getItem(DISMISSED_KEY) || '';
+      return raw ? raw.split(',') : [];
+    } catch (_e) {
+      return [];
+    }
+  }
+
+  function pagesPhrase(n) {
+    return n + (n === 1 ? ' page' : ' pages');
+  }
+
+  function claimTitle(entry) {
+    return (entry && typeof entry.title === 'string' && entry.title) || (entry && entry.id) || '';
+  }
+
+  function renderClaim(failures, errorText) {
+    var banner = document.getElementById('claim-banner');
+    if (!banner) return;
+    var addBtn = document.getElementById('claim-add');
+    var dismissBtn = document.getElementById('claim-dismiss');
+    var pending = claim.state === 'pending';
+    var n = claim.entries.length;
+
+    if (n > 0) {
+      setText('claim-label', pagesPhrase(n) + ' published in this browser without an account');
+    } else {
+      setText('claim-label', 'Some pages could not be added');
+    }
+    setText('claim-detail', n > 0 ? 'Add them to your account to manage them here.' : '');
+    setText('claim-error', errorText || '');
+
+    var list = document.getElementById('claim-failures');
+    if (list) {
+      list.innerHTML = '';
+      var items = failures || [];
+      for (var i = 0; i < items.length; i++) {
+        var li = document.createElement('li');
+        li.textContent = "Couldn't add " + items[i];
+        list.appendChild(li);
+      }
+      if (items.length) list.classList.remove('hidden');
+      else list.classList.add('hidden');
+    }
+
+    if (addBtn) {
+      if (n === 0) {
+        addBtn.classList.add('hidden');
+      } else {
+        addBtn.classList.remove('hidden');
+        addBtn.disabled = pending;
+        if (pending) addBtn.setAttribute('aria-busy', 'true');
+        else addBtn.removeAttribute('aria-busy');
+        addBtn.textContent = pending ? 'Adding…' : (claim.state === 'idle' ? 'Add to my account' : 'Try again');
+      }
+    }
+    if (dismissBtn) {
+      dismissBtn.disabled = pending;
+      dismissBtn.textContent = n === 0 ? 'Dismiss' : 'Not now';
+    }
+    banner.classList.remove('hidden');
+  }
+
+  function hideClaim() {
+    var banner = document.getElementById('claim-banner');
+    if (banner) banner.classList.add('hidden');
+    // Leave the controls idle so nothing stale shows if the banner returns.
+    var addBtn = document.getElementById('claim-add');
+    var dismissBtn = document.getElementById('claim-dismiss');
+    if (addBtn) {
+      addBtn.disabled = false;
+      addBtn.removeAttribute('aria-busy');
+      addBtn.textContent = 'Add to my account';
+    }
+    if (dismissBtn) {
+      dismissBtn.disabled = false;
+      dismissBtn.textContent = 'Not now';
+    }
+  }
+
+  function dismissClaim() {
+    if (claim.state === 'pending') return;
+    var entries = readClaimEntries();
+    if (entries.length) {
+      try { window.localStorage.setItem(DISMISSED_KEY, idsKey(entries)); } catch (_e) {}
+    }
+    hideClaim();
+  }
+
+  function postClaimChunk(chunk) {
+    return fetch('/api/me/claim-batch', {
+      method: 'POST',
+      headers: { 'X-Aired-Request': '1', 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        items: chunk.map(function (e) { return { id: e.id, update_token: e.token }; }),
+      }),
+    });
+  }
+
+  function runClaim() {
+    if (claim.state === 'pending') return;
+    var entries = readClaimEntries();
+    if (!entries.length) { hideClaim(); return; }
+
+    var byId = {};
+    for (var i = 0; i < entries.length; i++) byId[entries[i].id] = entries[i];
+
+    claim.state = 'pending';
+    claim.entries = entries;
+    renderClaim([], '');
+    announce('Adding ' + pagesPhrase(entries.length) + '…');
+
+    var added = 0;
+    var failures = [];
+    var problem = ''; // set when the run stops early (rate limit or request error)
+
+    function chunkAt(start) {
+      if (start >= entries.length || problem) return Promise.resolve();
+      var chunk = entries.slice(start, start + CLAIM_CHUNK);
+      return postClaimChunk(chunk).then(function (res) {
+        if (res.status === 429) {
+          problem = 'Try again in an hour.';
+          return;
+        }
+        if (!res.ok) throw new Error('Request failed: ' + res.status);
+        return res.json().then(function (data) {
+          var claimed = (data && Array.isArray(data.claimed)) ? data.claimed : [];
+          var failed = (data && Array.isArray(data.failed)) ? data.failed : [];
+          var drop = claimed.slice();
+          added += claimed.length;
+          for (var j = 0; j < failed.length; j++) {
+            var f = failed[j] || {};
+            failures.push(claimTitle(byId[f.id]) || (typeof f.id === 'string' ? f.id : ''));
+            if (typeof f.reason === 'string' && CLAIM_GONE_RE.test(f.reason)) drop.push(f.id);
+          }
+          // Persist per chunk so a later failure never re-sends claimed pages.
+          removeStoredPages(drop);
+        });
+      }).then(function () {
+        return chunkAt(start + CLAIM_CHUNK);
+      });
+    }
+
+    chunkAt(0).catch(function () {
+      problem = 'Could not add pages. Try again.';
+    }).then(function () {
+      claim.entries = readClaimEntries();
+      var addedText = added > 0 ? 'Added ' + pagesPhrase(added) : '';
+
+      if (added > 0) loadDashboard();
+
+      if (problem) {
+        claim.state = 'error';
+        renderClaim(failures, problem);
+        announce((addedText ? addedText + '. ' : '') + problem);
+      } else if (failures.length) {
+        claim.state = 'partial';
+        renderClaim(failures, '');
+        announce((addedText ? addedText + '. ' : '') + failures.length + ' could not be added');
+      } else {
+        claim.state = 'idle';
+        hideClaim();
+        announce(addedText || 'Nothing to add');
+      }
+    });
+  }
+
+  function initClaim() {
+    var addBtn = document.getElementById('claim-add');
+    var dismissBtn = document.getElementById('claim-dismiss');
+    if (!addBtn || !dismissBtn) return;
+    addBtn.addEventListener('click', runClaim);
+    dismissBtn.addEventListener('click', dismissClaim);
+
+    var entries = readClaimEntries();
+    if (!entries.length) return;
+    // Stay hidden if every saved page was already dismissed; new ones bring it back.
+    var dismissed = readDismissed();
+    var allDismissed = entries.every(function (e) { return dismissed.indexOf(e.id) !== -1; });
+    if (allDismissed) return;
+    claim.entries = entries;
+    renderClaim([], '');
+  }
+
   // ── Init ──
   document.addEventListener('DOMContentLoaded', function () {
     init();
@@ -532,6 +1061,8 @@
     var h1 = document.getElementById('user-handle');
     if (h1) h1.textContent = '@' + user.login;
 
+    initPlan();
+    initClaim();
     await loadDashboard();
 
     var signOutBtn = document.getElementById('sign-out');

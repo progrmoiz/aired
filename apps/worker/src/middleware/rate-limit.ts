@@ -3,6 +3,15 @@ import type { AppBindings } from "../types.js";
 import { hashToHex } from "@aired/core";
 import { TIERS, publishTier, type RateLimitTier } from "../lib/rate-limit-tiers.js";
 import { underBurstLimit } from "../lib/burst-limit.js";
+import { billingEnabled, getEntitlements, planLimitError } from "../lib/entitlements.js";
+
+type RateLimitOptions = {
+  /**
+   * Called when the window limit is hit. Return a Response to send instead of
+   * the default 429, or undefined to keep the 429.
+   */
+  onLimited?: (c: Context<AppBindings>) => Response | undefined;
+};
 
 /**
  * In-memory rate limit store.
@@ -54,7 +63,7 @@ function checkRateLimit(
  *
  * Bucket key strategy:
  *   - rl:ip  → hashed IP (anonymous)
- *   - rl:user, rl:claim, rl:delete → user.id (requires authMiddleware to run first)
+ *   - rl:user, rl:pro, rl:claim, rl:delete → user.id (requires authMiddleware to run first)
  *
  * Fallback: when a user tier is requested but user is null (unauthenticated),
  * fall back to anonymous IP-based limiting using the tier's own limit/window.
@@ -62,6 +71,7 @@ function checkRateLimit(
  */
 export function rateLimit(
   tier: RateLimitTier,
+  options: RateLimitOptions = {},
 ): (c: Context<AppBindings>, next: Next) => Promise<Response | void> {
   return async (c: Context<AppBindings>, next: Next): Promise<Response | void> => {
     const ip =
@@ -74,7 +84,7 @@ export function rateLimit(
     if (tier.bucketPrefix === "rl:ip") {
       bucketSubKey = await hashToHex(ip, 16);
     } else {
-      // User-keyed tiers (rl:user, rl:claim, rl:delete)
+      // User-keyed tiers (rl:user, rl:pro, rl:claim, rl:delete)
       const user = c.get("user");
       if (user !== null && user !== undefined) {
         bucketSubKey = String(user.id);
@@ -102,6 +112,8 @@ export function rateLimit(
     maybePrune();
 
     if (!allowed) {
+      const custom = options.onLimited?.(c);
+      if (custom !== undefined) return custom;
       return c.json(
         { error: "Rate limit exceeded. Please try again later." },
         429,
@@ -114,16 +126,30 @@ export function rateLimit(
 
 const publishLimits = {
   anonymous: rateLimit(TIERS.anonymous),
-  authenticated: rateLimit(TIERS.authenticated),
+  // Only signed-in free users land here (publishTier). With billing on, their
+  // limit is a plan limit, so they get the 402 upgrade prompt instead of a 429.
+  authenticated: rateLimit(TIERS.authenticated, {
+    onLimited: (c) =>
+      c.get("user") && billingEnabled(c.env)
+        ? c.json(planLimitError("publish_rate"), 402)
+        : undefined,
+  }),
+  pro: rateLimit(TIERS.pro),
 };
 
-/** Publish limit: per account when signed in, per IP otherwise. */
-export function publishRateLimit(
+/** Publish limit: per account when signed in (by plan), per IP otherwise. */
+export async function publishRateLimit(
   c: Context<AppBindings>,
   next: Next,
 ): Promise<Response | void> {
-  const tier = publishTier(c.get("user"));
-  return (tier === TIERS.authenticated ? publishLimits.authenticated : publishLimits.anonymous)(c, next);
+  const user = c.get("user");
+  const ent = user ? await getEntitlements(c.env, user.id) : null;
+  const tier = publishTier(user, ent);
+  const limiter =
+    tier === TIERS.pro ? publishLimits.pro
+    : tier === TIERS.authenticated ? publishLimits.authenticated
+    : publishLimits.anonymous;
+  return limiter(c, next);
 }
 
 /**

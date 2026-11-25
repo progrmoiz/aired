@@ -6,12 +6,15 @@
  * behind it and switches between a dark glass style (on dark pages, the
  * default) and a light one (on light pages), so it never looks pasted on.
  * Hover (or tap, on touch screens) reveals the view count and a report link.
+ * Pages owned by a Pro account get the OG tags only (badge: false).
  */
 
 export interface AiredBarOptions {
   id: string;
   title: string;
   readCount: number;
+  /** Show the badge. Defaults to true; false for pages owned by a Pro account. */
+  badge?: boolean;
 }
 
 export const BADGE_HREF = "https://aired.sh/?ref=badge";
@@ -21,6 +24,7 @@ export function injectAiredBar(html: string, opts: AiredBarOptions): string {
   const ogTags = renderOgTags(opts);
   let out = html.replace(/<\/head>/i, `${ogTags}\n</head>`);
   if (out === html) out = ogTags + "\n" + html;
+  if (opts.badge === false) return out;
 
   const bar = renderAiredBar(opts);
   const barOut = out.replace(/<\/body>/i, `${bar}\n</body>`);

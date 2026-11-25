@@ -244,7 +244,7 @@ CLI:
 ```bash
 npx aired login              # browser flow
 npx aired login --device     # SSH-friendly fallback
-npx aired claim --all        # bind existing tokens to your account
+npx aired claim --all        # add your pages to your account (each gets a new token)
 npx aired whoami
 npx aired logout
 ```

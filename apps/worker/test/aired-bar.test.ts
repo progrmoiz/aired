@@ -41,3 +41,20 @@ test("badge adapts to light pages", () => {
   // the regex inside the script must survive the template literal
   assert.ok(out.includes("rgba?\\(([^)]+)\\)"));
 });
+
+test("badge: false keeps the OG tags but drops all badge markup", () => {
+  const out = injectAiredBar("<html><head></head><body><p>hi</p></body></html>", { ...opts, badge: false });
+  assert.ok(out.includes("og:title"));
+  assert.ok(out.includes('content="Q3 report"'));
+  assert.ok(!out.includes("__aired-bar"));
+  assert.ok(!out.includes("aired badge"));
+  assert.ok(!out.includes("<script>"));
+  assert.ok(!out.includes("<style>"));
+  assert.ok(out.endsWith("<p>hi</p></body></html>"));
+});
+
+test("badge shows by default and with badge: true", () => {
+  const html = "<html><head></head><body></body></html>";
+  assert.ok(injectAiredBar(html, opts).includes('id="__aired-bar"'));
+  assert.ok(injectAiredBar(html, { ...opts, badge: true }).includes('id="__aired-bar"'));
+});

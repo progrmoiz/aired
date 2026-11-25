@@ -68,11 +68,8 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
   <link rel="icon" href="/favicon-16.png" type="image/png" sizes="16x16" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
-  <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" /></noscript>
+  <link rel="preload" href="/fonts/inter-latin-v20.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/fonts/fonts.css" />
   <link rel="stylesheet" href="/site.css" />
 </head>
 <body>
@@ -97,7 +94,7 @@
           <button type="button" id="upload-btn" class="upl" title="Upload an .html file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg>Upload</button>
           <input id="file-input" type="file" accept=".html,.htm,text/html" hidden />
           <span><label for="ttl-select">Expires</label><select id="ttl-select"><option value="3600">1 hour</option><option value="86400">1 day</option><option value="604800" selected>7 days</option><option value="2592000">30 days</option><option value="permanent">Never</option></select></span>
-          <span><label for="pin-input">Password</label><input type="password" id="pin-input" name="pin" placeholder="none" maxlength="20" inputmode="numeric" autocomplete="new-password" /></span>
+          <span><label for="pin-input">PIN</label><input type="password" id="pin-input" name="pin" placeholder="none" maxlength="20" inputmode="numeric" autocomplete="off" /></span>
           <span id="char-count" class="kb"></span>
           <button class="publish" type="submit" id="submit-btn" disabled>Publish</button>
         </div>
@@ -110,6 +107,7 @@
           <div class="row2"><div class="lbl"><span>Update token</span><span id="result-expiry"></span></div>
             <div class="line"><code id="result-token"></code><button type="button" id="copy-token-btn" class="copy-btn">Copy</button></div>
             <p class="note">Save this token. You need it to update or delete the page.</p></div>
+          <div class="row2 hidden" id="result-saved"><p class="note" style="margin:0">Saved in this browser. <a href="/auth/github?return=/dashboard" style="color:var(--text-2);text-decoration:underline">Sign in</a> to keep this link and see who opened it.</p></div>
         </div>
         <button type="button" id="new-btn" class="again">Publish another</button>
       </div>
@@ -336,7 +334,7 @@
 
 <footer><div class="wrap">
   <span>aired</span>
-  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
+  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
 </div></footer>
 <script src="/app.js"></script>
 </body>

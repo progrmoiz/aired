@@ -22,6 +22,17 @@ export function saveToken(
   })
 }
 
+/**
+ * Swap the stored token for the one a claim returned, keeping the record's
+ * title, url and created date. Does nothing if the page isn't stored here.
+ */
+export function replaceToken(id: string, token: string): void {
+  const conf = getConf()
+  const record = conf.get(id)
+  if (record === undefined) return
+  conf.set(id, { ...record, token })
+}
+
 export function getToken(id: string): string | null {
   const conf = getConf()
   const record = conf.get(id)

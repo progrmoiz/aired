@@ -4,6 +4,9 @@ export const REPORT_CATEGORIES = [
   "malware",
   "illegal",
   "other",
+  // The publisher lost their update token and wants their own page removed.
+  // Handled on review; ownership is never transferred without the token.
+  "owner_removal",
 ] as const;
 
 export type ReportCategory = (typeof REPORT_CATEGORIES)[number];

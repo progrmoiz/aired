@@ -6,7 +6,17 @@ import { applyPageHeaders } from "../middleware/security.js";
 import { loadStats, recordView, saveStats } from "../lib/stats.js";
 import { SANDBOX_SHIM, injectEarlyScript } from "../lib/sandbox-shim.js";
 import { injectAiredBar } from "../lib/aired-bar.js";
+import { getEntitlements } from "../lib/entitlements.js";
 import { notFoundPage } from "../lib/not-found.js";
+import { viewWrite } from "../lib/view-write.js";
+import { hashPin, isPinHash, pinCookieValue, verifyPin, verifyPinCookie } from "../lib/pin-hash.js";
+import { underBurstLimit } from "../lib/burst-limit.js";
+import { pinGuessKeys, visitorNetwork } from "../lib/pin-guess.js";
+import { releasePinAttempt, reservePinAttempt } from "../lib/pin-failures.js";
+import { hashToHex } from "@aired/core";
+
+/** How long a correct PIN entry lets the browser in. */
+const PIN_COOKIE_SECONDS = 3600;
 
 const viewer = new Hono<AppBindings>();
 
@@ -22,6 +32,12 @@ viewer.get("/p/:id", async (c) => {
   const metadata = parseMetadata(raw);
   if (metadata === null) {
     return c.text("Page metadata is corrupted", 500);
+  }
+
+  // An expired page KV still hands out for a moment is gone, like a missing one.
+  const write = viewWrite(metadata, Date.now());
+  if (write.expired) {
+    return notFoundPage(c.env.ASSETS, c.req.url);
   }
 
   // Check read limit
@@ -40,8 +56,14 @@ viewer.get("/p/:id", async (c) => {
 
   // Check PIN protection
   if (metadata.pin !== null) {
-    const pinCookie = getCookie(c, `pin_${id}`) ?? null;
-    if (pinCookie !== metadata.pin) {
+    // The cookie is an HMAC token from verify-pin, never the PIN itself.
+    const allowed = await verifyPinCookie(
+      c.env.SESSION_SECRET,
+      id,
+      getCookie(c, `pin_${id}`),
+      Math.floor(Date.now() / 1000),
+    );
+    if (!allowed) {
       return new Response(renderPinPage(id), {
         status: 200,
         headers: { "Content-Type": "text/html; charset=utf-8" },
@@ -60,21 +82,26 @@ viewer.get("/p/:id", async (c) => {
   // Increment read count (eventually consistent — slight inaccuracy is acceptable)
   const newReadCount = metadata.readCount + 1;
   const updated = { ...metadata, readCount: newReadCount };
-  const kvOptions: KVNamespacePutOptions = {};
-  if (!metadata.permanent && metadata.expiresAt !== null) {
-    const remaining = Math.floor(
-      (new Date(metadata.expiresAt).getTime() - Date.now()) / 1000,
-    );
-    if (remaining > 0) {
-      kvOptions.expirationTtl = remaining;
-    }
-  }
+  // Keep the page's expiry exactly (lib/view-write.ts); skip the count in its last minute.
+  const kvOptions: KVNamespacePutOptions | null = write.options;
   // Fire-and-forget — don't block response
   // Two KV writes: page metadata (readCount) + merged stats blob
   const country = (c.req.header("CF-IPCountry") ?? "XX").toUpperCase();
   c.executionCtx.waitUntil(
     Promise.all([
-      c.env.PAGES_KV.put(`page:${id}`, serializeMetadata(updated), kvOptions),
+      kvOptions !== null
+        ? (async () => {
+            // A page whose PIN is still stored as typed may have just been
+            // rehashed by verify-pin: keep the fresh PIN rather than undo it.
+            let toWrite = updated;
+            if (updated.pin !== null && !isPinHash(updated.pin)) {
+              const freshRaw = await c.env.PAGES_KV.get(`page:${id}`);
+              const fresh = freshRaw === null ? null : parseMetadata(freshRaw);
+              if (fresh !== null && fresh.pin !== null) toWrite = { ...updated, pin: fresh.pin };
+            }
+            await c.env.PAGES_KV.put(`page:${id}`, serializeMetadata(toWrite), kvOptions);
+          })()
+        : Promise.resolve(),
       (async () => {
         const stats = recordView(await loadStats(c.env.PAGES_KV), country);
         await saveStats(c.env.PAGES_KV, stats);
@@ -89,6 +116,17 @@ viewer.get("/p/:id", async (c) => {
   const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
   const pageTitle = titleMatch?.[1]?.trim() || metadata.title || "Shared page";
 
+  // Pro owners get no badge. Anonymous pages skip the lookup; if it fails,
+  // show the badge rather than break the page.
+  let badge = true;
+  if (metadata.ownerId !== null) {
+    try {
+      badge = (await getEntitlements(c.env, metadata.ownerId)).badge;
+    } catch {
+      badge = true;
+    }
+  }
+
   // The shim must run before page scripts, so it goes in after the bar's
   // own <head> injection.
   const wrappedHtml = injectEarlyScript(
@@ -96,6 +134,7 @@ viewer.get("/p/:id", async (c) => {
       id,
       title: pageTitle,
       readCount: newReadCount,
+      badge,
     }),
     SANDBOX_SHIM,
   );
@@ -129,6 +168,17 @@ viewer.post("/p/:id/verify-pin", async (c) => {
     return c.json({ error: "pin is required" }, 400);
   }
 
+  // Limit guesses per page and visitor, and per page in all (lib/pin-guess.ts).
+  // The address is only hashed into the key, never stored.
+  const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
+  const keys = pinGuessKeys(id, await hashToHex(visitorNetwork(ip), 16));
+  if (
+    !(await underBurstLimit(c.env.PIN_GUESS, keys.visitor)) ||
+    !(await underBurstLimit(c.env.PIN_GUESS_PAGE, keys.page))
+  ) {
+    return c.json({ error: "Too many tries. Wait a minute and try again." }, 429);
+  }
+
   const raw = await c.env.PAGES_KV.get(`page:${id}`);
   if (raw === null) {
     return c.json({ error: "Page not found" }, 404);
@@ -143,17 +193,59 @@ viewer.post("/p/:id/verify-pin", async (c) => {
     return c.json({ error: "Page is not PIN protected" }, 400);
   }
 
-  if (pin !== metadata.pin) {
+  // The global cap (lib/pin-failures.ts): reserve the attempt atomically
+  // before checking, so parallel guesses can't slip past. If D1 fails, the
+  // per-location limits above still apply.
+  let reserved = false;
+  try {
+    if (!(await reservePinAttempt(c.env.DB, id, Date.now()))) {
+      return c.json({ error: "Too many wrong PINs for this page. Try again in 15 minutes." }, 429);
+    }
+    reserved = true;
+  } catch (err) {
+    console.error("pin attempt reservation failed", { id, err });
+  }
+
+  const check = await verifyPin(pin, metadata.pin);
+  if (!check.ok) {
     return c.json({ error: "Incorrect PIN" }, 403);
+  }
+  // Only wrong PINs use up the page's budget.
+  if (reserved) {
+    c.executionCtx.waitUntil(
+      releasePinAttempt(c.env.DB, id).catch((err) => console.error("pin attempt release failed", { id, err })),
+    );
+  }
+
+  // A page from before hashing holds the PIN as typed: store it hashed now.
+  // Keeps the page's expiry; skipped if it's about to expire (view-write.ts).
+  if (check.needsRehash) {
+    const hashed = await hashPin(pin);
+    c.executionCtx.waitUntil(
+      (async () => {
+        // Re-read right before writing: skip a page that's gone, already
+        // rehashed, or whose PIN changed, and keep everything else as it is now.
+        const freshRaw = await c.env.PAGES_KV.get(`page:${id}`);
+        const fresh = freshRaw === null ? null : parseMetadata(freshRaw);
+        if (fresh === null || fresh.pin !== metadata.pin || fresh.pin === null || isPinHash(fresh.pin)) return;
+        const write = viewWrite(fresh, Date.now());
+        if (write.expired || write.options === null) return;
+        await c.env.PAGES_KV.put(`page:${id}`, serializeMetadata({ ...fresh, pin: hashed }), write.options);
+      })().catch((err) => {
+        console.error("pin rehash failed", { id, err });
+      }),
+    );
   }
 
   // Set a cookie and return success — client handles redirect
+  const expSec = Math.floor(Date.now() / 1000) + PIN_COOKIE_SECONDS;
   const headers = new Headers();
   headers.set("Content-Type", "application/json");
-  // HttpOnly so JS can't read it; SameSite=Strict for security
+  // HttpOnly so JS can't read it; SameSite=Strict for security. An HMAC token,
+  // not the PIN, so the cookie reveals nothing.
   headers.set(
     "Set-Cookie",
-    `pin_${id}=${metadata.pin}; Path=/p/${id}; HttpOnly; SameSite=Strict; Max-Age=3600`,
+    `pin_${id}=${await pinCookieValue(c.env.SESSION_SECRET, id, expSec)}; Path=/p/${id}; HttpOnly; Secure; SameSite=Strict; Max-Age=${PIN_COOKIE_SECONDS}`,
   );
 
   return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
