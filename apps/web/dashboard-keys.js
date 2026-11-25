@@ -175,7 +175,7 @@
         focusSomething();
       }).catch(function (err) {
         btn.disabled = false;
-        btn.textContent = 'Revoke';
+        disarm();
         showError(err.message || 'Could not revoke the key.');
       });
     });
