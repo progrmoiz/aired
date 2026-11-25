@@ -670,7 +670,7 @@
           return;
         }
         if (res.status === 401) {
-          window.location.href = '/auth/github?return=/dashboard';
+          window.location.href = '/auth/login?return=/dashboard';
           return;
         }
         if (mode === 'checkout' && res.status === 409) {
@@ -1047,7 +1047,7 @@
     }
 
     if (meRes.status === 401) {
-      window.location.href = '/auth/github?return=/dashboard';
+      window.location.href = '/auth/login?return=/dashboard';
       return;
     }
 

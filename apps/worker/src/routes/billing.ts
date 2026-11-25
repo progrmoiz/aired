@@ -498,7 +498,7 @@ upgrade.get('/upgrade', rateLimit(TIERS.billing), async (c) => {
   const user = c.get('user');
   if (!user) {
     const back = `/upgrade?interval=${interval}`;
-    return c.redirect(`/auth/github?return=${encodeURIComponent(back)}`, 302);
+    return c.redirect(`/auth/login?return=${encodeURIComponent(back)}`, 302);
   }
   // Billing is for a person: an API key can't start a checkout.
   if (c.get('authMethod') !== 'session') {

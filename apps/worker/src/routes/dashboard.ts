@@ -8,7 +8,7 @@ dashboard.get('/dashboard', async (c) => {
   const user = c.get('user');
 
   if (user === null || user === undefined) {
-    return c.redirect('/auth/github?return=/dashboard', 302);
+    return c.redirect('/auth/login?return=/dashboard', 302);
   }
 
   if (c.env.ASSETS) {

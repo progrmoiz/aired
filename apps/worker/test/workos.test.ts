@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { authorizeUrl, parseAuthenticateResponse, workosEnabled, workosRedirectUri } from "../src/lib/workos.ts";
 import { isAllowedReturn } from "../src/lib/return-path.ts";
 
@@ -61,4 +61,20 @@ test("wiring: /auth/login falls back to GitHub, callbacks refuse each other's st
   assert.match(github, /if \(workosEnabled\(c\.env\)\) \{\s*return startWorkosSignIn\(c, \{ port: portNum, client_state: clientState \}\);/);
   const index = src("index.ts");
   assert.ok(index.indexOf('app.route("/auth", authWorkos)') < index.indexOf('app.route("/auth", auth)'));
+});
+
+test("every Log in link and signed-out redirect goes through /auth/login", () => {
+  const dir = new URL("../../web/", import.meta.url);
+  const offenders = readdirSync(dir)
+    .filter((f) => f.endsWith(".html") || f.endsWith(".js"))
+    .filter((f) => readFileSync(new URL(f, dir), "utf8").includes("/auth/github?return="));
+  assert.deepEqual(offenders, []);
+  for (const f of ["routes/dashboard.ts", "routes/billing.ts"]) {
+    const src = readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8");
+    assert.ok(!src.includes("/auth/github?return="), f);
+    assert.ok(src.includes("/auth/login?return="), f);
+  }
+  // With WorkOS off, /auth/login doesn't count the attempt twice.
+  const workos = readFileSync(new URL("../src/routes/auth-workos.ts", import.meta.url), "utf8");
+  assert.match(workos, /authWorkos\.get\('\/login', \(c, next\) => \(workosEnabled\(c\.env\) \? loginRateLimit\(c, next\) : next\(\)\)/);
 });
