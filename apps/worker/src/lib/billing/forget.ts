@@ -12,3 +12,12 @@ export async function deleteAccountRows(db: D1Database, uid: number): Promise<vo
     db.prepare('DELETE FROM users WHERE id = ?').bind(uid),
   ]);
 }
+
+/**
+ * Whether Stripe's live subscriptions for the user's customer block account
+ * deletion: one that will renew (not set to cancel at period end) would keep
+ * charging an account that no longer exists.
+ */
+export function blocksAccountDeletion(live: ReadonlyArray<{ cancelAtPeriodEnd: boolean }>): boolean {
+  return live.some((sub) => !sub.cancelAtPeriodEnd);
+}

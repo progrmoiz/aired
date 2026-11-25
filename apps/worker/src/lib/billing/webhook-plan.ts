@@ -149,20 +149,20 @@ export function checkoutGate<S extends { status: string }>(
 /**
  * Which user a webhook's subscription belongs to. Our own customer mapping
  * (subscriptions / billing_customers) wins; metadata.uid or client_reference_id
- * is only a fallback for a customer we have no row for, and only while that
- * account still exists (`metadataUserExists`): account deletion removes the
- * billing rows, and a late event for the deleted account must not put them
- * back. `conflict` is set when both ids exist and disagree, so the caller can
- * log it; `deletedUser` when the fallback was refused.
+ * is only a fallback for a customer we have no row for. Either way the account
+ * must still exist (`userExists`: its KV user record, checked by the caller
+ * for `dbUid ?? metadataUid`): account deletion removes the billing rows, and
+ * a late or in-flight event for the deleted account must not put them back.
+ * `conflict` is set when both ids exist and disagree, so the caller can log
+ * it; `deletedUser` when the event was refused for that reason.
  */
 export function resolveWebhookUid(
   dbUid: number | null,
   metadataUid: number | null,
-  metadataUserExists = true,
+  userExists = true,
 ): { uid: number | null; conflict: boolean; deletedUser: boolean } {
-  if (dbUid !== null) {
-    return { uid: dbUid, conflict: metadataUid !== null && metadataUid !== dbUid, deletedUser: false };
-  }
-  if (metadataUid !== null && !metadataUserExists) return { uid: null, conflict: false, deletedUser: true };
-  return { uid: metadataUid, conflict: false, deletedUser: false };
+  const conflict = dbUid !== null && metadataUid !== null && metadataUid !== dbUid;
+  const uid = dbUid ?? metadataUid;
+  if (uid !== null && !userExists) return { uid: null, conflict, deletedUser: true };
+  return { uid, conflict, deletedUser: false };
 }

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
-import { deleteAccountRows } from "../src/lib/billing/forget.ts";
+import { blocksAccountDeletion, deleteAccountRows } from "../src/lib/billing/forget.ts";
 import { resolveWebhookUid } from "../src/lib/billing/webhook-plan.ts";
 
 const migration = (f: string) => readFileSync(new URL(`../migrations/${f}`, import.meta.url), "utf8");
@@ -55,18 +55,34 @@ test("deleting an account with no billing rows is a no-op, not an error", async 
   await deleteAccountRows(db, 99);
 });
 
-test("a late webhook can't re-create a deleted account's rows through metadata", () => {
+test("a webhook for a deleted account is refused, whichever way it finds the user", () => {
   // No customer row any more (deleted), metadata names the deleted user.
   assert.deepEqual(resolveWebhookUid(null, 4242, false), { uid: null, conflict: false, deletedUser: true });
-  // The account still exists: metadata is the fallback, as before.
+  // A webhook already in flight still found our row: refused too.
+  assert.deepEqual(resolveWebhookUid(4242, null, false), { uid: null, conflict: false, deletedUser: true });
+  assert.deepEqual(resolveWebhookUid(7, 4242, false), { uid: null, conflict: true, deletedUser: true });
+  // The account exists: our row wins, metadata is the fallback, as before.
   assert.deepEqual(resolveWebhookUid(null, 4242, true), { uid: 4242, conflict: false, deletedUser: false });
-  // Our own customer row always wins.
-  assert.deepEqual(resolveWebhookUid(7, 4242, false), { uid: 7, conflict: true, deletedUser: false });
+  assert.deepEqual(resolveWebhookUid(7, 4242, true), { uid: 7, conflict: true, deletedUser: false });
   assert.deepEqual(resolveWebhookUid(null, null, false), { uid: null, conflict: false, deletedUser: false });
 });
 
-test("me.ts deletes the D1 rows and the Pro projection during account deletion", () => {
+test("only a subscription that will renew blocks account deletion", () => {
+  assert.equal(blocksAccountDeletion([]), false);
+  assert.equal(blocksAccountDeletion([{ cancelAtPeriodEnd: true }]), false);
+  assert.equal(blocksAccountDeletion([{ cancelAtPeriodEnd: true }, { cancelAtPeriodEnd: false }]), true);
+});
+
+test("me.ts deletes the D1 rows before responding, refusing on failure, and asks Stripe when D1 has no subscription", () => {
   const code = readFileSync(new URL("../src/routes/me.ts", import.meta.url), "utf8");
-  assert.match(code, /deleteAccountRows\(c\.env\.DB, userId\)/);
+  const del = code.indexOf("await deleteAccountRows(c.env.DB, userId)");
+  assert.ok(del > 0);
+  assert.ok(del < code.indexOf("const response = c.json({ ok: true })"), "D1 delete must run before the response");
+  assert.ok(del < code.indexOf("c.executionCtx.waitUntil("), "D1 delete must not be in the background sweep");
+  assert.match(code, /Could not delete your billing records/);
   assert.match(code, /PAGES_KV\.delete\(`ent:\$\{userId\}`\)/);
+  assert.match(code, /blocksAccountDeletion\(await listActiveSubscriptions\(c\.env, customerId\)\)/);
+  const billing = readFileSync(new URL("../src/routes/billing.ts", import.meta.url), "utf8");
+  assert.match(billing, /const candidate = dbUid \?\? metadataUid;/);
+  assert.match(billing, /userRowExists\(c\.env\.DB, candidate\)/);
 });

@@ -32,7 +32,7 @@ import {
   subscriptionsForPaymentIntent,
 } from '../lib/billing/stripe.js';
 import { RISK_EVENTS, alreadyEnded, currentPeriodOf, planRiskEvent, refundEndsPro } from '../lib/billing/risk-events.js';
-import {
+import { userRowExists,
   ensureUser,
   hasEvent,
   recordEvent,
@@ -330,14 +330,15 @@ async function storeSubscription(
 async function webhookUid(c: Context<AppBindings>, evt: WebhookEvent, sub: NormalizedSubscription): Promise<number | null> {
   const dbUid = await findUidByCustomer(c.env.DB, sub.customerId);
   const metadataUid = sub.uid ?? uidFromEvent(evt.raw);
-  // Only reached for a customer we hold no row for. The account must still
-  // exist (its KV user record), or a late event would re-create the billing
-  // rows account deletion removed.
-  const metadataUserExists =
-    dbUid === null && metadataUid !== null
-      ? (await c.env.PAGES_KV.get(kvKeys.user(metadataUid))) !== null
-      : true;
-  const { uid, conflict, deletedUser } = resolveWebhookUid(dbUid, metadataUid, metadataUserExists);
+  // The account must still exist (its KV user record or its D1 users row;
+  // account deletion removes both), or an event arriving during or after
+  // account deletion would re-create the billing rows it removed.
+  const candidate = dbUid ?? metadataUid;
+  const userExists =
+    candidate === null ||
+    (await c.env.PAGES_KV.get(kvKeys.user(candidate))) !== null ||
+    (await userRowExists(c.env.DB, candidate));
+  const { uid, conflict, deletedUser } = resolveWebhookUid(dbUid, metadataUid, userExists);
   if (deletedUser) {
     console.log({ event: 'billing_webhook_deleted_account', eventId: evt.id, customerId: sub.customerId, metadataUid });
   }

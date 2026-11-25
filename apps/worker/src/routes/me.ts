@@ -27,8 +27,9 @@ import {
 } from '../lib/owner-index.js';
 import { clearSessionCookie, readSessionCookie } from '../lib/cookies.js';
 import { billingEnabled, getEntitlements, isEntitled } from '../lib/entitlements.js';
-import { getSubscription } from '../lib/billing/store.js';
-import { deleteAccountRows } from '../lib/billing/forget.js';
+import { getCustomerId, getSubscription } from '../lib/billing/store.js';
+import { blocksAccountDeletion, deleteAccountRows } from '../lib/billing/forget.js';
+import { listActiveSubscriptions } from '../lib/billing/stripe.js';
 import type { StoredSubscription } from '../lib/billing/store.js';
 import { AUTH_HEADER } from '@aired/core';
 import { addClaimResult, runClaim } from '../lib/claim-decision.js';
@@ -313,12 +314,41 @@ me.delete('/', requireCsrfHeader, async (c) => {
     } catch {
       return c.json({ error: 'Could not check your subscription. Please try again.' }, 503);
     }
-    if (sub !== null && !sub.cancelAtPeriodEnd && isEntitled(sub, new Date())) {
-      return c.json(
-        { error: 'Cancel Pro in Manage billing before deleting your account.', code: 'subscription_active' },
-        409,
-      );
+    const blocked = c.json(
+      { error: 'Cancel Pro in Manage billing before deleting your account.', code: 'subscription_active' },
+      409,
+    );
+    if (sub !== null && !sub.cancelAtPeriodEnd && isEntitled(sub, new Date())) return blocked;
+    // No stored subscription, but a Stripe customer: a purchase whose webhook
+    // hasn't landed yet would otherwise slip through, and the delete below
+    // removes our only link to it. Ask Stripe.
+    if (sub === null) {
+      try {
+        const customerId = await getCustomerId(c.env.DB, userId);
+        if (customerId !== null && blocksAccountDeletion(await listActiveSubscriptions(c.env, customerId))) {
+          return blocked;
+        }
+      } catch {
+        return c.json({ error: 'Could not check your subscription. Please try again.' }, 503);
+      }
     }
+  }
+
+  // Billing and sign-in rows in D1 go before anything else, so a failure can
+  // be retried with the account intact. Link (Stripe) keeps its own record of
+  // each sale. Without billing on, D1 may hold nothing yet: don't block on it.
+  try {
+    await deleteAccountRows(c.env.DB, userId);
+  } catch (err) {
+    console.error('Failed to delete billing rows during account deletion:', err);
+    if (billingEnabled(c.env)) {
+      return c.json({ error: 'Could not delete your billing records. Please try again.' }, 503);
+    }
+  }
+  try {
+    await c.env.PAGES_KV.delete(`ent:${userId}`);
+  } catch (err) {
+    console.error('Failed to delete entitlement during account deletion:', err);
   }
 
   // Step 1: Revoke current JWT by writing revoked_jti to KV
@@ -398,19 +428,6 @@ me.delete('/', requireCsrfHeader, async (c) => {
   // Step 5: waitUntil — paginated sweep to null out ownerId on all pages
   c.executionCtx.waitUntil(
     (async () => {
-      // Billing and sign-in rows in D1 go too (Link keeps its own record of
-      // each sale), and so does the Pro projection in KV.
-      try {
-        await deleteAccountRows(c.env.DB, userId);
-      } catch (err) {
-        console.error('Failed to delete billing rows during account deletion:', err);
-      }
-      try {
-        await c.env.PAGES_KV.delete(`ent:${userId}`);
-      } catch (err) {
-        console.error('Failed to delete entitlement during account deletion:', err);
-      }
-
       // Claimed pages become anonymous pages again, like every other page.
       // Their D1 rows are released, not deleted, and keep the rotated hash:
       // the KV record may hold a stale pre-claim hash, which must not become

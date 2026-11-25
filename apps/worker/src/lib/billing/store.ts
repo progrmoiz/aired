@@ -49,6 +49,12 @@ export async function ensureUser(
     .run();
 }
 
+/** Whether D1 has a users row for this id (account deletion removes it). */
+export async function userRowExists(db: D1Database, uid: number): Promise<boolean> {
+  const row = await db.prepare('SELECT 1 AS found FROM users WHERE id = ?').bind(uid).first<{ found: number }>();
+  return row !== null;
+}
+
 /** Whether a webhook event id was already handled. */
 export async function hasEvent(db: D1Database, id: string): Promise<boolean> {
   const row = await db
