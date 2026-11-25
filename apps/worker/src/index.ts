@@ -9,6 +9,7 @@ import { handleMcp } from "./routes/mcp.js";
 import { og } from "./routes/og.js";
 import { auth } from "./routes/auth.js";
 import { dashboard } from "./routes/dashboard.js";
+import { billing, upgrade } from "./routes/billing.js";
 import { publishRateLimit } from "./middleware/rate-limit.js";
 import { corsMiddleware } from "./middleware/cors.js";
 import { authMiddleware } from "./middleware/auth.js";
@@ -64,12 +65,18 @@ app.route("/", og);
 // Mount auth routes
 app.route("/auth", auth);
 
+// Mount billing routes before api so /api/billing/* matches first
+app.route("/api/billing", billing);
+
 // Mount me routes before api so /api/me/* matches first
 app.route("/api/me", me);
 
 // Mount API routes
 app.route("/api", api);
 app.route("/api", report);
+
+// GET /upgrade — sign in if needed, then redirect to checkout
+app.route("/", upgrade);
 
 // Mount dashboard route (authenticated HTML shell)
 app.route("/", dashboard);

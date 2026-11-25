@@ -30,7 +30,13 @@ import { TIERS } from '../lib/rate-limit-tiers.js';
 const auth = new Hono<AppBindings>();
 
 // Valid return paths for post-login redirect
-const ALLOWED_RETURN_PATHS = ['/dashboard', '/'];
+const ALLOWED_RETURN_PATHS = [
+  '/dashboard',
+  '/',
+  '/upgrade',
+  '/upgrade?interval=year',
+  '/upgrade?interval=month',
+];
 const ALLOWED_RETURN_PREFIX = '/p/';
 
 function isAllowedReturn(path: string): boolean {
