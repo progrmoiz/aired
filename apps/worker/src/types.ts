@@ -12,6 +12,7 @@ export type Env = {
   PUBLISH_BURST?: RateLimit;
   REPORT_BURST?: RateLimit;
   PIN_GUESS?: RateLimit;
+  PIN_GUESS_PAGE?: RateLimit;
   /** D1 database for accounts and billing state (wrangler.toml [[d1_databases]]). */
   DB: D1Database;
   /** "1" turns billing on (checkout, portal, Pro limits). Unset or anything else: off. */

@@ -11,6 +11,7 @@ import { notFoundPage } from "../lib/not-found.js";
 import { viewWrite } from "../lib/view-write.js";
 import { hashPin, isPinHash, pinCookieValue, verifyPin, verifyPinCookie } from "../lib/pin-hash.js";
 import { underBurstLimit } from "../lib/burst-limit.js";
+import { pinGuessKeys, visitorNetwork } from "../lib/pin-guess.js";
 import { hashToHex } from "@aired/core";
 
 /** How long a correct PIN entry lets the browser in. */
@@ -166,10 +167,14 @@ viewer.post("/p/:id/verify-pin", async (c) => {
     return c.json({ error: "pin is required" }, 400);
   }
 
-  // Limit guesses per page and visitor (wrangler.toml PIN_GUESS). The IP is
-  // only hashed into the key, never stored.
+  // Limit guesses per page and visitor, and per page in all (lib/pin-guess.ts).
+  // The address is only hashed into the key, never stored.
   const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
-  if (!(await underBurstLimit(c.env.PIN_GUESS, `${id}:${await hashToHex(ip, 16)}`))) {
+  const keys = pinGuessKeys(id, await hashToHex(visitorNetwork(ip), 16));
+  if (
+    !(await underBurstLimit(c.env.PIN_GUESS, keys.visitor)) ||
+    !(await underBurstLimit(c.env.PIN_GUESS_PAGE, keys.page))
+  ) {
     return c.json({ error: "Too many tries. Wait a minute and try again." }, 429);
   }
 

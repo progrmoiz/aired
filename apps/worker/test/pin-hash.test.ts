@@ -81,7 +81,9 @@ test("publish, MCP and the viewer store hashes and check cookie tokens", () => {
 test("verify-pin limits guesses, and the rehash and view-count writes don't undo each other", () => {
   const viewer = readFileSync(new URL("../src/routes/viewer.ts", import.meta.url), "utf8");
   // Guess limit keyed by page and hashed IP, checked before any PIN work.
-  assert.match(viewer, /underBurstLimit\(c\.env\.PIN_GUESS, `\$\{id\}:\$\{await hashToHex\(ip, 16\)\}`\)/);
+  assert.match(viewer, /const keys = pinGuessKeys\(id, await hashToHex\(visitorNetwork\(ip\), 16\)\);/);
+  assert.match(viewer, /underBurstLimit\(c\.env\.PIN_GUESS, keys\.visitor\)/);
+  assert.match(viewer, /underBurstLimit\(c\.env\.PIN_GUESS_PAGE, keys\.page\)/);
   assert.ok(viewer.indexOf("c.env.PIN_GUESS") < viewer.indexOf("await verifyPin(pin, metadata.pin)"));
   // Rehash re-reads and skips gone, changed or already-hashed records.
   assert.match(viewer, /if \(fresh === null \|\| fresh\.pin !== metadata\.pin \|\| fresh\.pin === null \|\| isPinHash\(fresh\.pin\)\) return;/);
@@ -90,4 +92,5 @@ test("verify-pin limits guesses, and the rehash and view-count writes don't undo
   assert.match(viewer, /if \(updated\.pin !== null && !isPinHash\(updated\.pin\)\) \{/);
   const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
   assert.match(toml, /name = "PIN_GUESS"\s*\nnamespace_id = "1003"\s*\nsimple = \{ limit = 10, period = 60 \}/);
+  assert.match(toml, /name = "PIN_GUESS_PAGE"\s*\nnamespace_id = "1004"\s*\nsimple = \{ limit = 60, period = 60 \}/);
 });

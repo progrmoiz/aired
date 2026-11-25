@@ -45,12 +45,18 @@ name = "REPORT_BURST"
 namespace_id = "1002"
 simple = { limit = 3, period = 60 }
 
-# PIN guesses per page per visitor: 10 a minute makes guessing a 4-digit PIN
-# take hours from one address instead of minutes.
+# PIN guesses: 10 a minute per page and visitor (an IPv6 visitor counts by
+# /64), and 60 a minute per page in all (src/lib/pin-guess.ts). A 4-digit PIN
+# then takes hours to guess however many addresses are used.
 [[ratelimits]]
 name = "PIN_GUESS"
 namespace_id = "1003"
 simple = { limit = 10, period = 60 }
+
+[[ratelimits]]
+name = "PIN_GUESS_PAGE"
+namespace_id = "1004"
+simple = { limit = 60, period = 60 }
 
 # Custom domain
 [[routes]]
