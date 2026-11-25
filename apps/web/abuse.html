@@ -64,8 +64,13 @@
           <option value="malware">Malware or a scam download</option>
           <option value="illegal">Illegal content</option>
           <option value="other">Something else</option>
+          <option value="owner_removal">I published this and lost the link to manage it</option>
         </select>
       </label>
+
+      <p id="owner-note" class="hidden text-sm text-aired-text-secondary border border-aired-border rounded-lg px-3 py-2.5" role="note">
+        We remove pages on request after a quick check. We never move a page to someone else's account without its update token.
+      </p>
 
       <label class="flex flex-col gap-1.5">
         <span class="text-sm font-medium">Details</span>
@@ -108,6 +113,20 @@
       var status = document.getElementById('status');
       var submit = document.getElementById('submit');
 
+      var category = document.getElementById('category');
+      var ownerNote = document.getElementById('owner-note');
+      var reasonBox = document.getElementById('reason');
+      var defaultPlaceholder = reasonBox.placeholder;
+      function syncCategory() {
+        var owner = category.value === 'owner_removal';
+        ownerNote.classList.toggle('hidden', !owner);
+        reasonBox.placeholder = owner
+          ? 'What is the page, and when did you publish it? Add your email below so we can reply.'
+          : defaultPlaceholder;
+      }
+      category.addEventListener('change', syncCategory);
+      syncCategory();
+
       var preset = new URLSearchParams(location.search).get('id');
       if (preset) page.value = 'https://aired.sh/p/' + preset;
 
@@ -133,6 +152,7 @@
           return res.json().catch(function () { return {}; }).then(function (data) {
             if (res.ok) {
               form.reset();
+              syncCategory();
               status.textContent = 'Thanks. We got your report and will review it.';
             } else {
               status.textContent = data.error || 'Could not send the report. Try again.';
