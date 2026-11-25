@@ -145,3 +145,17 @@ export function checkoutGate<S extends { status: string }>(
   if (subs.length > 0) return { kind: 'processing' };
   return null;
 }
+
+/**
+ * Which user a webhook's subscription belongs to. Our own customer mapping
+ * (subscriptions / billing_customers) wins; metadata.uid or client_reference_id
+ * is only a fallback for a customer we have no row for. `conflict` is set when
+ * both exist and disagree, so the caller can log it.
+ */
+export function resolveWebhookUid(
+  dbUid: number | null,
+  metadataUid: number | null,
+): { uid: number | null; conflict: boolean } {
+  if (dbUid !== null) return { uid: dbUid, conflict: metadataUid !== null && metadataUid !== dbUid };
+  return { uid: metadataUid, conflict: false };
+}

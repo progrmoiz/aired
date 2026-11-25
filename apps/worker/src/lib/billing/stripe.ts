@@ -1,16 +1,22 @@
 import type { Env } from '../../types.js';
 import {
+  BillingConfigError,
   STRIPE_API_VERSION,
+  StripeError,
+  checkoutConfigProblem,
   checkoutParams,
   liveSubscriptions,
   normalizeSubscription,
   stripeErrorFrom,
+  stripeKeyProblem,
   type NormalizedSubscription,
 } from './stripe-shapes.js';
+import { alreadyEnded, invoicePaymentsPage, subscriptionOfInvoice } from './risk-events.js';
 
 /**
- * The three Stripe REST calls billing needs, over plain fetch with form bodies
+ * The Stripe REST calls billing needs, over plain fetch with form bodies
  * (no SDK). Every call pins `Stripe-Version`. Errors never carry the key.
+ * Only restricted keys (rk_…) are accepted.
  */
 
 type StripeEnv = Pick<
@@ -19,6 +25,7 @@ type StripeEnv = Pick<
   | 'STRIPE_PRICE_MONTHLY'
   | 'STRIPE_PRICE_YEARLY'
   | 'STRIPE_AUTOMATIC_TAX'
+  | 'STRIPE_MANAGED_PAYMENTS'
   | 'STRIPE_API_BASE'
 >;
 
@@ -35,11 +42,14 @@ export type CheckoutInput = {
 export async function createCheckout(env: StripeEnv, input: CheckoutInput): Promise<{ url: string }> {
   const price = input.interval === 'year' ? env.STRIPE_PRICE_YEARLY : env.STRIPE_PRICE_MONTHLY;
   if (!price) throw new Error(`Stripe price for interval "${input.interval}" is not configured`);
+  const problem = checkoutConfigProblem(env);
+  if (problem) throw new BillingConfigError(problem);
   const body = checkoutParams({
     ...input,
     priceMonthly: env.STRIPE_PRICE_MONTHLY ?? '',
     priceYearly: env.STRIPE_PRICE_YEARLY ?? '',
     automaticTax: env.STRIPE_AUTOMATIC_TAX === '1',
+    managedPayments: env.STRIPE_MANAGED_PAYMENTS === '1',
   });
   const { data } = await stripeRequest(env, 'POST', '/v1/checkout/sessions', body);
   return { url: urlOf(data, 'checkout session') };
@@ -87,20 +97,96 @@ export async function fetchSubscription(env: StripeEnv, id: string): Promise<Nor
   return normalizeSubscription(data);
 }
 
+/** The PaymentIntent behind a charge, or null (a legacy charge without one, or no such charge). */
+export async function fetchChargePaymentIntent(env: StripeEnv, chargeId: string): Promise<string | null> {
+  const { status, data } = await stripeRequest(
+    env, 'GET', `/v1/charges/${encodeURIComponent(chargeId)}`, null, [404],
+  );
+  if (status === 404) return null;
+  const pi = (data as { payment_intent?: unknown } | null)?.payment_intent;
+  if (typeof pi === 'string' && pi) return pi;
+  const expanded = (pi as { id?: unknown } | null)?.id;
+  return typeof expanded === 'string' && expanded ? expanded : null;
+}
+
+const MAX_INVOICE_PAYMENT_PAGES = 10;
+
+/**
+ * Subscriptions paid by a PaymentIntent: its paid invoice payments (all pages),
+ * each invoice's parent subscription. Empty when it paid no subscription invoice.
+ */
+export async function subscriptionsForPaymentIntent(env: StripeEnv, paymentIntentId: string): Promise<string[]> {
+  const found = new Set<string>();
+  let cursor: string | null = null;
+  for (let page = 0; page < MAX_INVOICE_PAYMENT_PAGES; page++) {
+    const q = new URLSearchParams({
+      'payment[type]': 'payment_intent',
+      'payment[payment_intent]': paymentIntentId,
+      status: 'paid',
+      limit: '100',
+      'expand[]': 'data.invoice',
+    });
+    if (cursor) q.set('starting_after', cursor);
+    const { data } = await stripeRequest(env, 'GET', `/v1/invoice_payments?${q.toString()}`, null);
+    const { invoices, nextCursor } = invoicePaymentsPage(data);
+    for (const inv of invoices) {
+      const invoice = typeof inv === 'string' ? await fetchInvoice(env, inv) : inv;
+      const sub = invoice ? subscriptionOfInvoice(invoice) : null;
+      if (sub) found.add(sub);
+    }
+    if (!nextCursor) break;
+    cursor = nextCursor;
+  }
+  return [...found];
+}
+
+async function fetchInvoice(env: StripeEnv, id: string): Promise<unknown> {
+  const { status, data } = await stripeRequest(env, 'GET', `/v1/invoices/${encodeURIComponent(id)}`, null, [404]);
+  return status === 404 ? null : data;
+}
+
+/**
+ * Cancel a subscription now (no proration, no final invoice). Idempotent: when
+ * Stripe refuses because it is already canceled or gone, that counts as done.
+ * Never refunds anything.
+ */
+export async function cancelSubscription(
+  env: StripeEnv,
+  id: string,
+  comment: string,
+): Promise<'canceled' | 'already_ended'> {
+  const q = new URLSearchParams({ 'cancellation_details[comment]': comment });
+  try {
+    await stripeRequest(env, 'DELETE', `/v1/subscriptions/${encodeURIComponent(id)}?${q.toString()}`, null);
+    return 'canceled';
+  } catch (err) {
+    if (!(err instanceof StripeError)) throw err;
+    if (err.code === 'resource_missing') return 'already_ended';
+    // Whatever the error code, re-read the subscription: if it already ended, we're done.
+    const now = await fetchSubscription(env, id);
+    if (!now || alreadyEnded(now.status)) return 'already_ended';
+    throw err;
+  }
+}
+
 async function stripeRequest(
   env: StripeEnv,
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'DELETE',
   path: string,
   body: URLSearchParams | null,
   allowStatuses: number[] = [],
   extraHeaders: Record<string, string> = {},
 ): Promise<{ status: number; data: unknown }> {
   const key = env.STRIPE_SECRET_KEY;
-  if (!key) throw new Error('Stripe is not configured (STRIPE_SECRET_KEY missing)');
+  const keyProblem = stripeKeyProblem(key);
+  if (keyProblem) {
+    console.error({ event: 'billing_misconfigured', error: keyProblem });
+    throw new BillingConfigError(keyProblem);
+  }
   const base = (env.STRIPE_API_BASE ?? 'https://api.stripe.com').replace(/\/+$/, '');
 
   const headers = {
-    'Authorization': `Bearer ${key}`,
+    'Authorization': `Bearer ${key!}`,
     'Stripe-Version': STRIPE_API_VERSION,
     'Content-Type': 'application/x-www-form-urlencoded',
     ...extraHeaders,

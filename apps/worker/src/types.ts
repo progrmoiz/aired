@@ -15,7 +15,7 @@ export type Env = {
   DB: D1Database;
   /** "1" turns billing on (checkout, portal, Pro limits). Unset or anything else: off. */
   BILLING_ENABLED?: string;
-  /** Stripe secret or restricted API key (rk_… / sk_…). */
+  /** Stripe restricted API key (rk_…). Secret keys (sk_…) are refused. */
   STRIPE_SECRET_KEY?: string;
   /** Stripe webhook signing secret (whsec_…). */
   STRIPE_WEBHOOK_SECRET?: string;
@@ -30,6 +30,11 @@ export type Env = {
   STRIPE_LEGACY_PRICE_IDS?: string;
   /** "1" turns on Stripe automatic tax in checkout. Unset: off. */
   STRIPE_AUTOMATIC_TAX?: string;
+  /**
+   * "1" turns on Stripe Managed Payments (Stripe as merchant of record; it
+   * handles tax itself). Unset: off. Can't be combined with STRIPE_AUTOMATIC_TAX.
+   */
+  STRIPE_MANAGED_PAYMENTS?: string;
   /** Stripe API origin. Default https://api.stripe.com; override only for local mocks. */
   STRIPE_API_BASE?: string;
   /** Site origin for Stripe success/cancel/portal return URLs. Default https://aired.sh; set only for local dev. */

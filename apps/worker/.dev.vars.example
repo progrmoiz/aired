@@ -16,6 +16,8 @@ STRIPE_PRICE_YEARLY=price_yearly_test_id
 # STRIPE_LEGACY_PRICE_IDS=price_old_monthly,price_old_yearly
 # "1" turns on Stripe automatic tax in checkout; empty = off.
 STRIPE_AUTOMATIC_TAX=
+# "1" turns on Stripe Managed Payments (merchant of record; handles tax). Not with STRIPE_AUTOMATIC_TAX.
+# STRIPE_MANAGED_PAYMENTS=1
 # Optional: point at a local Stripe mock. Default https://api.stripe.com.
 # STRIPE_API_BASE=http://localhost:12111
 # Optional, local dev only: where Stripe sends the user back. Default https://aired.sh.

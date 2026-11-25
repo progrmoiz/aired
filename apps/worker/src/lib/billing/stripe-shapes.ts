@@ -24,10 +24,13 @@ export type NormalizedSubscription = {
   priceId: string | null;
 };
 
+/** Lifecycle events: each re-fetches the subscription and stores it. */
 export const HANDLED_EVENTS: readonly string[] = [
   'checkout.session.completed',
+  'customer.subscription.created',
   'customer.subscription.updated',
   'customer.subscription.deleted',
+  'invoice.paid',
   'invoice.payment_failed',
 ];
 
@@ -39,6 +42,8 @@ export function checkoutParams(i: {
   customerId: string | null;
   email: string | null;
   automaticTax: boolean;
+  /** Stripe Managed Payments (merchant of record). Stripe handles tax, so no tax params are sent. */
+  managedPayments?: boolean;
   origin: string;
 }): URLSearchParams {
   const uid = String(i.uid);
@@ -53,7 +58,11 @@ export function checkoutParams(i: {
   else if (i.email) p.set('customer_email', i.email);
   p.set('success_url', `${i.origin}/dashboard?upgraded=1`);
   p.set('cancel_url', `${i.origin}/pricing`);
-  if (i.automaticTax) {
+  if (i.managedPayments) {
+    // Managed Payments rejects automatic_tax and customer_update[name|address]:
+    // it collects name and address itself and updates the passed customer.
+    p.set('managed_payments[enabled]', 'true');
+  } else if (i.automaticTax) {
     p.set('automatic_tax[enabled]', 'true');
     // Stripe Tax needs an address; let Checkout save it on an existing customer.
     if (i.customerId) p.set('customer_update[address]', 'auto');
@@ -119,6 +128,44 @@ export class StripeError extends Error {
     this.code = detail.code;
     this.param = detail.param;
   }
+}
+
+/** Billing is set up wrong (key type, conflicting flags). Never retried against Stripe. */
+export class BillingConfigError extends Error {
+  readonly code = 'billing_misconfigured';
+  constructor(message: string) {
+    super(message);
+    this.name = 'BillingConfigError';
+  }
+}
+
+/**
+ * Why this Stripe key can't be used, or null. Only restricted keys (rk_…) are
+ * accepted: a leaked secret key (sk_…) can do anything on the account.
+ */
+export function stripeKeyProblem(key: string | undefined): string | null {
+  if (!key) return 'Stripe is not configured (STRIPE_SECRET_KEY missing)';
+  if (key.startsWith('sk_')) return 'Use a restricted key (rk_…), not a secret key';
+  if (!key.startsWith('rk_')) return 'STRIPE_SECRET_KEY must be a restricted key (rk_…)';
+  return null;
+}
+
+/** Why Checkout can't be created with these flags, or null. */
+export function checkoutConfigProblem(env: { STRIPE_MANAGED_PAYMENTS?: string; STRIPE_AUTOMATIC_TAX?: string }): string | null {
+  if (env.STRIPE_MANAGED_PAYMENTS === '1' && env.STRIPE_AUTOMATIC_TAX === '1') {
+    return 'STRIPE_MANAGED_PAYMENTS and STRIPE_AUTOMATIC_TAX are both on; Managed Payments handles tax, so turn STRIPE_AUTOMATIC_TAX off';
+  }
+  return null;
+}
+
+/**
+ * The subscription carried in a customer.subscription.* event, normalized.
+ * Used when the re-fetch 404s on a deleted subscription (Managed Payments can
+ * delete customer data on request); otherwise the re-fetch is the truth.
+ */
+export function eventSubscription(evt: unknown): NormalizedSubscription | null {
+  const e = eventObject(evt);
+  return e && e.kind === 'subscription' ? normalizeSubscription(e.obj) : null;
 }
 
 /** Build the StripeError for a non-2xx response body. */

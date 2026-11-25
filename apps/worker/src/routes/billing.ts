@@ -8,19 +8,27 @@ import { TIERS } from '../lib/rate-limit-tiers.js';
 import { billingEnabled, isEntitled } from '../lib/entitlements.js';
 import { verifyStripeSignature } from '../lib/billing/signature.js';
 import {
+  BillingConfigError,
   HANDLED_EVENTS,
+  checkoutConfigProblem,
+  eventSubscription,
   isMissingCustomer,
+  stripeKeyProblem,
   subscriptionIdFromEvent,
   uidFromEvent,
   type NormalizedSubscription,
 } from '../lib/billing/stripe-shapes.js';
 import {
+  cancelSubscription,
   createCheckout,
   createCustomer,
   createPortal,
+  fetchChargePaymentIntent,
   fetchSubscription,
   listActiveSubscriptions,
+  subscriptionsForPaymentIntent,
 } from '../lib/billing/stripe.js';
+import { RISK_EVENTS, alreadyEnded, planRiskEvent } from '../lib/billing/risk-events.js';
 import {
   ensureUser,
   hasEvent,
@@ -40,6 +48,7 @@ import {
   parseInterval,
   parseWebhookEvent,
   planWebhookEvent,
+  resolveWebhookUid,
   siteOrigin,
   upgradeInterval,
   type Interval,
@@ -54,6 +63,12 @@ const ALREADY_PRO = 'You already have Pro';
 const PROCESSING = 'Your payment is still processing. This can take a few minutes, or longer for bank payments.';
 const NO_ACCOUNT = 'No billing account yet';
 const PAYMENT_FAILED = 'Your last payment failed. Update your card in Manage billing.';
+const MISCONFIGURED = 'Billing is misconfigured';
+
+/** A setup problem that makes every Stripe call pointless (bad key type, conflicting flags), or null. */
+function configProblem(env: AppBindings['Bindings']): string | null {
+  return stripeKeyProblem(env.STRIPE_SECRET_KEY) ?? checkoutConfigProblem(env);
+}
 
 const billing = new Hono<AppBindings>();
 const upgrade = new Hono<AppBindings>();
@@ -162,6 +177,11 @@ billing.get('/status', async (c) => {
 billing.post('/checkout', requireAuth, requireCsrfHeader, rateLimit(TIERS.billing), async (c) => {
   if (!billingEnabled(c.env)) return c.json({ error: BILLING_OFF }, 503);
   const user = c.get('user')!;
+  const problem = configProblem(c.env);
+  if (problem) {
+    console.error({ event: 'billing_misconfigured', error: problem });
+    return c.json({ error: MISCONFIGURED }, 503);
+  }
 
   let body: unknown;
   try {
@@ -187,6 +207,7 @@ billing.post('/checkout', requireAuth, requireCsrfHeader, rateLimit(TIERS.billin
     return c.json({ url: result.url });
   } catch (err) {
     logBillingError('billing_checkout_failed', user.id, err);
+    if (err instanceof BillingConfigError) return c.json({ error: MISCONFIGURED }, 503);
     return c.json({ error: CHECKOUT_FAILED }, 502);
   }
 });
@@ -215,6 +236,7 @@ billing.post('/portal', requireAuth, requireCsrfHeader, rateLimit(TIERS.billing)
       }
     }
     logBillingError('billing_portal_failed', user.id, err);
+    if (err instanceof BillingConfigError) return c.json({ error: MISCONFIGURED }, 503);
     return c.json({ error: 'Could not open billing. Please try again.' }, 502);
   }
 });
@@ -261,27 +283,109 @@ billing.post('/webhook', async (c) => {
 
 /** Re-fetch the subscription an event points at and store it. Returns quietly for events to ignore. */
 async function handleEvent(c: Context<AppBindings>, evt: WebhookEvent): Promise<void> {
+  if (RISK_EVENTS.includes(evt.type)) return handleRiskEvent(c, evt);
+
   const plan = planWebhookEvent(evt, HANDLED_EVENTS, subscriptionIdFromEvent);
   if (plan === 'ignore') return;
 
-  const sub = await fetchSubscription(c.env, plan.subscriptionId);
+  let sub = await fetchSubscription(c.env, plan.subscriptionId);
+  if (!sub && evt.type === 'customer.subscription.deleted') {
+    // Gone from Stripe (e.g. a Managed Payments data deletion): the event's own
+    // object is the last state we'll ever see, so store that.
+    sub = eventSubscription(evt.raw);
+    if (sub) console.warn({ event: 'billing_webhook_sub_gone_using_event', eventId: evt.id, subscriptionId: sub.id });
+  }
   if (!sub) return;
+  await storeSubscription(c, evt, sub);
+}
 
+/** Store a subscription for its user. Returns the uid, or null when it was skipped (not Pro, no user). */
+async function storeSubscription(
+  c: Context<AppBindings>,
+  evt: WebhookEvent,
+  sub: NormalizedSubscription,
+): Promise<number | null> {
   // Only our Pro prices grant Pro; other products on the Stripe account don't.
   if (!isProPrice(sub.priceId, c.env)) {
     console.warn({ event: 'billing_webhook_not_pro_price', eventId: evt.id, subscriptionId: sub.id, priceId: sub.priceId });
-    return;
+    return null;
   }
 
-  const uid = sub.uid ?? uidFromEvent(evt.raw) ?? (await findUidByCustomer(c.env.DB, sub.customerId));
+  const uid = await webhookUid(c, evt, sub);
   if (uid === null) {
     console.warn({ event: 'billing_webhook_no_uid', eventId: evt.id, type: evt.type });
-    return;
+    return null;
   }
 
   // INSERT OR IGNORE: leaves a real users row alone; adds a stub only when none exists.
   await ensureUser(c.env.DB, { id: uid, login: `user-${uid}`, email: null, name: null });
   await syncSubscription(c.env, uid, sub);
+  return uid;
+}
+
+/** Our customer → user mapping first; metadata only for a customer we've never stored. */
+async function webhookUid(c: Context<AppBindings>, evt: WebhookEvent, sub: NormalizedSubscription): Promise<number | null> {
+  const dbUid = await findUidByCustomer(c.env.DB, sub.customerId);
+  const metadataUid = sub.uid ?? uidFromEvent(evt.raw);
+  const { uid, conflict } = resolveWebhookUid(dbUid, metadataUid);
+  if (conflict) {
+    console.warn({
+      event: 'billing_webhook_uid_mismatch',
+      eventId: evt.id,
+      customerId: sub.customerId,
+      dbUid,
+      metadataUid,
+    });
+  }
+  return uid;
+}
+
+/**
+ * A full refund, a dispute or an early fraud warning on a subscription charge
+ * ends Pro: cancel the subscription now and store the result, which removes
+ * `ent:<uid>`. A partial refund is only logged. Nothing is ever refunded here.
+ */
+async function handleRiskEvent(c: Context<AppBindings>, evt: WebhookEvent): Promise<void> {
+  const plan = planRiskEvent(evt);
+  if (plan.action === 'ignore') return;
+  if (plan.action === 'log_partial_refund') {
+    console.log({ event: 'billing_partial_refund', eventId: evt.id, chargeId: plan.chargeId });
+    return;
+  }
+  const notSubscription = (why: string) =>
+    console.log({ event: 'billing_risk_not_subscription', reason: plan.reason, eventId: evt.id, why });
+  if (plan.action === 'no_payment_intent') return notSubscription('no_payment_intent');
+
+  const paymentIntentId =
+    plan.action === 'resolve_payment_intent'
+      ? plan.paymentIntentId
+      : await fetchChargePaymentIntent(c.env, plan.chargeId);
+  if (!paymentIntentId) return notSubscription('no_payment_intent');
+
+  const subscriptionIds = await subscriptionsForPaymentIntent(c.env, paymentIntentId);
+  if (subscriptionIds.length === 0) return notSubscription('no_invoice_payment');
+
+  for (const subscriptionId of subscriptionIds) {
+    const before = await fetchSubscription(c.env, subscriptionId);
+    if (!before) {
+      notSubscription('subscription_gone');
+      continue;
+    }
+    if (!isProPrice(before.priceId, c.env)) {
+      console.warn({ event: 'billing_risk_not_pro_price', eventId: evt.id, subscriptionId, priceId: before.priceId });
+      continue;
+    }
+    const result = alreadyEnded(before.status)
+      ? 'already_ended'
+      : await cancelSubscription(c.env, subscriptionId, `aired: ${plan.reason}`);
+    const after = (await fetchSubscription(c.env, subscriptionId)) ?? {
+      ...before,
+      status: 'canceled',
+      cancelAtPeriodEnd: false,
+    };
+    const uid = await storeSubscription(c, evt, after);
+    console.log({ event: 'billing_pro_revoked', reason: plan.reason, eventId: evt.id, uid, subscriptionId, result });
+  }
 }
 
 // GET /upgrade?interval=year|month — sign in if needed, then go to Stripe Checkout.
@@ -293,6 +397,12 @@ upgrade.get('/upgrade', rateLimit(TIERS.billing), async (c) => {
   if (!user) {
     const back = `/upgrade?interval=${interval}`;
     return c.redirect(`/auth/github?return=${encodeURIComponent(back)}`, 302);
+  }
+
+  const problem = configProblem(c.env);
+  if (problem) {
+    console.error({ event: 'billing_misconfigured', error: problem });
+    return c.redirect('/pricing?checkout=error', 302);
   }
 
   try {

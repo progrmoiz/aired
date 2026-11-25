@@ -5,7 +5,11 @@ import {
   STRIPE_API_VERSION,
   checkoutParams,
   LIVE_STATUSES,
+  BillingConfigError,
   StripeError,
+  checkoutConfigProblem,
+  eventSubscription,
+  stripeKeyProblem,
   isMissingCustomer,
   stripeErrorFrom,
   liveSubscriptions,
@@ -182,11 +186,13 @@ test("the API version is pinned to basil", () => {
   assert.equal(STRIPE_API_VERSION, "2025-03-31.basil");
 });
 
-test("handles exactly the four webhook events", () => {
+test("handles exactly the six lifecycle webhook events", () => {
   assert.deepEqual([...HANDLED_EVENTS].sort(), [
     "checkout.session.completed",
+    "customer.subscription.created",
     "customer.subscription.deleted",
     "customer.subscription.updated",
+    "invoice.paid",
     "invoice.payment_failed",
   ]);
 });
@@ -495,4 +501,66 @@ test("isMissingCustomer: resource_missing on the customer, or with no param", ()
   assert.equal(isMissingCustomer(e(undefined)), false);
   assert.equal(isMissingCustomer(new Error("resource_missing")), false);
   assert.equal(isMissingCustomer(null), false);
+});
+
+test("checkout params with Managed Payments on: managed_payments, never tax or customer_update", () => {
+  for (const automaticTax of [false, true]) {
+    const p = checkoutParams({ ...baseCheckout, customerId: "cus_1", automaticTax, managedPayments: true });
+    assert.equal(p.get("managed_payments[enabled]"), "true", `tax ${automaticTax}`);
+    assert.equal(p.get("customer"), "cus_1");
+    for (const key of p.keys()) {
+      assert.ok(!key.startsWith("automatic_tax"), key);
+      assert.ok(!key.startsWith("customer_update"), key);
+    }
+  }
+});
+
+test("checkout params with Managed Payments off keep today's tax behaviour", () => {
+  const off = checkoutParams({ ...baseCheckout, customerId: "cus_1", automaticTax: true, managedPayments: false });
+  assert.equal(off.has("managed_payments[enabled]"), false);
+  assert.equal(off.get("automatic_tax[enabled]"), "true");
+  assert.equal(off.get("customer_update[address]"), "auto");
+  const none = checkoutParams({ ...baseCheckout, customerId: "cus_1" });
+  assert.equal(none.has("managed_payments[enabled]"), false);
+  assert.equal(none.has("automatic_tax[enabled]"), false);
+});
+
+test("checkoutConfigProblem refuses Managed Payments together with automatic tax", () => {
+  assert.equal(checkoutConfigProblem({}), null);
+  assert.equal(checkoutConfigProblem({ STRIPE_MANAGED_PAYMENTS: "1" }), null);
+  assert.equal(checkoutConfigProblem({ STRIPE_AUTOMATIC_TAX: "1" }), null);
+  assert.equal(checkoutConfigProblem({ STRIPE_MANAGED_PAYMENTS: "1", STRIPE_AUTOMATIC_TAX: "" }), null);
+  assert.match(
+    checkoutConfigProblem({ STRIPE_MANAGED_PAYMENTS: "1", STRIPE_AUTOMATIC_TAX: "1" }) ?? "",
+    /STRIPE_MANAGED_PAYMENTS and STRIPE_AUTOMATIC_TAX/,
+  );
+});
+
+test("stripeKeyProblem accepts only restricted keys", () => {
+  assert.equal(stripeKeyProblem("rk_test_abc"), null);
+  assert.equal(stripeKeyProblem("rk_live_abc"), null);
+  assert.equal(stripeKeyProblem("sk_test_abc"), "Use a restricted key (rk_…), not a secret key");
+  assert.equal(stripeKeyProblem("sk_live_abc"), "Use a restricted key (rk_…), not a secret key");
+  assert.match(stripeKeyProblem("pk_test_abc") ?? "", /must be a restricted key/);
+  assert.match(stripeKeyProblem(undefined) ?? "", /STRIPE_SECRET_KEY missing/);
+  assert.match(stripeKeyProblem("") ?? "", /STRIPE_SECRET_KEY missing/);
+  // the message never echoes the key
+  assert.ok(!(stripeKeyProblem("sk_live_secretvalue") ?? "").includes("secretvalue"));
+});
+
+test("BillingConfigError carries a fixed code", () => {
+  const e = new BillingConfigError("x");
+  assert.ok(e instanceof Error);
+  assert.equal(e.code, "billing_misconfigured");
+  assert.equal(e.message, "x");
+});
+
+test("eventSubscription normalizes the object of a customer.subscription.* event only", () => {
+  const sub = eventSubscription(subscriptionDeleted);
+  assert.equal(sub?.id, "sub_1RbasilA2b3C4d5E");
+  assert.equal(sub?.status, "canceled");
+  assert.equal(sub?.priceId, "price_1RyearlyPro");
+  assert.equal(eventSubscription({ type: "invoice.paid", data: { object: basilSubscription } }), null);
+  assert.equal(eventSubscription({ type: "customer.subscription.deleted", data: { object: { id: "sub_x" } } }), null);
+  for (const g of garbage) assert.equal(eventSubscription(g), null);
 });
