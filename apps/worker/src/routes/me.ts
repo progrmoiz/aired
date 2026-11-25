@@ -24,7 +24,7 @@ import {
   bumpProjectCount,
 } from '../lib/owner-index.js';
 import { clearSessionCookie, readSessionCookie } from '../lib/cookies.js';
-import { billingEnabled, getEntitlements } from '../lib/entitlements.js';
+import { billingEnabled, getEntitlements, isEntitled } from '../lib/entitlements.js';
 import { getSubscription } from '../lib/billing/store.js';
 import type { StoredSubscription } from '../lib/billing/store.js';
 import { AUTH_HEADER } from '@aired/core';
@@ -286,6 +286,23 @@ me.delete('/', requireCsrfHeader, async (c) => {
   const user = c.get('user')!;
   const userId = user.id;
   const jti = c.get('jti');
+
+  // A live Pro subscription would keep charging after the account is gone,
+  // so it has to be cancelled first (Manage billing → cancel).
+  if (billingEnabled(c.env)) {
+    let sub: StoredSubscription | null;
+    try {
+      sub = await getSubscription(c.env.DB, userId);
+    } catch {
+      return c.json({ error: 'Could not check your subscription. Please try again.' }, 503);
+    }
+    if (sub !== null && !sub.cancelAtPeriodEnd && isEntitled(sub, new Date())) {
+      return c.json(
+        { error: 'Cancel Pro in Manage billing before deleting your account.', code: 'subscription_active' },
+        409,
+      );
+    }
+  }
 
   // Step 1: Revoke current JWT by writing revoked_jti to KV
   if (jti !== null) {
