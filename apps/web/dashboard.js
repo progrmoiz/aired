@@ -588,6 +588,11 @@
       if (date) label += status.cancelAtPeriodEnd ? ' · ends ' + date : ' · renews ' + date;
       if (status.status === 'past_due') helper = 'Last payment failed. Update your card in billing';
       plan.mode = 'portal';
+    } else if (status.status === 'past_due' || status.status === 'unpaid') {
+      // Pro lapsed because a payment failed: the fix is the card, not a new checkout.
+      label = 'Free';
+      helper = 'Your last payment failed. Update your card to get Pro back.';
+      plan.mode = 'portal';
     } else {
       label = 'Free';
       helper = 'Pro: no aired badge, 10 MB pages, $108/year';
@@ -666,10 +671,21 @@
           return;
         }
         if (mode === 'checkout' && res.status === 409) {
-          // Already Pro (e.g. paid in another tab): show it instead of an error.
+          // Checkout was refused because a subscription already exists. Show the
+          // real state rather than an error; only claim Pro when it is Pro.
+          var message = (data && typeof data.error === 'string') ? data.error : '';
           return loadPlanStatus().then(function (status) {
-            renderPlan(status);
-            announce("You're on Pro");
+            if (data && data.code === 'payment_failed') {
+              renderPlan(status, message);
+              if (plan.mode !== 'portal') { plan.mode = 'portal'; setPlanButton(); }
+              announce(message);
+            } else if (status && status.plan === 'pro') {
+              renderPlan(status);
+              announce("You're on Pro");
+            } else {
+              renderPlan(status, message);
+              announce(message);
+            }
           });
         }
         if (mode === 'portal' && res.status === 404) {
@@ -746,6 +762,17 @@
       }
       if (!upgraded) {
         renderPlan(status);
+        // /upgrade sends a user whose payment failed here with ?billing=payment_failed.
+        var params = new URLSearchParams(window.location.search);
+        if (params.get('billing') === 'payment_failed') {
+          if (plan.mode !== 'portal') { plan.mode = 'portal'; setPlanButton(); }
+          setText('plan-detail', 'Your last payment failed. Update your card in Manage billing.');
+          params.delete('billing');
+          var qs = params.toString();
+          try {
+            window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+          } catch (_e) {}
+        }
       } else if (status.plan === 'pro') {
         clearUpgradedParam();
         renderPlan(status, "You're on Pro");

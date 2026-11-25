@@ -15,7 +15,13 @@ export type Entitlements = {
 export const FREE_MAX_BYTES = 2 * 1024 * 1024;
 export const PRO_MAX_BYTES = 10 * 1024 * 1024;
 
-/** A failed renewal keeps Pro for three days while Stripe retries the card. */
+/**
+ * Extra time after current_period_end before Pro ends. It covers a renewal
+ * webhook arriving late. A failed renewal is not limited to this: Stripe moves
+ * the period end forward when it creates the renewal invoice, so a past_due
+ * subscription keeps Pro until Stripe gives up and cancels it (Stripe setting:
+ * "cancel the subscription" after the last retry).
+ */
 export const GRACE_MS = 3 * 24 * 3600 * 1000;
 
 export const UPGRADE_URL = 'https://aired.sh/pricing';

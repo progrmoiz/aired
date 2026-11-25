@@ -179,11 +179,11 @@ billing.post('/checkout', requireAuth, requireCsrfHeader, rateLimit(TIERS.billin
 
   try {
     const result = await startCheckout(c, user, interval);
-    if (result.kind === 'pro') return c.json({ error: ALREADY_PRO }, 409);
+    if (result.kind === 'pro') return c.json({ error: ALREADY_PRO, code: 'already_pro' }, 409);
     if (result.kind === 'payment_failed') {
       return c.json({ error: PAYMENT_FAILED, code: 'payment_failed' }, 409);
     }
-    if (result.kind === 'processing') return c.json({ error: PROCESSING }, 409);
+    if (result.kind === 'processing') return c.json({ error: PROCESSING, code: 'processing' }, 409);
     return c.json({ url: result.url });
   } catch (err) {
     logBillingError('billing_checkout_failed', user.id, err);
