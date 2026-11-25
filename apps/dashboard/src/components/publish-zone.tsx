@@ -37,9 +37,10 @@ export function PublishZone({ size = 'compact', title, description, onPublished 
   const [pin, setPin] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [needsPro, setNeedsPro] = useState(false)
 
   const start = (code: string, from: { name: string; size: number } | null) => {
-    setHtml(code); setFile(from); setPin(''); setError(''); setLasts('Never'); setOpen(true)
+    setHtml(code); setFile(from); setPin(''); setError(''); setNeedsPro(false); setLasts('Never'); setOpen(true)
   }
 
   const takeFile = async (f: File | undefined) => {
@@ -56,14 +57,20 @@ export function PublishZone({ size = 'compact', title, description, onPublished 
 
   const publish = async () => {
     if (!html.trim()) { setError('Paste the page’s HTML first.'); return }
-    setBusy(true); setError('')
+    setBusy(true); setError(''); setNeedsPro(false)
     try {
       const choice = LASTS.find((l) => l.label === lasts) ?? LASTS[0]
       const res = await mutate('POST', '/api/publish', { html, ...choice.body, ...(pin ? { pin } : {}) })
       const data = await readJson(res)
       if (!res.ok) {
-        const msg = typeof data.error === 'string' ? data.error : typeof data.message === 'string' ? data.message : `Could not publish (error ${res.status}).`
-        setError(res.status === 402 ? `${msg} See Plan & billing for Pro.` : msg)
+        if (data.code === 'plan_limit') {
+          setNeedsPro(true)
+          setError(data.limit === 'publish_rate'
+            ? 'You’ve published a lot in a short time, more than the Free plan allows. Try again later, or get Pro for a higher limit.'
+            : 'This page is bigger than the Free plan allows. Pro takes pages up to 10 MB.')
+          return
+        }
+        setError(typeof data.error === 'string' ? data.error : `Could not publish (error ${res.status}).`)
         return
       }
       const url = typeof data.url === 'string' ? data.url : ''
@@ -121,7 +128,11 @@ export function PublishZone({ size = 'compact', title, description, onPublished 
             <p className="text-xs text-subtle">People need it to open the page. Send it separately from the link.</p>
           </div>
 
-          {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+          {error && (
+            <p className="text-sm text-destructive" role="alert">
+              {error}{needsPro && <> <a href="#billing" onClick={() => setOpen(false)} className="font-medium text-foreground underline underline-offset-4">See Pro</a></>}
+            </p>
+          )}
 
           <DialogFooter className="-mx-6 -mb-6 rounded-b-2xl border-t border-hairline bg-tint px-6 py-4">
             <Button variant="outline" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>
