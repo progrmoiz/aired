@@ -2,203 +2,103 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>aired — dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>aired — your pages</title>
   <meta name="robots" content="noindex, nofollow" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
   <link rel="icon" href="/favicon-16.png" type="image/png" sizes="16x16" />
-  <link rel="stylesheet" href="/style.css" />
   <link rel="preload" href="/fonts/inter-latin-v20.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/fonts/fonts.css" />
-  <style>
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
-
-    @keyframes skeleton-pulse {
-      from { opacity: 1; }
-      to { opacity: 0.4; }
-    }
-
-    .skeleton-row {
-      animation: skeleton-pulse 1.2s linear infinite alternate;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .skeleton-row { animation: none; opacity: 0.7; }
-    }
-
-    .row-action-btn {
-      transition: color 120ms cubic-bezier(0.16, 1, 0.3, 1),
-                  border-color 120ms cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    .row-link {
-      transition: color 120ms cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .row-link:hover {
-      text-decoration: underline;
-      text-decoration-color: #3b3b40;
-      text-underline-offset: 3px;
-    }
-
-    /* Copied state — DESIGN.md §8.2: green text + green border, no fill change */
-    .row-action-copied {
-      color: #34d399;
-      border-color: rgba(52, 211, 153, 0.3);
-    }
-
-    /* Delete confirm — stronger signal: primary text + outlined border */
-    .row-action-confirm {
-      color: #ededef;
-      border-color: #3b3b40;
-    }
-
-    /* Project group header chevron — rotates when the group is expanded */
-    .group-chevron {
-      transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .group-header[aria-expanded="true"] .group-chevron {
-      transform: rotate(90deg);
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .group-chevron { transition: none; }
-    }
-
-    /* Plan strip buttons: light primary (DESIGN.md §8.1) and secondary (§8.2) */
-    .plan-btn {
-      transition: background-color 120ms cubic-bezier(0.16, 1, 0.3, 1),
-                  border-color 120ms cubic-bezier(0.16, 1, 0.3, 1),
-                  color 120ms cubic-bezier(0.16, 1, 0.3, 1),
-                  opacity 120ms cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .plan-btn-primary:hover:not(:disabled) { opacity: 0.9; }
-    .plan-btn-primary:active:not(:disabled) { opacity: 0.8; }
-    .plan-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    @media (pointer: coarse) {
-      .plan-btn { min-height: 44px; }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .plan-btn { transition: none; }
-    }
-
-    .sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-      border: 0;
-    }
-  </style>
+  <link rel="stylesheet" href="/site.css" />
 </head>
-<body class="bg-aired-bg min-h-screen text-aired-text-primary">
+<body>
+<header><div class="wrap">
+  <a class="logo" href="/" aria-label="aired home"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>aired</a>
+  <nav aria-label="Main"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link">Guides</a></nav>
+  <div class="right"><span id="nav-who" class="who"></span><button id="sign-out" type="button" class="linkbtn">Sign out</button><a class="start" href="/#publish">Publish</a></div>
+</div></header>
 
-  <!-- ─── Top nav (matches /, /docs.html) ─── -->
-  <header class="w-full px-6 h-14 flex items-center justify-between max-w-2xl mx-auto">
-    <a href="/" class="text-base font-semibold tracking-tight text-aired-text-primary hover:text-white transition-colors duration-150">aired</a>
-    <nav class="flex items-center gap-5 text-sm text-aired-text-secondary">
-      <a href="/docs" class="hover:text-aired-text-primary transition-colors duration-150">Docs</a>
-      <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener"
-         class="flex items-center gap-1.5 hover:text-aired-text-primary transition-colors duration-150">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-        GitHub
-      </a>
-      <button id="sign-out" type="button" class="text-aired-text-tertiary hover:text-aired-text-primary transition-colors duration-150 focus-ring rounded-sm">sign out</button>
-    </nav>
-  </header>
-
-  <main class="max-w-2xl mx-auto px-6 py-12">
-
-    <div class="mb-10">
-      <!-- hero: handle + count + publish link -->
-      <section class="flex items-end justify-between gap-4">
-        <div class="min-w-0">
-          <h1 id="user-handle" class="text-xl font-medium tracking-tight text-aired-text-primary truncate">@</h1>
-          <p id="page-count" class="text-sm text-aired-text-secondary mt-1" aria-live="polite">&nbsp;</p>
-        </div>
-        <a id="hero-publish" href="/" class="text-sm text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150 focus-ring rounded-sm whitespace-nowrap">Publish another →</a>
-      </section>
-
-      <!-- plan strip: shown only when billing is on (filled by dashboard.js) -->
-      <section id="plan-strip" class="hidden mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-aired-border bg-aired-surface px-4 py-3" aria-label="Plan">
-        <div class="min-w-0">
-          <p id="plan-label" class="text-sm text-aired-text-primary"></p>
-          <p id="plan-detail" class="hidden text-xs text-aired-text-tertiary mt-0.5"></p>
-        </div>
-        <button id="plan-action" type="button" class="hidden"></button>
-        <p id="plan-renew" class="hidden w-full text-xs text-aired-text-tertiary">Renews automatically until you cancel. Cancel anytime in Manage billing.</p>
-        <p id="plan-error" class="hidden w-full text-xs text-red-400"></p>
-      </section>
-
-      <!-- browser-held pages offer: shown when aired.pages has entries (filled by dashboard.js) -->
-      <section id="claim-banner" class="hidden mt-4 rounded-lg border border-aired-border bg-aired-surface px-4 py-3" aria-label="Pages published in this browser">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="min-w-0">
-            <p id="claim-label" class="text-sm text-aired-text-primary"></p>
-            <p id="claim-detail" class="text-xs text-aired-text-tertiary mt-0.5">Add them to your account to manage them here.</p>
-          </div>
-          <div class="flex flex-shrink-0 items-center gap-2">
-            <button id="claim-add" type="button" class="plan-btn plan-btn-primary flex-shrink-0 rounded px-3 py-2 text-sm font-medium bg-aired-text-primary text-aired-bg focus-ring">Add to my account</button>
-            <button id="claim-dismiss" type="button" class="plan-btn flex-shrink-0 rounded px-3 py-2 text-sm border border-aired-border bg-aired-bg text-aired-text-secondary hover:text-aired-text-primary hover:border-aired-border-focus hover:bg-aired-surface-hover active:bg-aired-border focus-ring">Not now</button>
-          </div>
-        </div>
-        <p id="claim-error" class="hidden mt-2 text-xs text-red-400"></p>
-        <ul id="claim-failures" class="hidden mt-2 space-y-1 text-xs text-red-400"></ul>
-      </section>
+<main class="wrap">
+  <section class="db-top">
+    <div style="min-width:0">
+      <p class="eyebrow">Dashboard</p>
+      <h1>Your pages</h1>
+      <p class="db-sub"><span id="user-handle">Signed in</span><span id="page-count" aria-live="polite"></span></p>
     </div>
+    <a id="hero-publish" href="/#publish" class="btn solid">Publish another</a>
+  </section>
 
-    <!-- page list, grouped by project (filled by dashboard.js) -->
-    <div id="project-groups" aria-label="Published pages grouped by project">
-      <!-- skeleton rows match real row layout: title + (id · age) | views | Copy | Delete -->
-      <div id="initial-skeleton" class="divide-y divide-aired-border">
-        <div class="skeleton-row flex items-center gap-3 min-h-[44px] py-3">
-          <div class="flex-1 min-w-0 flex flex-col gap-1.5">
-            <div class="h-3 w-48 rounded-sm bg-aired-surface-hover"></div>
-            <div class="h-2.5 w-32 rounded-sm bg-aired-surface-hover"></div>
-          </div>
-          <div class="h-3 w-12 rounded-sm bg-aired-surface-hover"></div>
-          <div class="h-3 w-8 rounded-sm bg-aired-surface-hover"></div>
-          <div class="h-3 w-10 rounded-sm bg-aired-surface-hover"></div>
-        </div>
-        <div class="skeleton-row flex items-center gap-3 min-h-[44px] py-3" style="animation-delay: 0.2s;">
-          <div class="flex-1 min-w-0 flex flex-col gap-1.5">
-            <div class="h-3 w-36 rounded-sm bg-aired-surface-hover"></div>
-            <div class="h-2.5 w-24 rounded-sm bg-aired-surface-hover"></div>
-          </div>
-          <div class="h-3 w-12 rounded-sm bg-aired-surface-hover"></div>
-          <div class="h-3 w-8 rounded-sm bg-aired-surface-hover"></div>
-          <div class="h-3 w-10 rounded-sm bg-aired-surface-hover"></div>
-        </div>
-        <div class="skeleton-row flex items-center gap-3 min-h-[44px] py-3" style="animation-delay: 0.4s;">
-          <div class="flex-1 min-w-0 flex flex-col gap-1.5">
-            <div class="h-3 w-56 rounded-sm bg-aired-surface-hover"></div>
-            <div class="h-2.5 w-28 rounded-sm bg-aired-surface-hover"></div>
-          </div>
-          <div class="h-3 w-12 rounded-sm bg-aired-surface-hover"></div>
-          <div class="h-3 w-8 rounded-sm bg-aired-surface-hover"></div>
-          <div class="h-3 w-10 rounded-sm bg-aired-surface-hover"></div>
-        </div>
+  <div class="db-stack">
+    <!-- browser-held pages offer: shown when aired.pages has entries (filled by dashboard.js) -->
+    <section id="claim-banner" class="hidden panel strip" aria-label="Pages published in this browser">
+      <span class="sic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></svg></span>
+      <div class="stx"><p id="claim-label"></p><p id="claim-detail">Add them to your account to manage them here.</p></div>
+      <div class="acts">
+        <button id="claim-add" type="button" class="btn solid sm">Add to my account</button>
+        <button id="claim-dismiss" type="button" class="btn sm">Not now</button>
       </div>
+      <p id="claim-error" class="hidden full err-t"></p>
+      <ul id="claim-failures" class="hidden full err-t"></ul>
+    </section>
+
+    <!-- plan strip: shown only when billing is on (filled by dashboard.js) -->
+    <section id="plan-strip" class="hidden panel strip plan-strip" aria-label="Plan">
+      <span class="sic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.3L12 16.8l-6.2 4.4 2.4-7.3L2 9.4h7.6z"/></svg></span>
+      <div class="stx"><p id="plan-label"></p><p id="plan-detail" class="hidden"></p></div>
+      <div class="acts"><button id="plan-action" type="button" class="hidden"></button></div>
+      <p id="plan-renew" class="hidden full">Renews automatically until you cancel. Cancel anytime in Manage billing.</p>
+      <p id="plan-error" class="hidden full err-t"></p>
+    </section>
+  </div>
+
+  <!-- page list, grouped by project (filled by dashboard.js) -->
+  <div id="project-groups" class="groups" aria-label="Published pages grouped by project">
+    <div id="initial-skeleton" class="panel pgroup">
+      <div class="ghead" aria-hidden="true"><span class="skel" style="width:8rem"></span></div>
+      <ul class="prows">
+        <li class="prow" aria-hidden="true"><span class="thumb"></span><div><span class="skel" style="width:14rem"></span><span class="skel" style="width:9rem;height:10px;margin-top:8px"></span><div class="chips"><span class="skel" style="width:6rem;height:22px"></span><span class="skel" style="width:5rem;height:22px"></span><span class="skel" style="width:4.5rem;height:22px"></span></div></div></li>
+        <li class="prow" aria-hidden="true"><span class="thumb"></span><div><span class="skel" style="width:10rem"></span><span class="skel" style="width:9rem;height:10px;margin-top:8px"></span><div class="chips"><span class="skel" style="width:6rem;height:22px"></span><span class="skel" style="width:5rem;height:22px"></span><span class="skel" style="width:4.5rem;height:22px"></span></div></div></li>
+        <li class="prow" aria-hidden="true"><span class="thumb"></span><div><span class="skel" style="width:12rem"></span><span class="skel" style="width:9rem;height:10px;margin-top:8px"></span><div class="chips"><span class="skel" style="width:6rem;height:22px"></span><span class="skel" style="width:5rem;height:22px"></span><span class="skel" style="width:4.5rem;height:22px"></span></div></div></li>
+      </ul>
     </div>
+  </div>
 
-    <!-- empty state — single inline line, no card, no illustration -->
-    <p id="empty-state" class="hidden text-sm text-aired-text-secondary py-3">
-      Nothing aired yet. Publish from <a href="/" class="text-aired-text-primary hover:text-white underline decoration-aired-border hover:decoration-aired-text-secondary transition-colors duration-150">the homepage</a> or run <code class="font-mono text-aired-text-primary">aired publish file.html</code>.
-    </p>
+  <!-- empty state: what to do next, and what a page will look like here -->
+  <section id="empty-state" class="hidden panel empty" aria-labelledby="empty-title">
+    <div>
+      <p class="eyebrow">Get started</p>
+      <h2 id="empty-title">Nothing here yet</h2>
+      <p class="sub">Every page you publish while signed in shows up here, with how long it lasts and how many times it was opened.</p>
+      <ol class="flow">
+        <li><i>1</i><span><b>Copy the HTML</b>From Claude, ChatGPT, Gemini or a file on your computer.</span></li>
+        <li><i>2</i><span><b>Paste it on the homepage</b>Pick how long it lasts, add a PIN if it's private.</span></li>
+        <li><i>3</i><span><b>Send the link</b>It opens on any phone or laptop. It also lands here.</span></li>
+      </ol>
+      <div class="btns"><a href="/#publish" class="btn solid">Publish your first page</a><a href="/html-to-link" class="btn">How it works</a></div>
+      <p class="dev">Publishing from Claude Code, Cursor or a script? <a href="/docs#skill">Set up your agent</a>.</p>
+    </div>
+    <div class="example" aria-label="Example of how a page looks here">
+      <div class="cap"><span>Example</span><span>2 pages</span></div>
+      <div class="prow"><span class="thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></span><div style="min-width:0"><span class="ttl">Q3 performance report</span><p class="sub"><span class="mono">aired.sh/p/q3-northwind</span> · Published 2 days ago</p>
+        <div class="chips"><span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>14 views</span><span class="chip good"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Never expires</span><span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Needs a PIN</span><span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg>86 KB</span></div></div></div>
+      <div class="prow"><span class="thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></span><div style="min-width:0"><span class="ttl">Snake, made with ChatGPT</span><p class="sub"><span class="mono">aired.sh/p/snake-v2</span> · Published 5 hours ago</p>
+        <div class="chips"><span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>88 views</span><span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Expires in 7 days</span><span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Anyone with the link</span><span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg>24 KB</span></div></div></div>
+    </div>
+  </section>
 
-    <!-- live region for action results (Copied, Deleted, plan changes, added pages) -->
-    <div id="action-status" class="sr-only" role="status" aria-live="polite"></div>
+  <p class="viewers" style="margin-top:28px">Need an API key or the command line? <a href="/docs">Developer docs →</a></p>
 
-  </main>
+  <!-- live region for action results (Copied, Deleted, plan changes, added pages) -->
+  <div id="action-status" class="sr-only" role="status" aria-live="polite"></div>
+</main>
 
-  <script src="/dashboard.js" defer></script>
+<footer><div class="wrap">
+  <span>aired</span>
+  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link">Guides</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
+</div></footer>
+
+<script src="/dashboard.js" defer></script>
 </body>
 </html>

@@ -352,6 +352,24 @@
         .catch(function () { navAuth.classList.remove("hidden"); });
     }
 
+    // ── "On this page" contents: mark the section being read ──
+    var tocLinks = Array.prototype.slice.call(document.querySelectorAll(".toc a[href^='#']"));
+    if (tocLinks.length) {
+      var tocTargets = tocLinks.map(function (a) {
+        return { link: a, el: document.getElementById(a.getAttribute("href").slice(1)) };
+      }).filter(function (t) { return t.el; });
+      var tocUpdate = function () {
+        var line = window.scrollY + 120;
+        var current = null;
+        tocTargets.forEach(function (t) {
+          if (t.el.getBoundingClientRect().top + window.scrollY <= line) current = t;
+        });
+        tocTargets.forEach(function (t) { t.link.classList.toggle("on", t === current); });
+      };
+      window.addEventListener("scroll", tocUpdate, { passive: true });
+      tocUpdate();
+    }
+
     // ── "Start free" / "Publish a page" links jump to the form and focus it ──
     document.querySelectorAll("[data-publish]").forEach(function (a) {
       a.addEventListener("click", function (e) {
