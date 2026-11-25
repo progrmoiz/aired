@@ -57,12 +57,13 @@ app.post(
     } catch {
       // Malformed body: let the MCP handler return the JSON-RPC error.
     }
-    if (isMcpToolCall(body)) return publishRateLimit(c, next);
+    // Key callers' tools go through the API, which applies its own limits.
+    if (isMcpToolCall(body) && c.get("authMethod") !== "key") return publishRateLimit(c, next);
     await next();
   },
-  handleMcp,
+  (c) => handleMcp(c, (req) => app.fetch(req, c.env, c.executionCtx)),
 );
-app.on(["GET", "DELETE", "OPTIONS"], "/mcp", handleMcp);
+app.on(["GET", "DELETE", "OPTIONS"], "/mcp", (c) => handleMcp(c, (req) => app.fetch(req, c.env, c.executionCtx)));
 
 // OG image route
 app.route("/", og);

@@ -296,6 +296,17 @@
 <pre><code>[mcp_servers.aired]
 url = "https://aired.sh/mcp"</code></pre>
 
+        <h3>Signed in with an API key</h3>
+        <p>Add your <a href="#api-keys">API key</a> as a header and the remote server works as your account: <code>publish_html</code> pages belong to you, and <code>list_pages</code>, <code>update_page</code>, <code>delete_page</code> and <code>get_account</code> become available. Without a key, only anonymous <code>publish_html</code> works.</p>
+<pre><code>{
+  "mcpServers": {
+    "aired": {
+      "url": "https://aired.sh/mcp",
+      "headers": { "Authorization": "Bearer aired_sk_..." }
+    }
+  }
+}</code></pre>
+
         <h3>STDIO bridge (any client)</h3>
 <pre><code>{
   "mcpServers": {
