@@ -125,7 +125,11 @@ Update existing artifact. Token goes in the body as `update_token`, or as an `Au
 
 ### DELETE /api/pages/:id
 
-Delete artifact. Token goes in the `Authorization: Bearer <token>` header.
+Delete artifact. Token goes in the `Authorization: Bearer <token>` header, or as `update_token` in a JSON body.
+
+### API keys
+
+Create a key (`aired_sk_…`) under **API keys** in the dashboard; it's shown once. Send `Authorization: Bearer aired_sk_…` on any request and it runs as your account: published pages are yours and permanent by default, and you can update (PUT) or delete (DELETE) your own pages with the key alone, without an update token. When the key takes the Authorization header and you also want to pass an update token, put it in the JSON body. The CLI and local MCP server read `AIRED_API_KEY`. On the remote MCP server, the same header adds `list_pages`, `update_page`, `delete_page` and `get_account`. A key can't create keys, open billing or delete the account. Plan limits answer 402 with an `upgrade_url` that a person must open.
 
 ### GET /api/pages/:id
 

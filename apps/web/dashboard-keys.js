@@ -10,8 +10,9 @@
   var root = document.getElementById('api-keys');
   if (!root) return;
 
-  var PRIMARY = 'plan-btn plan-btn-primary flex-shrink-0 rounded px-3 py-2 text-sm font-medium bg-aired-text-primary text-aired-bg focus-ring';
-  var SECONDARY = 'plan-btn flex-shrink-0 rounded px-3 py-2 text-sm border border-aired-border bg-aired-bg text-aired-text-secondary hover:text-aired-text-primary hover:border-aired-border-focus hover:bg-aired-surface-hover active:bg-aired-border focus-ring';
+  // Only classes in style.css (no reliance on dashboard.html's inline styles).
+  var PRIMARY = 'flex-shrink-0 rounded px-3 py-2 text-sm font-medium bg-aired-text-primary text-aired-bg focus-ring disabled:opacity-50';
+  var SECONDARY = 'flex-shrink-0 rounded px-3 py-2 text-sm border border-aired-border bg-aired-bg text-aired-text-secondary hover:text-aired-text-primary hover:border-aired-border-focus hover:bg-aired-surface-hover active:bg-aired-border focus-ring disabled:opacity-50';
   var SMALL = 'text-xs text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150 focus-ring rounded-sm px-1.5 py-1';
 
   var state = { keys: [], max: 5, busy: false };
@@ -20,6 +21,8 @@
     var node = document.createElement(tag);
     if (className) node.className = className;
     if (text !== undefined) node.textContent = text;
+    // 44px touch targets for every button.
+    if (tag === 'button') node.style.minHeight = '44px';
     return node;
   }
 
@@ -46,7 +49,9 @@
   // --- elements ---------------------------------------------------------------
 
   var header = el('div', 'min-w-0');
-  header.appendChild(el('h2', 'text-sm text-aired-text-primary', 'API keys'));
+  var heading = el('h2', 'text-sm text-aired-text-primary', 'API keys');
+  heading.tabIndex = -1; // focus lands here when there's nothing else to focus
+  header.appendChild(heading);
   var hint = el('p', 'text-xs text-aired-text-tertiary mt-0.5');
   hint.appendChild(document.createTextNode('For CI and agents. Set '));
   hint.appendChild(el('code', 'font-mono text-aired-text-primary', 'AIRED_API_KEY'));
@@ -75,7 +80,9 @@
   var reveal = el('div', 'hidden mt-4 rounded-lg border border-aired-border bg-aired-surface px-4 py-3');
   var revealText = el('p', 'text-sm text-aired-text-primary', 'Copy this key now. You won’t be able to see it again.');
   var revealRow = el('div', 'mt-2 flex flex-wrap items-center gap-3');
-  var revealKey = el('code', 'flex-1 min-w-0 font-mono text-xs text-aired-text-primary truncate');
+  // The whole key stays visible (wraps), so it can be checked or copied by hand.
+  var revealKey = el('code', 'flex-1 min-w-0 font-mono text-xs text-aired-text-primary');
+  revealKey.style.wordBreak = 'break-all';
   var copy = el('button', SECONDARY, 'Copy');
   copy.type = 'button';
   var done = el('button', SECONDARY, 'Done');
@@ -133,16 +140,26 @@
     input.placeholder = full ? 'You have ' + state.max + ' keys. Revoke one to add another.' : 'Name, e.g. GitHub Actions';
   }
 
-  // Two clicks: "Revoke" arms it for a few seconds, "Confirm revoke" does it.
+  // Two clicks: "Revoke" arms it, "Confirm revoke" does it. It disarms when
+  // focus leaves the button or after 10 seconds, and both steps are announced.
   function revokeButton(key) {
     var btn = el('button', SMALL, 'Revoke');
     btn.type = 'button';
     btn.setAttribute('aria-label', 'Revoke key ' + key.name);
     var armed = null;
+    function disarm() {
+      if (armed) clearTimeout(armed);
+      armed = null;
+      btn.textContent = 'Revoke';
+      btn.setAttribute('aria-label', 'Revoke key ' + key.name);
+    }
+    btn.addEventListener('blur', function () { if (armed) disarm(); });
     btn.addEventListener('click', function () {
       if (!armed) {
         btn.textContent = 'Confirm revoke';
-        armed = setTimeout(function () { armed = null; btn.textContent = 'Revoke'; }, 4000);
+        btn.setAttribute('aria-label', 'Confirm revoke key ' + key.name);
+        announce('Press again to revoke ' + key.name + '. Anything using it stops working.');
+        armed = setTimeout(disarm, 10000);
         return;
       }
       clearTimeout(armed);
@@ -155,6 +172,7 @@
         showError('');
         render();
         announce('Revoked ' + key.name);
+        focusSomething();
       }).catch(function (err) {
         btn.disabled = false;
         btn.textContent = 'Revoke';
@@ -203,20 +221,41 @@
     }
   });
 
+  // After a row or the reveal box goes away: the name field, else the first
+  // Revoke button, else the heading.
+  function focusSomething() {
+    if (!input.disabled) return input.focus();
+    var first = list.querySelector('button');
+    (first || heading).focus();
+  }
+
   // Forget the key once it's dismissed: it's never shown again.
   done.addEventListener('click', function () {
     revealKey.textContent = '';
     copy.textContent = 'Copy';
     reveal.classList.add('hidden');
-    input.focus();
+    focusSomething();
   });
 
   // Signed in with a session: show the panel. Anything else keeps it hidden.
+  // Signed out (401) or signed in with a key (403): stay hidden. A server or
+  // network error shows the panel with the error, so a leaked key can't be
+  // hidden by an outage without the person knowing.
   request('GET', '/api/me/keys').then(function (res) {
-    if (!res.ok) return;
+    if (res.status === 401 || res.status === 403) return;
+    if (!res.ok) {
+      showError(res.data.error || 'Could not load your keys. Reload to try again.');
+      form.classList.add('hidden');
+      root.classList.remove('hidden');
+      return;
+    }
     state.keys = Array.isArray(res.data.keys) ? res.data.keys : [];
     if (typeof res.data.max === 'number') state.max = res.data.max;
     render();
     root.classList.remove('hidden');
-  }).catch(function () { /* the panel stays hidden */ });
+  }).catch(function () {
+    showError('Could not load your keys. Check your connection and reload.');
+    form.classList.add('hidden');
+    root.classList.remove('hidden');
+  });
 })();

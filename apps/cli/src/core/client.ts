@@ -8,8 +8,18 @@ import type { PublishResult, PageInfo } from './types.js'
  * sent as Authorization: Bearer and publishes go to the key's account.
  */
 export function apiKeyFromEnv(): string | null {
-  const key = process.env['AIRED_API_KEY']?.trim()
-  return key ? key : null
+  const raw = process.env['AIRED_API_KEY']
+  if (raw === undefined) return null
+  // Accept a value pasted with its "Bearer " prefix.
+  const key = raw.trim().replace(/^bearer\s+/i, '')
+  if (key === '') {
+    // An unset CI secret: refuse rather than publish anonymously.
+    throw new Error('AIRED_API_KEY is set but empty. Set it to your aired_sk_ key, or unset it to publish without one.')
+  }
+  if (!key.startsWith('aired_sk_')) {
+    throw new Error('AIRED_API_KEY must be an aired API key starting with aired_sk_ (create one under API keys in the dashboard).')
+  }
+  return key
 }
 
 function addApiKey(headers: Record<string, string>): Record<string, string> {

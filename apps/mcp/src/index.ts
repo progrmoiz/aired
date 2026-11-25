@@ -49,9 +49,16 @@ async function publishHTML(
     headers[AUTH_HEADER] = jwt;
     headers[CSRF_HEADER] = "1";
   }
-  // AIRED_API_KEY (CI, agents) signs the publish in as the key's account.
-  const apiKey = process.env["AIRED_API_KEY"]?.trim();
-  if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+  // AIRED_API_KEY (CI, agents) signs the publish in as the key's account. A
+  // set-but-wrong value is an error, never a quiet anonymous publish.
+  const rawKey = process.env["AIRED_API_KEY"];
+  if (rawKey !== undefined) {
+    const apiKey = rawKey.trim().replace(/^bearer\s+/i, "");
+    if (!apiKey.startsWith("aired_sk_")) {
+      throw new Error("AIRED_API_KEY must be an aired API key starting with aired_sk_ (or unset it to publish anonymously).");
+    }
+    headers["Authorization"] = `Bearer ${apiKey}`;
+  }
 
   const resp = await fetch(`${base}/api/publish`, {
     method: "POST",

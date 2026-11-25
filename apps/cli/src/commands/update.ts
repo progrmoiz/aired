@@ -9,7 +9,7 @@ import { withSpinner } from '../lib/spinner.js'
 import { updatePage } from '../core/client.js'
 import { getToken, saveToken } from '../core/store.js'
 import { getSession } from '../core/session.js'
-import { apiKeyFromEnv } from '../core/client.js'
+import { apiKeyConfigured } from '../lib/api-key-env.js'
 
 function formatExpiry(expiresAt: string | null): string {
   if (expiresAt === null) return 'Never (permanent)'
@@ -31,7 +31,7 @@ export function makeUpdateCommand(globalOpts: () => GlobalOpts): Command {
       const token = getToken(id)
       const session = getSession()
 
-      if (token === null && session === null && apiKeyFromEnv() === null) {
+      if (token === null && session === null && !apiKeyConfigured(opts)) {
         outputError({ code: 'VALIDATION', message: `No token found for page '${id}'. Run 'aired tokens' to list stored tokens.` }, opts)
         process.exit(ExitCode.VALIDATION_ERROR)
       }
