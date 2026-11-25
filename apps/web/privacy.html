@@ -82,7 +82,7 @@
     <h3>When you publish a page</h3>
     <ul>
       <li><strong>The page itself</strong>: the HTML you send and its title. We need it to show the page to people with the link.</li>
-      <li><strong>Page settings</strong>: expiry, PIN, view limit, project, size and when you published. We store your PIN exactly as you typed it, not scrambled, so we can check it when someone enters it. A PIN keeps casual visitors out. It isn't a password, so don't reuse one you use anywhere else.</li>
+      <li><strong>Page settings</strong>: expiry, PIN, view limit, project, size and when you published. We store your PIN as a salted hash, not as you typed it, and check what people enter against that. A PIN keeps casual visitors out. It isn't a password, so don't reuse one you use anywhere else.</li>
       <li><strong>A scrambled copy of your update token</strong>, so we can check it when you edit or delete the page. We never keep the token itself.</li>
       <li><strong>Your account id</strong>, if you were signed in, so the page shows up in your dashboard.</li>
       <li><strong>A one-way hash of your IP address</strong>, held in memory only, to enforce publishing limits. It disappears when the limit window resets, after an hour (a day for Pro's daily limit). We never write your IP address to storage.</li>
@@ -156,7 +156,7 @@
         <tbody>
           <tr><td><code>aired_session</code></td><td>Keeps you signed in. Your browser's scripts can't read it.</td><td>30 days, renewed as you use aired</td></tr>
           <tr><td><code>aired_oauth_state</code></td><td>Protects the GitHub sign-in step from forgery.</td><td>10 minutes</td></tr>
-          <tr><td><code>pin_&lt;page id&gt;</code></td><td>Holds the PIN you entered for that page, so you don't have to type it again. Only sent to that page.</td><td>1 hour</td></tr>
+          <tr><td><code>pin_&lt;page id&gt;</code></td><td>Shows you entered that page's PIN, so you don't have to type it again. It doesn't contain the PIN. Only sent to that page.</td><td>1 hour</td></tr>
         </tbody>
       </table>
     </div>
@@ -188,7 +188,7 @@
     <p>aired isn't meant for anyone under 16. If you think someone under 16 has given us personal data, email <a href="mailto:support@aired.sh">support@aired.sh</a> and we'll delete it.</p>
 
     <h2>Security</h2>
-    <p>Every connection to aired uses HTTPS. Session cookies are HttpOnly and Secure. Update tokens are stored only as hashes. Page PINs aren't hashed. GitHub sign-in asks for the smallest set of permissions. The code is open source, so anyone can check how it handles data. If we ever have a breach that puts your data at risk, we'll tell affected users and the authorities as the law requires.</p>
+    <p>Every connection to aired uses HTTPS. Session cookies are HttpOnly and Secure. Update tokens are stored only as hashes. Page PINs are stored as salted hashes. GitHub sign-in asks for the smallest set of permissions. The code is open source, so anyone can check how it handles data. If we ever have a breach that puts your data at risk, we'll tell affected users and the authorities as the law requires.</p>
 
     <h2>Changes and questions</h2>
     <p>When we change this policy, we update this page and the date at the top. The full history is in the <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">public repository</a>. If a change affects how we use data you already gave us, we tell signed-in users before it takes effect. Questions? Email <a href="mailto:support@aired.sh">support@aired.sh</a>. See also our <a href="/terms">terms</a> and <a href="/refunds">refund policy</a>.</p>

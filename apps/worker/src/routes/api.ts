@@ -7,6 +7,7 @@ import { readUpdateToken } from "../lib/page-token.js";
 import { TIERS } from "../lib/rate-limit-tiers.js";
 import { detectSpam, SPAM_REJECTION } from "../lib/spam.js";
 import { claimUrl } from "../lib/claim-url.js";
+import { hashPin } from "../lib/pin-hash.js";
 import { authoritativeCredentials, authorizePageWrite } from "../lib/claim-decision.js";
 import { getClaim, tombstoneClaim } from "../lib/page-claims.js";
 import { billingEnabled, getEntitlements, planLimitError, UPGRADE_URL } from "../lib/entitlements.js";
@@ -208,7 +209,8 @@ api.post("/publish", publishRateLimit, async (c) => {
     title: resolvedTitle,
     size: new TextEncoder().encode(html).byteLength,
     tokenHash,
-    pin: typeof pin === "string" && pin.length > 0 ? pin : null,
+    // Stored as a salted PBKDF2 hash (lib/pin-hash.ts), never as typed.
+    pin: typeof pin === "string" && pin.length > 0 ? await hashPin(pin) : null,
     reads: typeof reads === "number" && reads > 0 ? Math.floor(reads) : null,
     readCount: 0,
     permanent: isPermanent,

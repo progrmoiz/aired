@@ -9,6 +9,10 @@ import { injectAiredBar } from "../lib/aired-bar.js";
 import { getEntitlements } from "../lib/entitlements.js";
 import { notFoundPage } from "../lib/not-found.js";
 import { viewWrite } from "../lib/view-write.js";
+import { hashPin, pinCookieValue, verifyPin, verifyPinCookie } from "../lib/pin-hash.js";
+
+/** How long a correct PIN entry lets the browser in. */
+const PIN_COOKIE_SECONDS = 3600;
 
 const viewer = new Hono<AppBindings>();
 
@@ -48,8 +52,14 @@ viewer.get("/p/:id", async (c) => {
 
   // Check PIN protection
   if (metadata.pin !== null) {
-    const pinCookie = getCookie(c, `pin_${id}`) ?? null;
-    if (pinCookie !== metadata.pin) {
+    // The cookie is an HMAC token from verify-pin, never the PIN itself.
+    const allowed = await verifyPinCookie(
+      c.env.SESSION_SECRET,
+      id,
+      getCookie(c, `pin_${id}`),
+      Math.floor(Date.now() / 1000),
+    );
+    if (!allowed) {
       return new Response(renderPinPage(id), {
         status: 200,
         headers: { "Content-Type": "text/html; charset=utf-8" },
@@ -158,17 +168,34 @@ viewer.post("/p/:id/verify-pin", async (c) => {
     return c.json({ error: "Page is not PIN protected" }, 400);
   }
 
-  if (pin !== metadata.pin) {
+  const check = await verifyPin(pin, metadata.pin);
+  if (!check.ok) {
     return c.json({ error: "Incorrect PIN" }, 403);
   }
 
+  // A page from before hashing holds the PIN as typed: store it hashed now.
+  // Keeps the page's expiry; skipped if it's about to expire (view-write.ts).
+  if (check.needsRehash) {
+    const write = viewWrite(metadata, Date.now());
+    if (!write.expired && write.options !== null) {
+      const updated = { ...metadata, pin: await hashPin(pin) };
+      c.executionCtx.waitUntil(
+        c.env.PAGES_KV.put(`page:${id}`, serializeMetadata(updated), write.options).catch((err) => {
+          console.error("pin rehash failed", { id, err });
+        }),
+      );
+    }
+  }
+
   // Set a cookie and return success — client handles redirect
+  const expSec = Math.floor(Date.now() / 1000) + PIN_COOKIE_SECONDS;
   const headers = new Headers();
   headers.set("Content-Type", "application/json");
-  // HttpOnly so JS can't read it; SameSite=Strict for security
+  // HttpOnly so JS can't read it; SameSite=Strict for security. An HMAC token,
+  // not the PIN, so the cookie reveals nothing.
   headers.set(
     "Set-Cookie",
-    `pin_${id}=${metadata.pin}; Path=/p/${id}; HttpOnly; SameSite=Strict; Max-Age=3600`,
+    `pin_${id}=${await pinCookieValue(c.env.SESSION_SECRET, id, expSec)}; Path=/p/${id}; HttpOnly; Secure; SameSite=Strict; Max-Age=${PIN_COOKIE_SECONDS}`,
   );
 
   return new Response(JSON.stringify({ ok: true }), { status: 200, headers });

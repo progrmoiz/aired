@@ -20,6 +20,7 @@ import {
 import type { PageMetadata } from "@aired/core";
 import { authoritativeCredentials } from "../lib/claim-decision.js";
 import { getClaim } from "../lib/page-claims.js";
+import { hashPin } from "../lib/pin-hash.js";
 
 function createAiredMcpServer(env: {
   PAGES_BUCKET: R2Bucket;
@@ -176,7 +177,8 @@ function createAiredMcpServer(env: {
         title: resolvedTitle,
         size: new TextEncoder().encode(html).byteLength,
         tokenHash,
-        pin: typeof pin === "string" && pin.length > 0 ? pin : null,
+        // Stored as a salted PBKDF2 hash (lib/pin-hash.ts), never as typed.
+        pin: typeof pin === "string" && pin.length > 0 ? await hashPin(pin) : null,
         reads: null,
         readCount: 0,
         permanent: isPermanent,
