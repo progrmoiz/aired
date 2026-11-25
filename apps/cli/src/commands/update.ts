@@ -54,10 +54,15 @@ export function makeUpdateCommand(globalOpts: () => GlobalOpts): Command {
           opts,
         )
 
-        saveToken(result.id, result.update_token, {
-          title: cmdOpts.title ?? null,
-          url: result.url,
-        })
+        // The server returns a token only when it authorised the update with
+        // one. An update through the signed-in session (for example with a
+        // token a claim already retired) returns none: keep the record as is.
+        if (typeof result.update_token === 'string') {
+          saveToken(result.id, result.update_token, {
+            title: cmdOpts.title ?? null,
+            url: result.url,
+          })
+        }
 
         if (shouldOutputJson(opts)) {
           process.stdout.write(JSON.stringify(result, null, 2) + '\n')

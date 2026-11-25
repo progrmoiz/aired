@@ -3,7 +3,7 @@ import pc from 'picocolors'
 import type { GlobalOpts } from '../lib/config.js'
 import { resolveApiUrl } from '../lib/config.js'
 import { shouldOutputJson, outputError, ExitCode } from '../lib/output.js'
-import { getToken, listTokens } from '../core/store.js'
+import { getToken, listTokens, replaceToken } from '../core/store.js'
 import { getSession } from '../core/session.js'
 import { claimPage, claimBatch } from '../core/client.js'
 
@@ -41,15 +41,20 @@ export function makeClaimCommand(globalOpts: () => GlobalOpts): Command {
 
           try {
             const result = await claimBatch(baseUrl, session.jwt, items)
+            // Claiming retires the old tokens; store the new ones right away.
+            for (const [claimedId, newToken] of Object.entries(result.tokens ?? {})) {
+              replaceToken(claimedId, newToken)
+            }
+            const chunkFailedIds = result.failed.map((f) => (typeof f === 'string' ? f : f.id))
             totalClaimed += result.claimed.length
-            totalFailed += result.failed.length
-            failedIds.push(...result.failed)
+            totalFailed += chunkFailedIds.length
+            failedIds.push(...chunkFailedIds)
 
             if (opts.verbose) {
               for (const claimedId of result.claimed) {
                 process.stdout.write(pc.green('claimed') + ` ${claimedId}\n`)
               }
-              for (const failedId of result.failed) {
+              for (const failedId of chunkFailedIds) {
                 process.stdout.write(pc.red('failed') + `  ${failedId}\n`)
               }
             }
@@ -80,7 +85,9 @@ export function makeClaimCommand(globalOpts: () => GlobalOpts): Command {
       }
 
       try {
-        await claimPage(baseUrl, session.jwt, id, token)
+        const result = await claimPage(baseUrl, session.jwt, id, token)
+        // Claiming retires the old token; store the new one.
+        if (typeof result.update_token === 'string') replaceToken(id, result.update_token)
         if (shouldOutputJson(opts)) {
           process.stdout.write(JSON.stringify({ ok: true, id }, null, 2) + '\n')
         } else {

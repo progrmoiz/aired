@@ -3,6 +3,8 @@ import type { AppBindings } from '../types.js';
 import {
   kvKeys,
   verifyToken,
+  generateToken,
+  hashToken,
   parseMetadata,
   serializeMetadata,
   redactNoreplyEmail,
@@ -28,6 +30,7 @@ import { billingEnabled, getEntitlements, isEntitled } from '../lib/entitlements
 import { getSubscription } from '../lib/billing/store.js';
 import type { StoredSubscription } from '../lib/billing/store.js';
 import { AUTH_HEADER } from '@aired/core';
+import { decideClaim } from '../lib/claim-decision.js';
 
 const me = new Hono<AppBindings>();
 
@@ -188,6 +191,8 @@ me.get('/projects', async (c) => {
 
 // POST /api/me/claim — claim a single page by id + update_token.
 // Shares the claim-batch bucket (rl:claim, 5/hour per user).
+// The response carries the page's new update_token: the one sent here stops
+// working (see lib/claim-decision.ts).
 me.post('/claim', requireCsrfHeader, rateLimit(TIERS.claim_batch), async (c) => {
   const user = c.get('user')!;
 
@@ -247,6 +252,9 @@ me.post(
 
     const claimed: string[] = [];
     const failed: { id: string; reason: string }[] = [];
+    // New update token per claimed id. Kept apart from `claimed` so older
+    // clients that read `claimed` as a list of ids keep working.
+    const tokens: Record<string, string> = {};
 
     for (const item of items) {
       if (
@@ -267,9 +275,10 @@ me.post(
 
       try {
         const result = await claimPage(c.env.PAGES_KV, user.id, id, update_token);
-        const resultJson = await result.json<{ ok?: boolean; error?: string }>();
+        const resultJson = await result.json<{ ok?: boolean; error?: string; update_token?: string }>();
         if (resultJson.ok) {
           claimed.push(id);
+          if (typeof resultJson.update_token === 'string') tokens[id] = resultJson.update_token;
         } else {
           failed.push({ id, reason: 'claim failed' });
         }
@@ -278,7 +287,7 @@ me.post(
       }
     }
 
-    return c.json({ claimed, failed });
+    return c.json({ claimed, failed, tokens });
   },
 );
 
@@ -505,37 +514,47 @@ async function claimPage(
     return Response.json({ error: 'claim failed' }, { status: 403 });
   }
 
-  // Step 3: ownership precheck — if already owned by someone else, 403 (no oracle)
-  if (metadata.ownerId !== null && metadata.ownerId !== userId) {
+  // Step 3: decide. Someone else's page or a wrong token is the same
+  // generic 403 (no oracle). The token is only checked for unowned pages.
+  const decision = decideClaim(
+    metadata.ownerId,
+    userId,
+    metadata.ownerId === null ? await verifyToken(updateToken, metadata.tokenHash) : false,
+  );
+  if (decision === 'deny') {
     return Response.json({ error: 'claim failed' }, { status: 403 });
   }
 
-  // Step 4: verify update_token
-  const valid = await verifyToken(updateToken, metadata.tokenHash);
-  if (!valid) {
-    return Response.json({ error: 'claim failed' }, { status: 403 });
-  }
-
-  // Step 5: idempotent if already owned by this user
-  if (metadata.ownerId === userId) {
-    return Response.json({
-      ok: true,
-      page: {
-        id: metadata.id,
-        title: metadata.title,
-        createdAt: metadata.createdAt,
-        expiresAt: metadata.expiresAt,
-      },
-    });
-  }
-
-  // Set ownerId and write updated metadata
-  const updated: PageMetadata = { ...metadata, ownerId: userId };
+  // Step 4: set the owner and replace the update token. Only the new hash is
+  // stored, so the token from the claim link, CLI output or a transcript is
+  // dead from here on. The owner gets the new one in the response.
+  const newToken = generateToken();
+  const updated: PageMetadata = {
+    ...metadata,
+    ownerId: userId,
+    tokenHash: await hashToken(newToken),
+  };
   const kvOptions: KVNamespacePutOptions = {};
   if (metadata.expiresAt !== null) {
     kvOptions.expiration = Math.floor(Date.parse(metadata.expiresAt) / 1000);
   }
   await kv.put(kvKeys.page(pageId), serializeMetadata(updated), kvOptions);
+
+  const success = Response.json({
+    ok: true,
+    page: {
+      id: metadata.id,
+      title: metadata.title,
+      createdAt: metadata.createdAt,
+      expiresAt: metadata.expiresAt,
+    },
+    update_token: newToken,
+  });
+
+  // Already this user's page: it's in their indexes, only the token changed.
+  if (decision === 'reissue') {
+    return success;
+  }
 
   // Write owner index entry (best-effort)
   try {
@@ -554,16 +573,7 @@ async function claimPage(
     }
   }
 
-  // Step 6: return success
-  return Response.json({
-    ok: true,
-    page: {
-      id: metadata.id,
-      title: metadata.title,
-      createdAt: metadata.createdAt,
-      expiresAt: metadata.expiresAt,
-    },
-  });
+  return success;
 }
 
 export { me };

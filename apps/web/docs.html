@@ -394,6 +394,7 @@ url = "https://aired.sh/mcp"</code></pre>
           <li><strong>DELETE</strong> takes the token as <code>Authorization: Bearer &lt;token&gt;</code> header.</li>
           <li><strong>POST</strong> can act as update when <code>id</code> and <code>update_token</code> are both in the body.</li>
           <li>Lose the token and you can't mutate the page (you can still publish a fresh one).</li>
+          <li>Adding a page to your account (<code>aired claim</code>, a claim link or the dashboard) replaces its token. The old token stops working everywhere it was shared, and the claim response returns the new one; the CLI stores it for you. Signed in, you can also update or delete your own pages without a token.</li>
         </ul>
       </section>
 

@@ -34,7 +34,15 @@ export interface MeResult {
 
 export interface ClaimResult {
   ok: boolean
-  id: string
+  /** The page's new update token. Claiming retires the token that was sent. */
+  update_token?: string
+}
+
+export interface ClaimBatchResult {
+  claimed: string[]
+  failed: Array<{ id: string; reason: string }>
+  /** New update token per claimed id (absent from servers before rotation). */
+  tokens?: Record<string, string>
 }
 
 export interface PageListResult {
@@ -270,7 +278,7 @@ export async function claimBatch(
   baseUrl: string,
   jwt: string,
   items: Array<{ id: string; update_token: string }>,
-): Promise<{ claimed: string[]; failed: string[] }> {
+): Promise<ClaimBatchResult> {
   const resp = await fetch(`${baseUrl}/api/me/claim-batch`, {
     method: 'POST',
     headers: {
@@ -281,7 +289,7 @@ export async function claimBatch(
     },
     body: JSON.stringify({ items }),
   })
-  return handleResponse<{ claimed: string[]; failed: string[] }>(resp, 'Claim batch')
+  return handleResponse<ClaimBatchResult>(resp, 'Claim batch')
 }
 
 export async function listMyPages(
