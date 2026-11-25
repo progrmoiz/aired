@@ -111,6 +111,30 @@ export function uidFromEvent(evt: unknown): number | null {
   return parseUid(record(details?.metadata)?.uid);
 }
 
+/**
+ * Whether to store `incoming` over the user's current row. Stripe retries and
+ * reorders events, so a late event for an old, ended subscription must not
+ * replace a newer one that still pays. Only that case is refused.
+ */
+export function shouldStoreSubscription(
+  existing: { subscriptionId: string | null; status: string; currentPeriodEnd: string | null } | null,
+  incoming: NormalizedSubscription,
+  now: Date,
+): boolean {
+  if (!existing || existing.subscriptionId === incoming.id) return true;
+  return !(paidThrough(existing, now) && !paidThrough(incoming, now));
+}
+
+// Same rule as isEntitled in lib/entitlements.ts, repeated so this module stays import-free.
+const PAID_STATUSES = new Set(['active', 'trialing', 'past_due']);
+const GRACE_MS = 3 * 24 * 3600 * 1000;
+
+function paidThrough(s: { status: string; currentPeriodEnd: string | null }, now: Date): boolean {
+  if (!PAID_STATUSES.has(s.status) || !s.currentPeriodEnd) return false;
+  const end = Date.parse(s.currentPeriodEnd);
+  return !Number.isNaN(end) && now.getTime() < end + GRACE_MS;
+}
+
 type Obj = Record<string, unknown>;
 
 function eventObject(

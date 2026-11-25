@@ -1,6 +1,6 @@
 import type { Env } from '../../types.js';
 import { GRACE_MS, isEntitled } from '../entitlements.js';
-import type { NormalizedSubscription } from './stripe-shapes.js';
+import { shouldStoreSubscription, type NormalizedSubscription } from './stripe-shapes.js';
 
 /**
  * Billing state in D1 (source of truth) plus the KV projection `ent:<uid>`
@@ -83,6 +83,8 @@ export async function findUidByCustomer(db: D1Database, customerId: string): Pro
  * Store a subscription's current state for a user, then project it to KV:
  * `ent:<uid>` while entitled (expiring a day after the grace period ends),
  * deleted otherwise. Needs a users row for uid (see ensureUser).
+ * Does nothing when the event is about an older subscription and the stored
+ * one still pays (see shouldStoreSubscription).
  */
 export async function syncSubscription(
   env: Pick<Env, 'DB' | 'PAGES_KV'>,
@@ -90,6 +92,9 @@ export async function syncSubscription(
   sub: NormalizedSubscription,
 ): Promise<void> {
   const now = new Date();
+  const existing = await getSubscription(env.DB, uid);
+  if (!shouldStoreSubscription(existing, sub, now)) return;
+
   await env.DB
     .prepare(
       `INSERT INTO subscriptions

@@ -5,6 +5,7 @@ import {
   STRIPE_API_VERSION,
   checkoutParams,
   normalizeSubscription,
+  shouldStoreSubscription,
   subscriptionIdFromEvent,
   uidFromEvent,
 } from "../src/lib/billing/stripe-shapes.ts";
@@ -360,4 +361,53 @@ test("the dev origin is used for the return urls", () => {
   const p = checkoutParams({ ...baseCheckout, origin: "http://localhost:8787" });
   assert.equal(p.get("success_url"), "http://localhost:8787/dashboard?upgraded=1");
   assert.equal(p.get("cancel_url"), "http://localhost:8787/pricing");
+});
+
+// A late or retried event for an old subscription must not replace a newer, paid one.
+const nowS = new Date("2026-06-15T12:00:00Z");
+const DAY_MS = 24 * 3600 * 1000;
+const nextMonth = new Date(nowS.getTime() + 30 * DAY_MS).toISOString();
+const lastMonth = new Date(nowS.getTime() - 30 * DAY_MS).toISOString();
+const incomingSub = (id: string, status: string, currentPeriodEnd: string | null) => ({
+  id, customerId: "cus_1", status, interval: "month" as const, currentPeriodEnd, cancelAtPeriodEnd: false, uid: 5,
+});
+
+test("the same subscription is always stored", () => {
+  const existing = { subscriptionId: "sub_A", status: "active", currentPeriodEnd: nextMonth };
+  assert.equal(shouldStoreSubscription(existing, incomingSub("sub_A", "canceled", nextMonth), nowS), true);
+  assert.equal(shouldStoreSubscription(existing, incomingSub("sub_A", "active", nextMonth), nowS), true);
+});
+
+test("a first subscription is stored", () => {
+  assert.equal(shouldStoreSubscription(null, incomingSub("sub_A", "active", nextMonth), nowS), true);
+  assert.equal(shouldStoreSubscription(null, incomingSub("sub_A", "canceled", lastMonth), nowS), true);
+});
+
+test("an old canceled subscription does not replace an active new one", () => {
+  const existing = { subscriptionId: "sub_B", status: "active", currentPeriodEnd: nextMonth };
+  assert.equal(shouldStoreSubscription(existing, incomingSub("sub_A", "canceled", lastMonth), nowS), false);
+  // still protected during the grace window, and for past_due / trialing
+  const inGrace = new Date(nowS.getTime() - 2 * DAY_MS).toISOString();
+  for (const status of ["past_due", "trialing"]) {
+    const e = { subscriptionId: "sub_B", status, currentPeriodEnd: inGrace };
+    assert.equal(shouldStoreSubscription(e, incomingSub("sub_A", "canceled", nextMonth), nowS), false, status);
+  }
+});
+
+test("a new active subscription replaces an old canceled one", () => {
+  const existing = { subscriptionId: "sub_A", status: "canceled", currentPeriodEnd: lastMonth };
+  assert.equal(shouldStoreSubscription(existing, incomingSub("sub_B", "active", nextMonth), nowS), true);
+  // and an entitled one may replace another entitled one
+  const active = { subscriptionId: "sub_A", status: "active", currentPeriodEnd: nextMonth };
+  assert.equal(shouldStoreSubscription(active, incomingSub("sub_B", "active", nextMonth), nowS), true);
+});
+
+test("when neither is entitled, the incoming one is stored", () => {
+  const existing = { subscriptionId: "sub_B", status: "canceled", currentPeriodEnd: lastMonth };
+  assert.equal(shouldStoreSubscription(existing, incomingSub("sub_A", "unpaid", lastMonth), nowS), true);
+  // an active row whose period ended past the grace is no longer entitled
+  const lapsed = { subscriptionId: "sub_B", status: "active", currentPeriodEnd: lastMonth };
+  assert.equal(shouldStoreSubscription(lapsed, incomingSub("sub_A", "canceled", lastMonth), nowS), true);
+  const noEnd = { subscriptionId: "sub_B", status: "active", currentPeriodEnd: null };
+  assert.equal(shouldStoreSubscription(noEnd, incomingSub("sub_A", "canceled", lastMonth), nowS), true);
 });
