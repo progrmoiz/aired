@@ -112,11 +112,15 @@ export async function fetchChargePaymentIntent(env: StripeEnv, chargeId: string)
 const MAX_INVOICE_PAYMENT_PAGES = 10;
 
 /**
- * Subscriptions paid by a PaymentIntent: its paid invoice payments (all pages),
- * each invoice's parent subscription. Empty when it paid no subscription invoice.
+ * Subscriptions paid by a PaymentIntent, each with the invoices it paid: its
+ * paid invoice payments (all pages), each invoice's parent subscription.
+ * Empty when it paid no subscription invoice.
  */
-export async function subscriptionsForPaymentIntent(env: StripeEnv, paymentIntentId: string): Promise<string[]> {
-  const found = new Set<string>();
+export async function subscriptionsForPaymentIntent(
+  env: StripeEnv,
+  paymentIntentId: string,
+): Promise<Map<string, Set<string>>> {
+  const found = new Map<string, Set<string>>();
   let cursor: string | null = null;
   for (let page = 0; page < MAX_INVOICE_PAYMENT_PAGES; page++) {
     const q = new URLSearchParams({
@@ -132,12 +136,50 @@ export async function subscriptionsForPaymentIntent(env: StripeEnv, paymentInten
     for (const inv of invoices) {
       const invoice = typeof inv === 'string' ? await fetchInvoice(env, inv) : inv;
       const sub = invoice ? subscriptionOfInvoice(invoice) : null;
-      if (sub) found.add(sub);
+      const invoiceId = typeof inv === 'string' ? inv : (inv as { id: string }).id;
+      if (sub) found.set(sub, (found.get(sub) ?? new Set()).add(invoiceId));
     }
     if (!nextCursor) break;
     cursor = nextCursor;
   }
-  return [...found];
+  return found;
+}
+
+/** A subscription's paid invoices, most recent first (one page of 20 is plenty for "covers today"). */
+export async function paidInvoicesOfSubscription(env: StripeEnv, subscriptionId: string): Promise<unknown[]> {
+  const q = new URLSearchParams({ subscription: subscriptionId, status: 'paid', limit: '20' });
+  const { data } = await stripeRequest(env, 'GET', `/v1/invoices?${q.toString()}`, null);
+  const list = (data as { data?: unknown } | null)?.data;
+  return Array.isArray(list) ? list : [];
+}
+
+/** Every charge that paid an invoice: its paid invoice payments → PaymentIntent charges (or the charge itself). */
+export async function chargesForInvoice(env: StripeEnv, invoiceId: string): Promise<unknown[]> {
+  const q = new URLSearchParams({ invoice: invoiceId, status: 'paid', limit: '100' });
+  const { data } = await stripeRequest(env, 'GET', `/v1/invoice_payments?${q.toString()}`, null);
+  const payments = (data as { data?: unknown } | null)?.data;
+  const charges: unknown[] = [];
+  for (const item of Array.isArray(payments) ? payments : []) {
+    const payment = (item as { payment?: { type?: unknown; payment_intent?: unknown; charge?: unknown } } | null)?.payment;
+    const pi = idOrNull(payment?.payment_intent);
+    const chargeId = idOrNull(payment?.charge);
+    if (pi) {
+      const cq = new URLSearchParams({ payment_intent: pi, limit: '100' });
+      const res = await stripeRequest(env, 'GET', `/v1/charges?${cq.toString()}`, null);
+      const list = (res.data as { data?: unknown } | null)?.data;
+      if (Array.isArray(list)) charges.push(...list);
+    } else if (chargeId) {
+      const res = await stripeRequest(env, 'GET', `/v1/charges/${encodeURIComponent(chargeId)}`, null, [404]);
+      if (res.status !== 404) charges.push(res.data);
+    }
+  }
+  return charges;
+}
+
+function idOrNull(v: unknown): string | null {
+  if (typeof v === 'string' && v) return v;
+  const id = (v as { id?: unknown } | null)?.id;
+  return typeof id === 'string' && id ? id : null;
 }
 
 async function fetchInvoice(env: StripeEnv, id: string): Promise<unknown> {

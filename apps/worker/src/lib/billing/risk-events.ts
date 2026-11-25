@@ -108,6 +108,55 @@ export function subscriptionOfInvoice(invoice: unknown): string | null {
   return idOf(record(parent.subscription_details)?.subscription);
 }
 
+/**
+ * Whether an invoice pays for a period that includes `nowSec`: one of its
+ * lines has a period covering it. (Use the lines, not invoice.period_*: for a
+ * subscription renewal those describe the previous period.) False when it
+ * can't tell, which keeps the old behaviour of ending Pro.
+ */
+export function invoiceCoversTime(invoice: unknown, nowSec: number): boolean {
+  const lines = record(record(invoice)?.lines)?.data;
+  if (!Array.isArray(lines)) return false;
+  return lines.some((line) => {
+    const period = record(record(line)?.period);
+    const start = period?.start;
+    const end = period?.end;
+    return typeof start === 'number' && typeof end === 'number' && start <= nowSec && nowSec < end;
+  });
+}
+
+/** True when there is at least one succeeded charge and every succeeded charge is fully refunded. */
+export function chargesAllRefunded(charges: unknown[]): boolean {
+  const paid = charges.filter((c) => record(c)?.status === 'succeeded' || record(c)?.paid === true);
+  return paid.length > 0 && paid.every(isFullRefund);
+}
+
+/**
+ * Does a full refund end Pro? Only when nothing else still pays for today:
+ * no other paid invoice of the subscription that covers now and wasn't fully
+ * refunded itself. So refunding a duplicate charge, an extra charge or an
+ * earlier month keeps Pro; refunding the only payment for the current period
+ * (the 14-day refund) ends it. Disputes and fraud warnings don't use this:
+ * they always end Pro.
+ */
+export async function refundEndsPro(
+  input: { refundedInvoiceIds: ReadonlySet<string>; nowSec: number },
+  deps: {
+    /** The subscription's paid invoices (most recent first). */
+    paidInvoices: () => Promise<unknown[]>;
+    /** Every charge that paid this invoice. */
+    chargesForInvoice: (invoiceId: string) => Promise<unknown[]>;
+  },
+): Promise<{ ends: boolean; keptBy: string | null }> {
+  for (const invoice of await deps.paidInvoices()) {
+    const id = str(record(invoice)?.id);
+    if (id === null || input.refundedInvoiceIds.has(id)) continue;
+    if (!invoiceCoversTime(invoice, input.nowSec)) continue;
+    if (!chargesAllRefunded(await deps.chargesForInvoice(id))) return { ends: false, keptBy: id };
+  }
+  return { ends: true, keptBy: null };
+}
+
 /** A subscription status that means there is nothing left to cancel. */
 export function alreadyEnded(status: string | null | undefined): boolean {
   return status === 'canceled' || status === 'incomplete_expired';

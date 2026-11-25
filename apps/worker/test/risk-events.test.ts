@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import {
   RISK_EVENTS,
   alreadyEnded,
+  chargesAllRefunded,
+  invoiceCoversTime,
+  refundEndsPro,
   invoicePaymentsPage,
   isFullRefund,
   paymentIntentOfCharge,
@@ -163,4 +166,83 @@ test("alreadyEnded: canceled and incomplete_expired", () => {
   for (const s of ["active", "past_due", "unpaid", "incomplete", "trialing", null, undefined]) {
     assert.equal(alreadyEnded(s), false, String(s));
   }
+});
+
+// --- Which full refunds end Pro --------------------------------------------------
+
+const NOW = 1_800_000_000;
+const DAY = 86_400;
+/** A paid subscription invoice whose line covers [start, end). */
+const inv = (id: string, start: number, end: number) => ({
+  id,
+  object: "invoice",
+  status: "paid",
+  // invoice.period_* describe the previous period on renewals; only lines count.
+  period_start: start - 30 * DAY,
+  period_end: start,
+  lines: { data: [{ id: `il_${id}`, period: { start, end } }] },
+});
+const paidCharge = (refunded: boolean) => ({ status: "succeeded", paid: true, amount: 1200, amount_refunded: refunded ? 1200 : 0, refunded });
+
+function deps(invoices: unknown[], charges: Record<string, unknown[]> = {}) {
+  const asked: string[] = [];
+  return {
+    asked,
+    deps: {
+      paidInvoices: async () => invoices,
+      chargesForInvoice: async (id: string) => { asked.push(id); return charges[id] ?? [paidCharge(false)]; },
+    },
+  };
+}
+
+test("invoiceCoversTime reads line periods, not invoice.period_*", () => {
+  const current = inv("in_now", NOW - DAY, NOW + 29 * DAY);
+  assert.equal(invoiceCoversTime(current, NOW), true);
+  assert.equal(invoiceCoversTime(inv("in_old", NOW - 40 * DAY, NOW - 10 * DAY), NOW), false);
+  // End is exclusive.
+  assert.equal(invoiceCoversTime(inv("in_edge", NOW - 30 * DAY, NOW), NOW), false);
+  assert.equal(invoiceCoversTime({ id: "in_x" }, NOW), false);
+  // The invoice-level period (previous period) alone doesn't count.
+  assert.equal(invoiceCoversTime({ id: "in_y", period_start: NOW - DAY, period_end: NOW + DAY, lines: { data: [] } }, NOW), false);
+});
+
+test("chargesAllRefunded needs at least one succeeded charge, all fully refunded", () => {
+  assert.equal(chargesAllRefunded([paidCharge(true)]), true);
+  assert.equal(chargesAllRefunded([paidCharge(true), paidCharge(false)]), false);
+  assert.equal(chargesAllRefunded([]), false);
+  assert.equal(chargesAllRefunded([{ status: "failed", amount: 1200, amount_refunded: 0 }]), false);
+  assert.equal(chargesAllRefunded([{ status: "failed", amount: 1200 }, paidCharge(true)]), true);
+});
+
+test("refunding the only payment for the current period ends Pro (the 14-day refund)", async () => {
+  const current = inv("in_now", NOW - DAY, NOW + 29 * DAY);
+  const d = deps([current, inv("in_prev", NOW - 31 * DAY, NOW - DAY)]);
+  assert.deepEqual(await refundEndsPro({ refundedInvoiceIds: new Set(["in_now"]), nowSec: NOW }, d.deps), { ends: true, keptBy: null });
+  assert.deepEqual(d.asked, []); // the earlier month doesn't cover today, so it isn't even checked
+});
+
+test("refunding a duplicate charge for the same period keeps Pro", async () => {
+  const real = inv("in_real", NOW - DAY, NOW + 29 * DAY);
+  const dup = inv("in_dup", NOW - DAY, NOW + 29 * DAY);
+  const d = deps([dup, real]);
+  assert.deepEqual(await refundEndsPro({ refundedInvoiceIds: new Set(["in_dup"]), nowSec: NOW }, d.deps), { ends: false, keptBy: "in_real" });
+});
+
+test("refunding an earlier month keeps Pro while the current period is paid", async () => {
+  const d = deps([inv("in_now", NOW - DAY, NOW + 29 * DAY), inv("in_prev", NOW - 31 * DAY, NOW - DAY)]);
+  assert.deepEqual(await refundEndsPro({ refundedInvoiceIds: new Set(["in_prev"]), nowSec: NOW }, d.deps), { ends: false, keptBy: "in_now" });
+});
+
+test("refunding the second of two charges ends Pro when the first was already refunded", async () => {
+  const d = deps(
+    [inv("in_a", NOW - DAY, NOW + 29 * DAY), inv("in_b", NOW - DAY, NOW + 29 * DAY)],
+    { in_a: [paidCharge(true)] },
+  );
+  assert.deepEqual(await refundEndsPro({ refundedInvoiceIds: new Set(["in_b"]), nowSec: NOW }, d.deps), { ends: true, keptBy: null });
+  assert.deepEqual(d.asked, ["in_a"]);
+});
+
+test("one payment refunding several invoices of the subscription counts them all as refunded", async () => {
+  const d = deps([inv("in_a", NOW - DAY, NOW + 29 * DAY), inv("in_b", NOW - DAY, NOW + 29 * DAY)]);
+  assert.deepEqual(await refundEndsPro({ refundedInvoiceIds: new Set(["in_a", "in_b"]), nowSec: NOW }, d.deps), { ends: true, keptBy: null });
 });

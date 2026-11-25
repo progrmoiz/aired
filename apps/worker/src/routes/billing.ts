@@ -23,12 +23,14 @@ import {
   createCheckout,
   createCustomer,
   createPortal,
+  chargesForInvoice,
   fetchChargePaymentIntent,
+  paidInvoicesOfSubscription,
   fetchSubscription,
   listActiveSubscriptions,
   subscriptionsForPaymentIntent,
 } from '../lib/billing/stripe.js';
-import { RISK_EVENTS, alreadyEnded, planRiskEvent } from '../lib/billing/risk-events.js';
+import { RISK_EVENTS, alreadyEnded, planRiskEvent, refundEndsPro } from '../lib/billing/risk-events.js';
 import {
   ensureUser,
   hasEvent,
@@ -362,10 +364,10 @@ async function handleRiskEvent(c: Context<AppBindings>, evt: WebhookEvent): Prom
       : await fetchChargePaymentIntent(c.env, plan.chargeId);
   if (!paymentIntentId) return notSubscription('no_payment_intent');
 
-  const subscriptionIds = await subscriptionsForPaymentIntent(c.env, paymentIntentId);
-  if (subscriptionIds.length === 0) return notSubscription('no_invoice_payment');
+  const paidBy = await subscriptionsForPaymentIntent(c.env, paymentIntentId);
+  if (paidBy.size === 0) return notSubscription('no_invoice_payment');
 
-  for (const subscriptionId of subscriptionIds) {
+  for (const [subscriptionId, refundedInvoiceIds] of paidBy) {
     const before = await fetchSubscription(c.env, subscriptionId);
     if (!before) {
       notSubscription('subscription_gone');
@@ -374,6 +376,22 @@ async function handleRiskEvent(c: Context<AppBindings>, evt: WebhookEvent): Prom
     if (!isProPrice(before.priceId, c.env)) {
       console.warn({ event: 'billing_risk_not_pro_price', eventId: evt.id, subscriptionId, priceId: before.priceId });
       continue;
+    }
+    // A refund ends Pro only if nothing else pays for today (a duplicate or
+    // earlier charge was refunded otherwise). Disputes and fraud warnings
+    // always end it.
+    if (plan.reason === 'refund' && !alreadyEnded(before.status)) {
+      const decision = await refundEndsPro(
+        { refundedInvoiceIds, nowSec: Math.floor(Date.now() / 1000) },
+        {
+          paidInvoices: () => paidInvoicesOfSubscription(c.env, subscriptionId),
+          chargesForInvoice: (invoiceId) => chargesForInvoice(c.env, invoiceId),
+        },
+      );
+      if (!decision.ends) {
+        console.log({ event: 'billing_refund_kept_pro', eventId: evt.id, subscriptionId, keptBy: decision.keptBy });
+        continue;
+      }
     }
     const result = alreadyEnded(before.status)
       ? 'already_ended'
