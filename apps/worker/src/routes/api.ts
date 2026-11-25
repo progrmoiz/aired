@@ -6,6 +6,7 @@ import { requireCsrfHeader } from "../middleware/csrf.js";
 import { readUpdateToken } from "../lib/page-token.js";
 import { TIERS } from "../lib/rate-limit-tiers.js";
 import { detectSpam, SPAM_REJECTION } from "../lib/spam.js";
+import { claimUrl } from "../lib/claim-url.js";
 import { billingEnabled, getEntitlements, planLimitError, UPGRADE_URL } from "../lib/entitlements.js";
 import type { Entitlements } from "../lib/entitlements.js";
 import {
@@ -269,6 +270,8 @@ api.post("/publish", publishRateLimit, async (c) => {
     url: `${origin}/p/${id}`,
     update_token: token,
     expiresAt,
+    // Anonymous creates get a link to attach the page to an account later.
+    ...(user === null ? { claim_url: claimUrl(c.env.SITE_ORIGIN, id, token) } : {}),
     ...upgradeHint(c, ent),
   });
 });

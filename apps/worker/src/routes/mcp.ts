@@ -5,6 +5,7 @@ import type { Context } from "hono";
 import type { AppBindings } from "../types.js";
 import { loadStats, saveStats } from "../lib/stats.js";
 import { detectSpam, SPAM_REJECTION } from "../lib/spam.js";
+import { claimUrl } from "../lib/claim-url.js";
 import {
   generateId,
   generateToken,
@@ -21,6 +22,7 @@ import type { PageMetadata } from "@aired/core";
 function createAiredMcpServer(env: {
   PAGES_BUCKET: R2Bucket;
   PAGES_KV: KVNamespace;
+  SITE_ORIGIN?: string;
 }) {
   const server = new McpServer({
     name: "aired",
@@ -195,6 +197,7 @@ function createAiredMcpServer(env: {
           : "Expires: never (permanent)",
         "",
         "Pass update_token and id to update the same URL.",
+        `To keep this page in an aired account, open: ${claimUrl(env.SITE_ORIGIN, pageId, token)}`,
       ];
 
       return {

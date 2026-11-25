@@ -36,6 +36,7 @@ const ALLOWED_RETURN_PATHS = [
   '/upgrade',
   '/upgrade?interval=year',
   '/upgrade?interval=month',
+  '/claim',
 ];
 const ALLOWED_RETURN_PREFIX = '/p/';
 

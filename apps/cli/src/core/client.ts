@@ -20,7 +20,8 @@ export interface UpgradeHint {
   url: string
 }
 
-export type PublishResponse = PublishResult & { upgrade?: UpgradeHint }
+/** `claim_url` comes back on anonymous creates only: open it signed in to keep the page. */
+export type PublishResponse = PublishResult & { upgrade?: UpgradeHint; claim_url?: string }
 
 export interface MeResult {
   id: number
