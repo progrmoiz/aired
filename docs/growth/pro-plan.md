@@ -49,7 +49,7 @@
 ## How the money moves
 
 ```
-Get Pro ─► sign in (Google, GitHub or email link) ─► Stripe Checkout (Stripe-hosted page)
+Get Pro ─► sign in (WorkOS: Google, GitHub or email code) ─► Stripe Checkout (Stripe-hosted page)
         ─► Stripe tells aired "paid" (signed webhook) ─► aired stores the plan
         ─► the badge disappears from your pages within 5 minutes
 Cancel or switch monthly↔yearly ─► Stripe customer portal ─► Pro until the paid period ends
@@ -67,13 +67,20 @@ Agents never pay. When one hits a limit, aired returns an upgrade link and the a
 |---|---|---|---|
 | 1 | **Take money** | Buy Pro (GitHub sign-in): no badge, 10 MB, 500/day, billing in the dashboard | 2–3 days |
 | 2 | Claim pages | Pages published without an account can be added to one; a "remove my page" path for lost links | ½–1 day, can run alongside 1 |
-| 3 | Sign in without GitHub | Google and email-link sign-in, CLI login for those accounts | 2–3 days |
+| 3 | Sign in with WorkOS | One sign-in page with Google, GitHub and email codes; existing GitHub users keep their account and pages; CLI login for everyone | 2–3 days |
 | 4 | API keys | Keys for CI and agents, from the dashboard | 1 day |
 | 5 | Signed-in MCP | Agents can list, update and delete their own pages; connectors in Claude and ChatGPT | 1½–3 days |
 | 6 | Analytics | Views over time, countries, referrers per page | 1–2 days |
 | 7 | Custom domain | `share.yourco.com` serves your pages | 2–3 days, after the aired.page move's routing |
+| 8 | Workspaces and members | Team workspaces, invites by email or link, a workspace switcher, paid editor seats | planned |
+| 9 | Five fixed roles | Owner, Admin, Member (paid seats); Viewer, Guest (free) | planned |
+| 10 | Page access | Share dialog: view, comment, edit, full; viewers and guests capped at comment; guests by email code | planned |
+| 11 | Groups | Share with "Design" once; groups made by hand, no SSO needed | planned |
+| 12 | Company domains | Verify acme.com; request-to-join or auto-join | planned |
+| 13 | SSO and SCIM | Company sign-in (add-on) and directory sync (Enterprise) through WorkOS | planned |
+| 14 | Audit log | Who did what, with export | planned |
 
-Total: about 12–19 working days including review and testing. **Announce Pro widely after phase 3**, so people without GitHub can buy it. Phase 1 can go live quietly before that.
+Phases 1–7 total about 12–19 working days including review and testing. Phases 8–14 are planned only; they start after the workspace pricing below is decided. **Announce Pro widely after phase 3**, so people without GitHub can buy it. Phase 1 can go live quietly before that.
 
 ## Decided (2026-11-25)
 
@@ -82,10 +89,26 @@ Total: about 12–19 working days including review and testing. **Announce Pro w
 3. **API keys are free.**
 4. **Refunds: 14 days, full, no questions.** Issued by hand in the Stripe dashboard.
 5. **When Pro lapses:** pages stay up, the badge returns, and the custom domain redirects to aired.sh links for 30 days, then disconnects.
+6. **Sign-in: WorkOS AuthKit** replaces GitHub-only login. Free up to 1M monthly active users. GitHub stays as one button; your existing accounts keep their ids and pages.
+7. **One database.** The D1 database added for billing also holds workspaces, roles, groups and the audit log later.
 
 ## Still yours to decide
 
 - **Stripe Tax: on or off.** Off by default. Turning it on (`STRIPE_AUTOMATIC_TAX=1`) makes Checkout add and collect tax for 0.5% per sale. Stripe does **not** register you or file returns; you do that wherever you're registered. Stripe Tax's threshold monitoring shows where registration becomes due. Selling digital services to EU and UK consumers usually needs registration from the first sale for sellers based outside those regions.
+
+- **Workspace pricing (Team, Business, Enterprise).** Recommended, not decided:
+  - **SSO (SAML/OIDC, e.g. Okta, Entra): a $150/mo add-on on Business, included in Enterprise.** It replaces the earlier idea of SSO inside Business, and the live pricing page still lists "SSO: SAML, Okta, Google" under Business, so that line changes when you decide.
+  - **SCIM (directory sync): Enterprise only.**
+  - **Why:** WorkOS charges per customer company per month, and SSO and Directory Sync (SCIM) are separate products:
+
+    | Connections | 1–15 | 16–30 | 31–50 | 100+ |
+    |---|---|---|---|---|
+    | SSO, per company per month | $125 | $100 | $80 | $65 |
+    | SCIM, per company per month | $125 | $100 | $80 | $65 |
+
+    A company with both costs us **$250/mo** at the start, so SCIM goes where the floor is about $500/mo (Enterprise). SSO alone costs us $125 and sells for $150. Rule: never put a paid connection inside a plan whose floor is under about 3× its cost. Business at $20 per editor with a minimum of 3 is $60/mo, which is why SSO can't be included in it. Google, GitHub and email sign-in, and "require Google sign-in for @acme.com", cost nothing and go on every plan that needs them.
+  - **Seats:** Owner, Admin and Member are paid editor seats; Viewer and Guest are free.
+- **Moving old pages into workspaces.** Recommended: don't. Every existing page counts as being in its owner's personal workspace, with no rewrite of about 11,000 records. The workspace spec moves them; this plan avoids the rewrite.
 
 ## Set up (only you can)
 
@@ -93,8 +116,8 @@ Total: about 12–19 working days including review and testing. **Announce Pro w
 |---|---|
 | Before phase 1 goes live | Everything in the Stripe checklist below |
 | Before phase 1 goes live | Refund policy, terms and privacy updated to name Stripe as the payment processor |
-| Before phase 1 goes live | `wrangler d1 create aired`, paste the id into `apps/worker/wrangler.toml` (placeholder today), `wrangler d1 migrations apply aired --remote` |
-| Before phase 3 | Google Cloud OAuth client with the `openid email profile` scopes only, and Cloudflare Email Sending on aired.sh for sign-in links |
+| Before the next deploy of this branch | `wrangler d1 create aired`, paste the id into `apps/worker/wrangler.toml` (a placeholder today, so `wrangler deploy` fails until it's replaced), then `wrangler d1 migrations apply aired --remote` (migrations 0001 and 0002) |
+| Before phase 3 | WorkOS account (staging first, free): turn on Google, GitHub (with "return OAuth tokens") and Magic Auth in AuthKit; redirect URI `https://aired.sh/auth/workos/callback`; `wrangler secret put WORKOS_API_KEY` and `WORKOS_CLIENT_ID` |
 | Before phase 6 | Cloudflare API token that can read Analytics Engine |
 | Before phase 7 | Cloudflare for SaaS on aired.sh (100 hostnames free, then $0.10 each) and the content-domain routing from `.forge/blueprints/content-domain.md` |
 
@@ -109,10 +132,12 @@ Total: about 12–19 working days including review and testing. **Announce Pro w
 | 5 | Settings → Billing → Subscriptions and emails | Turn on Smart Retries and the failed-payment emails, and set "cancel the subscription" when retries run out. |
 | 6 | Settings → Tax (only if you turn Stripe Tax on) | Origin address, default tax code "SaaS" (`txcd_10000000`), then `STRIPE_AUTOMATIC_TAX=1`. |
 | 7 | Terminal | `wrangler secret put STRIPE_SECRET_KEY` (the `rk_…` key), `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_MONTHLY`, `STRIPE_PRICE_YEARLY`, then set `BILLING_ENABLED=1` and deploy. |
+| 8 | Later, if you ever change the price | Create the new prices, put the **old** price ids in `STRIPE_LEGACY_PRICE_IDS` (comma-separated) **before** switching `STRIPE_PRICE_MONTHLY`/`YEARLY`, so existing subscribers stay Pro. |
 
 Check in test mode before live: `stripe listen --forward-to localhost:8787/api/billing/webhook`, buy with card `4242 4242 4242 4242`, and confirm the dashboard says "Pro".
 
 ## Open questions
 
 - **Apex domains (`yourco.com`).** Cloudflare only supports them on Enterprise. v1 offers subdomains (`share.yourco.com`).
-- **Team plan.** Pro is per person, so pages stay owned by a person. Team needs pages to belong to a workspace, which is a migration. Do it before Team, not before Pro.
+- **Team plan.** Pro is per person. Team billing is per workspace (one Stripe subscription with a seat count), planned in phase 8.
+- **WorkOS on Workers.** Phase 3 starts with a short spike: does AuthKit's flow work from the Worker with plain `fetch`, and does WorkOS hand back the GitHub id so old accounts link automatically? If not, accounts link by verified email.

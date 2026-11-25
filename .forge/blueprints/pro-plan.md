@@ -1,6 +1,6 @@
 # Blueprint: Aired Pro (paid plan, billing, sign-in, claiming, API keys)
 
-> Based on: direct request (Pro plan study, 2026-11-25). Upstream: `docs/growth/seo-marketing-pricing.md` §5–6, `docs/research/artifacts-chatgpt-parity.md` §6 (gitignored, main checkout), `.forge/blueprints/content-domain.md`, `.forge/blueprints/aired-accounts.md` (main checkout)
+> Based on: direct request (Pro plan study, 2026-11-25). Upstream: `docs/growth/seo-marketing-pricing.md` §5–6, `docs/research/artifacts-chatgpt-parity.md` §6 (gitignored, main checkout), `.forge/blueprints/content-domain.md`, `.forge/blueprints/aired-accounts.md` (main checkout), `docs/research/workspace-membership.md` (workspaces, roles, SSO; gitignored, main checkout)
 > Design direction: DESIGN.md
 > Status: Approved
 > Date: 2026-11-25
@@ -13,7 +13,7 @@ Decision summary for the owner: `docs/growth/pro-plan.md`. Billing provider: **S
 
 ## Purpose
 
-A signed-in person can pay for Pro in two clicks and immediately publish pages with no aired badge, up to 10 MB, at a higher publish limit. Later phases add Google and email sign-in (so non-developers can pay), a way to claim pages published without an account, API keys and a signed-in remote MCP for agents, per-page analytics and a custom domain. Nobody who views a page ever pays or signs in.
+A signed-in person can pay for Pro in two clicks and immediately publish pages with no aired badge, up to 10 MB, at a higher publish limit. Later phases add sign-in through WorkOS AuthKit (Google, GitHub, email codes) so non-developers can pay, a way to claim pages published without an account, API keys and a signed-in remote MCP for agents, per-page analytics and a custom domain. Nobody who views a page ever pays or signs in.
 
 ## Requirements Trace
 
@@ -22,7 +22,7 @@ A signed-in person can pay for Pro in two clicks and immediately publish pages w
 - R3. Payment state is server-side truth, updated only from verified webhooks, and survives webhook retries and out-of-order delivery.
 - R4. A plan lookup adds at most one cached KV read to a page view, and no KV write.
 - R5. When Pro lapses, nothing is deleted: the badge comes back, new publishes use free limits, a custom domain redirects to the aired URL.
-- R6. People without GitHub can sign in (Google, email link) and reach checkout.
+- R6. People without GitHub can sign in (WorkOS AuthKit: Google, email code) and reach checkout; existing GitHub users keep their ids and pages.
 - R7. A person who published without an account can attach those pages to an account, and a person who lost the token has a removal path that does not rely on the token.
 - R8. Agents and CI authenticate with an API key or remote-MCP sign-in, and get a machine-readable upgrade link when a limit stops them. A human always does the paying.
 - R9. Until billing is switched on (`BILLING_ENABLED` unset), production behaves exactly as today.
@@ -32,13 +32,13 @@ A signed-in person can pay for Pro in two clicks and immediately publish pages w
 ### In Scope
 - Billing: hosted checkout, customer portal, webhook, subscription store, entitlements.
 - Feature gates in the worker: badge, page size, publish limits; later analytics and custom domain.
-- Sign-in: Google OIDC, email magic link, an aired-native device flow for the CLI, a `/login` chooser.
+- Sign-in: WorkOS AuthKit (Google, GitHub, email codes) on Aired's own session and numeric ids, linking of existing GitHub accounts, an aired-native device flow for the CLI.
 - Page claiming: browser-held tokens, claim links, removal requests.
 - API keys, authenticated remote MCP, upgrade responses (HTTP 402).
 - Dashboard plan strip, billing, keys, analytics, domain screens. Pricing page copy and live button.
 
 ### Out of Scope
-- Team and Business plans (workspaces, seats, roles, SSO, audit log). The `workspaceId` refactor from `seo-marketing-pricing.md` §6 is deliberately not in this plan; see Risks.
+- Building Team and Business (workspaces, seats, roles, groups, domains, SSO, SCIM, audit log). They are **planned** as Phases 8–14 below, not approved to build.
 - Your-logo-instead-of-badge (white-label). Pro removes the badge; a custom logo comes with Team.
 - Coupons, referral credits, lifetime deals, usage-based billing.
 - Free trial. The free plan is the trial; Pro has a 14-day refund instead (Key Decisions).
@@ -59,8 +59,8 @@ A builder must not do any of these. Each is listed where it blocks.
 | P4d | `wrangler d1 create aired`, put the id in `wrangler.toml` (a placeholder today), run `wrangler d1 migrations apply aired --remote`. | Phase 1 deploy | |
 | P4e | **Stripe Tax decision.** Off by default (`STRIPE_AUTOMATIC_TAX` unset). Turning it on makes Checkout calculate and collect tax (0.5% per transaction), but **registering, filing and paying the tax stays the owner's job** wherever Aired is registered. Stripe Tax's threshold monitoring shows where registration becomes due. | Phase 1 go-live | If on: set the origin address and the SaaS tax code (`txcd_10000000`) in Stripe Tax settings first. |
 | P5 | Refund, terms and privacy updates (14-day refund, what happens on cancel, Stripe as payment processor) | Phase 1 launch | `docs/privacy.md` must name Stripe before the button goes live. Refunds are issued by hand in the Stripe dashboard. |
-| P6 | Google Cloud OAuth client (Web), consent screen with `openid email profile` | Phase 3 deploy | Basic scopes only. |
-| P7 | Turn on Cloudflare Email Sending for aired.sh (public beta; 3,000 emails/month included on Workers Paid; it sets SPF/DKIM/DMARC) | Task 3.4 deploy | Fallback: Resend. |
+| P6 | WorkOS account (staging environment first, free). In AuthKit enable Google, GitHub (with "return OAuth tokens" on, for linking) and Magic Auth; redirect URI `https://aired.sh/auth/workos/callback`; secrets `WORKOS_API_KEY`, `WORKOS_CLIENT_ID`. | Phase 3 deploy | Free up to 1M monthly active users. SSO/SCIM connections are paid per customer company (Phase 13). |
+| P7 | ~~Email sending provider~~ Dropped: WorkOS Magic Auth sends sign-in codes. Revisit only for Phase 8 invite emails (WorkOS invitations or Cloudflare Email Sending). | — | |
 | P8 | Enable Cloudflare for SaaS on the aired.sh zone; add fallback origin `customers.aired.sh` (proxied `AAAA 100::`) and a `*/*` Worker route | Phase 7 deploy | 100 hostnames free, then $0.10 each. |
 | P9 | Cloudflare API token for Analytics Engine SQL reads | Phase 6 deploy | Account Analytics: Read. |
 
@@ -103,9 +103,11 @@ A builder must not do any of these. Each is listed where it blocks.
 | Webhook handling | Verify `Stripe-Signature` (`t=…,v1=…`) with Web Crypto HMAC-SHA256 over `${t}.${rawBody}`, accept any matching `v1`, 300 s tolerance, constant-time compare; dedupe by `event.id` in D1; then **re-fetch the subscription** from Stripe and store its current state | Stripe retries for 3 days, sends duplicates and doesn't guarantee order. Fetch-on-webhook makes all three harmless. |
 | Source of truth | **D1** (`aired` database) for users, identities, subscriptions, events, API keys, domains | Strongly consistent and relational. KV is eventually consistent (up to ~60 s) and write-limited. |
 | Hot-path reads | KV projection `ent:<uid>` written by the webhook; read with `cacheTtl: 300` in the viewer and publish path | Page views stay on KV only (R4). D1 is read on account pages, not on views. |
-| User ids | Keep `ownerId: number`. GitHub users keep their GitHub id. New users (Google, email) get ids from D1 starting at `1_000_000_000_000`. | No migration of 11,000 page records or owner indexes. GitHub ids are far below 10^12; JS integers stay exact. |
-| Account linking | Link a new identity to an existing user only when both emails are verified and equal; otherwise ask the person to sign in with the method they used before | Prevents takeover through an unverified email. |
-| CLI login | Add an aired-native device flow (`/auth/device` issues the code; the user approves at `aired.sh/device` after any sign-in). Keep the GitHub device flow for old CLI versions. | GitHub's device flow can't sign in a Google user. |
+| Sign-in provider | **WorkOS AuthKit** for everyone (owner's decision, 2026-11-25); GitHub is one button on it. Aired still issues its own HS256 session cookie after the AuthKit callback, called with `fetch` (no SDK). | Free to 1M MAU, covers Google, GitHub, email codes, passkeys and later SSO/SCIM. Keeping Aired's own session leaves `authMiddleware`, CLI tokens and the CSRF rule unchanged. |
+| User ids | Keep `ownerId: number`. GitHub users keep their GitHub id. New users (WorkOS) get ids from D1 starting at `1_000_000_000_000`. The spec's text ids (`u_…`) are not adopted. | No migration of 11,000 page records or owner indexes. GitHub ids are far below 10^12; JS integers stay exact. |
+| Account linking | Four steps, first match wins: known WorkOS identity → GitHub id from WorkOS provider tokens → verified, non-noreply email equal to one Aired holds → new user (Phase 3 intro) | Keeps every existing GitHub user on their id and pages; never links on an unverified email. |
+| CLI login | Aired-native device flow (`/auth/device` issues the code; the user approves at `aired.sh/device` after an AuthKit sign-in). Keep the GitHub device flow for old CLI versions. WorkOS CLI auth is evaluated in the Task 3.2 spike. | GitHub's device flow can't sign in a Google user; ours works for every sign-in method. |
+| Workspace data | D1 (`aired`, the same database) is the source of truth for workspaces, memberships, roles, groups and audit; WorkOS SSO/SCIM is mirrored in by webhook | Access checks on the view path stay in our own database, and WorkOS can be swapped later. |
 | Remote MCP auth | Publishing stays anonymous. Task 5.1: `Authorization: Bearer aired_sk_…` on `/mcp` unlocks account tools. Task 5.2: OAuth via `@cloudflare/workers-oauth-provider` for connector clients. | Claude Code and Cursor accept a static Bearer header today. ChatGPT accepts OAuth only, and Claude.ai's header support is a limited beta, so connector users need OAuth; ship it second. |
 | Upgrade for agents | HTTP **402** `{error, code: "plan_limit", limit, upgrade_url}`; the MCP tool result carries the same link as text for the human | Agents relay a link; they never pay. |
 | Analytics store | Workers Analytics Engine dataset `page_views`, written only for owned pages; read through the SQL API | No KV writes per view; 3-month retention matches a "last 90 days" chart. |
@@ -121,6 +123,17 @@ A builder must not do any of these. Each is listed where it blocks.
 - Do signed-in users get a different publish limit today? Yes, since `d4679ce` (30/hour per account). Task 1.6 adds Pro (500/day) on top of `publishTier`.
 - Does a read limit need Pro? No. `reads` works free today (`apps/web/docs.html:244`). The pricing page's "Plus view-limited links" on Pro is wrong and is removed in Task 1.8.
 - Can existing claim code be reused? Yes. `claimPage` stays the only place ownership changes; the new entry points (browser tokens, claim links) call it.
+
+### Open for the owner (workspace fold-in, 2026-11-25)
+Where this blueprint and `docs/research/workspace-membership.md` disagree, this blueprint currently follows the left column:
+| Topic | This blueprint | Spec | Why it matters |
+|---|---|---|---|
+| User ids | Numeric, GitHub users keep theirs, new ones ≥ 10^12 | Text ids `u_…` | Text ids would mean rewriting `ownerId` on ~11,000 KV pages and every owner index. The owner's instruction (keep numeric ids) matches the left column. |
+| Existing pages | Stay as they are; personal workspace derived from `ownerId` | Backfill every page into a personal workspace | Same 11,000-record KV rewrite on a write-limited namespace. |
+| Invites | In Phase 8 (with workspaces) | Requested list puts invites after groups | A team workspace can't get members without invites, so they ship together; company domains stay in Phase 12. |
+| Keys | `api_keys` (Phase 4) gets a nullable `workspace_id`; one table | Separate workspace-scoped `api_tokens` | One key table, so CLI/MCP auth has one lookup. |
+| Sessions | Aired's own HS256 cookie after AuthKit; per-user `sessions_valid_since` in Phase 8 | JWT with `sid`, `amr`, `sso_conn`; AuthKit sessions considered | Keeps Phase 1–7 auth untouched; `amr`/`sso_conn` claims are added in Phase 13 when Require SSO needs them. |
+| Email sign-in | WorkOS Magic Auth (no Aired email sender) | Same | The earlier Cloudflare Email Sending prerequisite is dropped. |
 
 ### Deferred to Implementation
 - Which events Stripe sends for a plan switch in the portal (expected: `customer.subscription.updated` only); the handler re-fetches either way.
@@ -145,8 +158,8 @@ D1 database `aired`, binding `DB`. Migrations in `apps/worker/migrations/` (`wra
 `identities`: sign-in methods per user
 | Column | Type | Constraints | Notes |
 |---|---|---|---|
-| provider | TEXT | NOT NULL | `github` \| `google` \| `email` |
-| subject | TEXT | NOT NULL | GitHub id, Google `sub`, or lowercased email |
+| provider | TEXT | NOT NULL | `github` \| `workos` (later `saml:<conn>` via WorkOS) |
+| subject | TEXT | NOT NULL | GitHub id, or WorkOS user id (`user_…`) |
 | user_id | INTEGER | NOT NULL REFERENCES users(id) | |
 | email | TEXT | NULL | |
 | email_verified | INTEGER | NOT NULL DEFAULT 0 | |
@@ -214,7 +227,7 @@ D1 database `aired`, binding `DB`. Migrations in `apps/worker/migrations/` (`wra
 ### KV (additive, small, written rarely)
 | Key | Value | Written by | Read by |
 |---|---|---|---|
-| `ent:<uid>` | `{"plan":"pro","until":"ISO","status":"active"}` | webhook sync, admin script | viewer (owned pages), publish, `/api/me` |
+| `ent:<uid>` | `{"plan":"pro","status":"active","currentPeriodEnd":"ISO"}`, expires at period end + 4 days | webhook sync, admin script | viewer (owned pages), publish, `/api/me` |
 | `apikey:<sha256>` | `{"uid":n,"keyId":"…"}` | key create; deleted on revoke | auth middleware |
 | `host:<hostname>` | `{"uid":n,"home":"id"\|null}` | domain activation; deleted on detach | host router (Phase 7) |
 
@@ -270,10 +283,8 @@ Entitled when status is `active`, `trialing` or `past_due` and `now < current_pe
 | `GET /api/billing/status` | `routes/billing.ts` | session | — | `{plan, status, interval, renewsAt, cancelAtPeriodEnd}` from D1 |
 | `POST /api/billing/webhook` | `routes/billing.ts` | `Stripe-Signature` | raw body | 200 / 400 bad signature / 500 retry |
 | `GET /api/me` | `routes/me.ts` | session or key | — | adds `plan`, `limits`, `billing` |
-| `GET /auth/google`, `/auth/google/callback` | `routes/auth-google.ts` | — | — | session cookie, redirect |
-| `POST /auth/email` | `routes/auth-email.ts` | — (rate-limited) | `{email, return}` | 202 always |
-| `GET /auth/email/confirm` | `routes/auth-email.ts` | link token | `?t=` | page with a "Sign in" button (no auto-consume) |
-| `POST /auth/email/confirm` | `routes/auth-email.ts` | link token | `t` | session cookie, redirect |
+| `GET /auth/login` | `routes/auth-workos.ts` | — | `?return=` | 302 to WorkOS AuthKit |
+| `GET /auth/workos/callback` | `routes/auth-workos.ts` | `state` cookie | `?code&state` | session cookie, redirect |
 | `POST /auth/device`, `/auth/device/poll`, `/auth/device/approve` | `routes/auth-device.ts` | — / session | | aired-native device flow |
 | `GET/POST /api/me/keys`, `DELETE /api/me/keys/:id` | `routes/keys.ts` | session + CSRF | `{name}` | key shown once on create |
 | `GET /api/me/pages/:id/analytics` | `routes/analytics.ts` | session or key, Pro | `?days=7\|30\|90` | `{series, countries, referrers, devices}` |
@@ -297,7 +308,6 @@ When a plan limit blocks a signed-in request: **402** `{"error":"This needs Pro"
 
 ```
 apps/web/
-  login.html              new: Continue with Google / GitHub / email link (tool-page rules)
   device.html             new: confirm the CLI code (after sign-in)
   claim.html              new: reads #<id>.<token>, claims after sign-in
   consent.html            new (Phase 5): "Let <client> publish to your aired account"
@@ -312,7 +322,7 @@ apps/web/
 ### Phase 1: Take money — [DB] [API]
 The smallest Pro that can charge: GitHub users can buy Pro and get no badge, 10 MB pages and higher limits. Ships dark behind `BILLING_ENABLED`. The dashboard and pricing tasks (1.7, 1.8) are small UI changes kept here so the phase ends with a working purchase.
 
-#### Task 1.1: Add the D1 binding and billing schema
+#### Task 1.1: Add the D1 binding and billing schema — DONE c04fd50
 - **Size:** S
 - **Acceptance criteria:**
   - [ ] `wrangler.toml` declares `[[d1_databases]]` with `binding = "DB"`, `database_name = "aired"`, a placeholder `database_id` for the owner, `migrations_dir = "migrations"`; `Env` gains `DB: D1Database` and optional `BILLING_ENABLED`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_MONTHLY`, `STRIPE_PRICE_YEARLY`, `STRIPE_AUTOMATIC_TAX`.
@@ -322,7 +332,7 @@ The smallest Pro that can charge: GitHub users can buy Pro and get no badge, 10 
 - **Verification:** `cd apps/worker && npx wrangler d1 migrations apply aired --local` exits 0; `npx wrangler d1 execute aired --local --command "INSERT INTO users(email,login,created_at) VALUES('a@b.c','a','x') RETURNING id"` returns `1000000000000`.
 - **Dependencies:** None
 
-#### Task 1.2: Write the pure entitlements and signature helpers
+#### Task 1.2: Write the pure entitlements and signature helpers — DONE e7f5b9b
 - **Size:** S
 - **Acceptance criteria:**
   - [ ] `entitlementsFor(null, now)` returns free limits (badge on, 2 MB, 30 publishes/hour); an `active` or `past_due` sub before `period_end + 3 days` returns Pro (badge off, 10 MB, 500/day); `canceled`, or past the grace, returns free.
@@ -331,7 +341,7 @@ The smallest Pro that can charge: GitHub users can buy Pro and get no badge, 10 
 - **Verification:** `cd apps/worker && npm test` passes, including the new cases.
 - **Dependencies:** None
 
-#### Task 1.3: Add the Stripe client and the subscription store
+#### Task 1.3: Add the Stripe client and the subscription store — DONE e8416d5 a783713
 - **Size:** M
 - **Acceptance criteria:**
   - [ ] `stripe-shapes.ts` (pure, unit-tested) builds Checkout params (subscription mode, `client_reference_id` and `metadata[uid]`, `automatic_tax` only when enabled) and normalizes a subscription (status, interval, period end from the item or top level, `cancel_at_period_end`); `stripe.ts` calls `/v1/checkout/sessions`, `/v1/billing_portal/sessions` and `/v1/subscriptions/:id` with `fetch`, the restricted key and a pinned `Stripe-Version`. No SDK.
@@ -341,7 +351,7 @@ The smallest Pro that can charge: GitHub users can buy Pro and get no badge, 10 
 - **Verification:** `npm test` passes the shape tests. With the owner's test-mode key later: `stripe listen --forward-to localhost:8787/api/billing/webhook`, a `4242 4242 4242 4242` checkout, then `npx wrangler d1 execute aired --local --command "SELECT status,plan FROM subscriptions"` prints `active|pro`.
 - **Dependencies:** Task 1.1, Task 1.2
 
-#### Task 1.4: Add checkout, portal, status and webhook routes
+#### Task 1.4: Add checkout, portal, status and webhook routes — DONE f256203 8089aa0 46be950 9def97c
 - **Size:** M
 - **Acceptance criteria:**
   - [ ] `POST /api/billing/checkout` and `/portal` require session + CSRF header and return `{url}`; checkout returns 409 for a current Pro user and 503 when `BILLING_ENABLED` is unset. `GET /upgrade?interval=` signs the user in if needed, then redirects to checkout.
@@ -351,7 +361,7 @@ The smallest Pro that can charge: GitHub users can buy Pro and get no badge, 10 
 - **Verification:** local dev: `curl -s -X POST localhost:8787/api/billing/webhook -d '{}' -H 'Stripe-Signature: t=1,v1=bad' -o /dev/null -w '%{http_code}'` prints `400`; replaying the same signed test event twice leaves one `billing_events` row.
 - **Dependencies:** Task 1.3
 
-#### Task 1.5: Hide the badge on pages whose owner has Pro
+#### Task 1.5: Hide the badge on pages whose owner has Pro — DONE dd2d0ba
 - **Size:** S
 - **Acceptance criteria:**
   - [ ] `injectAiredBar(html, {…, badge: false})` adds the OG tags but no badge markup.
@@ -360,7 +370,7 @@ The smallest Pro that can charge: GitHub users can buy Pro and get no badge, 10 
 - **Verification:** `npm test` passes (new case: `badge: false` output contains `og:title` and not `__aired-bar`); local dev with `ent:<uid>` set by hand in local KV: the owner's page has no badge, an anonymous page still does.
 - **Dependencies:** Task 1.3
 
-#### Task 1.6: Apply plan limits to publish (size and rate)
+#### Task 1.6: Apply plan limits to publish (size and rate) — DONE bf62dff
 - **Size:** M
 - **Acceptance criteria:**
   - [ ] `validateHtml(html, maxBytes = MAX_SIZE)`; `PRO_MAX_SIZE = 10 MB` in core constants. `/api/publish`, `PUT /api/pages/:id` and MCP `publish_html` pass the caller's `maxBytes`.
@@ -370,7 +380,7 @@ The smallest Pro that can charge: GitHub users can buy Pro and get no badge, 10 
 - **Verification:** local dev: a 3 MB publish as a free signed-in user returns 402 JSON with `upgrade_url`; the same as a Pro user (`ent:` set by hand) returns 200; an anonymous 3 MB publish returns 400 as today.
 - **Dependencies:** Task 1.3
 
-#### Task 1.7: Show the plan and billing in /api/me and the dashboard
+#### Task 1.7: Show the plan and billing in /api/me and the dashboard — DONE f75aaba
 - **Size:** M
 - **Acceptance criteria:**
   - [ ] `GET /api/me` adds `plan: "free"|"pro"`, `limits: {maxBytes, publishLimit}`, and `billing: {status, interval, renewsAt, cancelAtPeriodEnd} | null`.
@@ -380,7 +390,7 @@ The smallest Pro that can charge: GitHub users can buy Pro and get no badge, 10 
 - **Verification:** local dev signed in: the dashboard shows "Get Pro"; a test checkout returns to `/dashboard?upgraded=1`, which flips to "Pro · renews …" within 30 s; "Manage billing" opens the portal.
 - **Dependencies:** Task 1.4
 
-#### Task 1.8: Turn on the Pro button and correct the pricing page
+#### Task 1.8: Turn on the Pro button and correct the pricing page — DONE bc7939b 11768fb
 - **Size:** S
 - **Model:** sonnet
 - **Acceptance criteria:**
@@ -390,7 +400,7 @@ The smallest Pro that can charge: GitHub users can buy Pro and get no badge, 10 
 - **Verification:** local dev with `BILLING_ENABLED=1` and test-mode keys: signed out, click "Get Pro" (yearly) → sign-in → Stripe Checkout shows $108.00 per year; with it unset the button reads "Coming soon".
 - **Dependencies:** Task 1.4
 
-#### Task 1.9: Show the Pro offer where the badge is seen
+#### Task 1.9: Show the Pro offer where the badge is seen — DONE 097243a
 - **Size:** S
 - **Acceptance criteria:**
   - [ ] Signed-in free publish responses add `upgrade: {reason: "badge", url: "https://aired.sh/pricing?ref=publish"}`; the CLI prints one dim line "Remove the badge with Pro: <url>" under the page URL; MCP adds the same sentence to its text.
@@ -444,55 +454,67 @@ Independent of Phase 1; can run in parallel. Fixes the lost-token takedown class
 
 **Checkpoint after Phase 2:** `npm test` green; the three claim paths (browser banner, claim link, CLI `aired claim --all`) each attach a page in local dev.
 
-### Phase 3: Sign in without GitHub — [API] [UI]
+### Phase 3: Sign in with WorkOS AuthKit — [API] [UI]
+WorkOS AuthKit becomes the sign-in for everyone (owner's decision, 2026-11-25): Google, GitHub and email codes (Magic Auth) on one hosted page, free up to 1M monthly active users. Aired keeps its own HS256 session cookie and numeric user ids; WorkOS only proves who someone is. GitHub stays as a button on the AuthKit page and stops defining the user id. Source: `docs/research/workspace-membership.md` §11 (gitignored, main checkout).
+
+**How an existing GitHub user is linked (Task 3.1, in this order, first match wins):**
+1. `identities(provider='workos', subject=<WorkOS user id>)` already exists → that user.
+2. They signed in with GitHub through AuthKit (`authentication_method = "GitHubOAuth"`) and WorkOS returned provider tokens → `GET https://api.github.com/user` gives the numeric GitHub id → if `identities(github, <id>)` or KV `user:<id>` exists, link to that id. (Needs "return OAuth tokens" switched on for the GitHub connection in WorkOS; confirm in the Task 3.2 spike. If it isn't available, step 3 covers most users.)
+3. WorkOS says `email_verified = true`, the email isn't a GitHub noreply address, and it matches a verified email Aired already holds (D1 `identities.email` with `email_verified = 1`, or the GitHub-era KV index `email:<email>`, which only ever stored GitHub's primary verified email) → link to that id.
+4. Otherwise create a new user (id ≥ 10^12).
+
+The `users.id` never changes, so `ownerId` in KV, owner indexes, `subscriptions`, `billing_customers` and `ent:<uid>` keep resolving. A GitHub user whose GitHub email was unverified or private and who signs in with a different method gets a new account; the dashboard shows "Signed in before with GitHub? Sign in with GitHub to link it" for 90 days.
+
+**Phase 1 audit for GitHub-id assumptions:** nothing in Phase 1 treats `users.id` as a GitHub id (ids are opaque numbers; `ensureUser` copies the session's id; webhook placeholders use `user-<uid>`). Two sign-in redirects hard-code GitHub and are fixed in Task 3.3: `GET /upgrade` (signed out → `/auth/github?return=…`) and the signed-out `/dashboard` redirect. One gap: `GET /api/me` reads `createdAt` from KV `user:<id>`, which only GitHub sign-ins write; Task 3.1 writes it for every new user.
 
 #### Task 3.1: Resolve users across identities in D1
 - **Size:** M
 - **Acceptance criteria:**
-  - [ ] `resolveUser(env, identity)` returns the linked user for a known identity; links to an existing user only when both emails are verified and equal; otherwise creates a user (id ≥ 10^12) and an identity.
-  - [ ] The GitHub callback calls it too, inserting `users.id = githubId` on first sight, so existing accounts keep their id and pages.
-  - [ ] `0002_auth_tokens.sql` creates `auth_tokens` (used by Tasks 3.4 and 3.5).
-- **Files:** `apps/worker/src/lib/users.ts`, `apps/worker/src/routes/auth.ts`, `apps/worker/migrations/0002_auth_tokens.sql`, `apps/worker/test/users.test.ts`
-- **Verification:** `npm test` passes (new Google user → id 10^12; Google with a verified email equal to a GitHub user's → same id; unverified match → new id).
+  - [ ] `resolveUser(env, identity)` applies the four linking steps above and returns `{id, login, email, name}`; new users get an id ≥ 10^12; `identities.provider` accepts `workos` (plus the existing `github`); a KV `user:<id>` record is written when missing.
+  - [ ] The legacy GitHub callback also calls it (provider `github`, subject = GitHub id, `users.id = githubId` on first sight), so old CLI versions and the 30-day fallback route keep working.
+  - [ ] `migrations/0003_auth.sql` creates `auth_tokens` (CLI device codes, Task 3.5) and adds `users.sessions_valid_since INTEGER` (used by Phase 8).
+- **Files:** `apps/worker/src/lib/users.ts`, `apps/worker/src/lib/user-link.ts`, `apps/worker/src/routes/auth.ts`, `apps/worker/migrations/0003_auth.sql`, `apps/worker/test/user-link.test.ts`
+- **Verification:** `npm test` passes; `user-link.ts` is the pure decision (inputs: WorkOS profile, GitHub id or null, matches found) with cases: known workos identity; GitHub id match; verified email match; noreply email → new user; unverified email → new user.
 - **Dependencies:** Task 1.1
 
-#### Task 3.2: Add Google sign-in
+#### Task 3.2: Add WorkOS AuthKit sign-in
 - **Size:** M
 - **Acceptance criteria:**
-  - [ ] `/auth/google` starts an OIDC code flow with PKCE (S256), `state` and `nonce`, hand-rolled with `fetch` + `jose` (`arctic` was deprecated in July 2026); `/auth/google/callback` exchanges the code, verifies the ID token against Google's JWKS with `jose`, reads `sub`, `email`, `email_verified`, `name`, and issues the existing session cookie.
-  - [ ] Return paths reuse `isAllowedReturn`, extended with `/upgrade`, `/claim` and `/device`.
-- **Files:** `apps/worker/src/routes/auth-google.ts`, `apps/worker/src/lib/google.ts`, `apps/worker/src/index.ts`, `apps/worker/src/types.ts`
-- **Verification:** local dev with a test OAuth client: `/auth/google?return=/dashboard` → Google consent → dashboard shows the Google name; `GET /api/me` returns an id ≥ 10^12.
+  - [ ] `GET /auth/login?return=` redirects to `https://api.workos.com/user_management/authorize` (`provider=authkit`, `client_id`, `redirect_uri=<SITE_ORIGIN>/auth/workos/callback`, `state` in a short-lived cookie); `GET /auth/workos/callback` checks `state`, exchanges the code at `POST /user_management/authenticate` with `fetch` (no SDK), calls `resolveUser`, and sets the existing session cookie.
+  - [ ] Return paths reuse `isAllowedReturn` (already includes `/upgrade`), extended with `/claim` and `/device`. Errors land on `/login?error=…` with a plain message.
+  - [ ] Spike notes in `.forge/notes/pro-plan.md`: whether GitHub provider tokens come back, and whether WorkOS's own CLI auth could replace Task 3.5.
+- **Files:** `apps/worker/src/routes/auth-workos.ts`, `apps/worker/src/lib/workos.ts`, `apps/worker/src/index.ts`, `apps/worker/src/types.ts`
+- **Verification:** local dev with the WorkOS staging environment (free): `/auth/login?return=/dashboard` → AuthKit → sign in with Google → dashboard; `GET /api/me` returns an id ≥ 10^12. Sign in with the GitHub button as an existing GitHub user → same id as before.
 - **Dependencies:** Task 3.1
 
-#### Task 3.3: Add the /login chooser and point every "Log in" at it
+#### Task 3.3: Point every "Log in" at AuthKit
 - **Size:** S
 - **Acceptance criteria:**
-  - [ ] `login.html`: "Continue with Google", "Continue with GitHub", "Email me a sign-in link" (hidden until Task 3.4 ships); passes `return` through.
-  - [ ] Nav "Log in" on marketing pages, the signed-out `/dashboard` redirect and `/upgrade` all go to `/login`.
-- **Files:** `apps/web/login.html`, `apps/web/app.js`, `apps/worker/src/routes/dashboard.ts`, `apps/worker/src/routes/billing.ts`
-- **Verification:** signed out, visit `/dashboard` → `/login?return=/dashboard`; each button reaches its provider and returns to the dashboard.
+  - [ ] Nav "Log in" on marketing pages, the signed-out `/dashboard` redirect, and signed-out `GET /upgrade` all go to `/auth/login?return=…` (replacing the hard-coded `/auth/github`).
+  - [ ] `/auth/github` stays for 30 days for old links and CLI versions, then redirects to `/auth/login`.
+- **Files:** `apps/web/app.js`, `apps/web/pricing.html`, `apps/web/index.html`, `apps/worker/src/routes/dashboard.ts`, `apps/worker/src/routes/billing.ts`
+- **Verification:** signed out, visit `/dashboard` → AuthKit page; `/upgrade?interval=year` signed out → AuthKit → back to `/upgrade` → Stripe Checkout (test mode).
 - **Dependencies:** Task 3.2
 
-#### Task 3.4: Add email magic-link sign-in
-- **Size:** M
+#### Task 3.4: Count and report GitHub users who will need manual linking
+- **Size:** S
+- **Model:** sonnet
 - **Acceptance criteria:**
-  - [ ] `POST /auth/email` (rate-limited per IP and per address) always returns 202, stores an `auth_tokens` row (`kind = email_link`, 15 minutes), and sends one email with the link and a 6-digit code (the code covers people who open mail on another device).
-  - [ ] `GET /auth/email/confirm?t=` shows a page with a "Sign in" button, so link scanners can't use the token; `POST` consumes it once and signs in via `resolveUser` with `provider: 'email', verified: true`.
-- **Files:** `apps/worker/src/routes/auth-email.ts`, `apps/worker/src/lib/email.ts`, `apps/web/login.html`
-- **Verification:** local dev with `EMAIL_DEV_LOG=1` (prints the link instead of sending): request a link, open it, click "Sign in" → dashboard; opening it again shows "This link was already used".
-- **Dependencies:** Task 3.3
+  - [ ] `scripts/link-report.mjs` reads KV `user:*` records (read-only, run by the owner) and prints how many have a verified email that step 3 will link, and how many will rely on step 2 or the "sign in with GitHub to link it" prompt. It writes nothing.
+- **Files:** `apps/worker/scripts/link-report.mjs`
+- **Verification:** `node apps/worker/scripts/link-report.mjs --local` against local KV with three fixture users prints the three counts.
+- **Dependencies:** Task 3.1
 
 #### Task 3.5: Add an aired-native device flow for the CLI
 - **Size:** M
 - **Acceptance criteria:**
-  - [ ] `POST /auth/device` returns `{device_code, user_code, verification_uri: "https://aired.sh/device", interval}`; `device.html` (after any sign-in) approves the code; `/auth/device/poll` then returns a CLI session (365-day JWT, as today).
-  - [ ] CLI `aired login --device` uses the new flow; old CLI versions keep working against the GitHub flow.
+  - [ ] `POST /auth/device` returns `{device_code, user_code, verification_uri: "https://aired.sh/device", interval}`; `device.html` (after any AuthKit sign-in) approves the code; `/auth/device/poll` then returns a CLI session (365-day JWT, as today).
+  - [ ] CLI `aired login --device` uses the new flow; old CLI versions keep working against the GitHub flow until it's retired.
 - **Files:** `apps/worker/src/routes/auth-device.ts`, `apps/web/device.html`, `apps/cli/src/commands/login.ts`, `apps/cli/src/core/client.ts`
-- **Verification:** `node apps/cli/dist/index.js --api-url http://localhost:8787 login --device`, approve at `localhost:8787/device` with a Google account; `aired whoami` prints that account.
+- **Verification:** `node apps/cli/dist/index.js --api-url http://localhost:8787 login --device`, approve at `localhost:8787/device` after an AuthKit Google sign-in; `aired whoami` prints that account.
 - **Dependencies:** Task 3.2
 
-**Checkpoint after Phase 3:** `npm test` green; a Google-only user signs in on web and CLI and completes a test checkout.
+**Checkpoint after Phase 3:** `npm test` green; a Google-only user signs in on web and CLI and completes a test checkout; an existing GitHub user signs in through AuthKit and keeps their pages.
 
 ### Phase 4: API keys — [DB] [API]
 
@@ -507,10 +529,10 @@ Independent of Phase 1; can run in parallel. Fixes the lost-token takedown class
 #### Task 4.2: Store keys and accept them in the auth middleware
 - **Size:** M
 - **Acceptance criteria:**
-  - [ ] `migrations/0003_api_keys.sql`; `POST /api/me/keys {name}` returns the key once; `GET` lists name, prefix, created and last used; `DELETE` revokes (D1 `revoked_at`, KV `apikey:` deleted). At most 5 active keys.
+  - [ ] `migrations/0004_api_keys.sql`; `POST /api/me/keys {name}` returns the key once; `GET` lists name, prefix, created and last used; `DELETE` revokes (D1 `revoked_at`, KV `apikey:` deleted). At most 5 active keys.
   - [ ] `authMiddleware` accepts `Authorization: Bearer aired_sk_…` (checksum, then KV `apikey:<hash>`), sets `c.get('user')`, and never treats `at_` update tokens as keys. `last_used_at` updates at most hourly via `waitUntil`.
   - [ ] Key-authenticated requests need no CSRF header; this already follows from `lib/csrf-rule.ts` (no session cookie), so only a test is added.
-- **Files:** `apps/worker/migrations/0003_api_keys.sql`, `apps/worker/src/routes/keys.ts`, `apps/worker/src/middleware/auth.ts`, `apps/worker/test/api-auth.test.ts`, `apps/worker/src/index.ts`
+- **Files:** `apps/worker/migrations/0004_api_keys.sql`, `apps/worker/src/routes/keys.ts`, `apps/worker/src/middleware/auth.ts`, `apps/worker/test/api-auth.test.ts`, `apps/worker/src/index.ts`
 - **Verification:** local dev: create a key, then `curl -s -X POST localhost:8787/api/publish -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' -d '{"html":"<h1>k</h1>"}'` → the page appears in `/api/me/pages`; after revoking, `GET /api/me` with the key returns 401.
 - **Dependencies:** Task 4.1, Task 1.1
 
@@ -583,9 +605,9 @@ Requires `.forge/blueprints/content-domain.md` Phase 1 (host classifier) to be m
 #### Task 7.1: Create and verify a customer hostname
 - **Size:** M
 - **Acceptance criteria:**
-  - [ ] `migrations/0004_custom_domains.sql`; `POST /api/me/domain {hostname}` (Pro only, subdomains only, one per user) creates a Cloudflare custom hostname and returns `{status: "pending", cname_target}`; `GET` refreshes status from Cloudflare; `DELETE` removes it.
+  - [ ] `migrations/0005_custom_domains.sql`; `POST /api/me/domain {hostname}` (Pro only, subdomains only, one per user) creates a Cloudflare custom hostname and returns `{status: "pending", cname_target}`; `GET` refreshes status from Cloudflare; `DELETE` removes it.
   - [ ] On `active` it writes KV `host:<hostname>`; on delete or lapse it deletes it.
-- **Files:** `apps/worker/migrations/0004_custom_domains.sql`, `apps/worker/src/routes/domains.ts`, `apps/worker/src/lib/cf-custom-hostnames.ts`, `apps/worker/src/index.ts`
+- **Files:** `apps/worker/migrations/0005_custom_domains.sql`, `apps/worker/src/routes/domains.ts`, `apps/worker/src/lib/cf-custom-hostnames.ts`, `apps/worker/src/index.ts`
 - **Verification:** staging zone: add a test subdomain, create the shown CNAME, and `GET /api/me/domain` reaches `active` within 10 minutes.
 - **Dependencies:** Task 1.3
 
@@ -607,6 +629,80 @@ Requires `.forge/blueprints/content-domain.md` Phase 1 (host classifier) to be m
 - **Dependencies:** Task 7.1
 
 **Checkpoint after Phase 7:** `npm test` green; one staging custom hostname serves pages and refuses app routes.
+
+## Workspace Phases (8–14): plan only, not approved to build
+
+Folded in from `docs/research/workspace-membership.md` (parity session, 2026-11-25; gitignored, main checkout) and its hand-over note. These phases share the one D1 database `aired` and continue its migrations after Phase 7. They are planned here so Phases 1–7 don't paint them into a corner. Build them only after the owner approves the open decisions in `docs/growth/pro-plan.md` ("Workspaces and SSO") and Team demand passes its gate. Each phase below would get the same task-level breakdown before it starts.
+
+**Model in one paragraph.** A person (`users`, numeric id) signs in through WorkOS. A **workspace** is `personal` (one per person, derived, no members) or `team`. A **membership** gives a person one of five fixed roles: **Owner, Admin, Member** (paid editor seats), **Viewer** (free, a member) and **Guest** (free, not a member: only the pages or spaces shared to them by email). Roles are bundles of permission strings; code checks permissions, never role names. A page belongs to a workspace and records who created it. A page's access is a list of **grants** (person, group, workspace, guest email, link) at four **levels**: view, comment, edit, full. Viewers and guests are capped at comment. Workspace **policies** are the ceiling for every share. D1 is the source of truth for workspaces, roles, groups and audit; WorkOS is sign-in, SSO and SCIM, mirrored into D1 by webhook.
+
+**Migrations (same database, in order):**
+| # | File | Adds |
+|---|---|---|
+| 0001 | `0001_accounts_billing.sql` (Phase 1, done) | users, identities, subscriptions, billing_events |
+| 0002 | `0002_billing_customers.sql` (Phase 1, done) | billing_customers |
+| 0003 | `0003_auth.sql` (Phase 3) | auth_tokens, `users.sessions_valid_since` |
+| 0004 | `0004_api_keys.sql` (Phase 4) | api_keys (with a nullable `workspace_id` from the start, no FK yet) |
+| 0005 | `0005_custom_domains.sql` (Phase 7) | custom_domains |
+| 0006 | `0006_workspaces.sql` (Phase 8) | workspaces, memberships, workspace_billing, audit_events |
+| 0007 | `0007_invites.sql` (Phase 8) | invites, invite_links |
+| 0008 | `0008_page_grants.sql` (Phase 10) | page_grants, guests |
+| 0009 | `0009_groups.sql` (Phase 11) | groups, group_members |
+| 0010 | `0010_domains.sql` (Phase 12) | domains |
+| 0011 | `0011_sso_scim.sql` (Phase 13) | sso_connections, scim_directories |
+
+**Personal workspaces without a backfill.** A page with no `workspaceId` belongs to its owner's personal workspace (`ws_p_<uid>`, row created lazily on first need). Existing pages are not rewritten: rewriting ~11,000 KV records on a namespace that has hit write limits buys nothing a derived rule can't do. New pages published into a team workspace carry `workspaceId` (an additive, optional `PageMetadata` field — Ask First). This differs from the spec, which moves every page; see Open Questions.
+
+### Phase 8: Workspaces and members — [DB] [API]
+Goal: a person can create a team workspace, invite people by email or link, switch between workspaces in web, CLI and MCP, and pay for editor seats.
+- Task 8.1 (M): `0006_workspaces.sql` (workspaces with `kind`, `slug`, `name`, `plan`, `seat_limit`, `policies` JSON, `primary_owner_id`, `deleted_at`; memberships with `role`, `status` active/suspended/deactivated, `source`, never hard-deleted; workspace_billing; audit_events) and a pure `permissions.ts` (role → permission bundle, `can(role, perm)`), with tests.
+- Task 8.2 (M): per-user sign-out: auth middleware rejects sessions issued before `users.sessions_valid_since`, read through a KV projection `svs:<uid>` (cacheTtl 30) so the hot path stays on KV; "Sign out everywhere" in the dashboard.
+- Task 8.3 (M): create a team workspace, active-workspace switcher (dashboard, `aired workspace use <slug>`, optional `workspace` argument on MCP tools); publishing goes to the active workspace, personal by default; `pages_by_workspace:` KV index for team pages.
+- Task 8.4 (M): email invites (hashed single-use token, 7 days, accepted only by a verified matching email) and one rotating invite link (Member or Viewer only); invites rate-limited per workspace per day; invite emails carry only the workspace name. Uses the existing claim-style one-time-token pattern.
+- Task 8.5 (M): Team billing: one Stripe subscription per workspace with `quantity` = paid seats (Owner, Admin, Member; pending invites hold a seat), reusing Phase 1's checkout, portal and webhook with `metadata[workspace_id]`; Pro and Team entitlements are checked separately (Pro per person, Team per workspace).
+- Verification: two local users; A creates "Acme", invites B as Member by email; B accepts and publishes into Acme; A's dashboard lists B's page; seat count in Stripe test mode = 2.
+
+### Phase 9: Five fixed roles — [API] [UI]
+Goal: Owner, Admin, Member, Viewer and Guest behave as specified, with the guardrails enforced in one D1 transaction.
+- Task 9.1 (M): role changes and removal with guardrails: at least one active Owner; the primary owner can't leave or be demoted until ownership is transferred; nobody grants above their own role; Admins can't change Owners; changing your own role needs another Owner or Admin; `scim`-sourced members are read-only (lock in the UI). Every change writes an audit event in the same batch.
+- Task 9.2 (S): removal flow: membership → deactivated, `sessions_valid_since` bump, their workspace-scoped keys revoked, pages stay with `created_by` kept and can be reassigned by an Admin.
+- Task 9.3 (M): Members screen in the dashboard (list, role select, remove, transfer ownership), with DESIGN.md tool-page states.
+- Verification: as Admin, try to demote the Owner → refused; remove a Member → their session stops working on the next request and their key returns 401; their pages remain.
+
+### Phase 10: Page access levels and the Share dialog — [DB] [API] [UI]
+Goal: every page has an access list: people, "Everyone at <workspace>", guest emails and the existing link, each at view, comment, edit or full.
+- Task 10.1 (M): `0008_page_grants.sql` and a pure `access.ts` deciding access in order: policy ceiling → explicit grants → space grants (later) → role baseline (publisher, Owners and Admins have full). Viewers and guests are capped at comment ("Jun needs a Member seat to edit. Ask an admin.").
+- Task 10.2 (M): view path: link pages stay on KV only; workspace-only or restricted pages do one D1 read (membership/grant), cached per viewer for 30 s.
+- Task 10.3 (M): guests by email: a 6-digit WorkOS Magic Auth code, no account setup and no seat; guest invites expire after 30 days; emails carry no sender text.
+- Task 10.4 (M): Share dialog (people, "Everyone at", guests, link with PIN, expiry and view limit, greyed by policy) plus `aired share <page> --with … --level …` and an MCP `share_page` tool.
+- Verification: share a page with a guest at "Can view": the guest opens it with an email code; set the Viewer B to "Can edit" → refused with the seat message; the public link still works with its PIN.
+
+### Phase 11: Groups made by hand — [DB] [API] [UI]
+Goal: Admins create groups ("Design") and share with a group once; new members of the group see what it was given. No SAML needed.
+- Task 11.1 (S): `0009_groups.sql` (`source` manual | scim; scim groups read-only in Aired).
+- Task 11.2 (M): group CRUD and membership for Admins; groups as grant targets in `access.ts` and the Share dialog.
+- Verification: share a page with "Design" at comment; add C to Design; C can open and comment without a new share.
+
+### Phase 12: Invites by company domain — [DB] [API]
+Goal: an Owner verifies `acme.com` with a DNS TXT record and picks a join mode: off, request to join (an Admin approves), or auto-join as Viewer or Member.
+- Task 12.1 (M): `0010_domains.sql`, TXT verification and a daily re-check (Cron Trigger); a domain belongs to one workspace only.
+- Task 12.2 (S): join on sign-in: a verified email at a verified domain sees "Join Acme" (request mode) or joins automatically; source `domain`.
+- Task 12.3 (S): workspace policy "require Google sign-in for @acme.com" through WorkOS organization auth policies (free).
+- Verification: verify a local test domain with a stubbed DNS lookup; a new user with that domain joins as Viewer automatically.
+
+### Phase 13: SSO and SCIM — [API] [CONFIG]
+Goal: a company signs in through its own identity provider (SSO add-on), and on Enterprise its directory creates and removes members (SCIM).
+- Task 13.1 (M): SAML/OIDC through WorkOS SSO: the WorkOS Admin Portal link for the customer's IT person, JIT membership with the default role (source `sso_jit`), "Require SSO" policy with a max session age, Owner break-glass sign-in written to the audit log.
+- Task 13.2 (M): SCIM through WorkOS Directory Sync: a webhook mirrors users and groups into D1 (`source = scim`); deactivation cuts access within seconds (`sessions_valid_since`); IdP group → role mapping.
+- Task 13.3 (S): billing: SSO switches on only with the add-on active for that workspace; SCIM only on Enterprise (contract).
+- Verification: WorkOS staging with a test IdP: a user signs in through SSO and lands as Member; deactivating them in the test directory blocks their next request.
+
+### Phase 14: Audit log — [API] [UI]
+Goal: Owners and Admins can read and export what happened. Writes start in Phase 8; this phase shows them.
+- Task 14.1 (S): `GET /api/workspaces/:id/audit` with filters (actor, action, date), paginated; `audit.read` permission.
+- Task 14.2 (M): audit page in the dashboard and CSV export.
+- Task 14.3 (S): Enterprise: retention setting and streaming to a SIEM through WorkOS audit logs.
+- Verification: change a role, revoke an invite and share a page; the audit page lists all three with actor and before/after.
 
 ## Pricing Page Copy (Task 1.8)
 
@@ -649,7 +745,7 @@ FAQ additions:
 |-------|-------|-------|-------|
 | Phase 1: Take money | 1.1–1.9 | S, S, M, M, S, M, M, S, S | 2–3 days |
 | Phase 2: Claim and recover | 2.1–2.4 | S, S, M, S | 0.5–1 day |
-| Phase 3: Sign in without GitHub | 3.1–3.5 | M, M, S, M, M | 2–3 days |
+| Phase 3: Sign in with WorkOS AuthKit | 3.1–3.5 | M, M, S, S, M | 2–3 days |
 | Phase 4: API keys | 4.1–4.3 | S, M, S | 1 day |
 | Phase 5: Signed-in remote MCP | 5.1–5.2 | M, L | 1.5–3 days |
 | Phase 6: Analytics | 6.1–6.3 | S, M, M | 1–2 days |
@@ -678,7 +774,7 @@ FAQ additions:
 - Any change to what is free today.
 
 ### Never
-- Create, configure or sign in to a billing, Google, email or Cloudflare account; run anything against production KV, R2 or D1; deploy.
+- Create, configure or sign in to a billing, WorkOS, email or Cloudflare account; run anything against production KV, R2 or D1; deploy.
 - Commit secrets or real keys; log webhook bodies, email addresses or keys.
 - Treat the checkout redirect as proof of payment. Only the webhook writes plan state.
 - Delete pages when a subscription ends.
@@ -689,7 +785,8 @@ FAQ additions:
 | Tax obligations with Aired as the seller | Unpaid VAT or sales tax | `STRIPE_AUTOMATIC_TAX` is ready to switch on; the owner decides registration (P4e). A merchant of record (Paddle) stays the fallback if tax work becomes too much. |
 | Webhook missed or delayed | Paid user stays on Free | Stripe retries for 3 days; `/api/billing/status` reads D1; an admin script re-syncs one user from Stripe. |
 | KV `ent:` lag (up to ~60 s) after payment | Badge visible for a minute | Success page polls D1; copy says "within a minute". |
-| No `workspaceId` on pages | Team plan later needs an ownership migration | Accepted: Team is out of scope and gated on demand; Pro is per person, so `ownerId` fits. Revisit before Team. |
+| Pages and workspaces | Team pages need a workspace, but 11,000 pages have only `ownerId` | Personal workspace is derived from `ownerId` (no backfill); team pages carry an optional `workspaceId` (Phase 8). |
+| WorkOS on Workers | AuthKit flow or GitHub provider tokens may not behave as expected | Task 3.2 is a spike first; REST via `fetch` avoids SDK runtime issues; the legacy GitHub route stays 30 days. |
 | Account linking by email | Takeover through an unverified email | Link verified-to-verified only; never on GitHub noreply addresses. |
 | API key leaks in a public repo | Someone publishes as the user | Checksummed prefix allows secret scanning later; one-click revoke; keys can't delete the account or touch billing. |
 | Custom domains serve user HTML on customer origins | Phishing on a trusted-looking domain | Pro only (paid, accountable), owner's pages only, abuse path unchanged, hostname removed on abuse. |
