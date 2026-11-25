@@ -74,7 +74,6 @@
       "response_schema": {
         "publishes": "number",
         "views": "number",
-        "recent": "array of recent publishes",
         "geo": "object, country code -> view count"
       }
     },

@@ -40,7 +40,7 @@ Agents should read the live docs at https://github.com/progrmoiz/aired before an
 - PUT /api/pages/:id — update an artifact. Pass `update_token` in the JSON body or as `Authorization: Bearer <update_token>`.
 - DELETE /api/pages/:id — delete an artifact. Pass `Authorization: Bearer <update_token>` header.
 - GET /api/pages/:id — public metadata: `{ id, title, size, readCount, expiresAt }`.
-- GET /api/stats — aggregate counts plus recent publishes for the homepage feed.
+- GET /api/stats — aggregate counts (publishes, views, views per country). No page titles or URLs.
 - POST /api/report — body `{ id, reason }`, no auth, flags an artifact for review.
 - POST /p/:id/verify-pin — body `{ pin }`, sets a 1-hour cookie scoped to the page.
 

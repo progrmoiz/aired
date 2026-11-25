@@ -133,7 +133,7 @@ Public metadata: `{ id, title, size, readCount, expiresAt }`. No auth.
 
 ### GET /api/stats
 
-Aggregate counts plus a `recent` array of public publishes for the homepage feed. No auth.
+Aggregate counts: `{ publishes, views, geo }`, where `geo` maps a country code to its view count. No auth. It never lists individual pages, their titles or URLs.
 
 ### POST /api/report
 

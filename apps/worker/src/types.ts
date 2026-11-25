@@ -26,5 +26,4 @@ export type StatsLive = {
   publishes: number;
   views: number;
   geo: Record<string, number>;
-  recent: { title: string; country: string; ts: number }[];
 };

@@ -3,7 +3,7 @@ import { getCookie } from "hono/cookie";
 import type { AppBindings } from "../types.js";
 import { parseMetadata, serializeMetadata } from "@aired/core";
 import { applyPageHeaders } from "../middleware/security.js";
-import { loadStats, saveStats } from "../lib/stats.js";
+import { loadStats, recordView, saveStats } from "../lib/stats.js";
 import { SANDBOX_SHIM, injectEarlyScript } from "../lib/sandbox-shim.js";
 import { injectAiredBar } from "../lib/aired-bar.js";
 
@@ -75,15 +75,7 @@ viewer.get("/p/:id", async (c) => {
     Promise.all([
       c.env.PAGES_KV.put(`page:${id}`, serializeMetadata(updated), kvOptions),
       (async () => {
-        const stats = await loadStats(c.env.PAGES_KV);
-        stats.views += 1;
-        stats.geo[country] = (stats.geo[country] ?? 0) + 1;
-        stats.recent.unshift({
-          title: metadata.title ?? "Untitled",
-          country,
-          ts: Date.now(),
-        });
-        if (stats.recent.length > 20) stats.recent.length = 20;
+        const stats = recordView(await loadStats(c.env.PAGES_KV), country);
         await saveStats(c.env.PAGES_KV, stats);
       })(),
     ]).catch(() => {}),
