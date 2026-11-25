@@ -4,7 +4,8 @@ import {
   RISK_EVENTS,
   alreadyEnded,
   chargesAllRefunded,
-  invoiceCoversTime,
+  currentPeriodOf,
+  paysForCurrentPeriod,
   refundEndsPro,
   invoicePaymentsPage,
   isFullRefund,
@@ -170,19 +171,19 @@ test("alreadyEnded: canceled and incomplete_expired", () => {
 
 // --- Which full refunds end Pro --------------------------------------------------
 
-const NOW = 1_800_000_000;
 const DAY = 86_400;
-/** A paid subscription invoice whose line covers [start, end). */
-const inv = (id: string, start: number, end: number) => ({
-  id,
-  object: "invoice",
-  status: "paid",
-  // invoice.period_* describe the previous period on renewals; only lines count.
-  period_start: start - 30 * DAY,
-  period_end: start,
-  lines: { data: [{ id: `il_${id}`, period: { start, end } }] },
+const END = 1_800_000_000; // current period end
+const CURRENT = { priceId: "price_y", periodEndSec: END };
+
+/** A basil-shaped subscription line. */
+const line = (o: { price?: string; start?: number; end?: number; amount?: number; proration?: boolean } = {}) => ({
+  amount: o.amount ?? 10800,
+  period: { start: o.start ?? END - 365 * DAY, end: o.end ?? END },
+  pricing: { type: "price_details", price_details: { price: o.price ?? "price_y" } },
+  parent: { type: "subscription_item_details", subscription_item_details: { proration: o.proration ?? false } },
 });
-const paidCharge = (refunded: boolean) => ({ status: "succeeded", paid: true, amount: 1200, amount_refunded: refunded ? 1200 : 0, refunded });
+const inv = (id: string, lines: unknown[] = [line()], amountPaid = 10800) => ({ id, object: "invoice", status: "paid", amount_paid: amountPaid, lines: { data: lines } });
+const paidCharge = (refunded: boolean) => ({ status: "succeeded", paid: true, amount: 10800, amount_refunded: refunded ? 10800 : 0, refunded });
 
 function deps(invoices: unknown[], charges: Record<string, unknown[]> = {}) {
   const asked: string[] = [];
@@ -194,16 +195,34 @@ function deps(invoices: unknown[], charges: Record<string, unknown[]> = {}) {
     },
   };
 }
+const decide = (refunded: string[], d: ReturnType<typeof deps>) =>
+  refundEndsPro({ refundedInvoiceIds: new Set(refunded), current: CURRENT }, d.deps);
 
-test("invoiceCoversTime reads line periods, not invoice.period_*", () => {
-  const current = inv("in_now", NOW - DAY, NOW + 29 * DAY);
-  assert.equal(invoiceCoversTime(current, NOW), true);
-  assert.equal(invoiceCoversTime(inv("in_old", NOW - 40 * DAY, NOW - 10 * DAY), NOW), false);
-  // End is exclusive.
-  assert.equal(invoiceCoversTime(inv("in_edge", NOW - 30 * DAY, NOW), NOW), false);
-  assert.equal(invoiceCoversTime({ id: "in_x" }, NOW), false);
-  // The invoice-level period (previous period) alone doesn't count.
-  assert.equal(invoiceCoversTime({ id: "in_y", period_start: NOW - DAY, period_end: NOW + DAY, lines: { data: [] } }, NOW), false);
+test("paysForCurrentPeriod: a regular line at the current price ending at the period end", () => {
+  assert.equal(paysForCurrentPeriod(inv("a"), CURRENT), true);
+  // Old monthly invoice from before a switch to yearly.
+  assert.equal(paysForCurrentPeriod(inv("m", [line({ price: "price_m", start: END - 400 * DAY, end: END - 370 * DAY, amount: 1200 })]), CURRENT), false);
+  // Same price, earlier period.
+  assert.equal(paysForCurrentPeriod(inv("p", [line({ end: END - 365 * DAY })]), CURRENT), false);
+  // Proration lines and $0 lines don't pay for the period.
+  assert.equal(paysForCurrentPeriod(inv("pr", [line({ proration: true })]), CURRENT), false);
+  assert.equal(paysForCurrentPeriod(inv("z", [line({ amount: 0 })]), CURRENT), false);
+  assert.equal(paysForCurrentPeriod(inv("neg", [line({ amount: -500 })]), CURRENT), false);
+  // One qualifying line among others is enough.
+  assert.equal(paysForCurrentPeriod(inv("mix", [line({ proration: true, amount: -300 }), line()]), CURRENT), true);
+  assert.equal(paysForCurrentPeriod({ id: "x" }, CURRENT), false);
+  assert.equal(paysForCurrentPeriod(inv("a"), { priceId: null, periodEndSec: END }), false);
+});
+
+test("paysForCurrentPeriod reads the older line shape too", () => {
+  const old = { id: "o", lines: { data: [{ amount: 10800, proration: false, price: { id: "price_y" }, period: { start: END - 365 * DAY, end: END } }] } };
+  assert.equal(paysForCurrentPeriod(old, CURRENT), true);
+  assert.equal(paysForCurrentPeriod({ id: "o2", lines: { data: [{ ...old.lines.data[0], proration: true }] } }, CURRENT), false);
+});
+
+test("currentPeriodOf converts the stored period end to seconds", () => {
+  assert.deepEqual(currentPeriodOf({ priceId: "price_y", currentPeriodEnd: new Date(END * 1000).toISOString() }), CURRENT);
+  assert.deepEqual(currentPeriodOf({ priceId: "price_y", currentPeriodEnd: null }), { priceId: "price_y", periodEndSec: null });
 });
 
 test("chargesAllRefunded needs at least one succeeded charge, all fully refunded", () => {
@@ -212,37 +231,91 @@ test("chargesAllRefunded needs at least one succeeded charge, all fully refunded
   assert.equal(chargesAllRefunded([]), false);
   assert.equal(chargesAllRefunded([{ status: "failed", amount: 1200, amount_refunded: 0 }]), false);
   assert.equal(chargesAllRefunded([{ status: "failed", amount: 1200 }, paidCharge(true)]), true);
+  assert.equal(chargesAllRefunded([{ ...paidCharge(false), amount_refunded: 5000 }]), false); // partial
 });
 
 test("refunding the only payment for the current period ends Pro (the 14-day refund)", async () => {
-  const current = inv("in_now", NOW - DAY, NOW + 29 * DAY);
-  const d = deps([current, inv("in_prev", NOW - 31 * DAY, NOW - DAY)]);
-  assert.deepEqual(await refundEndsPro({ refundedInvoiceIds: new Set(["in_now"]), nowSec: NOW }, d.deps), { ends: true, keptBy: null });
-  assert.deepEqual(d.asked, []); // the earlier month doesn't cover today, so it isn't even checked
+  const d = deps([inv("in_now"), inv("in_prev", [line({ end: END - 365 * DAY })])]);
+  assert.deepEqual(await decide(["in_now"], d), { ends: true, why: "nothing_else_pays", keptBy: null });
+  assert.deepEqual(d.asked, []); // the earlier year doesn't pay for this one, so it isn't checked
 });
 
-test("refunding a duplicate charge for the same period keeps Pro", async () => {
-  const real = inv("in_real", NOW - DAY, NOW + 29 * DAY);
-  const dup = inv("in_dup", NOW - DAY, NOW + 29 * DAY);
-  const d = deps([dup, real]);
-  assert.deepEqual(await refundEndsPro({ refundedInvoiceIds: new Set(["in_dup"]), nowSec: NOW }, d.deps), { ends: false, keptBy: "in_real" });
+test("refunding a duplicate charge for the current period keeps Pro", async () => {
+  const d = deps([inv("in_dup"), inv("in_real")]);
+  assert.deepEqual(await decide(["in_dup"], d), { ends: false, why: "other_invoice", keptBy: "in_real" });
 });
 
-test("refunding an earlier month keeps Pro while the current period is paid", async () => {
-  const d = deps([inv("in_now", NOW - DAY, NOW + 29 * DAY), inv("in_prev", NOW - 31 * DAY, NOW - DAY)]);
-  assert.deepEqual(await refundEndsPro({ refundedInvoiceIds: new Set(["in_prev"]), nowSec: NOW }, d.deps), { ends: false, keptBy: "in_now" });
+test("refunding an earlier period keeps Pro without checking anything else", async () => {
+  const d = deps([inv("in_now"), inv("in_prev", [line({ end: END - 365 * DAY })])]);
+  assert.deepEqual(await decide(["in_prev"], d), { ends: false, why: "earlier_period", keptBy: null });
+  assert.deepEqual(d.asked, []);
+  // Even when nothing paid covers now (renewal still a draft, or in dunning).
+  const lapsed = deps([inv("in_prev", [line({ end: END - 365 * DAY })])]);
+  assert.deepEqual(await decide(["in_prev"], lapsed), { ends: false, why: "earlier_period", keptBy: null });
+  // A refunded invoice older than the listed page is an earlier period too.
+  assert.deepEqual(await decide(["in_ancient"], deps([inv("in_now")])), { ends: false, why: "earlier_period", keptBy: null });
 });
 
-test("refunding the second of two charges ends Pro when the first was already refunded", async () => {
-  const d = deps(
-    [inv("in_a", NOW - DAY, NOW + 29 * DAY), inv("in_b", NOW - DAY, NOW + 29 * DAY)],
-    { in_a: [paidCharge(true)] },
+test("after a monthly-to-yearly switch, refunding the yearly charge ends Pro despite the paid monthly invoice", async () => {
+  const monthly = inv("in_m", [line({ price: "price_m", start: END - 375 * DAY, end: END - 345 * DAY, amount: 1200 })], 1200);
+  const d = deps([inv("in_y"), monthly]);
+  assert.deepEqual(await decide(["in_y"], d), { ends: true, why: "nothing_else_pays", keptBy: null });
+  assert.deepEqual(d.asked, []);
+});
+
+test("a covering invoice paid $0 or with no charges found doesn't keep Pro", async () => {
+  assert.equal((await decide(["in_y"], deps([inv("in_y"), inv("in_free", [line()], 0)]))).ends, true);
+  assert.equal((await decide(["in_y"], deps([inv("in_y"), inv("in_oob")], { in_oob: [] }))).ends, true);
+});
+
+test("a covering invoice that was itself fully refunded doesn't keep Pro; a partial refund does", async () => {
+  const both = deps([inv("in_a"), inv("in_b")], { in_a: [paidCharge(true)] });
+  assert.deepEqual(await decide(["in_b"], both), { ends: true, why: "nothing_else_pays", keptBy: null });
+  assert.deepEqual(both.asked, ["in_a"]);
+  const partial = deps([inv("in_a"), inv("in_b")], { in_a: [{ ...paidCharge(false), amount_refunded: 5000 }] });
+  assert.equal((await decide(["in_b"], partial)).ends, false);
+});
+
+test("the first invoice that keeps Pro stops the search", async () => {
+  const d = deps([inv("in_r"), inv("in_k1"), inv("in_k2")]);
+  assert.equal((await decide(["in_r"], d)).keptBy, "in_k1");
+  assert.deepEqual(d.asked, ["in_k1"]);
+});
+
+test("one payment for several invoices of the subscription counts them all as refunded", async () => {
+  assert.equal((await decide(["in_a", "in_b"], deps([inv("in_a"), inv("in_b")]))).ends, true);
+});
+
+test("an unreadable current period ends Pro, as before; invoices without ids are skipped", async () => {
+  const d = deps([inv("in_now")]);
+  assert.deepEqual(
+    await refundEndsPro({ refundedInvoiceIds: new Set(["in_now"]), current: { priceId: "price_y", periodEndSec: null } }, d.deps),
+    { ends: true, why: "period_unknown", keptBy: null },
   );
-  assert.deepEqual(await refundEndsPro({ refundedInvoiceIds: new Set(["in_b"]), nowSec: NOW }, d.deps), { ends: true, keptBy: null });
-  assert.deepEqual(d.asked, ["in_a"]);
+  const noId = { ...inv("x"), id: undefined };
+  assert.equal((await decide(["in_now"], deps([inv("in_now"), noId]))).ends, true);
 });
 
-test("one payment refunding several invoices of the subscription counts them all as refunded", async () => {
-  const d = deps([inv("in_a", NOW - DAY, NOW + 29 * DAY), inv("in_b", NOW - DAY, NOW + 29 * DAY)]);
-  assert.deepEqual(await refundEndsPro({ refundedInvoiceIds: new Set(["in_a", "in_b"]), nowSec: NOW }, d.deps), { ends: true, keptBy: null });
+test("Stripe lookup failures propagate so the webhook is retried", async () => {
+  await assert.rejects(
+    refundEndsPro({ refundedInvoiceIds: new Set(["a"]), current: CURRENT }, { paidInvoices: async () => { throw new Error("stripe 500"); }, chargesForInvoice: async () => [] }),
+    /stripe 500/,
+  );
+  await assert.rejects(
+    refundEndsPro({ refundedInvoiceIds: new Set(["a"]), current: CURRENT }, { paidInvoices: async () => [inv("a"), inv("b")], chargesForInvoice: async () => { throw new Error("stripe 503"); } }),
+    /stripe 503/,
+  );
+});
+
+// Tripwire: routes/billing.ts and stripe.ts can't be imported here.
+test("billing.ts runs the refund check only for refunds on live subscriptions, and skips the cancel when it keeps Pro", async () => {
+  const { readFileSync } = await import("node:fs");
+  const code = readFileSync(new URL("../src/routes/billing.ts", import.meta.url), "utf8");
+  assert.match(code, /if \(plan\.reason === 'refund' && !alreadyEnded\(before\.status\)\) \{\s*const decision = await refundEndsPro\(/);
+  assert.match(code, /\{ refundedInvoiceIds, current: currentPeriodOf\(before\) \}/);
+  assert.match(code, /if \(!decision\.ends\) \{[^}]*\}\);\s*continue;/);
+  const stripe = readFileSync(new URL("../src/lib/billing/stripe.ts", import.meta.url), "utf8");
+  assert.match(stripe, /subscription: subscriptionId, status: 'paid'/);
+  assert.match(stripe, /invoice: invoiceId, status: 'paid'/);
+  assert.match(stripe, /found\.set\(sub, \(found\.get\(sub\) \?\? new Set\(\)\)\.add\(invoiceId\)\)/);
 });

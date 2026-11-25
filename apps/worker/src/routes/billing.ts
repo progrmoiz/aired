@@ -31,7 +31,7 @@ import {
   listActiveSubscriptions,
   subscriptionsForPaymentIntent,
 } from '../lib/billing/stripe.js';
-import { RISK_EVENTS, alreadyEnded, planRiskEvent, refundEndsPro } from '../lib/billing/risk-events.js';
+import { RISK_EVENTS, alreadyEnded, currentPeriodOf, planRiskEvent, refundEndsPro } from '../lib/billing/risk-events.js';
 import {
   ensureUser,
   hasEvent,
@@ -388,19 +388,19 @@ async function handleRiskEvent(c: Context<AppBindings>, evt: WebhookEvent): Prom
       console.warn({ event: 'billing_risk_not_pro_price', eventId: evt.id, subscriptionId, priceId: before.priceId });
       continue;
     }
-    // A refund ends Pro only if nothing else pays for today (a duplicate or
-    // earlier charge was refunded otherwise). Disputes and fraud warnings
-    // always end it.
+    // A refund ends Pro only when it refunds the payment for the current
+    // period and nothing else pays for it (risk-events.ts refundEndsPro).
+    // Disputes and fraud warnings always end it.
     if (plan.reason === 'refund' && !alreadyEnded(before.status)) {
       const decision = await refundEndsPro(
-        { refundedInvoiceIds, nowSec: Math.floor(Date.now() / 1000) },
+        { refundedInvoiceIds, current: currentPeriodOf(before) },
         {
           paidInvoices: () => paidInvoicesOfSubscription(c.env, subscriptionId),
           chargesForInvoice: (invoiceId) => chargesForInvoice(c.env, invoiceId),
         },
       );
       if (!decision.ends) {
-        console.log({ event: 'billing_refund_kept_pro', eventId: evt.id, subscriptionId, keptBy: decision.keptBy });
+        console.log({ event: 'billing_refund_kept_pro', eventId: evt.id, subscriptionId, why: decision.why, keptBy: decision.keptBy });
         continue;
       }
     }

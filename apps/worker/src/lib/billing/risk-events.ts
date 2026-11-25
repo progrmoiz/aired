@@ -108,20 +108,39 @@ export function subscriptionOfInvoice(invoice: unknown): string | null {
   return idOf(record(parent.subscription_details)?.subscription);
 }
 
+/** The subscription's current price and period end, which an invoice must pay for to count. */
+export type CurrentPeriod = { priceId: string | null; periodEndSec: number | null };
+
+/** The current period of a normalized subscription (period end as an ISO string). */
+export function currentPeriodOf(sub: { priceId: string | null; currentPeriodEnd: string | null }): CurrentPeriod {
+  const ms = sub.currentPeriodEnd === null ? NaN : Date.parse(sub.currentPeriodEnd);
+  return { priceId: sub.priceId, periodEndSec: Number.isFinite(ms) ? Math.floor(ms / 1000) : null };
+}
+
 /**
- * Whether an invoice pays for a period that includes `nowSec`: one of its
- * lines has a period covering it. (Use the lines, not invoice.period_*: for a
- * subscription renewal those describe the previous period.) False when it
- * can't tell, which keeps the old behaviour of ending Pro.
+ * Whether an invoice pays for the subscription's current period: it has a
+ * regular (non-proration) line with a positive amount, for the current price,
+ * whose period ends at the current period end. An invoice from before a
+ * monthly↔yearly switch, a proration credit, or a $0 line doesn't count.
+ * Reads basil line shapes (parent.subscription_item_details.proration,
+ * pricing.price_details.price) and the older ones (proration, price.id).
  */
-export function invoiceCoversTime(invoice: unknown, nowSec: number): boolean {
+export function paysForCurrentPeriod(invoice: unknown, current: CurrentPeriod): boolean {
+  if (current.priceId === null || current.periodEndSec === null) return false;
   const lines = record(record(invoice)?.lines)?.data;
   if (!Array.isArray(lines)) return false;
-  return lines.some((line) => {
-    const period = record(record(line)?.period);
-    const start = period?.start;
-    const end = period?.end;
-    return typeof start === 'number' && typeof end === 'number' && start <= nowSec && nowSec < end;
+  return lines.some((raw) => {
+    const line = record(raw);
+    if (!line) return false;
+    const details = record(record(line.parent)?.subscription_item_details);
+    const proration = details?.proration ?? line.proration;
+    if (proration === true) return false;
+    const amount = line.amount;
+    if (typeof amount !== 'number' || amount <= 0) return false;
+    const price = idOf(record(record(line.pricing)?.price_details)?.price) ?? idOf(line.price);
+    if (price !== current.priceId) return false;
+    const end = record(line.period)?.end;
+    return typeof end === 'number' && end >= current.periodEndSec!;
   });
 }
 
@@ -131,30 +150,57 @@ export function chargesAllRefunded(charges: unknown[]): boolean {
   return paid.length > 0 && paid.every(isFullRefund);
 }
 
+export type RefundDecision = {
+  ends: boolean;
+  /** Why Pro is kept: the refund was for an earlier period, or another invoice pays for this one. */
+  why: 'earlier_period' | 'other_invoice' | 'nothing_else_pays' | 'period_unknown';
+  keptBy: string | null;
+};
+
 /**
- * Does a full refund end Pro? Only when nothing else still pays for today:
- * no other paid invoice of the subscription that covers now and wasn't fully
- * refunded itself. So refunding a duplicate charge, an extra charge or an
- * earlier month keeps Pro; refunding the only payment for the current period
- * (the 14-day refund) ends it. Disputes and fraud warnings don't use this:
- * they always end Pro.
+ * Does a full refund end Pro? Only when it refunds the payment for the
+ * subscription's current period and no other invoice still pays for that
+ * period with a real, unrefunded charge.
+ * - Refunding an earlier period (or a duplicate of one) keeps Pro: the current
+ *   period is paid, or Stripe's normal retries deal with it.
+ * - Refunding a duplicate charge for the current period keeps Pro: the other
+ *   payment still covers it.
+ * - Refunding the only payment for the current period (the 14-day refund) ends Pro.
+ * When the current period can't be read, it ends Pro, as before this rule.
+ * Disputes and fraud warnings don't use this: they always end Pro.
  */
 export async function refundEndsPro(
-  input: { refundedInvoiceIds: ReadonlySet<string>; nowSec: number },
+  input: { refundedInvoiceIds: ReadonlySet<string>; current: CurrentPeriod },
   deps: {
-    /** The subscription's paid invoices (most recent first). */
+    /** The subscription's recent paid invoices (most recent first). */
     paidInvoices: () => Promise<unknown[]>;
     /** Every charge that paid this invoice. */
     chargesForInvoice: (invoiceId: string) => Promise<unknown[]>;
   },
-): Promise<{ ends: boolean; keptBy: string | null }> {
-  for (const invoice of await deps.paidInvoices()) {
-    const id = str(record(invoice)?.id);
-    if (id === null || input.refundedInvoiceIds.has(id)) continue;
-    if (!invoiceCoversTime(invoice, input.nowSec)) continue;
-    if (!chargesAllRefunded(await deps.chargesForInvoice(id))) return { ends: false, keptBy: id };
+): Promise<RefundDecision> {
+  if (input.current.priceId === null || input.current.periodEndSec === null) {
+    return { ends: true, why: 'period_unknown', keptBy: null };
   }
-  return { ends: true, keptBy: null };
+  const invoices = await deps.paidInvoices();
+  const idOfInvoice = (inv: unknown) => str(record(inv)?.id);
+
+  const refundedCurrent = invoices.some((inv) => {
+    const id = idOfInvoice(inv);
+    return id !== null && input.refundedInvoiceIds.has(id) && paysForCurrentPeriod(inv, input.current);
+  });
+  if (!refundedCurrent) return { ends: false, why: 'earlier_period', keptBy: null };
+
+  for (const invoice of invoices) {
+    const id = idOfInvoice(invoice);
+    if (id === null || input.refundedInvoiceIds.has(id)) continue;
+    if (!paysForCurrentPeriod(invoice, input.current)) continue;
+    const paid = record(invoice)?.amount_paid;
+    if (typeof paid !== 'number' || paid <= 0) continue;
+    const charges = await deps.chargesForInvoice(id);
+    // No charges found means we can't show it was paid: it doesn't keep Pro.
+    if (charges.length > 0 && !chargesAllRefunded(charges)) return { ends: false, why: 'other_invoice', keptBy: id };
+  }
+  return { ends: true, why: 'nothing_else_pays', keptBy: null };
 }
 
 /** A subscription status that means there is nothing left to cancel. */
