@@ -87,13 +87,16 @@ Phases 1–7 total about 12–19 working days including review and testing. Phas
 1. **Billing: Stripe.** Aired is the seller, so tax registration and filing are yours. Stripe Tax is built in but switched off (see below).
 2. **Price: $9/month billed yearly ($108), or $12 monthly.**
 3. **API keys are free.**
-4. **Refunds: 14 days, full, no questions.** Issued by hand in the Stripe dashboard.
+4. **Refunds: 14 days, full, no questions.** Issued by hand in the Stripe dashboard. **Until the refund handling on this branch is deployed: refund the payment and cancel the subscription immediately** (Subscriptions → Cancel → Immediately). After it's deployed, a full refund, a dispute or an early fraud warning cancels the subscription and ends Pro automatically; a partial refund doesn't.
 5. **When Pro lapses:** pages stay up, the badge returns, and the custom domain redirects to aired.sh links for 30 days, then disconnects.
 6. **Sign-in: WorkOS AuthKit** replaces GitHub-only login. Free up to 1M monthly active users. GitHub stays as one button; your existing accounts keep their ids and pages.
 7. **One database.** The D1 database added for billing also holds workspaces, roles, groups and the audit log later.
 
 ## Still yours to decide
 
+- **Standard Stripe or Stripe Managed Payments.** Both are now a setting. Standard: Aired is the seller; you handle tax (optionally with Stripe Tax). Managed Payments (`STRIPE_MANAGED_PAYMENTS=1`): Stripe is the merchant of record and handles tax, for an extra fee; the terms and refund pages then have to say Stripe is the seller of record. The two tax settings can't both be on.
+- **Price tax behaviour.** Set `tax_behavior` on both prices: *exclusive* (tax added on top of $12/$108) or *inclusive* (tax taken out of $12/$108). If it's left unset, Managed Payments adds tax on top.
+- **Tax code.** `txcd_10103000` (SaaS, personal use) or `txcd_10103001` (SaaS, business use). The generic `txcd_10000000` is not the SaaS code.
 - **Stripe Tax: on or off.** Off by default. Turning it on (`STRIPE_AUTOMATIC_TAX=1`) makes Checkout add and collect tax for 0.5% per sale. Stripe does **not** register you or file returns; you do that wherever you're registered. Stripe Tax's threshold monitoring shows where registration becomes due. Selling digital services to EU and UK consumers usually needs registration from the first sale for sellers based outside those regions.
 
 - **Workspace pricing (Team, Business, Enterprise).** Recommended, not decided:
@@ -124,22 +127,27 @@ Phases 1–7 total about 12–19 working days including review and testing. Phas
 | Before phase 6 | Cloudflare API token that can read Analytics Engine |
 | Before phase 7 | Cloudflare for SaaS on aired.sh (100 hostnames free, then $0.10 each) and the content-domain routing from `.forge/blueprints/content-domain.md` |
 
-### Stripe checklist (test mode first, then the same in live mode)
+### Stripe checklist (a sandbox first, then the same in live mode)
+
+Use a separate Stripe **sandbox** for each environment (local, staging), not the shared test mode, so test customers and webhooks don't mix.
+
 
 | # | Where in Stripe | What |
 |---|---|---|
 | 1 | Product catalog → Add product | **Aired Pro**, two recurring prices: **$12.00 USD monthly** and **$108.00 USD yearly**. Copy both `price_…` ids. |
-| 2 | Developers → Webhooks → Add endpoint | URL `https://aired.sh/api/billing/webhook`. Events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`. Copy the signing secret (`whsec_…`). |
-| 3 | Developers → API keys → Create restricted key | Permissions: Checkout Sessions **write**, Customer portal **write**, Customers **write**, Subscriptions **read**. Nothing else. Copy the `rk_…` key. |
+| 2 | Developers → Webhooks → Add endpoint | URL `https://aired.sh/api/billing/webhook`. Events: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, `invoice.payment_failed`, `charge.refunded`, `charge.dispute.created`, `radar.early_fraud_warning.created`. Copy the signing secret (`whsec_…`). |
+| 3 | Developers → API keys → Create restricted key | Permissions: Checkout Sessions **write**, Customer portal **write**, Customers **write**, Subscriptions **write** (cancels after a refund, dispute or fraud warning), Invoices **read** (and Invoice Payments read, if the Dashboard lists it separately), Charges **read**. Nothing else. Copy the `rk_…` key. The Worker refuses `sk_` keys. |
 | 4 | Settings → Billing → Customer portal | Allow cancel (at the end of the period), switching between the two Pro prices, updating the payment method and seeing invoices. Default return link `https://aired.sh/dashboard`. |
 | 5 | Settings → Billing → Subscriptions and emails | Turn on Smart Retries and the failed-payment emails, and set "cancel the subscription" when retries run out. |
-| 6 | Settings → Tax (only if you turn Stripe Tax on) | Origin address, default tax code "SaaS" (`txcd_10000000`), then `STRIPE_AUTOMATIC_TAX=1`. |
+| 6 | Settings → Tax (only if you turn Stripe Tax on, standard Stripe only) | Origin address; default tax code `txcd_10103000` or `txcd_10103001`; `tax_behavior` on both prices; **add a tax registration for every place you're registered**: Stripe collects zero tax, with no error, until a registration exists. Then set `STRIPE_AUTOMATIC_TAX=1`. Subscriptions created before tax was on are never taxed. |
 | 7 | Terminal | `wrangler secret put STRIPE_SECRET_KEY` (the `rk_…` key), `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_MONTHLY`, `STRIPE_PRICE_YEARLY`, then set `BILLING_ENABLED=1` and deploy. |
 | 8 | Later, if you ever change the price | Create the new prices, put the **old** price ids in `STRIPE_LEGACY_PRICE_IDS` (comma-separated) **before** switching `STRIPE_PRICE_MONTHLY`/`YEARLY`, so existing subscribers stay Pro. |
 
-Check in test mode before live: `stripe listen --forward-to localhost:8787/api/billing/webhook`, buy with card `4242 4242 4242 4242`, and confirm the dashboard says "Pro".
+Check in the sandbox before live: `stripe listen --forward-to localhost:8787/api/billing/webhook`, buy with card `4242 4242 4242 4242`, and confirm the dashboard says "Pro".
 
 ## Open questions
+
+- **Stripe API version.** The code pins `2025-03-31.basil`. Moving to the latest (`2026-11-18.endive`) waits for a real sandbox run.
 
 - **Apex domains (`yourco.com`).** Cloudflare only supports them on Enterprise. v1 offers subdomains (`share.yourco.com`).
 - **Team plan.** Pro is per person. Team billing is per workspace (one Stripe subscription with a seat count), planned in phase 8.
