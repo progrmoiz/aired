@@ -29,7 +29,7 @@ id = "6388d6b3b6c04fe5ad8529ae029e723e"
 [[d1_databases]]
 binding = "DB"
 database_name = "aired"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "4581e15e-7f00-408c-a69c-2558584a6d84"
 migrations_dir = "migrations"
 
 # Per-minute flood guards for anonymous traffic, counted by Cloudflare per
