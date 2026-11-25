@@ -327,7 +327,6 @@
             if (typeof v === "number" && v > 0) el.setAttribute("data-value", v);
             if (!el.hasAttribute("data-count") && el.getAttribute("data-value")) el.textContent = v.toLocaleString("en-US");
           });
-          renderOpens(data.recent || []);
           renderGeo(data.geo || {});
           countUpWhenSeen();
         })
@@ -360,38 +359,6 @@
       catch (e) { return function (cc) { return cc; }; }
     })();
 
-    function ago(ms) {
-      var s = Math.max(0, Math.floor(ms / 1000));
-      if (s < 60) return s + "s ago";
-      if (s < 3600) return Math.floor(s / 60) + "m ago";
-      if (s < 86400) return Math.floor(s / 3600) + "h ago";
-      return Math.floor(s / 86400) + "d ago";
-    }
-
-    // The latest opens, newest first: country and how long ago.
-    function renderOpens(recent) {
-      var list = document.getElementById("opens");
-      if (!list) return;
-      var opens = recent.filter(function (r) { return r && typeof r.ts === "number"; }).sort(function (a, b) { return b.ts - a.ts; });
-      if (!opens.length) return;
-      var rows = opens.slice(0, 3).map(function (o) {
-        var li = document.createElement("li");
-        var place = document.createElement("span");
-        place.textContent = o.country && o.country !== "XX" ? regionName(o.country) : "Somewhere";
-        var when = document.createElement("time");
-        when.dateTime = new Date(o.ts).toISOString();
-        li.appendChild(place);
-        li.appendChild(when);
-        list.appendChild(li);
-        return { el: when, ts: o.ts };
-      });
-      var refresh = function () { rows.forEach(function (r) { r.el.textContent = ago(Date.now() - r.ts); }); };
-      refresh();
-      setInterval(refresh, 1000);
-      var last = document.getElementById("last-open");
-      if (last) last.hidden = false;
-    }
-
     // Top countries by opens, with a bar for each one's share.
     function renderGeo(geo) {
       var list = document.getElementById("geo");
@@ -400,7 +367,7 @@
         .map(function (cc) { return [cc, geo[cc]]; })
         .sort(function (a, b) { return b[1] - a[1]; });
       if (!rows.length) return;
-      var total = rows.reduce(function (n, r) { return n + r[1]; }, 0), top = rows.slice(0, 4);
+      var total = rows.reduce(function (n, r) { return n + r[1]; }, 0), top = rows.slice(0, 5);
       list.innerHTML = "";
       top.forEach(function (r) {
         var li = document.createElement("li");
@@ -409,7 +376,16 @@
         li.style.setProperty("--w", Math.max(4, Math.round(100 * r[1] / top[0][1])) + "%");
         li.title = r[1].toLocaleString("en-US") + " opens";
         var name = document.createElement("span");
-        name.textContent = regionName(r[0]);
+        name.className = "flag";
+        var img = document.createElement("img");
+        img.src = "https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/flags/4x3/" + r[0].toLowerCase() + ".svg";
+        img.alt = "";
+        img.width = 18;
+        img.height = 14;
+        img.loading = "lazy";
+        img.onerror = function () { img.remove(); };
+        name.appendChild(img);
+        name.appendChild(document.createTextNode(regionName(r[0])));
         var pct = document.createElement("b");
         pct.textContent = (share < 0.01 ? "<1" : Math.round(share * 100)) + "%";
         li.addEventListener("mouseenter", function () { pct.textContent = r[1].toLocaleString("en-US"); });
