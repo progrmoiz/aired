@@ -381,8 +381,13 @@ nav a.on { color: var(--text-1); }
 .mbars { display: flex; align-items: flex-end; gap: 4px; height: 70px; }
 .mbars i { flex: 1; background: var(--border-2); border-radius: 2px 2px 0 0; }
 .mbars i:last-child { background: var(--text-1); }
-.num.geo-card { padding-bottom: 22px; }
-.nums3 .geo { margin-top: 14px; padding-bottom: 0; gap: 3px; }
-.nums3 .geo li { padding: 5px 9px; font-size: 13px; }
-.geo li .flag { display: inline-flex; align-items: center; gap: 9px; }
-.geo li .flag img { width: 18px; height: 13.5px; border-radius: 2px; box-shadow: 0 0 0 1px rgba(255,255,255,.08); object-fit: cover; flex: none; }
+.geo2 { height: 70px; display: flex; flex-direction: column; justify-content: flex-start; gap: 12px; padding-top: 14px; }
+.geo2 .stack { display: flex; height: 10px; border-radius: 3px; overflow: hidden; gap: 2px; }
+.geo2 .stack i { display: block; background: var(--border-2); }
+.geo2 .stack i:first-child { background: var(--text-1); }
+.geo2 .stack i:nth-child(2) { background: var(--text-2); }
+.geo2 .stack i:nth-child(3) { background: var(--text-3); }
+.geo2 .legend { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--text-3); }
+.geo2 .legend li { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.geo2 .legend li b { all: unset; color: var(--text-1); }
+.geo2 .legend img { width: 16px; height: 12px; border-radius: 2px; box-shadow: 0 0 0 1px rgba(255,255,255,.08); object-fit: cover; }
