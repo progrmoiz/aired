@@ -108,13 +108,40 @@ export function subscriptionOfInvoice(invoice: unknown): string | null {
   return idOf(record(parent.subscription_details)?.subscription);
 }
 
-/** The subscription's current price and period end, which an invoice must pay for to count. */
-export type CurrentPeriod = { priceId: string | null; periodEndSec: number | null };
+/** The subscription's current price, period end and status, which a refund is judged against. */
+export type CurrentPeriod = { priceId: string | null; periodEndSec: number | null; status?: string };
 
 /** The current period of a normalized subscription (period end as an ISO string). */
-export function currentPeriodOf(sub: { priceId: string | null; currentPeriodEnd: string | null }): CurrentPeriod {
+export function currentPeriodOf(sub: {
+  priceId: string | null;
+  currentPeriodEnd: string | null;
+  status?: string;
+}): CurrentPeriod {
   const ms = sub.currentPeriodEnd === null ? NaN : Date.parse(sub.currentPeriodEnd);
-  return { priceId: sub.priceId, periodEndSec: Number.isFinite(ms) ? Math.floor(ms / 1000) : null };
+  return {
+    priceId: sub.priceId,
+    periodEndSec: Number.isFinite(ms) ? Math.floor(ms / 1000) : null,
+    ...(sub.status !== undefined ? { status: sub.status } : {}),
+  };
+}
+
+/**
+ * Whether an invoice is provably for a period that ended before the current
+ * one: it has a readable regular line, and every such line ends before the
+ * current period end. False when that can't be read.
+ */
+export function provablyEarlierPeriod(invoice: unknown, current: CurrentPeriod): boolean {
+  if (current.periodEndSec === null) return false;
+  const lines = record(record(invoice)?.lines)?.data;
+  if (!Array.isArray(lines)) return false;
+  const ends = lines.flatMap((raw) => {
+    const line = record(raw);
+    const details = record(record(line?.parent)?.subscription_item_details);
+    if ((details?.proration ?? line?.proration) === true) return [];
+    const end = record(line?.period)?.end;
+    return typeof end === 'number' ? [end] : [];
+  });
+  return ends.length > 0 && ends.every((end) => end < current.periodEndSec!);
 }
 
 /**
@@ -152,22 +179,22 @@ export function chargesAllRefunded(charges: unknown[]): boolean {
 
 export type RefundDecision = {
   ends: boolean;
-  /** Why Pro is kept: the refund was for an earlier period, or another invoice pays for this one. */
-  why: 'earlier_period' | 'other_invoice' | 'nothing_else_pays' | 'period_unknown';
+  why: 'other_invoice' | 'earlier_period_in_dunning' | 'nothing_else_pays' | 'period_unknown';
   keptBy: string | null;
 };
 
 /**
- * Does a full refund end Pro? Only when it refunds the payment for the
- * subscription's current period and no other invoice still pays for that
- * period with a real, unrefunded charge.
- * - Refunding an earlier period (or a duplicate of one) keeps Pro: the current
- *   period is paid, or Stripe's normal retries deal with it.
- * - Refunding a duplicate charge for the current period keeps Pro: the other
- *   payment still covers it.
- * - Refunding the only payment for the current period (the 14-day refund) ends Pro.
- * When the current period can't be read, it ends Pro, as before this rule.
- * Disputes and fraud warnings don't use this: they always end Pro.
+ * Does a full refund end Pro? It keeps Pro only when something still pays for
+ * the subscription's current period:
+ * - another invoice pays for the current period (current price, regular line,
+ *   amount paid > 0) with a real charge that isn't fully refunded. This covers
+ *   refunding a duplicate charge, or an earlier month while the current one
+ *   is paid;
+ * - or the subscription is past_due and the refund was provably for an
+ *   earlier period: Stripe's own retries then decide, as for any unpaid renewal.
+ * Otherwise, including anything it can't read, it ends Pro. Refunding the only
+ * payment for the current period (the 14-day refund) ends it. Disputes and
+ * fraud warnings don't use this: they always end Pro.
  */
 export async function refundEndsPro(
   input: { refundedInvoiceIds: ReadonlySet<string>; current: CurrentPeriod },
@@ -184,12 +211,6 @@ export async function refundEndsPro(
   const invoices = await deps.paidInvoices();
   const idOfInvoice = (inv: unknown) => str(record(inv)?.id);
 
-  const refundedCurrent = invoices.some((inv) => {
-    const id = idOfInvoice(inv);
-    return id !== null && input.refundedInvoiceIds.has(id) && paysForCurrentPeriod(inv, input.current);
-  });
-  if (!refundedCurrent) return { ends: false, why: 'earlier_period', keptBy: null };
-
   for (const invoice of invoices) {
     const id = idOfInvoice(invoice);
     if (id === null || input.refundedInvoiceIds.has(id)) continue;
@@ -199,6 +220,19 @@ export async function refundEndsPro(
     const charges = await deps.chargesForInvoice(id);
     // No charges found means we can't show it was paid: it doesn't keep Pro.
     if (charges.length > 0 && !chargesAllRefunded(charges)) return { ends: false, why: 'other_invoice', keptBy: id };
+  }
+
+  if (input.current.status === 'past_due') {
+    const refunded = invoices.filter((inv) => {
+      const id = idOfInvoice(inv);
+      return id !== null && input.refundedInvoiceIds.has(id);
+    });
+    if (
+      refunded.length === input.refundedInvoiceIds.size &&
+      refunded.every((inv) => provablyEarlierPeriod(inv, input.current))
+    ) {
+      return { ends: false, why: 'earlier_period_in_dunning', keptBy: null };
+    }
   }
   return { ends: true, why: 'nothing_else_pays', keptBy: null };
 }

@@ -6,6 +6,7 @@ import {
   chargesAllRefunded,
   currentPeriodOf,
   paysForCurrentPeriod,
+  provablyEarlierPeriod,
   refundEndsPro,
   invoicePaymentsPage,
   isFullRefund,
@@ -211,6 +212,9 @@ test("paysForCurrentPeriod: a regular line at the current price ending at the pe
   // One qualifying line among others is enough.
   assert.equal(paysForCurrentPeriod(inv("mix", [line({ proration: true, amount: -300 }), line()]), CURRENT), true);
   assert.equal(paysForCurrentPeriod({ id: "x" }, CURRENT), false);
+  // A line at the current period end but for another price doesn't count.
+  assert.equal(paysForCurrentPeriod(inv("other", [line({ price: "price_other" })]), CURRENT), false);
+  assert.equal(paysForCurrentPeriod(inv("a"), { priceId: "price_y", periodEndSec: null }), false);
   assert.equal(paysForCurrentPeriod(inv("a"), { priceId: null, periodEndSec: END }), false);
 });
 
@@ -220,8 +224,9 @@ test("paysForCurrentPeriod reads the older line shape too", () => {
   assert.equal(paysForCurrentPeriod({ id: "o2", lines: { data: [{ ...old.lines.data[0], proration: true }] } }, CURRENT), false);
 });
 
-test("currentPeriodOf converts the stored period end to seconds", () => {
+test("currentPeriodOf converts the stored period end to seconds and keeps the status", () => {
   assert.deepEqual(currentPeriodOf({ priceId: "price_y", currentPeriodEnd: new Date(END * 1000).toISOString() }), CURRENT);
+  assert.deepEqual(currentPeriodOf({ priceId: "price_y", currentPeriodEnd: new Date(END * 1000).toISOString(), status: "past_due" }), { ...CURRENT, status: "past_due" });
   assert.deepEqual(currentPeriodOf({ priceId: "price_y", currentPeriodEnd: null }), { priceId: "price_y", periodEndSec: null });
 });
 
@@ -245,15 +250,44 @@ test("refunding a duplicate charge for the current period keeps Pro", async () =
   assert.deepEqual(await decide(["in_dup"], d), { ends: false, why: "other_invoice", keptBy: "in_real" });
 });
 
-test("refunding an earlier period keeps Pro without checking anything else", async () => {
+test("refunding an earlier month keeps Pro while the current period is paid", async () => {
   const d = deps([inv("in_now"), inv("in_prev", [line({ end: END - 365 * DAY })])]);
-  assert.deepEqual(await decide(["in_prev"], d), { ends: false, why: "earlier_period", keptBy: null });
-  assert.deepEqual(d.asked, []);
-  // Even when nothing paid covers now (renewal still a draft, or in dunning).
-  const lapsed = deps([inv("in_prev", [line({ end: END - 365 * DAY })])]);
-  assert.deepEqual(await decide(["in_prev"], lapsed), { ends: false, why: "earlier_period", keptBy: null });
-  // A refunded invoice older than the listed page is an earlier period too.
-  assert.deepEqual(await decide(["in_ancient"], deps([inv("in_now")])), { ends: false, why: "earlier_period", keptBy: null });
+  assert.deepEqual(await decide(["in_prev"], d), { ends: false, why: "other_invoice", keptBy: "in_now" });
+});
+
+test("refunding an earlier period while past_due keeps Pro for Stripe's retries; while active with nothing paid, it ends", async () => {
+  const prev = inv("in_prev", [line({ end: END - 365 * DAY })]);
+  const pastDue = await refundEndsPro({ refundedInvoiceIds: new Set(["in_prev"]), current: { ...CURRENT, status: "past_due" } }, deps([prev]).deps);
+  assert.deepEqual(pastDue, { ends: false, why: "earlier_period_in_dunning", keptBy: null });
+  const active = await refundEndsPro({ refundedInvoiceIds: new Set(["in_prev"]), current: { ...CURRENT, status: "active" } }, deps([prev]).deps);
+  assert.equal(active.ends, true);
+});
+
+test("while past_due, a refunded invoice that can't be read or isn't for an earlier period ends Pro", async () => {
+  const pd = { ...CURRENT, status: "past_due" };
+  // Not in the listed page.
+  assert.equal((await refundEndsPro({ refundedInvoiceIds: new Set(["in_gone"]), current: pd }, deps([]).deps)).ends, true);
+  // No readable lines.
+  assert.equal((await refundEndsPro({ refundedInvoiceIds: new Set(["in_x"]), current: pd }, deps([{ id: "in_x", amount_paid: 10800 }]).deps)).ends, true);
+  // Its period reaches the current period end.
+  assert.equal((await refundEndsPro({ refundedInvoiceIds: new Set(["in_now"]), current: pd }, deps([inv("in_now")]).deps)).ends, true);
+});
+
+test("provablyEarlierPeriod needs readable regular lines that all end before the current period end", () => {
+  assert.equal(provablyEarlierPeriod(inv("p", [line({ end: END - DAY })]), CURRENT), true);
+  assert.equal(provablyEarlierPeriod(inv("p", [line({ end: END })]), CURRENT), false);
+  assert.equal(provablyEarlierPeriod(inv("p", [line({ end: END - DAY }), line({ end: END + DAY })]), CURRENT), false);
+  assert.equal(provablyEarlierPeriod(inv("p", [line({ proration: true, end: END - DAY })]), CURRENT), false);
+  assert.equal(provablyEarlierPeriod({ id: "p" }, CURRENT), false);
+  assert.equal(provablyEarlierPeriod(inv("p", [line({ end: END - DAY })]), { priceId: "price_y", periodEndSec: null }), false);
+});
+
+test("after a yearly-to-monthly switch paid with credit, refunding the yearly charge ends Pro", async () => {
+  const MONTHLY = { priceId: "price_m", periodEndSec: END - 330 * DAY, status: "active" };
+  const yearly = inv("in_y", [line({ price: "price_y", start: END - 365 * DAY, end: END })]);
+  const switchInv = inv("in_switch", [line({ price: "price_m", start: END - 360 * DAY, end: END - 330 * DAY, amount: 1200 }), line({ price: "price_y", proration: true, amount: -10000 })], 0);
+  const out = await refundEndsPro({ refundedInvoiceIds: new Set(["in_y"]), current: MONTHLY }, deps([switchInv, yearly]).deps);
+  assert.deepEqual(out, { ends: true, why: "nothing_else_pays", keptBy: null });
 });
 
 test("after a monthly-to-yearly switch, refunding the yearly charge ends Pro despite the paid monthly invoice", async () => {
