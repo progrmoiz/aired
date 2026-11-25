@@ -5,6 +5,8 @@ import { findActiveKey, lastUsedDue, touchKey } from '../lib/api-keys.js';
 import { bearerToken } from '../lib/page-token.js';
 import { verifySession, signSession, shouldReissue } from '../lib/jwt.js';
 import { readSessionCookie, setSessionCookie } from '../lib/cookies.js';
+import { loadUserRecord, signedInUser } from '../lib/user-record.js';
+import { retiredBy, sessionsValidSince } from '../lib/revocation.js';
 
 /**
  * Auth middleware.
@@ -27,8 +29,9 @@ export async function authMiddleware(
   c: Context<AppBindings>,
   next: Next,
 ): Promise<Response | void> {
-  c.set('authMethod', null);
+  c.set('via', null);
   c.set('apiKeyId', null);
+  c.set('authTime', null);
 
   // An in-process API call for an MCP tool call made with an OAuth token.
   const mcpUser = c.env.AIRED_MCP_OAUTH_USER;
@@ -98,13 +101,26 @@ export async function authMiddleware(
     return;
   }
 
+  // Per-account revocation: account deleted, or its owner signed out
+  // everywhere. Compared with when the person signed in, not when this token
+  // was minted, so a reissue can't carry a session past the marker.
+  if (retiredBy(await sessionsValidSince(c.env.PAGES_KV, claims.sub), claims.authTime)) {
+    setAnonymous();
+    await next();
+    return;
+  }
+
   // Step 5: sliding reissue — web (cookie) sessions only.
   // Header-presented (CLI/MCP) tokens are NOT rotated: the reissue path revokes
   // the old jti but can only deliver the replacement via Set-Cookie, so a CLI
   // would revoke its own token and never receive the new one (silent 7-day death).
   // CLI tokens ride their full TTL instead.
+  // The website: a web token in the session cookie. A CLI token sent as the
+  // cookie stays a CLI caller and is never reissued as a web session.
+  const isWebSession = isWebContext && claims.kind === 'web';
+
   const now = Date.now();
-  if (isWebContext && shouldReissue(claims, now)) {
+  if (isWebSession && shouldReissue(claims, now)) {
     const oldJti = claims.jti;
     const oldExp = claims.exp;
     const nowSeconds = Math.floor(now / 1000);
@@ -128,6 +144,8 @@ export async function authMiddleware(
       const newJwt = await signSession(
         { sub: claims.sub, login: claims.login, email: claims.email, name: claims.name },
         c.env.SESSION_SECRET,
+        undefined,
+        { kind: 'web', authTime: claims.authTime },
       );
 
       // If web context (cookie was present), set new cookie
@@ -154,30 +172,21 @@ export async function authMiddleware(
     name: claims.name,
   });
   c.set('jti', claims.jti);
-  c.set('authMethod', 'session');
+  c.set('authTime', claims.authTime);
+  // The website and the CLI are different callers: only the website can
+  // manage keys, billing or the account (requireWebSession).
+  c.set('via', isWebSession ? 'cookie' : 'cli');
 
   await next();
 }
 
 /** Sign in as the account an MCP OAuth token was issued to (already validated by the /mcp route). */
 async function mcpOAuthAuth(c: Context<AppBindings>, next: Next, userId: number): Promise<Response | void> {
-  const raw = await c.env.PAGES_KV.get(kvKeys.user(userId));
-  type UserRecord = { login?: unknown; email?: unknown; name?: unknown };
-  let record: UserRecord | null = null;
-  try {
-    record = raw === null ? null : (JSON.parse(raw) as UserRecord);
-  } catch {
-    record = null;
-  }
-  if (record === null || typeof record.login !== 'string') return c.json({ error: 'Unauthorized' }, 401);
-  c.set('user', {
-    id: userId,
-    login: record.login,
-    email: redactNoreplyEmail(typeof record.email === 'string' ? record.email : null),
-    name: typeof record.name === 'string' ? record.name : null,
-  });
+  const record = await loadUserRecord(c.env.PAGES_KV, userId);
+  if (record === null) return c.json({ error: 'Unauthorized' }, 401);
+  c.set('user', signedInUser(record));
   c.set('jti', null);
-  c.set('authMethod', 'oauth');
+  c.set('via', 'oauth');
   await next();
 }
 
@@ -202,26 +211,12 @@ async function keyAuth(c: Context<AppBindings>, next: Next, presented: string): 
   }
 
   // The account behind the key. Account deletion removes it (and the key).
-  const raw = await c.env.PAGES_KV.get(kvKeys.user(found.userId));
-  type UserRecord = { login?: unknown; email?: unknown; name?: unknown };
-  let record: UserRecord | null = null;
-  try {
-    record = raw === null ? null : (JSON.parse(raw) as UserRecord);
-  } catch {
-    record = null;
-  }
-  if (record === null || typeof record.login !== 'string') {
-    return c.json({ error: 'Invalid or revoked API key' }, 401);
-  }
+  const record = await loadUserRecord(c.env.PAGES_KV, found.userId);
+  if (record === null) return c.json({ error: 'Invalid or revoked API key' }, 401);
 
-  c.set('user', {
-    id: found.userId,
-    login: record.login,
-    email: redactNoreplyEmail(typeof record.email === 'string' ? record.email : null),
-    name: typeof record.name === 'string' ? record.name : null,
-  });
+  c.set('user', signedInUser(record));
   c.set('jti', null);
-  c.set('authMethod', 'key');
+  c.set('via', 'key');
   c.set('apiKeyId', found.id);
 
   const now = Date.now();
@@ -234,17 +229,22 @@ async function keyAuth(c: Context<AppBindings>, next: Next, presented: string): 
 }
 
 /**
- * Guard middleware: only a signed-in session, not an API key. For managing
- * keys, deleting the account and billing: things an agent or CI job holding a
- * key shouldn't be able to do.
+ * Guard middleware: signed in on the website (the session cookie) only. For
+ * managing API keys, deleting the account, billing, approving CLI sign-ins
+ * and MCP connections: things a CLI token, an API key or a connected app
+ * mustn't be able to do, so a leaked one can't mint more access or take the
+ * account.
  */
-export async function requireSession(
+export async function requireWebSession(
   c: Context<AppBindings>,
   next: Next,
 ): Promise<Response | void> {
   if (c.get('user') === null) return c.json({ error: 'Unauthorized' }, 401);
-  if (c.get('authMethod') !== 'session') {
-    return c.json({ error: 'Sign in to do this. API keys can\'t manage keys, billing or the account.' }, 403);
+  if (c.get('via') !== 'cookie') {
+    return c.json(
+      { error: 'Sign in on the aired website to do this. The CLI, API keys and connected apps can\'t manage keys, billing or the account.' },
+      403,
+    );
   }
   await next();
 }

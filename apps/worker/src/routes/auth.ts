@@ -31,6 +31,7 @@ import { TIERS } from '../lib/rate-limit-tiers.js';
 import { resolveGithubSignIn } from '../lib/resolve-user.js';
 import { constantTimeEqual, finishSignIn, isAllowedReturn, type AuthState } from '../lib/sign-in.js';
 import { workosEnabled, workosLogoutUrl } from '../lib/workos.js';
+import { siteOrigin } from '../lib/billing/webhook-plan.js';
 import { startWorkosSignIn } from './auth-workos.js';
 import { pollNativeDevice } from './auth-device.js';
 import { isNativeDeviceCode } from '../lib/device-code.js';
@@ -60,7 +61,8 @@ auth.get('/github', rateLimit(TIERS.oauth_init), async (c) => {
 
   const githubUrl = new URL('https://github.com/login/oauth/authorize');
   githubUrl.searchParams.set('client_id', c.env.GITHUB_CLIENT_ID);
-  githubUrl.searchParams.set('redirect_uri', 'https://aired.sh/auth/callback');
+  // The GitHub OAuth app's callback must be <SITE_ORIGIN>/auth/callback.
+  githubUrl.searchParams.set('redirect_uri', `${siteOrigin(c.env)}/auth/callback`);
   githubUrl.searchParams.set('scope', 'read:user user:email');
   githubUrl.searchParams.set('state', state);
 
@@ -104,7 +106,8 @@ auth.get('/cli', rateLimit(TIERS.oauth_init), async (c) => {
 
   const githubUrl = new URL('https://github.com/login/oauth/authorize');
   githubUrl.searchParams.set('client_id', c.env.GITHUB_CLIENT_ID);
-  githubUrl.searchParams.set('redirect_uri', 'https://aired.sh/auth/callback');
+  // The GitHub OAuth app's callback must be <SITE_ORIGIN>/auth/callback.
+  githubUrl.searchParams.set('redirect_uri', `${siteOrigin(c.env)}/auth/callback`);
   githubUrl.searchParams.set('scope', 'read:user user:email');
   githubUrl.searchParams.set('state', stateWorker);
 
@@ -398,6 +401,7 @@ auth.post('/device/poll', async (c) => {
         { sub: user.id, login: user.login, email: user.email, name: user.name },
         c.env.SESSION_SECRET,
         CLI_SESSION_MAX_AGE_SECONDS,
+        { kind: 'cli' },
       );
     } catch (err) {
       console.error('Failed to mint JWT on device poll:', err);

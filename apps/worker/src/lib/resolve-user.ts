@@ -1,4 +1,5 @@
 import { kvKeys } from '@aired/core';
+import { loadUserRecord } from './user-record.js';
 import { decideLink, isGithubId, isGithubNoreply, loginFor, normalizeEmail } from './user-link.js';
 import {
   createUser,
@@ -46,18 +47,6 @@ export async function upsertUserRecord(
   }
 }
 
-type UserRecord = { login?: string; email?: string | null; name?: string | null };
-
-async function kvUser(kv: KVNamespace, id: number): Promise<UserRecord | null> {
-  const raw = await kv.get(kvKeys.user(id));
-  if (raw === null) return null;
-  try {
-    return JSON.parse(raw) as UserRecord;
-  } catch {
-    return null;
-  }
-}
-
 export type WorkosProfile = {
   workosUserId: string;
   email: string | null;
@@ -94,7 +83,7 @@ export class NoExistingAccountError extends Error {
 async function indexedEmailOwner(env: Env, email: string): Promise<number | null> {
   const indexed = Number(await env.PAGES_KV.get(kvKeys.emailIndex(email)));
   if (!Number.isSafeInteger(indexed) || indexed <= 0) return null;
-  const record = await kvUser(env.PAGES_KV, indexed);
+  const record = await loadUserRecord(env.PAGES_KV, indexed);
   if (record === null || normalizeEmail(record.email) !== email) return null;
   // D1 found no identity with this email; if it knows this account by others, the entry is stale.
   if (await userHasIdentities(env.DB, indexed)) return null;
@@ -114,7 +103,7 @@ export async function resolveWorkosUser(env: Env, profile: WorkosProfile): Promi
   if (workosIdentityUserId === null && githubId !== null) {
     githubAccountUserId =
       (await findIdentityUser(env.DB, 'github', String(githubId))) ??
-      ((await env.PAGES_KV.get(kvKeys.user(githubId))) !== null ? githubId : null);
+      ((await loadUserRecord(env.PAGES_KV, githubId)) !== null ? githubId : null);
   }
   let verifiedEmailOwner: number | null = null;
   if (workosIdentityUserId === null && githubAccountUserId === null && verifiedEmail !== null) {
@@ -138,7 +127,7 @@ export async function resolveWorkosUser(env: Env, profile: WorkosProfile): Promi
   if (decision.kind === 'existing') {
     // Keep an existing account's login and name (a GitHub login stays), and
     // its email unless WorkOS vouches for the new one.
-    const existing = await kvUser(env.PAGES_KV, decision.userId);
+    const existing = await loadUserRecord(env.PAGES_KV, decision.userId);
     user = {
       id: decision.userId,
       login: existing?.login ?? loginFor(verifiedEmail, name),
@@ -158,14 +147,14 @@ export async function resolveWorkosUser(env: Env, profile: WorkosProfile): Promi
   if (githubId !== null && !(decision.kind === 'existing' && decision.via === 'workos')) {
     const githubLinkedTo = await linkIdentity(
       env.DB,
-      { provider: 'github', subject: String(githubId), userId: user.id, email, emailVerified: verifiedEmail !== null },
+      { provider: 'github', subject: String(githubId), userId: user.id, email: verifiedEmail, emailVerified: verifiedEmail !== null },
       now,
     );
     if (githubLinkedTo !== user.id) throw new Error('GitHub identity is linked to another account');
   }
   const linkedTo = await linkIdentity(
     env.DB,
-    { provider: 'workos', subject: profile.workosUserId, userId: user.id, email, emailVerified: verifiedEmail !== null },
+    { provider: 'workos', subject: profile.workosUserId, userId: user.id, email: verifiedEmail, emailVerified: verifiedEmail !== null },
     now,
   );
   // Two first sign-ins racing: the other one linked first. Fail; the retry finds it.
@@ -191,12 +180,12 @@ export async function resolveGithubSignIn(env: Env, gh: SignedInUser): Promise<S
     accountId = (await findIdentityUser(env.DB, 'github', String(gh.id))) ?? gh.id;
   } catch (err) {
     console.error('Failed to read GitHub identity from D1:', err);
-    if ((await env.PAGES_KV.get(kvKeys.user(gh.id))) === null) throw err;
+    if ((await loadUserRecord(env.PAGES_KV, gh.id)) === null) throw err;
     accountId = gh.id;
   }
 
   if (accountId !== gh.id) {
-    const existing = await kvUser(env.PAGES_KV, accountId);
+    const existing = await loadUserRecord(env.PAGES_KV, accountId);
     const user: SignedInUser = {
       id: accountId,
       login: existing?.login ?? gh.login,

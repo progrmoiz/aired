@@ -366,12 +366,12 @@ export type AppFetch = (request: Request, asUser?: number) => Response | Promise
  */
 export async function handleMcp(c: Context<AppBindings>, appFetch: AppFetch, route: "/mcp" | "/mcp/account" = "/mcp") {
   const user = c.get("user");
-  const method = c.get("authMethod");
+  const via = c.get("via");
   const authorization = c.req.header("Authorization");
   // A key caller's calls carry their key; an OAuth caller's run as their
   // account in-process, and the OAuth token itself is never passed on.
-  const asKey = method === "key" && authorization !== undefined;
-  const asOAuth = method === "oauth";
+  const asKey = via === "key" && authorization !== undefined;
+  const asOAuth = via === "oauth";
   const signedIn: SignedIn | null =
     user !== null && (asKey || asOAuth)
       ? {

@@ -12,7 +12,8 @@ import {
   UNSORTED_PROJECT,
 } from '@aired/core';
 import type { PageMetadata } from '@aired/core';
-import { requireAuth, requireSession } from '../middleware/auth.js';
+import { requireAuth, requireWebSession } from '../middleware/auth.js';
+import { revokeAllSessions } from '../lib/revocation.js';
 import { requireCsrfHeader } from '../middleware/csrf.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { TIERS } from '../lib/rate-limit-tiers.js';
@@ -303,8 +304,30 @@ me.post(
   },
 );
 
+// POST /api/me/sign-out-everywhere — end every session of this account:
+// other browsers, CLI tokens and MCP connections. API keys keep working
+// (they're listed and revoked one by one under API keys). Website only.
+me.post('/sign-out-everywhere', requireWebSession, requireCsrfHeader, async (c) => {
+  const userId = c.get('user')!.id;
+  try {
+    await revokeAllSessions(c.env.PAGES_KV, userId);
+  } catch (err) {
+    console.error('Failed to sign out everywhere:', err);
+    return c.json({ error: 'Could not sign out everywhere. Please try again.' }, 503);
+  }
+  clearSessionCookie(c);
+  // End this browser's AuthKit session too, as sign-out does.
+  const workosSession = readWorkosSessionCookie(c);
+  if (workosSession !== null) clearWorkosSessionCookie(c);
+  return c.json(
+    workosSession !== null && workosEnabled(c.env)
+      ? { ok: true, redirect: workosLogoutUrl(c.env, workosSession) }
+      : { ok: true },
+  );
+});
+
 // DELETE /api/me — delete the authenticated user's account
-me.delete('/', requireSession, requireCsrfHeader, async (c) => {
+me.delete('/', requireWebSession, requireCsrfHeader, async (c) => {
   const user = c.get('user')!;
   const userId = user.id;
   const jti = c.get('jti');
@@ -354,11 +377,23 @@ me.delete('/', requireSession, requireCsrfHeader, async (c) => {
   } catch (err) {
     console.error('Failed to read identity emails during account deletion:', err);
   }
+  // Every other session (other browsers, CLI tokens) and MCP connection of
+  // this account stops working, not just the one making this request. First,
+  // and fail closed: without the marker those sessions would outlive the
+  // account. Writing it again on a retry is harmless.
+  try {
+    await revokeAllSessions(c.env.PAGES_KV, userId);
+  } catch (err) {
+    console.error('Failed to set the revocation marker during account deletion:', err);
+    return c.json({ error: 'Could not delete your account. Please try again.' }, 503);
+  }
   try {
     await deleteAccountRows(c.env.DB, userId);
   } catch (err) {
     console.error('Failed to delete account rows during account deletion:', err);
-    return c.json({ error: 'Could not delete your account records. Please try again.' }, 503);
+    // The marker above already ended every session, this one included.
+    clearSessionCookie(c);
+    return c.json({ error: 'Could not delete your account records. Sign in again and retry.' }, 503);
   }
   try {
     await c.env.PAGES_KV.delete(`ent:${userId}`);

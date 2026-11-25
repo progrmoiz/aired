@@ -1,16 +1,17 @@
 import { Hono } from 'hono';
 import type { AppBindings } from '../types.js';
 import { apiKeyDisplayPrefix, generateApiKey, generateId, hashToHex } from '@aired/core';
-import { requireSession } from '../middleware/auth.js';
+import { requireWebSession } from '../middleware/auth.js';
 import { requireCsrfHeader } from '../middleware/csrf.js';
 import { insertKey, listKeys, MAX_ACTIVE_KEYS, normalizeKeyName, revokeKey } from '../lib/api-keys.js';
 
 /**
  * /api/me/keys: create, list and revoke API keys. A signed-in session only:
- * a key can't mint or revoke keys (requireSession).
+ * only the website's session can mint or revoke keys (requireWebSession), not
+ * a key, a CLI token or a connected app.
  */
 const keys = new Hono<AppBindings>();
-keys.use('*', requireSession);
+keys.use('*', requireWebSession);
 // Responses can carry a new key: never store them anywhere.
 keys.use('*', async (c, next) => {
   await next();

@@ -86,7 +86,7 @@ Response:
 ```
 {
   "url": "https://aired.sh/p/a1b2c3d4e5",
-  "update_token": "tok_...",
+  "update_token": "at_...",
   "expiresAt": "2026-05-16T12:00:00.000Z"
 }
 ```
@@ -110,7 +110,7 @@ Body:
 
   // Update an existing artifact in one call:
   "id":           "a1b2c3d4e5",
-  "update_token": "tok_..."
+  "update_token": "at_..."
 }
 ```
 
@@ -124,7 +124,7 @@ Update existing artifact. Token goes in the body as `update_token`, or as an `Au
 {
   "html": "...",
   "title": "optional new title",
-  "update_token": "tok_..."
+  "update_token": "at_..."
 }
 ```
 
@@ -169,12 +169,12 @@ Body `{ pin }`. On success sets an `HttpOnly`, `SameSite=Strict` cookie scoped t
 
 | Limit | Value |
 |---|---|
-| Max artifact size | 2 MB |
-| Publishes per hour per IP | 5 |
+| Max page size | 2 MB (Free), 10 MB (Pro) |
+| Publishes | 5/hour per IP anonymously, 30/hour signed in on Free, 500/day on Pro |
 | Default TTL | 7 days |
 | Max TTL | permanent |
 
-There is no paid tier. If you need higher limits, run aired yourself — it is open source.
+Pro ($12/month or $108/year) removes the aired badge and raises the limits. aired is also open source: you can run it yourself (see https://aired.sh/docs#self-host).
 
 ---
 
@@ -185,7 +185,8 @@ There is no paid tier. If you need higher limits, run aired yourself — it is o
 - `/index.md` — markdown homepage fallback
 - `/.well-known/agent.json` — agent discovery manifest
 - `/.well-known/ai-plugin.json` — OpenAI plugin manifest pointing at the API
-- `/mcp` — MCP streamable HTTP endpoint
+- `/mcp` — MCP streamable HTTP endpoint (anonymous, or an API key)
+- `/mcp/account` — the same server signed in as your account (connector sign-in, or an API key)
 
 ---
 

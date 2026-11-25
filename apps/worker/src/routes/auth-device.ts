@@ -3,11 +3,12 @@ import type { AppBindings } from '../types.js';
 import { CLI_SESSION_MAX_AGE_SECONDS, hashToHex, kvKeys } from '@aired/core';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { TIERS } from '../lib/rate-limit-tiers.js';
-import { requireAuth, requireSession } from '../middleware/auth.js';
+import { requireAuth, requireWebSession } from '../middleware/auth.js';
 import { requireCsrfHeader } from '../middleware/csrf.js';
 import { signSession } from '../lib/jwt.js';
 import { siteOrigin } from '../lib/billing/webhook-plan.js';
-import { readSessionCookie } from '../lib/cookies.js';
+import { loadUserRecord } from '../lib/user-record.js';
+import { retiredBy, sessionsValidSince } from '../lib/revocation.js';
 import {
   DEVICE_CODE_TTL_MS,
   DEVICE_POLL_INTERVAL,
@@ -66,24 +67,23 @@ authDevice.post('/device', rateLimit(TIERS.device_start), async (c) => {
 authDevice.post(
   '/device/approve',
   requireAuth,
-  requireSession,
+  requireWebSession,
   requireCsrfHeader,
   rateLimit(TIERS.oauth_init),
   async (c) => {
-    if (readSessionCookie(c) === null) {
-      return c.json({ error: 'Approve the code on the aired website, signed in.' }, 403);
-    }
     const body = (await c.req.json().catch(() => null)) as { user_code?: unknown } | null;
     const userCode = normalizeUserCode(body?.user_code);
     if (userCode === null) return c.json({ error: 'That isn’t a sign-in code. It looks like BCDF-GHJK.' }, 400);
     const userId = c.get('user')!.id;
     // The CLI session is minted from the account record: no record, no approval.
-    if ((await c.env.PAGES_KV.get(kvKeys.user(userId))) === null) {
+    if ((await loadUserRecord(c.env.PAGES_KV, userId)) === null) {
       return c.json({ error: 'Sign in again, then approve the code.' }, 403);
     }
     let approved: boolean;
     try {
-      approved = await approveDeviceAuth(c.env.DB, userCode, userId, Date.now());
+      // The CLI token inherits when this person signed in (requireWebSession guarantees it's set).
+      const authTime = c.get('authTime') ?? Math.floor(Date.now() / 1000);
+      approved = await approveDeviceAuth(c.env.DB, userCode, userId, authTime, Date.now());
     } catch (err) {
       console.error('Failed to approve device code:', err);
       return c.json({ error: 'Could not approve the code. Please try again.' }, 503);
@@ -104,7 +104,7 @@ export async function pollNativeDevice(c: Context<AppBindings>, deviceCode: stri
 
   const deviceHash = await hashToHex(deviceCode);
   const now = Date.now();
-  let userId: number | null;
+  let collected: Awaited<ReturnType<typeof consumeDeviceAuth>>;
   try {
     const row = await readDeviceAuth(c.env.DB, deviceHash);
     if (row === null || row.expires_at <= now || row.consumed_at !== null) {
@@ -114,32 +114,33 @@ export async function pollNativeDevice(c: Context<AppBindings>, deviceCode: stri
       c.header('Retry-After', String(DEVICE_POLL_INTERVAL));
       return c.json({ status: 'authorization_pending' }, 202);
     }
-    userId = await consumeDeviceAuth(c.env.DB, deviceHash, now);
+    collected = await consumeDeviceAuth(c.env.DB, deviceHash, now);
   } catch (err) {
     console.error('Failed to read device code:', err);
     return c.json({ error: 'server error' }, 500);
   }
   // Collected by a poll that raced this one.
-  if (userId === null) return c.json({ error: 'device_code_expired' }, 400);
+  if (collected === null) return c.json({ error: 'device_code_expired' }, 400);
+  const userId = collected.userId;
+  const authTime = collected.authTime ?? Math.floor(now / 1000);
 
-  const raw = await c.env.PAGES_KV.get(kvKeys.user(userId));
-  type UserRecord = { login?: string; email?: string | null; name?: string | null };
-  let record: UserRecord | null = null;
-  try {
-    record = raw === null ? null : (JSON.parse(raw) as UserRecord);
-  } catch {
-    record = null;
+  // The account was deleted, or its owner signed out everywhere, since the
+  // approval: no token. (The token would carry the approval's sign-in time
+  // anyway, so a stale read here only delays its retirement.)
+  if (retiredBy(await sessionsValidSince(c.env.PAGES_KV, userId, { fresh: true }), authTime)) {
+    return c.json({ error: 'access_denied' }, 400);
   }
-  // The account was deleted after approving.
-  if (record === null || typeof record.login !== 'string') return c.json({ error: 'access_denied' }, 400);
+  const record = await loadUserRecord(c.env.PAGES_KV, userId);
+  if (record === null) return c.json({ error: 'access_denied' }, 400);
 
-  const user = { id: userId, login: record.login, email: record.email ?? null, name: record.name ?? null };
+  const user = { id: userId, login: record.login, email: record.email, name: record.name };
   let jwt: string;
   try {
     jwt = await signSession(
       { sub: user.id, login: user.login, email: user.email, name: user.name },
       c.env.SESSION_SECRET,
       CLI_SESSION_MAX_AGE_SECONDS,
+      { kind: 'cli', authTime },
     );
   } catch (err) {
     console.error('Failed to mint JWT on device poll:', err);

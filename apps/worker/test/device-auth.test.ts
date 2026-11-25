@@ -53,17 +53,17 @@ test("a code is approved once, collected once, and dies when it expires", async 
   // Not approved yet: nothing to collect.
   assert.equal(await consumeDeviceAuth(db, "h1", T + 1), null);
   assert.equal((await readDeviceAuth(db, "h1"))?.approved_user_id, null);
-  assert.equal(await approveDeviceAuth(db, "BCDF-GHJK", 42, T + 2), true);
+  assert.equal(await approveDeviceAuth(db, "BCDF-GHJK", 42, 1700, T + 2), true);
   // A second approval (someone else guessing the code) changes nothing.
-  assert.equal(await approveDeviceAuth(db, "BCDF-GHJK", 99, T + 3), false);
-  assert.equal(await consumeDeviceAuth(db, "h1", T + 4), 42);
+  assert.equal(await approveDeviceAuth(db, "BCDF-GHJK", 99, 1700, T + 3), false);
+  assert.deepEqual(await consumeDeviceAuth(db, "h1", T + 4), { userId: 42, authTime: 1700 }, "the token inherits when the approver signed in");
   assert.equal(await consumeDeviceAuth(db, "h1", T + 5), null, "once");
   assert.notEqual((await readDeviceAuth(db, "h1"))?.consumed_at, null);
 
   await createDeviceAuth(db, { deviceHash: "h2", userCode: "LMNP-QRST", now: T, expiresAt: T + 600_000 });
-  assert.equal(await approveDeviceAuth(db, "LMNP-QRST", 42, T + 600_001), false, "expired codes can't be approved");
+  assert.equal(await approveDeviceAuth(db, "LMNP-QRST", 42, 1700, T + 600_001), false, "expired codes can't be approved");
   await createDeviceAuth(db, { deviceHash: "h3", userCode: "VWXZ-BCDF", now: T, expiresAt: T + 600_000 });
-  await approveDeviceAuth(db, "VWXZ-BCDF", 42, T + 10);
+  await approveDeviceAuth(db, "VWXZ-BCDF", 42, 1700, T + 10);
   assert.equal(await consumeDeviceAuth(db, "h3", T + 600_001), null, "or collected after expiry");
 });
 
@@ -81,10 +81,9 @@ test("wiring: the poll route sends aired codes to the native flow; approving nee
   const auth = readFileSync(new URL("../src/routes/auth.ts", import.meta.url), "utf8");
   assert.match(auth, /if \(isNativeDeviceCode\(device_code\)\) return pollNativeDevice\(c, device_code\);\s*const limited = await githubPollLimit\(c, async \(\) => \{\}\);/);
   const device = readFileSync(new URL("../src/routes/auth-device.ts", import.meta.url), "utf8");
-  assert.match(device, /'\/device\/approve',\s*requireAuth,\s*requireSession,\s*requireCsrfHeader,/);
+  assert.match(device, /'\/device\/approve',\s*requireAuth,\s*requireWebSession,\s*requireCsrfHeader,/);
   assert.match(device, /CLI_SESSION_MAX_AGE_SECONDS/);
-  // Only the web cookie approves: a CLI token can't renew itself through the device flow.
-  assert.match(device, /if \(readSessionCookie\(c\) === null\) \{\s*return c\.json\(\{ error: 'Approve the code on the aired website, signed in\.' \}, 403\);/);
+  // Only the web cookie approves (requireWebSession): a CLI token can't renew itself through the device flow.
   // Starting a sign-in writes to D1, so it has a flood guard counted by Cloudflare.
   assert.match(device, /authDevice\.post\('\/device', rateLimit\(TIERS\.device_start\)/);
   assert.match(readFileSync(new URL("../src/lib/rate-limit-tiers.ts", import.meta.url), "utf8"), /device_start: +\{[^}]*burst: 'DEVICE_BURST' \}/);

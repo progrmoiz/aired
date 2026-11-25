@@ -42,20 +42,20 @@ test("wiring: /mcp/account challenges, OAuth tokens sign in only on MCP, and the
   assert.match(index, /if \(bearer !== null && !bearer\.startsWith\(API_KEY_PREFIX\)\) \{/);
   assert.match(index, /if \(found === null\) return mcpChallenge\(c, resource, "invalid_token"\);/);
   assert.match(index, /if \(!found\.scope\.includes\(MCP_SCOPE\)\) return mcpInsufficientScope\(c, resource\);/);
-  assert.match(index, /\} else if \(which === "account" && c\.get\("authMethod"\) !== "key"\) \{\s*return mcpChallenge\(c, resource\);/);
+  assert.match(index, /\} else if \(which === "account" && c\.get\("via"\) !== "key"\) \{\s*return mcpChallenge\(c, resource\);/);
   assert.match(index, /for \(const \[path, which\] of \[\["\/mcp", "open"\], \["\/mcp\/account", "account"\]\] as const\)/);
   assert.match(index, /asUser === undefined \? c\.env : withMcpOAuthUser\(c\.env, asUser\)/);
   // Only in-process calls carry the account: a request can't set env, and vars are strings.
   const auth = src("src/middleware/auth.ts");
   assert.match(auth, /const mcpUser = c\.env\.AIRED_MCP_OAUTH_USER;\s*if \(typeof mcpUser === 'number'\) return mcpOAuthAuth\(c, next, mcpUser\);/);
-  assert.match(auth, /c\.set\('authMethod', 'oauth'\);/);
+  assert.match(auth, /c\.set\('via', 'oauth'\);/);
   // OAuth callers are not sessions: no keys, billing or account deletion.
-  assert.match(auth, /if \(c\.get\('authMethod'\) !== 'session'\) \{/);
+  assert.match(auth, /if \(c\.get\('via'\) !== 'cookie'\) \{/);
 });
 
 test("wiring: consent needs the web session, and the OAuth store and fetch flag are configured", () => {
   const oauth = src("src/routes/mcp-oauth.ts");
-  assert.match(oauth, /if \(user === null \|\| c\.get\('authMethod'\) !== 'session' \|\| readSessionCookie\(c\) === null\) return null;/);
+  assert.match(oauth, /if \(user === null \|\| c\.get\('via'\) !== 'cookie'\) return null;/);
   assert.match(oauth, /if \(err instanceof AuthorizationError && err\.redirectTo\) return Response\.redirect\(err\.redirectTo, 302\);/);
   assert.match(oauth, /clientIdMetadataDocumentEnabled: true,/);
   assert.match(oauth, /h\.set\('X-Frame-Options', 'DENY'\);/);
@@ -78,7 +78,7 @@ test("CORS: protocol paths are open without credentials; the consent page and th
 
 test("MCP connections end with the account and with sign-out-everywhere; rate limits fit hosted clients", () => {
   const oauth = src("src/routes/mcp-oauth.ts");
-  assert.match(oauth, /props: \{ userId: account\.id, issuedAt: Math\.floor\(Date\.now\(\) \/ 1000\) \}/);
+  assert.match(oauth, /props: \{ userId: account\.id, issuedAt: Math\.floor\(Date\.now\(\) \/ 1000\), authTime: account\.authTime \}/);
   assert.match(oauth, /if \(grantRetired\(env, v\.props\?\.issuedAt\)\) return null;/);
   assert.match(oauth, /await oauth\.revokeGrant\(grant\.id, String\(userId\)\);/);
   const me = src("src/routes/me.ts");
@@ -99,7 +99,7 @@ test("the authorize return path survives characters URL leaves raw", () => {
 
 test("retired grants can't refresh, grants can't outlive their account, and deleting an account ends the AuthKit session", () => {
   const oauth = src("src/routes/mcp-oauth.ts");
-  assert.match(oauth, /tokenExchangeCallback: \(\{ props, env: e \}\) => \{\s*if \(grantRetired\(e,[\s\S]*?throw new OAuthError\('invalid_grant'/);
+  assert.match(oauth, /tokenExchangeCallback: async \(\{ props, env: e \}\) => \{[\s\S]*?grantRetired\(e, p\.issuedAt\) \|\|[\s\S]*?sessionsValidSince\(e\.PAGES_KV, p\.userId, \{ fresh: true \}\)[\s\S]*?throw new OAuthError\('invalid_grant'/);
   const index = src("src/index.ts");
   assert.match(index, /found\.issuedAt === null \|\| found\.issuedAt \* 1000 < created - 60_000/);
   const me = src("src/routes/me.ts");

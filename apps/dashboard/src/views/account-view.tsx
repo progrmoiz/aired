@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Avatar } from '@/components/app-sidebar'
 import { ViewHeader } from '@/components/common'
-import { type User, afterSignOut, mutate, readJson } from '@/lib/api'
+import { type User, SIGN_IN, afterSignOut, mutate, readJson } from '@/lib/api'
 import { formatDate } from '@/lib/format'
 
 export function AccountView({ user }: { user: User | null }) {
@@ -46,6 +46,16 @@ export function AccountView({ user }: { user: User | null }) {
         )}
       </Card>
 
+      <Card className="gap-3 px-5 py-5">
+        <div>
+          <h2 className="text-[15px] font-medium">Sign out everywhere</h2>
+          <p className="mt-1 max-w-[46em] text-sm text-muted-foreground">
+            Signs you out on every browser and the CLI, and disconnects AI tools. Your API keys keep working.
+          </p>
+        </div>
+        <SignOutEverywhere />
+      </Card>
+
       <Card className="gap-3 border-destructive/25 px-5 py-5">
         <div>
           <h2 className="text-[15px] font-medium">Delete account</h2>
@@ -56,6 +66,53 @@ export function AccountView({ user }: { user: User | null }) {
         <DeleteAccount />
       </Card>
     </div>
+  )
+}
+
+function SignOutEverywhere() {
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const change = (o: boolean) => {
+    if (busy) return
+    if (!o) setError('')
+    setOpen(o)
+  }
+  const confirm = async () => {
+    setBusy(true); setError('')
+    try {
+      // Website session only (the Worker refuses CLI tokens and keys here).
+      const res = await mutate('POST', '/api/me/sign-out-everywhere')
+      const data = await readJson(res)
+      if (res.ok) { afterSignOut(data); return }
+      if (res.status === 401) { window.location.href = SIGN_IN; return }
+      throw new Error((data.error as string) || 'Could not sign out everywhere. Try again.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not sign out everywhere. Try again.')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <div><Button variant="outline" size="lg" onClick={() => setOpen(true)}><LogOutIcon />Sign out everywhere…</Button></div>
+      <AlertDialog open={open} onOpenChange={change}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sign out everywhere?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Signs you out on every browser and the CLI, this one included, and disconnects AI tools. Your API keys keep working, so revoke any you no longer trust under Developer keys.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <Button onClick={confirm} disabled={busy}>{busy ? 'Signing out…' : 'Sign out everywhere'}</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }
 
@@ -79,6 +136,8 @@ function DeleteAccount() {
       const res = await mutate('DELETE', '/api/me')
       const data = await readJson(res)
       if (res.ok) { afterSignOut(data); return }
+      // A failed delete can end this session (the Worker revokes first); sign in again to retry.
+      if (res.status === 401) { window.location.href = SIGN_IN; return }
       throw new Error((data.error as string) || 'Could not delete your account. Try again.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not delete your account. Try again.')
