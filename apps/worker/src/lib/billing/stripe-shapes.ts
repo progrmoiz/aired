@@ -179,6 +179,14 @@ export function stripeErrorFrom(method: string, path: string, status: number, bo
 }
 
 /**
+ * Whether a Stripe call failed because the key isn't allowed to make it, for
+ * example a restricted key without "Refunds: write".
+ */
+export function isPermissionError(err: unknown): boolean {
+  return err instanceof StripeError && (err.status === 401 || err.status === 403);
+}
+
+/**
  * Whether a Stripe call failed because the customer no longer exists (deleted
  * in the dashboard, or saved from another Stripe account or mode).
  */

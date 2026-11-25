@@ -182,6 +182,30 @@ function idOrNull(v: unknown): string | null {
   return typeof id === 'string' && id ? id : null;
 }
 
+/** A charge, or null when Stripe has no such charge. */
+export async function fetchCharge(env: StripeEnv, chargeId: string): Promise<unknown> {
+  const { status, data } = await stripeRequest(env, 'GET', `/v1/charges/${encodeURIComponent(chargeId)}`, null, [404]);
+  return status === 404 ? null : data;
+}
+
+/**
+ * Refund what's left of a charge after an early fraud warning. The
+ * idempotency key is per charge, so retries and repeated warnings refund once.
+ * Needs "Refunds: write" on the restricted key.
+ */
+export async function refundFraudulentCharge(env: StripeEnv, chargeId: string): Promise<string | null> {
+  const body = new URLSearchParams({
+    charge: chargeId,
+    reason: 'fraudulent',
+    'metadata[aired_reason]': 'early_fraud_warning',
+  });
+  const { data } = await stripeRequest(env, 'POST', '/v1/refunds', body, [], {
+    'Idempotency-Key': `aired-efw-refund-${chargeId}`,
+  });
+  const id = (data as { id?: unknown } | null)?.id;
+  return typeof id === 'string' ? id : null;
+}
+
 async function fetchInvoice(env: StripeEnv, id: string): Promise<unknown> {
   const { status, data } = await stripeRequest(env, 'GET', `/v1/invoices/${encodeURIComponent(id)}`, null, [404]);
   return status === 404 ? null : data;

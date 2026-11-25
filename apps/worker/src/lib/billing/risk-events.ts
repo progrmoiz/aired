@@ -237,6 +237,24 @@ export async function refundEndsPro(
   return { ends: true, why: 'nothing_else_pays', keptBy: null };
 }
 
+/** The charge an early fraud warning event is about, or null. */
+export function fraudWarningChargeId(evt: { type: string; raw: unknown }): string | null {
+  if (evt.type !== 'radar.early_fraud_warning.created') return null;
+  return idOf(record(record(record(evt.raw)?.data)?.object)?.charge);
+}
+
+/**
+ * What to do with a charge that got an early fraud warning: refund whatever
+ * is left of it, unless it's already fully refunded or disputed (a dispute's
+ * money is already with the bank, and refunding it too would pay twice).
+ */
+export function fraudWarningRefundAction(charge: unknown): 'refund' | 'already_refunded' | 'disputed' {
+  const c = record(charge);
+  if (c?.disputed === true) return 'disputed';
+  if (isFullRefund(c)) return 'already_refunded';
+  return 'refund';
+}
+
 /** A subscription status that means there is nothing left to cancel. */
 export function alreadyEnded(status: string | null | undefined): boolean {
   return status === 'canceled' || status === 'incomplete_expired';

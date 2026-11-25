@@ -9,6 +9,7 @@ import { TIERS } from '../lib/rate-limit-tiers.js';
 import { billingEnabled, isEntitled } from '../lib/entitlements.js';
 import { verifyStripeSignature } from '../lib/billing/signature.js';
 import {
+  isPermissionError,
   BillingConfigError,
   HANDLED_EVENTS,
   checkoutConfigProblem,
@@ -20,6 +21,8 @@ import {
   type NormalizedSubscription,
 } from '../lib/billing/stripe-shapes.js';
 import {
+  fetchCharge,
+  refundFraudulentCharge,
   cancelSubscription,
   createCheckout,
   createCustomer,
@@ -31,7 +34,15 @@ import {
   listActiveSubscriptions,
   subscriptionsForPaymentIntent,
 } from '../lib/billing/stripe.js';
-import { RISK_EVENTS, alreadyEnded, currentPeriodOf, planRiskEvent, refundEndsPro } from '../lib/billing/risk-events.js';
+import {
+  RISK_EVENTS,
+  alreadyEnded,
+  currentPeriodOf,
+  fraudWarningChargeId,
+  fraudWarningRefundAction,
+  planRiskEvent,
+  refundEndsPro,
+} from '../lib/billing/risk-events.js';
 import { userRowExists,
   ensureUser,
   hasEvent,
@@ -355,11 +366,50 @@ async function webhookUid(c: Context<AppBindings>, evt: WebhookEvent, sub: Norma
 }
 
 /**
- * A full refund, a dispute or an early fraud warning on a subscription charge
- * ends Pro: cancel the subscription now and store the result, which removes
- * `ent:<uid>`. A partial refund is only logged. Nothing is ever refunded here.
+ * Risk events. A dispute or an early fraud warning ends Pro; a full refund
+ * ends it when it refunds the current period's payment (refundEndsPro). Ending
+ * Pro cancels the subscription now and stores the result, which removes
+ * `ent:<uid>`. An early fraud warning also refunds the charge in full.
  */
 async function handleRiskEvent(c: Context<AppBindings>, evt: WebhookEvent): Promise<void> {
+  await endProForRiskEvent(c, evt);
+  // After Pro has ended, so a refund failure can never keep Pro on.
+  if (evt.type === 'radar.early_fraud_warning.created') await refundFlaggedCharge(c, evt);
+}
+
+/**
+ * An early fraud warning: refund the charge in full (owner's decision,
+ * 2026-11-25), unless it's already refunded or disputed. The refund then
+ * sends charge.refunded, which finds the subscription already canceled and
+ * stops there. Logs one line. A key without "Refunds: write" is logged and
+ * answered 200: Pro has already ended, and retrying wouldn't help.
+ */
+async function refundFlaggedCharge(c: Context<AppBindings>, evt: WebhookEvent): Promise<void> {
+  const chargeId = fraudWarningChargeId(evt);
+  if (!chargeId) {
+    console.warn({ event: 'billing_efw_refund_skipped', eventId: evt.id, why: 'no_charge' });
+    return;
+  }
+  const charge = await fetchCharge(c.env, chargeId);
+  if (charge === null) {
+    console.warn({ event: 'billing_efw_refund_skipped', eventId: evt.id, chargeId, why: 'charge_missing' });
+    return;
+  }
+  const action = fraudWarningRefundAction(charge);
+  if (action !== 'refund') {
+    console.log({ event: 'billing_efw_refund_skipped', eventId: evt.id, chargeId, why: action });
+    return;
+  }
+  try {
+    const refundId = await refundFraudulentCharge(c.env, chargeId);
+    console.log({ event: 'billing_efw_refunded', eventId: evt.id, chargeId, refundId });
+  } catch (err) {
+    if (!isPermissionError(err)) throw err;
+    console.error({ event: 'billing_efw_refund_not_permitted', eventId: evt.id, chargeId, fix: 'add Refunds: write to the restricted key' });
+  }
+}
+
+async function endProForRiskEvent(c: Context<AppBindings>, evt: WebhookEvent): Promise<void> {
   const plan = planRiskEvent(evt);
   if (plan.action === 'ignore') return;
   if (plan.action === 'log_partial_refund') {

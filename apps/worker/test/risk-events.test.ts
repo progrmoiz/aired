@@ -4,6 +4,8 @@ import {
   RISK_EVENTS,
   alreadyEnded,
   chargesAllRefunded,
+  fraudWarningChargeId,
+  fraudWarningRefundAction,
   currentPeriodOf,
   paysForCurrentPeriod,
   provablyEarlierPeriod,
@@ -352,4 +354,32 @@ test("billing.ts runs the refund check only for refunds on live subscriptions, a
   assert.match(stripe, /subscription: subscriptionId, status: 'paid'/);
   assert.match(stripe, /invoice: invoiceId, status: 'paid'/);
   assert.match(stripe, /found\.set\(sub, \(found\.get\(sub\) \?\? new Set\(\)\)\.add\(invoiceId\)\)/);
+});
+
+// --- Early fraud warnings refund the charge ------------------------------------
+
+test("fraudWarningChargeId reads the warning's charge, and only for warnings", () => {
+  assert.equal(fraudWarningChargeId(evt("radar.early_fraud_warning.created", { id: "issfr_1", charge: "ch_9", payment_intent: "pi_9" })), "ch_9");
+  assert.equal(fraudWarningChargeId(evt("radar.early_fraud_warning.created", { id: "issfr_1", charge: { id: "ch_8" } })), "ch_8");
+  assert.equal(fraudWarningChargeId(evt("radar.early_fraud_warning.created", { id: "issfr_1" })), null);
+  assert.equal(fraudWarningChargeId(evt("charge.dispute.created", { id: "dp_1", charge: "ch_9" })), null);
+});
+
+test("a flagged charge is refunded unless it's already fully refunded or disputed", () => {
+  assert.equal(fraudWarningRefundAction({ amount: 1200, amount_refunded: 0, refunded: false, disputed: false }), "refund");
+  // A partial refund leaves something to refund.
+  assert.equal(fraudWarningRefundAction({ amount: 1200, amount_refunded: 200, refunded: false, disputed: false }), "refund");
+  assert.equal(fraudWarningRefundAction({ amount: 1200, amount_refunded: 1200, refunded: true, disputed: false }), "already_refunded");
+  assert.equal(fraudWarningRefundAction({ amount: 1200, amount_refunded: 0, refunded: false, disputed: true }), "disputed");
+  // Disputed wins even if partly refunded.
+  assert.equal(fraudWarningRefundAction({ amount: 1200, amount_refunded: 1200, refunded: true, disputed: true }), "disputed");
+});
+
+test("billing.ts ends Pro before refunding, and a refund permission error is logged, not thrown", async () => {
+  const { readFileSync } = await import("node:fs");
+  const code = readFileSync(new URL("../src/routes/billing.ts", import.meta.url), "utf8");
+  assert.match(code, /await endProForRiskEvent\(c, evt\);\s*\/\/[^\n]*\n\s*if \(evt\.type === 'radar\.early_fraud_warning\.created'\) await refundFlaggedCharge\(c, evt\);/);
+  assert.match(code, /if \(!isPermissionError\(err\)\) throw err;\s*console\.error\(\{ event: 'billing_efw_refund_not_permitted'/);
+  const stripe = readFileSync(new URL("../src/lib/billing/stripe.ts", import.meta.url), "utf8");
+  assert.match(stripe, /'Idempotency-Key': `aired-efw-refund-\$\{chargeId\}`/);
 });

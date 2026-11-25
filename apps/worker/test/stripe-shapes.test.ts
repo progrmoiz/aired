@@ -564,3 +564,13 @@ test("eventSubscription normalizes the object of a customer.subscription.* event
   assert.equal(eventSubscription({ type: "customer.subscription.deleted", data: { object: { id: "sub_x" } } }), null);
   for (const g of garbage) assert.equal(eventSubscription(g), null);
 });
+
+test("isPermissionError: 401 and 403 from Stripe only", async () => {
+  const { isPermissionError, StripeError } = await import("../src/lib/billing/stripe-shapes.ts");
+  const err = (status: number) => new StripeError("POST", "/v1/refunds", status, { type: "invalid_request_error", code: null, param: null });
+  assert.equal(isPermissionError(err(403)), true);
+  assert.equal(isPermissionError(err(401)), true);
+  assert.equal(isPermissionError(err(400)), false);
+  assert.equal(isPermissionError(err(500)), false);
+  assert.equal(isPermissionError(new Error("network")), false);
+});
