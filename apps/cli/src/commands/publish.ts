@@ -167,7 +167,8 @@ export function makePublishCommand(globalOpts: () => GlobalOpts): Command {
           if (result.upgrade?.url !== undefined) {
             process.stdout.write(pc.dim(`Remove the badge with Pro: ${result.upgrade.url}`) + '\n')
           }
-          if (result.claim_url !== undefined && jwt === undefined) {
+          // The server only adds claim_url to anonymous publishes (including an expired session).
+          if (result.claim_url !== undefined) {
             process.stdout.write(pc.dim(`Keep it in your account: ${result.claim_url}`) + '\n')
           }
           process.stdout.write(pc.dim('Token:   ') + result.update_token + '\n')

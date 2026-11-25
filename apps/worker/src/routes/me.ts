@@ -186,8 +186,9 @@ me.get('/projects', async (c) => {
   return c.json({ projects });
 });
 
-// POST /api/me/claim — claim a single page by id + update_token
-me.post('/claim', requireCsrfHeader, async (c) => {
+// POST /api/me/claim — claim a single page by id + update_token.
+// Shares the claim-batch bucket (rl:claim, 5/hour per user).
+me.post('/claim', requireCsrfHeader, rateLimit(TIERS.claim_batch), async (c) => {
   const user = c.get('user')!;
 
   let body: unknown;

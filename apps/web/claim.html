@@ -82,12 +82,24 @@
     <!-- Signed out -->
     <section id="state-signed-out" class="hidden mt-8">
       <h2 class="text-lg font-medium">Sign in to keep this page</h2>
-      <p class="mt-2 text-sm text-aired-text-secondary">After you sign in, you come back here and the page is added to your account.</p>
+      <p class="mt-2 text-sm text-aired-text-secondary">After you sign in, you come back here to confirm before anything is added.</p>
       <div class="mt-6">
         <a id="sign-in" href="/auth/github?return=/claim"
            class="claim-btn claim-btn-primary focus-ring px-4 py-2.5 rounded bg-aired-text-primary text-aired-bg text-sm font-medium">
           Sign in with GitHub
         </a>
+      </div>
+    </section>
+
+    <!-- Confirm: signed in, nothing is added until the button is pressed -->
+    <section id="state-confirm" class="hidden mt-8">
+      <h2 class="text-lg font-medium">Add this page to your account?</h2>
+      <p id="confirm-title" class="mt-2 text-sm text-aired-text-primary"></p>
+      <a id="confirm-link" href="/" target="_blank" rel="noopener" class="claim-url mt-1 block font-mono text-sm text-aired-accent focus-ring rounded-sm"></a>
+      <p class="mt-3 text-xs text-aired-text-tertiary">Only add a page you published. Anyone can send you a link to this screen.</p>
+      <div class="mt-6 flex flex-wrap items-center gap-3">
+        <button id="confirm-add" type="button" class="claim-btn claim-btn-primary focus-ring px-4 py-2.5 rounded bg-aired-text-primary text-aired-bg text-sm font-medium">Add to your account</button>
+        <button id="confirm-cancel" type="button" class="claim-btn claim-btn-secondary focus-ring px-4 py-2 rounded bg-aired-surface border border-aired-border text-aired-text-secondary text-sm hover:bg-aired-surface-hover hover:border-aired-border-focus hover:text-aired-text-primary">Cancel</button>
       </div>
     </section>
 
@@ -108,6 +120,14 @@
           Open dashboard
         </a>
       </div>
+    </section>
+
+    <!-- Cancelled -->
+    <section id="state-cancelled" class="hidden mt-8">
+      <p class="text-sm text-aired-text-secondary">Nothing was added.</p>
+      <p class="mt-6 text-sm text-aired-text-secondary">
+        <a href="/dashboard" class="hover:text-aired-text-primary underline transition-colors duration-150 focus-ring rounded-sm">Go to dashboard</a>
+      </p>
     </section>
 
     <!-- Error -->
@@ -150,7 +170,7 @@
       var ID_RE = /^[0-9A-Za-z]{6,32}$/;
       var TOKEN_RE = /^at_[A-Za-z0-9_-]{16,128}$/;
 
-      var STATES = ['loading', 'signed-out', 'claiming', 'success', 'error'];
+      var STATES = ['loading', 'signed-out', 'confirm', 'claiming', 'success', 'cancelled', 'error'];
       var status = document.getElementById('status');
       var retry = document.getElementById('retry');
 
@@ -213,8 +233,45 @@
       }
 
       var claim = null;
+      var login = null;
       // Bumped on every new claim, so a late response for an older link is ignored.
       var run = 0;
+
+      var confirmAdd = document.getElementById('confirm-add');
+      var confirmCancel = document.getElementById('confirm-cancel');
+
+      function pageHref(id) { return '/p/' + encodeURIComponent(id); }
+
+      // Show what would be added and wait for a click. Never POSTs by itself:
+      // any site can send a signed-in visitor to /claim#<id>.<token>.
+      function confirmClaim(current) {
+        var href = pageHref(claim.id);
+        var link = document.getElementById('confirm-link');
+        link.href = href;
+        link.textContent = location.host + href;
+        document.getElementById('confirm-title').textContent = 'Untitled page';
+        confirmAdd.textContent = login ? 'Add to @' + login : 'Add to your account';
+        confirmAdd.disabled = false;
+        confirmCancel.disabled = false;
+        show('confirm', 'Add this page to your account?');
+
+        // Public metadata, for the title only. A 404 means there is nothing to add.
+        fetch('/api/pages/' + encodeURIComponent(claim.id), { credentials: 'omit' }).then(function (res) {
+          if (current !== run) return;
+          if (res.status === 404) {
+            forget();
+            fail('This link has already been used, or the page is gone.', false);
+            return;
+          }
+          if (!res.ok) return;
+          return res.json().then(function (data) {
+            if (current !== run) return;
+            if (data && typeof data.title === 'string' && data.title) {
+              document.getElementById('confirm-title').textContent = data.title;
+            }
+          });
+        }).catch(function () { /* title is optional */ });
+      }
 
       function claimPage(current) {
         show('claiming', 'Adding the page to your account');
@@ -229,12 +286,16 @@
             show('signed-out', 'Sign in to keep this page');
             return;
           }
+          if (res.status === 429) {
+            fail('Too many attempts. Try again in an hour.', false);
+            return;
+          }
           return res.json().catch(function () { return {}; }).then(function (data) {
             if (current !== run) return;
             if (res.ok && data && data.ok) {
               forget();
               var page = data.page || {};
-              var href = '/p/' + encodeURIComponent(claim.id);
+              var href = pageHref(claim.id);
               var link = document.getElementById('success-link');
               link.href = href;
               link.textContent = location.host + href;
@@ -254,6 +315,7 @@
         });
       }
 
+      // Check sign-in, then ask. "Try again" also lands here, so a retry asks again too.
       function start() {
         var current = ++run;
         show('loading', '');
@@ -261,11 +323,17 @@
           if (current !== run) return;
           if (res.status === 401) {
             show('signed-out', 'Sign in to keep this page');
-          } else if (res.ok) {
-            claimPage(current);
-          } else {
-            fail('Could not check your sign-in. Try again.', true);
+            return;
           }
+          if (!res.ok) {
+            fail('Could not check your sign-in. Try again.', true);
+            return;
+          }
+          return res.json().catch(function () { return {}; }).then(function (me) {
+            if (current !== run) return;
+            login = me && typeof me.login === 'string' && me.login ? me.login : null;
+            confirmClaim(current);
+          });
         }).catch(function () {
           if (current !== run) return;
           fail('Could not reach aired. Check your connection and try again.', true);
@@ -277,6 +345,20 @@
         claim = readClaim();
         if (claim !== null) start();
       }
+
+      confirmAdd.addEventListener('click', function () {
+        if (claim === null) return;
+        confirmAdd.disabled = true;
+        confirmCancel.disabled = true;
+        claimPage(++run);
+      });
+
+      confirmCancel.addEventListener('click', function () {
+        run++;
+        forget();
+        claim = null;
+        show('cancelled', 'Nothing was added');
+      });
 
       retry.addEventListener('click', function () {
         retry.disabled = true;
