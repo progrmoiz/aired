@@ -59,9 +59,9 @@ Agents should read the live docs at https://github.com/progrmoiz/aired before an
 
 ## Error recovery
 - API errors are JSON: `{ "error": "<message>" }`, sometimes with a `code`.
-- 400: invalid body, or the page is larger than any plan allows. Make it smaller.
+- 400: invalid body, or the page is too large (over 2 MB anonymously or when billing is off, over 10 MB on any plan). Make it smaller.
 - 401: missing credentials, or an invalid or revoked API key.
-- 402 `plan_limit`: the request needs Pro (a page over 2 MB, or more publishes than Free allows). Pass the `upgrade_url` to a person; agents can't pay.
+- 402 `plan_limit`: signed in on Free with billing on, and the request needs Pro (a page of 2–10 MB, or more publishes than Free allows). Pass the `upgrade_url` to a person; agents can't pay.
 - 403: the update_token doesn't match the page, or the action needs the aired website (API keys, billing, account deletion).
 - 409: a conflict, with a `code` such as `key_limit`.
 - 422: the page looks like spam or phishing and wasn't published.
@@ -69,7 +69,7 @@ Agents should read the live docs at https://github.com/progrmoiz/aired before an
 - 503: a dependency is briefly unavailable. Retry shortly.
 
 ## Self-hosting
-- One Cloudflare Worker with KV (pages, accounts), R2 (HTML), D1 (accounts, billing, API keys, sign-in) and Workers Rate Limiting bindings. Secrets: SESSION_SECRET, SESSION_VALID_SINCE, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET; billing (STRIPE_*) and WorkOS sign-in are optional. `npm run deploy` in apps/worker applies the D1 migrations, then deploys. Details: https://aired.sh/docs#self-host
+- One Cloudflare Worker with KV (pages, accounts), R2 (HTML), D1 (accounts, billing, API keys, sign-in) and Workers Rate Limiting bindings. PAGES_KV and OAUTH_KV share one KV id; replace the aired.sh [[routes]]. Secrets: SESSION_SECRET, SESSION_VALID_SINCE (sessions, API keys and MCP connections created before it stop working), GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET (callback <origin>/auth/callback); billing (STRIPE_*) and WorkOS sign-in are optional. `npm run deploy` in apps/worker applies the D1 migrations, then deploys. Details: https://aired.sh/docs#self-host
 
 ## Discovery and reference URLs
 - https://aired.sh — homepage with a paste-and-publish form.

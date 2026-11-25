@@ -147,14 +147,14 @@ export async function resolveWorkosUser(env: Env, profile: WorkosProfile): Promi
   if (githubId !== null && !(decision.kind === 'existing' && decision.via === 'workos')) {
     const githubLinkedTo = await linkIdentity(
       env.DB,
-      { provider: 'github', subject: String(githubId), userId: user.id, email, emailVerified: verifiedEmail !== null },
+      { provider: 'github', subject: String(githubId), userId: user.id, email: verifiedEmail, emailVerified: verifiedEmail !== null },
       now,
     );
     if (githubLinkedTo !== user.id) throw new Error('GitHub identity is linked to another account');
   }
   const linkedTo = await linkIdentity(
     env.DB,
-    { provider: 'workos', subject: profile.workosUserId, userId: user.id, email, emailVerified: verifiedEmail !== null },
+    { provider: 'workos', subject: profile.workosUserId, userId: user.id, email: verifiedEmail, emailVerified: verifiedEmail !== null },
     now,
   );
   // Two first sign-ins racing: the other one linked first. Fail; the retry finds it.

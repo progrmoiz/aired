@@ -253,7 +253,7 @@ npx aired logout
 
 **Signed-in MCP.** Add `https://aired.sh/mcp/account` as a connector (Claude, ChatGPT, Cursor, VS Code): you sign in on aired and the server works as your account, adding `list_pages`, `update_page`, `delete_page` and `get_account`. `https://aired.sh/mcp` stays anonymous unless you send an API key.
 
-Managing API keys, billing and deleting the account only work on the website, not from the CLI, an API key or a connected app. Sign out everywhere (or deleting the account) ends every session, CLI login and connected app.
+Managing API keys, billing and deleting the account only work on the website, not from the CLI, an API key or a connected app. Sign out everywhere (at the bottom of API keys in the dashboard) ends every session, CLI login and connected app; API keys keep working until you revoke them. Deleting the account ends all of them and deletes the keys.
 
 ---
 
@@ -276,8 +276,8 @@ wrangler d1 create aired
 
 # Secrets (see .dev.vars.example for local values)
 wrangler secret put SESSION_SECRET        # 32+ random characters
-wrangler secret put SESSION_VALID_SINCE   # ISO date; sessions issued before it stop working
-wrangler secret put GITHUB_CLIENT_ID      # a GitHub OAuth app
+wrangler secret put SESSION_VALID_SINCE   # ISO date; sessions, API keys and MCP connections created before it stop working
+wrangler secret put GITHUB_CLIENT_ID      # a GitHub OAuth app, callback <your origin>/auth/callback
 wrangler secret put GITHUB_CLIENT_SECRET
 
 # Deploy: applies the D1 migrations, then deploys
@@ -285,7 +285,7 @@ npm run deploy
 ```
 
 - The `[[ratelimits]]` bindings in `wrangler.toml` (`PUBLISH_BURST`, `REPORT_BURST`, `PIN_GUESS`, `PIN_GUESS_PAGE`, `DEVICE_BURST`, `OAUTH_BURST`) need no setup; give them your own `namespace_id`s if you run more than one deployment in an account.
-- Set `SITE_ORIGIN` if you're not serving from aired.sh, and change the `[[routes]]` to your domain.
+- Set `SITE_ORIGIN` if you're not serving from aired.sh, and change the `[[routes]]` to your domain. A few links in MCP replies still say aired.sh.
 - Optional, off until set: billing (`BILLING_ENABLED`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_MONTHLY`, `STRIPE_PRICE_YEARLY`, `STRIPE_MANAGED_PAYMENTS`) and WorkOS sign-in (`WORKOS_CLIENT_ID`, `WORKOS_API_KEY`).
 - The `[assets]` directive serves the site from `apps/web/`, and a Cron Trigger every 5 minutes removes expired pages' files from R2.
 

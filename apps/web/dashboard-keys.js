@@ -50,6 +50,7 @@
       '#api-keys .ak-name{display:block;font-size:14px;color:#ededef;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '#api-keys .ak-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:2px;font-size:12px;color:#84848a}',
       '#api-keys .ak-empty{padding:12px 0;font-size:14px;color:#a1a1a6}',
+      '#api-keys .ak-foot{margin-top:16px;padding-top:12px;border-top:1px solid #222225;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;font-size:12px;color:#84848a}',
       '@media (prefers-reduced-motion:reduce){#api-keys .ak-btn{transition:none}}'
     ].join('\n');
     document.head.appendChild(css);
@@ -142,12 +143,21 @@
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
 
+  // Sign out everywhere: other browsers, CLI logins and connected apps.
+  // API keys keep working, so the line says to check them.
+  var foot = el('div', 'ak-foot');
+  foot.appendChild(el('span', '', 'Lost a laptop or think a session leaked? Sign out everywhere, then check the keys above.'));
+  var everywhere = el('button', SMALL, 'Sign out everywhere');
+  everywhere.type = 'button';
+  foot.appendChild(everywhere);
+
   root.appendChild(header);
   root.appendChild(form);
   root.appendChild(error);
   root.appendChild(reveal);
   root.appendChild(list);
   root.appendChild(empty);
+  root.appendChild(foot);
   root.appendChild(status);
 
   // --- behaviour ----------------------------------------------------------------
@@ -270,6 +280,37 @@
     var first = list.querySelector('button');
     (first || heading).focus();
   }
+
+  // Two clicks, like revoking a key: it signs this browser out too.
+  var everywhereArmed = null;
+  function disarmEverywhere() {
+    if (everywhereArmed) clearTimeout(everywhereArmed);
+    everywhereArmed = null;
+    everywhere.textContent = 'Sign out everywhere';
+  }
+  everywhere.addEventListener('blur', function () { if (everywhereArmed) disarmEverywhere(); });
+  everywhere.addEventListener('click', function () {
+    if (!everywhereArmed) {
+      everywhere.textContent = 'Confirm: sign out everywhere';
+      announce('Press again to sign out of every browser, CLI login and connected app, including this one.');
+      everywhereArmed = setTimeout(disarmEverywhere, 10000);
+      return;
+    }
+    clearTimeout(everywhereArmed);
+    everywhereArmed = null;
+    everywhere.disabled = true;
+    everywhere.textContent = 'Signing out…';
+    request('POST', '/api/me/sign-out-everywhere').then(function (res) {
+      if (!res.ok) throw new Error(res.data.error || 'Could not sign out everywhere.');
+      // Signed in through WorkOS: end that session too (it comes back to /).
+      var next = typeof res.data.redirect === 'string' && /^https:\/\/api\.workos\.com\//.test(res.data.redirect) ? res.data.redirect : '/';
+      window.location.href = next;
+    }).catch(function (err) {
+      everywhere.disabled = false;
+      disarmEverywhere();
+      showError(err.message || 'Could not sign out everywhere.');
+    });
+  });
 
   // Forget the key once it's dismissed: it's never shown again.
   done.addEventListener('click', function () {

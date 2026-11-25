@@ -88,8 +88,8 @@
       <li>Your GitHub username and display name, to show in your dashboard.</li>
       <li>Your primary email, only if it's verified and not a GitHub "noreply" address. Otherwise we store nothing. We use it to recognize your account. <strong>We don't send marketing email.</strong> If we ever send product news, you'll have to opt in. Link sends your receipts and billing emails.</li>
       <li>Your projects and the list of pages you own.</li>
-      <li>Which sign-in you used (GitHub today), with the email it gave us and whether it was verified, so a later sign-in reaches the same account.</li>
-      <li>If you create API keys: a one-way hash of each key (never the key itself), its name, and when it was created and last used.</li>
+      <li>Which sign-in you used (GitHub today), with its verified email if it gave one (same rule as above), so a later sign-in reaches the same account.</li>
+      <li>If you create API keys: a one-way hash of each key (never the key itself), its first few characters so you can tell keys apart, its name, when it was created and last used, and when you revoked it.</li>
       <li>If you connect an app to aired over MCP (for example a chat assistant): which app, where it receives access, and when you approved it. Its access is stored as hashes.</li>
     </ul>
     <p>We plan to move sign-in to WorkOS, which adds Google, Microsoft, Apple and email codes. Once that's switched on, WorkOS checks who you are and gives us your email address, whether it's verified and your name, and we keep the same things as above. This page will say when it's on.</p>
@@ -164,8 +164,9 @@
     <ul>
       <li><strong>Pages</strong>: until they expire or you delete them. When a page expires, we stop serving it right away and delete its file within 30 days. A page that reaches its view limit stops being served, but we keep it until it expires or you delete it.</li>
       <li><strong>Deleted pages</strong>: removed from storage right away.</li>
-      <li><strong>Your account</strong>: until you delete it. Deleting it ends every session (other browsers and CLI logins too), disconnects every app you connected, deletes your API keys, and removes your account record, sign-in records and email at once. Your pages stay up as anonymous pages without your name. Delete them first if you want them gone.</li>
+      <li><strong>Your account</strong>: until you delete it. Deleting it ends every session (other browsers and CLI logins too), disconnects every app you connected, deletes your API keys, and removes your account record, sign-in records and email. Other sessions stop within about a minute. Your pages stay up as anonymous pages without your name. Delete them first if you want them gone.</li>
       <li><strong>Billing records</strong>: until you delete your account. Then we delete your Stripe ids and plan history too. Link keeps its own record of each sale, under its own policy.</li>
+      <li><strong>API keys</strong>: until you delete your account, revoked ones included.</li>
       <li><strong>Abuse reports</strong>: 30 days.</li>
       <li><strong>IP hashes for publishing limits</strong>: in memory only, gone within a day at most.</li>
       <li><strong>View counts</strong>: as long as the page exists. The site-wide country tally holds no personal data.</li>
