@@ -8,6 +8,7 @@ import { SANDBOX_SHIM, injectEarlyScript } from "../lib/sandbox-shim.js";
 import { injectAiredBar } from "../lib/aired-bar.js";
 import { getEntitlements } from "../lib/entitlements.js";
 import { notFoundPage } from "../lib/not-found.js";
+import { viewWrite } from "../lib/view-write.js";
 
 const viewer = new Hono<AppBindings>();
 
@@ -23,6 +24,12 @@ viewer.get("/p/:id", async (c) => {
   const metadata = parseMetadata(raw);
   if (metadata === null) {
     return c.text("Page metadata is corrupted", 500);
+  }
+
+  // An expired page KV still hands out for a moment is gone, like a missing one.
+  const write = viewWrite(metadata, Date.now());
+  if (write.expired) {
+    return notFoundPage(c.env.ASSETS, c.req.url);
   }
 
   // Check read limit
@@ -61,21 +68,16 @@ viewer.get("/p/:id", async (c) => {
   // Increment read count (eventually consistent — slight inaccuracy is acceptable)
   const newReadCount = metadata.readCount + 1;
   const updated = { ...metadata, readCount: newReadCount };
-  const kvOptions: KVNamespacePutOptions = {};
-  if (!metadata.permanent && metadata.expiresAt !== null) {
-    const remaining = Math.floor(
-      (new Date(metadata.expiresAt).getTime() - Date.now()) / 1000,
-    );
-    if (remaining > 0) {
-      kvOptions.expirationTtl = remaining;
-    }
-  }
+  // Keep the page's expiry exactly (lib/view-write.ts); skip the count in its last minute.
+  const kvOptions: KVNamespacePutOptions | null = write.options;
   // Fire-and-forget — don't block response
   // Two KV writes: page metadata (readCount) + merged stats blob
   const country = (c.req.header("CF-IPCountry") ?? "XX").toUpperCase();
   c.executionCtx.waitUntil(
     Promise.all([
-      c.env.PAGES_KV.put(`page:${id}`, serializeMetadata(updated), kvOptions),
+      kvOptions !== null
+        ? c.env.PAGES_KV.put(`page:${id}`, serializeMetadata(updated), kvOptions)
+        : Promise.resolve(),
       (async () => {
         const stats = recordView(await loadStats(c.env.PAGES_KV), country);
         await saveStats(c.env.PAGES_KV, stats);
