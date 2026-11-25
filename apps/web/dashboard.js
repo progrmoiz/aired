@@ -869,7 +869,7 @@
     var n = claim.entries.length;
 
     if (n > 0) {
-      setText('claim-label', pagesPhrase(n) + ' you published in this browser');
+      setText('claim-label', pagesPhrase(n) + ' published in this browser without an account');
     } else {
       setText('claim-label', 'Some pages could not be added');
     }
