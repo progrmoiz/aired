@@ -15,6 +15,7 @@ import { corsMiddleware } from "./middleware/cors.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { isMcpToolCall } from "./lib/mcp-rpc.js";
 import { sweepExpiredPages } from "./lib/expired-sweep.js";
+import { assetCacheControl } from "./lib/asset-cache.js";
 import { kvKeys } from "@aired/core";
 import type { Env } from "./types.js";
 
@@ -91,7 +92,12 @@ app.route("/", viewer);
 // Cloudflare ASSETS binding handles routing to the correct file.
 app.notFound(async (c) => {
   if (c.env.ASSETS) {
-    return c.env.ASSETS.fetch(c.req.raw);
+    const res = await c.env.ASSETS.fetch(c.req.raw);
+    const cache = res.ok ? assetCacheControl(new URL(c.req.url).pathname) : null;
+    if (cache === null) return res;
+    const headers = new Headers(res.headers);
+    headers.set("Cache-Control", cache);
+    return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
   }
   return c.json({ error: "Not found" }, 404);
 });
