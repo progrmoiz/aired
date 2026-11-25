@@ -1,15 +1,12 @@
-// The proposed token sets ("styles") for the mockups, and a floating bar to
-// switch between them. The choice lives in the URL (?style=) so a link shows
+// The two themes for the mockups, and a floating bar to switch between them
+// and jump between mock screens. The choice lives in the URL (?style=) so a link shows
 // the same thing to whoever opens it.
 import { useEffect, useSyncExternalStore, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 export const STYLES = [
   { id: 'midnight', label: 'Midnight', dark: true, swatch: ['#0a0a0b', '#ededef'] },
-  { id: 'ink', label: 'Ink', dark: true, swatch: ['#0b1020', '#a194f7'] },
   { id: 'daylight', label: 'Daylight', dark: false, swatch: ['#f7f7f8', '#111113'] },
-  { id: 'warm', label: 'Warm', dark: false, swatch: ['#f6f1e9', '#1f1b16'] },
-  { id: 'violet', label: 'Violet', dark: false, swatch: ['#f7f5ff', '#5b4bd0'] },
 ] as const
 
 export type StyleId = (typeof STYLES)[number]['id']

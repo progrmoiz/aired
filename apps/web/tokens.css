@@ -4,10 +4,10 @@
    index.css). Edit here, then run `pnpm --filter @aired/ui-tokens sync`
    (the Worker's build does it too; a test fails if the copy drifts).
 
-   Dark ("Midnight") is the default. The [data-theme] sets below are proposed
-   styles: setting one on <html> re-skins the site and the dashboard together.
-   Light sets also drop the "dark" class. Every text colour passes WCAG AA on
-   its own bg, surface and surface-2. */
+   Two themes. Midnight (dark) is the default. Daylight (light) is
+   [data-theme="daylight"] on <html>, with the "dark" class removed; the
+   dashboard switches with its System / Midnight / Daylight setting. Every
+   text colour passes WCAG AA on its own bg, surface and surface-2. */
 
 :root {
   color-scheme: dark;
@@ -91,42 +91,7 @@
   --aired-dur: 200ms;
 }
 
-/* Proposed light, warm palette (Direction B). Same names, new values. */
-:root[data-theme="warm"] {
-  color-scheme: light;
-  --aired-bg: #f6f1e9;
-  --aired-surface: #fffdf9;
-  --aired-surface-2: #f6efe4;
-  --aired-popover: #fffdf9;
-  --aired-sidebar: #f1ebe1;
-  --aired-code-bg: #f1ebe1;
-  --aired-border: #e9e0d3;
-  --aired-border-strong: #d9cbb6;
-  --aired-hairline: rgba(60, 40, 10, 0.10);
-  --aired-hairline-strong: rgba(60, 40, 10, 0.22);
-  --aired-glow: rgba(255, 255, 255, 0.6);
-  --aired-tint: rgba(60, 40, 10, 0.04);
-  --aired-text-1: #1f1b16;
-  --aired-text-2: #6b6257;
-  --aired-text-3: #756b5f;
-  --aired-primary: #1f1b16;
-  --aired-primary-hover: #000000;
-  --aired-on-primary: #fffdf9;
-  --aired-mark: #5b4bd0;
-  --aired-ring: #5b4bd0;
-  --aired-ok: #15803d;
-  --aired-warn: #8a4b0f;
-  --aired-warn-bg: #fdebd3;
-  --aired-danger: #dc2626;
-  --aired-chip-bg: #efe9df;
-  --aired-chip-text: #5b5248;
-  --aired-avatar-from: #f6cfa9;
-  --aired-avatar-to: #eeb184;
-  --aired-avatar-text: #5a2e0e;
-  --aired-shadow-pop: 0 20px 50px -20px rgba(60, 40, 10, 0.35);
-}
-
-/* Proposed: crisp neutral light (Daylight). Tighter corners. */
+/* Daylight: neutral light, tighter corners. */
 :root[data-theme="daylight"] {
   color-scheme: light;
   --aired-bg: #f7f7f8;
@@ -164,76 +129,3 @@
   --aired-shadow-pop: 0 16px 40px -18px rgba(10, 10, 20, 0.3);
 }
 
-/* Proposed: playful light with a purple primary (Violet). Rounder corners. */
-:root[data-theme="violet"] {
-  color-scheme: light;
-  --aired-bg: #f7f5ff;
-  --aired-surface: #ffffff;
-  --aired-surface-2: #efebff;
-  --aired-popover: #ffffff;
-  --aired-sidebar: #efebff;
-  --aired-code-bg: #efebff;
-  --aired-border: #e4ddfb;
-  --aired-border-strong: #cfc4f5;
-  --aired-hairline: rgba(60, 30, 160, 0.10);
-  --aired-hairline-strong: rgba(60, 30, 160, 0.22);
-  --aired-glow: rgba(255, 255, 255, 0.7);
-  --aired-tint: rgba(91, 75, 208, 0.05);
-  --aired-text-1: #17142b;
-  --aired-text-2: #565274;
-  --aired-text-3: #66628a;
-  --aired-primary: #5b4bd0;
-  --aired-primary-hover: #4a3bbd;
-  --aired-on-primary: #ffffff;
-  --aired-mark: #5b4bd0;
-  --aired-ring: #5b4bd0;
-  --aired-ok: #15803d;
-  --aired-warn: #8a4b0f;
-  --aired-warn-bg: #fdecd5;
-  --aired-danger: #dc2626;
-  --aired-chip-bg: #efebff;
-  --aired-chip-text: #4a4470;
-  --aired-avatar-from: #ffb4a2;
-  --aired-avatar-to: #f472b6;
-  --aired-avatar-text: #3b0a24;
-  --aired-radius-lg: 14px;
-  --aired-radius-xl: 20px;
-  --aired-radius-2xl: 26px;
-  --aired-radius-3xl: 32px;
-  --aired-shadow-pop: 0 22px 50px -20px rgba(60, 30, 160, 0.35);
-}
-
-/* Proposed: deep navy dark with a purple primary (Ink). */
-:root[data-theme="ink"] {
-  color-scheme: dark;
-  --aired-bg: #0b1020;
-  --aired-surface: #111830;
-  --aired-surface-2: #18213d;
-  --aired-popover: #141c36;
-  --aired-sidebar: #0d1326;
-  --aired-code-bg: #080c19;
-  --aired-border: #222c4a;
-  --aired-border-strong: #33406a;
-  --aired-hairline: rgba(170, 190, 255, 0.10);
-  --aired-hairline-strong: rgba(170, 190, 255, 0.22);
-  --aired-glow: rgba(140, 123, 242, 0.12);
-  --aired-tint: rgba(170, 190, 255, 0.05);
-  --aired-text-1: #e8ecf8;
-  --aired-text-2: #a3acc8;
-  --aired-text-3: #8d96b6;
-  --aired-primary: #a194f7;
-  --aired-primary-hover: #b4a9fa;
-  --aired-on-primary: #0b1020;
-  --aired-mark: #a194f7;
-  --aired-ring: #a194f7;
-  --aired-ok: #4ade80;
-  --aired-warn: #fbbf24;
-  --aired-warn-bg: rgba(251, 191, 36, 0.12);
-  --aired-danger: #f87171;
-  --aired-chip-bg: #18213d;
-  --aired-chip-text: #a3acc8;
-  --aired-avatar-from: #67e8f9;
-  --aired-avatar-to: #818cf8;
-  --aired-avatar-text: #0b1020;
-  --aired-shadow-pop: 0 18px 40px -14px rgba(0, 0, 10, 0.85);
-}

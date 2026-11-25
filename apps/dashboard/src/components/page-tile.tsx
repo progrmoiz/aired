@@ -4,20 +4,29 @@ import { EllipsisIcon, EyeIcon, LockIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { CopyLinkAction, IconAction } from '@/components/icon-action'
-import { PagePreview, type PreviewSource } from '@/components/page-preview'
+import { PagePreview } from '@/components/page-preview'
+import { cn } from '@/lib/utils'
 
-export type TilePage = PreviewSource & { id: string; expires: string; soon?: boolean; pin: boolean; views: number; published: string }
+export type TilePage = { id: string; title: string; html?: string; expires: string; soon?: boolean; pin: boolean; views: number; published: string; dim?: boolean }
 
-/** `meta` replaces the views line and `actions` the copy/more buttons (team tiles show owner and access). */
-export function PageTile({ page, origin, meta, actions, onOpen }: { page: TilePage; origin: string; meta?: ReactNode; actions?: ReactNode; onOpen?: () => void }) {
+/**
+ * The top is a live preview when the page's HTML is at hand (mockups), or a
+ * `cover` (the real dashboard: opening the page would count a view). `meta`
+ * replaces the views line and `actions` the copy/more buttons. `href` opens
+ * the page; `onOpen` handles the click instead.
+ */
+export function PageTile({ page, origin, meta, actions, onOpen, cover, href }: {
+  page: TilePage; origin: string; meta?: ReactNode; actions?: ReactNode; onOpen?: () => void; cover?: ReactNode; href?: string
+}) {
   return (
     <article className="group">
       <Card variant="bare" className="rounded-xl transition-all group-hover:-translate-y-0.5 group-hover:ring-hairline-strong">
-        <a href="#" onClick={onOpen ? (e) => { e.preventDefault(); onOpen() } : undefined} aria-label={`Open ${page.title}`} className="relative block">
-          <PagePreview page={page} />
+        <a href={href ?? '#'} target={href ? '_blank' : undefined} rel={href ? 'noopener noreferrer' : undefined}
+          onClick={onOpen ? (e) => { e.preventDefault(); onOpen() } : undefined} aria-label={`Open ${page.title}`} className={cn('relative block', page.dim && 'opacity-55 saturate-50')}>
+          {cover ?? (page.html !== undefined && <PagePreview page={{ title: page.title, html: page.html }} />)}
           <span className="absolute inset-x-0 top-0 flex justify-between p-2.5">
             {page.pin ? <Badge variant="overlay"><LockIcon />PIN</Badge> : <span />}
-            {page.soon && <Badge variant="overlay">{page.expires}</Badge>}
+            {(page.soon || page.dim) && <Badge variant="overlay">{page.expires}</Badge>}
           </span>
         </a>
       </Card>

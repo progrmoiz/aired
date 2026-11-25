@@ -4,7 +4,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { Toaster } from '@/components/ui/sonner'
 import App from './App'
 
-// Design directions (mock data, no API): /dashboard?direction=a|b
+// Design directions (mock data, no API): /dashboard?direction=a (team mockup)
 const Directions = lazy(() => import('./directions'))
 const direction = new URLSearchParams(window.location.search).has('direction')
 import './index.css'
