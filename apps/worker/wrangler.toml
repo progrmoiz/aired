@@ -45,6 +45,13 @@ name = "REPORT_BURST"
 namespace_id = "1002"
 simple = { limit = 3, period = 60 }
 
+# PIN guesses per page per visitor: 10 a minute makes guessing a 4-digit PIN
+# take hours from one address instead of minutes.
+[[ratelimits]]
+name = "PIN_GUESS"
+namespace_id = "1003"
+simple = { limit = 10, period = 60 }
+
 # Custom domain
 [[routes]]
 pattern = "aired.sh/*"

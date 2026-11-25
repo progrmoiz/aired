@@ -9,7 +9,9 @@ import { injectAiredBar } from "../lib/aired-bar.js";
 import { getEntitlements } from "../lib/entitlements.js";
 import { notFoundPage } from "../lib/not-found.js";
 import { viewWrite } from "../lib/view-write.js";
-import { hashPin, pinCookieValue, verifyPin, verifyPinCookie } from "../lib/pin-hash.js";
+import { hashPin, isPinHash, pinCookieValue, verifyPin, verifyPinCookie } from "../lib/pin-hash.js";
+import { underBurstLimit } from "../lib/burst-limit.js";
+import { hashToHex } from "@aired/core";
 
 /** How long a correct PIN entry lets the browser in. */
 const PIN_COOKIE_SECONDS = 3600;
@@ -86,7 +88,17 @@ viewer.get("/p/:id", async (c) => {
   c.executionCtx.waitUntil(
     Promise.all([
       kvOptions !== null
-        ? c.env.PAGES_KV.put(`page:${id}`, serializeMetadata(updated), kvOptions)
+        ? (async () => {
+            // A page whose PIN is still stored as typed may have just been
+            // rehashed by verify-pin: keep the fresh PIN rather than undo it.
+            let toWrite = updated;
+            if (updated.pin !== null && !isPinHash(updated.pin)) {
+              const freshRaw = await c.env.PAGES_KV.get(`page:${id}`);
+              const fresh = freshRaw === null ? null : parseMetadata(freshRaw);
+              if (fresh !== null && fresh.pin !== null) toWrite = { ...updated, pin: fresh.pin };
+            }
+            await c.env.PAGES_KV.put(`page:${id}`, serializeMetadata(toWrite), kvOptions);
+          })()
         : Promise.resolve(),
       (async () => {
         const stats = recordView(await loadStats(c.env.PAGES_KV), country);
@@ -154,6 +166,13 @@ viewer.post("/p/:id/verify-pin", async (c) => {
     return c.json({ error: "pin is required" }, 400);
   }
 
+  // Limit guesses per page and visitor (wrangler.toml PIN_GUESS). The IP is
+  // only hashed into the key, never stored.
+  const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
+  if (!(await underBurstLimit(c.env.PIN_GUESS, `${id}:${await hashToHex(ip, 16)}`))) {
+    return c.json({ error: "Too many tries. Wait a minute and try again." }, 429);
+  }
+
   const raw = await c.env.PAGES_KV.get(`page:${id}`);
   if (raw === null) {
     return c.json({ error: "Page not found" }, 404);
@@ -176,15 +195,21 @@ viewer.post("/p/:id/verify-pin", async (c) => {
   // A page from before hashing holds the PIN as typed: store it hashed now.
   // Keeps the page's expiry; skipped if it's about to expire (view-write.ts).
   if (check.needsRehash) {
-    const write = viewWrite(metadata, Date.now());
-    if (!write.expired && write.options !== null) {
-      const updated = { ...metadata, pin: await hashPin(pin) };
-      c.executionCtx.waitUntil(
-        c.env.PAGES_KV.put(`page:${id}`, serializeMetadata(updated), write.options).catch((err) => {
-          console.error("pin rehash failed", { id, err });
-        }),
-      );
-    }
+    const hashed = await hashPin(pin);
+    c.executionCtx.waitUntil(
+      (async () => {
+        // Re-read right before writing: skip a page that's gone, already
+        // rehashed, or whose PIN changed, and keep everything else as it is now.
+        const freshRaw = await c.env.PAGES_KV.get(`page:${id}`);
+        const fresh = freshRaw === null ? null : parseMetadata(freshRaw);
+        if (fresh === null || fresh.pin !== metadata.pin || fresh.pin === null || isPinHash(fresh.pin)) return;
+        const write = viewWrite(fresh, Date.now());
+        if (write.expired || write.options === null) return;
+        await c.env.PAGES_KV.put(`page:${id}`, serializeMetadata({ ...fresh, pin: hashed }), write.options);
+      })().catch((err) => {
+        console.error("pin rehash failed", { id, err });
+      }),
+    );
   }
 
   // Set a cookie and return success — client handles redirect

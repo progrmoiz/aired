@@ -72,8 +72,22 @@ test("publish, MCP and the viewer store hashes and check cookie tokens", () => {
   assert.match(viewer, /await verifyPinCookie\(\s*c\.env\.SESSION_SECRET,\s*id,\s*getCookie\(c, `pin_\$\{id\}`\)/);
   assert.match(viewer, /const check = await verifyPin\(pin, metadata\.pin\);/);
   assert.match(viewer, /await pinCookieValue\(c\.env\.SESSION_SECRET, id, expSec\)/);
-  assert.doesNotMatch(viewer, /pinCookie !== metadata\.pin|pin !== metadata\.pin|=\$\{metadata\.pin\}/);
+  assert.doesNotMatch(viewer, /pinCookie !== metadata\.pin|if \(pin !== metadata\.pin\)|=\$\{metadata\.pin\}/);
   // Nothing returns the stored PIN.
   assert.doesNotMatch(src("api.ts"), /pin: metadata\.pin/);
   assert.match(src("me.ts"), /hasPin: metadata\.pin !== null/);
+});
+
+test("verify-pin limits guesses, and the rehash and view-count writes don't undo each other", () => {
+  const viewer = readFileSync(new URL("../src/routes/viewer.ts", import.meta.url), "utf8");
+  // Guess limit keyed by page and hashed IP, checked before any PIN work.
+  assert.match(viewer, /underBurstLimit\(c\.env\.PIN_GUESS, `\$\{id\}:\$\{await hashToHex\(ip, 16\)\}`\)/);
+  assert.ok(viewer.indexOf("c.env.PIN_GUESS") < viewer.indexOf("await verifyPin(pin, metadata.pin)"));
+  // Rehash re-reads and skips gone, changed or already-hashed records.
+  assert.match(viewer, /if \(fresh === null \|\| fresh\.pin !== metadata\.pin \|\| fresh\.pin === null \|\| isPinHash\(fresh\.pin\)\) return;/);
+  assert.match(viewer, /serializeMetadata\(\{ \.\.\.fresh, pin: hashed \}\)/);
+  // The view-count write keeps a fresh PIN for pages still holding a plain one.
+  assert.match(viewer, /if \(updated\.pin !== null && !isPinHash\(updated\.pin\)\) \{/);
+  const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
+  assert.match(toml, /name = "PIN_GUESS"\s*\nnamespace_id = "1003"\s*\nsimple = \{ limit = 10, period = 60 \}/);
 });
