@@ -2,12 +2,12 @@
 
 > Based on: direct request (Pro plan study, 2026-11-25). Upstream: `docs/growth/seo-marketing-pricing.md` §5–6, `docs/research/artifacts-chatgpt-parity.md` §6 (gitignored, main checkout), `.forge/blueprints/content-domain.md`, `.forge/blueprints/aired-accounts.md` (main checkout)
 > Design direction: DESIGN.md
-> Status: Draft
+> Status: Approved
 > Date: 2026-11-25
 > Depth: deep
 > Review: fast
 
-Decision summary for the owner: `docs/growth/pro-plan.md`. Research notes with sources: `docs/growth/research/pro-plan-billing.md`, `pro-plan-signin-agents.md`, `pro-plan-paywalls.md`, plus the earlier `competitor-pricing.md` and `team-pricing.md`.
+Decision summary for the owner: `docs/growth/pro-plan.md`. Billing provider: **Stripe** (owner's decision, 2026-11-25). Research notes with sources: `docs/growth/research/pro-plan-billing.md`, `pro-plan-signin-agents.md`, `pro-plan-paywalls.md`, plus the earlier `competitor-pricing.md` and `team-pricing.md`.
 
 ---
 
@@ -50,11 +50,15 @@ A builder must not do any of these. Each is listed where it blocks.
 
 | # | What | Blocks | Notes |
 |---|---|---|---|
-| P1 | Confirm the billing route (default Polar; Paddle fallback; Stripe only with an entity in a Stripe country) and open the account | Phase 1 deploy (not build) | Build and test run in Polar's sandbox (sandbox.polar.sh). |
-| P2 | Create the Pro product with two prices (monthly $12, yearly $108) and a webhook endpoint `https://aired.sh/api/billing/webhook` | Phase 1 deploy | Webhook events listed in "Billing Flow". |
-| P3 | `wrangler d1 create aired` and paste the id into `wrangler.toml` | Phase 1 deploy | Local dev and tests use the local D1 that Miniflare creates. |
-| P4 | Set secrets: `BILLING_SECRET_KEY`, `BILLING_WEBHOOK_SECRET`, `BILLING_PRICE_MONTHLY`, `BILLING_PRICE_YEARLY` | Phase 1 deploy | `wrangler secret put`. |
-| P5 | Refund, terms and privacy updates (14-day refund, what happens on cancel, billing data) | Phase 1 launch | `docs/privacy.md` must name the payment processor before the button goes live. |
+| P1 | Stripe account, test mode first (live mode later) | Phase 1 deploy (not build) | Build and tests need no account: signature and webhook logic are unit-tested with a fixed secret. |
+| P2 | Product **Aired Pro** with two recurring prices: **$12.00 USD / month** and **$108.00 USD / year**. Copy both `price_…` ids. | Phase 1 deploy | USD only. |
+| P3 | Webhook endpoint `https://aired.sh/api/billing/webhook`, events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`. Copy its signing secret (`whsec_…`). | Phase 1 deploy | Use the API version pinned in `STRIPE_API_VERSION` (`lib/billing/stripe.ts`). |
+| P4 | Restricted key (`rk_test_…`, later `rk_live_…`) with only: Checkout Sessions **write**, Customer portal **write**, Customers **write**, Subscriptions **read**. | Phase 1 deploy | No full secret key in the Worker. |
+| P4b | Customer portal settings: cancel at period end, switch between the two Pro prices, update payment method, invoice history; return link `https://aired.sh/dashboard`. | Phase 1 deploy | Settings → Billing → Customer portal. |
+| P4c | Worker secrets: `wrangler secret put STRIPE_SECRET_KEY` (the restricted key), `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_MONTHLY`, `STRIPE_PRICE_YEARLY`; then set `BILLING_ENABLED=1`. | Phase 1 go-live | |
+| P4d | `wrangler d1 create aired`, put the id in `wrangler.toml` (a placeholder today), run `wrangler d1 migrations apply aired --remote`. | Phase 1 deploy | |
+| P4e | **Stripe Tax decision.** Off by default (`STRIPE_AUTOMATIC_TAX` unset). Turning it on makes Checkout calculate and collect tax (0.5% per transaction), but **registering, filing and paying the tax stays the owner's job** wherever Aired is registered. Stripe Tax's threshold monitoring shows where registration becomes due. | Phase 1 go-live | If on: set the origin address and the SaaS tax code (`txcd_10000000`) in Stripe Tax settings first. |
+| P5 | Refund, terms and privacy updates (14-day refund, what happens on cancel, Stripe as payment processor) | Phase 1 launch | `docs/privacy.md` must name Stripe before the button goes live. Refunds are issued by hand in the Stripe dashboard. |
 | P6 | Google Cloud OAuth client (Web), consent screen with `openid email profile` | Phase 3 deploy | Basic scopes only. |
 | P7 | Turn on Cloudflare Email Sending for aired.sh (public beta; 3,000 emails/month included on Workers Paid; it sets SPF/DKIM/DMARC) | Task 3.4 deploy | Fallback: Resend. |
 | P8 | Enable Cloudflare for SaaS on the aired.sh zone; add fallback origin `customers.aired.sh` (proxied `AAAA 100::`) and a `*/*` Worker route | Phase 7 deploy | 100 hostnames free, then $0.10 each. |
@@ -70,7 +74,8 @@ A builder must not do any of these. Each is listed where it blocks.
 - Claim: `POST /api/me/claim` and `/api/me/claim-batch` in `apps/worker/src/routes/me.ts:160` (`claimPage`, needs the update token). CLI: `apps/cli/src/commands/claim.ts` + local token store `apps/cli/src/core/store.ts`.
 - Badge: `injectAiredBar` in `apps/worker/src/lib/aired-bar.ts`, called from `apps/worker/src/routes/viewer.ts`.
 - Size limit: `validateHtml` + `MAX_SIZE` (2 MB) in `packages/core/src/validate.ts`, `constants.ts`.
-- Rate limits: `apps/worker/src/lib/rate-limit-tiers.ts`, `apps/worker/src/middleware/rate-limit.ts`. **Gap found:** `/api/publish` and `/mcp` use `TIERS.anonymous` (5/hour per IP) even for signed-in users; `TIERS.authenticated` is defined but unused.
+- Rate limits: `apps/worker/src/lib/rate-limit-tiers.ts` (`publishTier`), `apps/worker/src/middleware/rate-limit.ts` (`publishRateLimit`, used by `/api/publish` and MCP tool calls). Since `d4679ce` signed-in publishes count against `TIERS.authenticated` (30/hour per account), anonymous ones against `TIERS.anonymous` (5/hour per IP). Pro adds a third tier.
+- CSRF: `lib/csrf-rule.ts` requires the header only when the request carries the session cookie, so header- and key-authenticated calls don't need it. Page tokens: `lib/page-token.ts` reads them from the body or a Bearer header.
 - Remote MCP: `apps/worker/src/routes/mcp.ts` always publishes with `ownerId: null` and never reads the session.
 - Web publish: `apps/web/app.js:138` posts to `/api/publish` and shows the update token once; it is never saved. That is how the lost-token takedown request happened.
 - Dashboard: `apps/web/dashboard.html`, `apps/web/dashboard.js` (vanilla JS, Tailwind tokens per DESIGN.md).
@@ -91,9 +96,11 @@ A builder must not do any of these. Each is listed where it blocks.
 | Trial | No trial. 14-day full refund. | Free already lets people try everything except the paid gates. A trial adds expiry emails and dunning edge cases for one person to run; a refund window removes the purchase risk instead. |
 | What's paid | Badge, size, volume, analytics, domain. Never access: PIN, read limits, expiry, permanent pages, API keys stay free. | Gate what a client-facing sender wants; never gate the agent wedge or safety controls. A free PIN is the clearest gap against Tiiny, Netlify and Vercel. |
 | API keys | **Free** for every signed-in account, 5 keys. Pro raises the limits a key publishes under. | Changes the earlier proposal ("API key in Pro"). Keys are how agent and MCP publishes get an owner. Without them pages stay anonymous, tokens get lost and takedowns need manual work (this week's real case). Volume, not access, is the upgrade. |
-| Billing API | Hosted checkout + hosted customer portal, called with `fetch` (no SDK) | Two REST calls and one webhook. No card form, no PCI scope, no SDK bundle on Workers. The portal handles cancel, card change, invoices and monthly↔yearly. |
-| Billing provider | **Polar** (merchant of record) unless the owner already has a Stripe account in a Stripe country. Fallback: Paddle. Code sits behind `lib/billing/provider.ts`. | Stripe and Stripe Managed Payments only onboard businesses in their supported countries, so a founder elsewhere needs a foreign entity first (Stripe Atlas: $500 + $100/yr + US filings); Lemon Squeezy closed to new signups and shuts down 2027-03-31; Polar pays out through Stripe Connect Express even where Stripe Payments isn't offered, and files VAT/sales tax as the seller. Fee ~6.5% + 50¢ on a non-US card ($7.52 on $108). The interface is `createCheckout`, `createPortal`, `fetchSubscription`, `verifyWebhook`, so a later move to Stripe is one adapter. |
-| Webhook handling | Verify the signature with Web Crypto HMAC-SHA256 (Polar uses the Standard Webhooks scheme: `webhook-id`, `webhook-timestamp`, `webhook-signature`); dedupe by `webhook-id` in D1; then **re-fetch the subscription** from the provider and store its current state | Providers retry, send duplicates and don't guarantee order. Fetch-on-webhook makes all three harmless. |
+| Billing API | **Stripe Checkout** (Checkout Sessions, `mode=subscription`) + **Stripe customer portal**, called with `fetch` and form-encoded bodies (no SDK) | Two REST calls and one webhook. No card form, no PCI scope, no SDK bundle. The portal handles cancel, card change, invoices and monthly↔yearly. |
+| Billing provider | **Stripe** (owner's decision). Code sits behind `lib/billing/stripe.ts`. | Lowest fees (2.9% + 30¢, +1.5% non-US cards, +0.7% Billing) and the most familiar checkout. Aired is the seller, so tax is the owner's responsibility (see Tax). |
+| Tax | `automatic_tax[enabled]=true` on Checkout only when `STRIPE_AUTOMATIC_TAX=1`; **off by default** | Stripe Tax calculates and collects but does not register or file. The owner decides (P4e). With it on, Checkout also sets `customer_update[address]=auto` for returning customers. |
+| Stripe API version | Pinned with a `Stripe-Version` header (`STRIPE_API_VERSION` constant) | Field locations moved in the 2025-03 versions (period end on subscription items; invoice → subscription under `parent`). The normalizer reads both old and new locations. |
+| Webhook handling | Verify `Stripe-Signature` (`t=…,v1=…`) with Web Crypto HMAC-SHA256 over `${t}.${rawBody}`, accept any matching `v1`, 300 s tolerance, constant-time compare; dedupe by `event.id` in D1; then **re-fetch the subscription** from Stripe and store its current state | Stripe retries for 3 days, sends duplicates and doesn't guarantee order. Fetch-on-webhook makes all three harmless. |
 | Source of truth | **D1** (`aired` database) for users, identities, subscriptions, events, API keys, domains | Strongly consistent and relational. KV is eventually consistent (up to ~60 s) and write-limited. |
 | Hot-path reads | KV projection `ent:<uid>` written by the webhook; read with `cacheTtl: 300` in the viewer and publish path | Page views stay on KV only (R4). D1 is read on account pages, not on views. |
 | User ids | Keep `ownerId: number`. GitHub users keep their GitHub id. New users (Google, email) get ids from D1 starting at `1_000_000_000_000`. | No migration of 11,000 page records or owner indexes. GitHub ids are far below 10^12; JS integers stay exact. |
@@ -111,12 +118,12 @@ A builder must not do any of these. Each is listed where it blocks.
 
 ### Resolved During Planning
 - Can the viewer know the owner's plan without a D1 read? Yes, via KV `ent:<uid>` (one cached read, only when `ownerId !== null`).
-- Do signed-in users get a different publish limit today? No; fixed in Task 1.6.
+- Do signed-in users get a different publish limit today? Yes, since `d4679ce` (30/hour per account). Task 1.6 adds Pro (500/day) on top of `publishTier`.
 - Does a read limit need Pro? No. `reads` works free today (`apps/web/docs.html:244`). The pricing page's "Plus view-limited links" on Pro is wrong and is removed in Task 1.8.
 - Can existing claim code be reused? Yes. `claimPage` stays the only place ownership changes; the new entry points (browser tokens, claim links) call it.
 
 ### Deferred to Implementation
-- Exact provider payload field names once P1 is decided; isolated in `lib/billing/provider.ts`.
+- Which events Stripe sends for a plan switch in the portal (expected: `customer.subscription.updated` only); the handler re-fetches either way.
 - Whether `GET /api/me` reads the plan from D1 or KV `ent:`. KV is fine unless a just-paid user sees "Free" for up to 60 s; the checkout success page polls D1 through `/api/billing/status`.
 - Whether GitHub's verified email is always present for linking (`lib/github.ts:90` fetches the primary verified email; null when none).
 
@@ -150,7 +157,7 @@ D1 database `aired`, binding `DB`. Migrations in `apps/worker/migrations/` (`wra
 | Column | Type | Constraints | Notes |
 |---|---|---|---|
 | user_id | INTEGER | PRIMARY KEY REFERENCES users(id) | |
-| provider | TEXT | NOT NULL | |
+| provider | TEXT | NOT NULL | `stripe` |
 | customer_id | TEXT | NOT NULL UNIQUE | |
 | subscription_id | TEXT | NULL UNIQUE | |
 | plan | TEXT | NOT NULL | `pro` |
@@ -163,7 +170,7 @@ D1 database `aired`, binding `DB`. Migrations in `apps/worker/migrations/` (`wra
 `billing_events`: webhook idempotency
 | Column | Type | Constraints | Notes |
 |---|---|---|---|
-| event_id | TEXT | PRIMARY KEY | provider event id |
+| event_id | TEXT | PRIMARY KEY | Stripe `evt_…` id |
 | type | TEXT | NOT NULL | |
 | received_at | TEXT | NOT NULL | prune after 30 days |
 
@@ -220,31 +227,38 @@ D1 database `aired`, binding `DB`. Migrations in `apps/worker/migrations/` (`wra
 
 ```
 Pricing page / dashboard "Get Pro"
-   │ (signed out → /login?return=/upgrade?interval=year)
+   │ (signed out → sign in → back to /upgrade?interval=year)
    ▼
-POST /api/billing/checkout {interval}        (session + CSRF header)
-   │  hosted checkout: price, customer email, client_reference_id=uid,
-   │  subscription metadata uid, success_url=/dashboard?upgraded=1, cancel_url=/pricing
+GET /upgrade?interval=year   or   POST /api/billing/checkout {interval}   (session; CSRF header on POST)
+   │  POST https://api.stripe.com/v1/checkout/sessions
+   │    mode=subscription, line_items[0][price]=STRIPE_PRICE_YEARLY|MONTHLY, line_items[0][quantity]=1
+   │    client_reference_id=<uid>, metadata[uid]=<uid>, subscription_data[metadata][uid]=<uid>
+   │    customer=<cus_…> if we have one, else customer_email=<email> (if known)
+   │    success_url=https://aired.sh/dashboard?upgraded=1, cancel_url=https://aired.sh/pricing
+   │    automatic_tax[enabled]=true (+ customer_update[address]=auto) only if STRIPE_AUTOMATIC_TAX=1
    ▼
-hosted checkout ──► customer pays
+303 to session.url (Stripe-hosted) ──► customer pays
    ▼
-Provider ──► POST /api/billing/webhook  (raw body + signature header)
-   1. verify HMAC-SHA256 with Web Crypto over `${webhook-id}.${webhook-timestamp}.${body}`
-      (Standard Webhooks; Stripe would be `${t}.${body}`), 5-minute tolerance, constant-time compare
-   2. INSERT OR IGNORE billing_events(event_id = webhook-id); already present → 200 and stop
-   3. uid from metadata / client_reference_id / customer_id lookup
-   4. GET the subscription from the provider (current truth, ignores event order)
-   5. UPSERT subscriptions row; write KV ent:<uid>, or delete it when not entitled
-   6. 200. Any failure before step 5 → 500, so the provider retries
+Stripe ──► POST /api/billing/webhook  (raw body + Stripe-Signature)
+   1. verify: parse t and every v1; HMAC-SHA256(secret, `${t}.${rawBody}`) with Web Crypto;
+      |now − t| ≤ 300 s; constant-time compare against each v1 → otherwise 400
+   2. INSERT OR IGNORE billing_events(event_id) → duplicate: 200 and stop
+   3. find the subscription id (session.subscription | subscription.id |
+      invoice.subscription | invoice.parent.subscription_details.subscription) and the uid
+      (client_reference_id | metadata.uid | subscriptions.customer_id lookup)
+   4. GET /v1/subscriptions/<id> (current truth, ignores event order)
+   5. UPSERT subscriptions; write KV ent:<uid> (or delete it when not entitled)
+   6. 200. Failure in steps 3–5 → delete the billing_events row and return 500, so Stripe retries
    ▼
 /dashboard?upgraded=1 polls GET /api/billing/status until plan = pro (max 30 s)
+
+Manage billing → POST /api/billing/portal → POST /v1/billing_portal/sessions {customer, return_url}
+   → portal: cancel at period end, switch monthly↔yearly, card, invoices
 ```
 
-Events to subscribe (Polar): `subscription.created`, `subscription.active`, `subscription.updated`, `subscription.canceled`, `subscription.uncanceled`, `subscription.revoked`, `order.paid`, `order.refunded`. Map to the same handler: every event re-fetches the subscription.
-Stripe equivalents if the route changes: `checkout.session.completed`, `customer.subscription.created/updated/deleted`, `invoice.paid`, `invoice.payment_failed`. Paddle: `subscription.created/updated/canceled`, `transaction.completed`, `transaction.payment_failed`.
-User id travels as the provider's external customer id (Polar `external_customer_id`, Stripe `client_reference_id` + subscription metadata). Polar's exact field is to be confirmed in its API reference at build time.
+Webhook events (P3): `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`. All four go through the same re-fetch-and-store handler; any other event type gets 200 and is ignored.
 
-Entitled when status is `active`, `trialing` or `past_due` and `now < current_period_end + 3 days`. `cancel_at_period_end` keeps Pro until the period ends.
+Entitled when status is `active`, `trialing` or `past_due` and `now < current_period_end + 3 days`. `cancel_at_period_end` keeps Pro until the period ends. `invoice.payment_failed` moves the subscription to `past_due`, which keeps Pro during Stripe's retries; when retries run out Stripe cancels it and `customer.subscription.deleted` ends Pro.
 
 ## API Layer
 
@@ -254,7 +268,7 @@ Entitled when status is `active`, `trialing` or `past_due` and `now < current_pe
 | `POST /api/billing/checkout` | `routes/billing.ts` | session + CSRF | `{interval: "month"\|"year"}` | `{url}`; 409 if already Pro; 503 if `BILLING_ENABLED` unset |
 | `POST /api/billing/portal` | `routes/billing.ts` | session + CSRF | — | `{url}`; 404 if no customer |
 | `GET /api/billing/status` | `routes/billing.ts` | session | — | `{plan, status, interval, renewsAt, cancelAtPeriodEnd}` from D1 |
-| `POST /api/billing/webhook` | `routes/billing.ts` | provider signature | raw body | 200 / 400 bad signature / 500 retry |
+| `POST /api/billing/webhook` | `routes/billing.ts` | `Stripe-Signature` | raw body | 200 / 400 bad signature / 500 retry |
 | `GET /api/me` | `routes/me.ts` | session or key | — | adds `plan`, `limits`, `billing` |
 | `GET /auth/google`, `/auth/google/callback` | `routes/auth-google.ts` | — | — | session cookie, redirect |
 | `POST /auth/email` | `routes/auth-email.ts` | — (rate-limited) | `{email, return}` | 202 always |
@@ -272,8 +286,9 @@ When a plan limit blocks a signed-in request: **402** `{"error":"This needs Pro"
 |---|---|---|---|
 | `entitlementsFor(sub, now)` | `lib/entitlements.ts` (pure) | subscription row \| null, Date | `{plan, badge, maxBytes, publishLimit, analytics, customDomain}` |
 | `getEntitlements(env, uid)` | `lib/entitlements.ts` | Env, number \| null | same, via KV `ent:<uid>`; free when missing |
-| `verifyStandardWebhook(body, headers, secret, nowSec)` | `lib/billing/signature.ts` (pure) | string, `{id, timestamp, signature}`, string, number | `boolean` |
-| `createCheckout`, `createPortal`, `fetchSubscription` | `lib/billing/provider.ts` | Env, … | `{url}` / normalized subscription |
+| `verifyStripeSignature(body, header, secret, nowSec, toleranceSec=300)` | `lib/billing/signature.ts` (pure) | string, string, string, number | `Promise<boolean>` |
+| `checkoutParams(input)`, `normalizeSubscription(obj)`, `subscriptionIdFromEvent(evt)`, `uidFromEvent(evt)` | `lib/billing/stripe-shapes.ts` (pure) | | form params / normalized sub / ids |
+| `createCheckout`, `createPortal`, `fetchSubscription` | `lib/billing/stripe.ts` | Env, … | `{url}` / normalized subscription |
 | `syncSubscription(env, uid, sub)` | `lib/billing/store.ts` | Env, number, normalized sub | writes D1 row + KV `ent:` |
 | `generateApiKey()`, `parseApiKey(s)` | `packages/core/src/api-key.ts` (pure) | — / string | `aired_sk_…` with CRC32 checksum / `{ok}` |
 | `resolveUser(env, identity)` | `lib/users.ts` | Env, `{provider, subject, email, verified, name, login}` | `{id, login, email, name}` (find, link or create) |
@@ -300,9 +315,9 @@ The smallest Pro that can charge: GitHub users can buy Pro and get no badge, 10 
 #### Task 1.1: Add the D1 binding and billing schema
 - **Size:** S
 - **Acceptance criteria:**
-  - [ ] `wrangler.toml` declares `[[d1_databases]]` with `binding = "DB"`, `database_name = "aired"`, `migrations_dir = "migrations"`; `Env` gains `DB: D1Database` and optional `BILLING_ENABLED`, `BILLING_SECRET_KEY`, `BILLING_WEBHOOK_SECRET`, `BILLING_PRICE_MONTHLY`, `BILLING_PRICE_YEARLY`.
+  - [ ] `wrangler.toml` declares `[[d1_databases]]` with `binding = "DB"`, `database_name = "aired"`, a placeholder `database_id` for the owner, `migrations_dir = "migrations"`; `Env` gains `DB: D1Database` and optional `BILLING_ENABLED`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_MONTHLY`, `STRIPE_PRICE_YEARLY`, `STRIPE_AUTOMATIC_TAX`.
   - [ ] `migrations/0001_accounts_billing.sql` creates `users`, `identities`, `subscriptions`, `billing_events` as specified and seeds `sqlite_sequence` so the next `users` id is 10^12.
-  - [ ] `.dev.vars.example` lists the new variables with sandbox placeholders.
+  - [ ] `.dev.vars.example` lists the new variables with test-mode placeholders (`rk_test_…`, `whsec_…`, `price_…`).
 - **Files:** `apps/worker/wrangler.toml`, `apps/worker/migrations/0001_accounts_billing.sql`, `apps/worker/src/types.ts`, `apps/worker/.dev.vars.example`
 - **Verification:** `cd apps/worker && npx wrangler d1 migrations apply aired --local` exits 0; `npx wrangler d1 execute aired --local --command "INSERT INTO users(email,login,created_at) VALUES('a@b.c','a','x') RETURNING id"` returns `1000000000000`.
 - **Dependencies:** None
@@ -311,29 +326,29 @@ The smallest Pro that can charge: GitHub users can buy Pro and get no badge, 10 
 - **Size:** S
 - **Acceptance criteria:**
   - [ ] `entitlementsFor(null, now)` returns free limits (badge on, 2 MB, 30 publishes/hour); an `active` or `past_due` sub before `period_end + 3 days` returns Pro (badge off, 10 MB, 500/day); `canceled`, or past the grace, returns free.
-  - [ ] `verifyStandardWebhook` accepts a correctly signed request (any `v1,<base64>` entry in `webhook-signature` matching HMAC-SHA256 of `id.timestamp.body` with the base64 secret after `whsec_`), and rejects a wrong secret, a tampered body and a timestamp older than 300 s, using Web Crypto only.
+  - [ ] `verifyStripeSignature` accepts a header whose any `v1` matches HMAC-SHA256 of `${t}.${body}` (hex) with the `whsec_` secret as given, and rejects a wrong secret, a tampered body, a missing `t` or `v1`, and a timestamp more than 300 s from now, using Web Crypto only.
 - **Files:** `apps/worker/src/lib/entitlements.ts`, `apps/worker/src/lib/billing/signature.ts`, `apps/worker/test/entitlements.test.ts`, `apps/worker/test/billing-signature.test.ts`
 - **Verification:** `cd apps/worker && npm test` passes, including the new cases.
 - **Dependencies:** None
 
-#### Task 1.3: Add the billing provider client and store
+#### Task 1.3: Add the Stripe client and the subscription store
 - **Size:** M
 - **Acceptance criteria:**
-  - [ ] `provider.ts` implements `createCheckout(env, {uid, email, interval})`, `createPortal(env, customerId)` and `fetchSubscription(env, id)` with `fetch`; no SDK dependency.
+  - [ ] `stripe-shapes.ts` (pure, unit-tested) builds Checkout params (subscription mode, `client_reference_id` and `metadata[uid]`, `automatic_tax` only when enabled) and normalizes a subscription (status, interval, period end from the item or top level, `cancel_at_period_end`); `stripe.ts` calls `/v1/checkout/sessions`, `/v1/billing_portal/sessions` and `/v1/subscriptions/:id` with `fetch`, the restricted key and a pinned `Stripe-Version`. No SDK.
   - [ ] `store.ts` `syncSubscription` upserts the D1 row and writes or deletes KV `ent:<uid>` from `entitlementsFor`; `recordEvent` returns false for a duplicate event id.
   - [ ] `getEntitlements(env, uid)` reads `ent:<uid>` with `cacheTtl: 300` and returns free for `uid === null`, a missing key, or `BILLING_ENABLED` unset.
-- **Files:** `apps/worker/src/lib/billing/provider.ts`, `apps/worker/src/lib/billing/store.ts`, `apps/worker/src/lib/entitlements.ts`
-- **Verification:** with Polar sandbox keys in `.dev.vars`: run `wrangler dev`, expose it with `cloudflared tunnel --url http://localhost:8787` (quick tunnel, no account), point the sandbox webhook at `<tunnel>/api/billing/webhook`, complete a sandbox test-card checkout; `npx wrangler d1 execute aired --local --command "SELECT status,plan FROM subscriptions"` prints `active|pro`.
+- **Files:** `apps/worker/src/lib/billing/stripe-shapes.ts`, `apps/worker/src/lib/billing/stripe.ts`, `apps/worker/src/lib/billing/store.ts`, `apps/worker/src/lib/entitlements.ts`, `apps/worker/test/stripe-shapes.test.ts`
+- **Verification:** `npm test` passes the shape tests. With the owner's test-mode key later: `stripe listen --forward-to localhost:8787/api/billing/webhook`, a `4242 4242 4242 4242` checkout, then `npx wrangler d1 execute aired --local --command "SELECT status,plan FROM subscriptions"` prints `active|pro`.
 - **Dependencies:** Task 1.1, Task 1.2
 
 #### Task 1.4: Add checkout, portal, status and webhook routes
 - **Size:** M
 - **Acceptance criteria:**
   - [ ] `POST /api/billing/checkout` and `/portal` require session + CSRF header and return `{url}`; checkout returns 409 for a current Pro user and 503 when `BILLING_ENABLED` is unset. `GET /upgrade?interval=` signs the user in if needed, then redirects to checkout.
-  - [ ] `POST /api/billing/webhook` reads the raw body, rejects bad signatures with 400, dedupes event ids, re-fetches the subscription and calls `syncSubscription`; returns 500 on a D1/KV failure so the provider retries.
+  - [ ] `POST /api/billing/webhook` reads the raw body, rejects bad signatures with 400, dedupes event ids, re-fetches the subscription and calls `syncSubscription`; returns 500 on a D1/KV/Stripe failure so Stripe retries.
   - [ ] Routes are mounted in `index.ts` before `/api`; the webhook needs no CSRF header.
 - **Files:** `apps/worker/src/routes/billing.ts`, `apps/worker/src/index.ts`
-- **Verification:** local dev: `curl -s -X POST localhost:8787/api/billing/webhook -d '{}' -H 'webhook-id: x' -H 'webhook-timestamp: 1' -H 'webhook-signature: v1,bad' -o /dev/null -w '%{http_code}'` prints `400`; replaying the same signed test event twice leaves one `billing_events` row.
+- **Verification:** local dev: `curl -s -X POST localhost:8787/api/billing/webhook -d '{}' -H 'Stripe-Signature: t=1,v1=bad' -o /dev/null -w '%{http_code}'` prints `400`; replaying the same signed test event twice leaves one `billing_events` row.
 - **Dependencies:** Task 1.3
 
 #### Task 1.5: Hide the badge on pages whose owner has Pro
@@ -349,9 +364,9 @@ The smallest Pro that can charge: GitHub users can buy Pro and get no badge, 10 
 - **Size:** M
 - **Acceptance criteria:**
   - [ ] `validateHtml(html, maxBytes = MAX_SIZE)`; `PRO_MAX_SIZE = 10 MB` in core constants. `/api/publish`, `PUT /api/pages/:id` and MCP `publish_html` pass the caller's `maxBytes`.
-  - [ ] Publish limit by caller: anonymous 5/hour per IP (unchanged), signed-in free 30/hour per user (`TIERS.authenticated`, now used), Pro 500/day per user (new `TIERS.pro`), chosen in a new `publishLimit` middleware.
+  - [ ] Publish limit by caller: anonymous 5/hour per IP and signed-in free 30/hour per account (both unchanged since `d4679ce`), Pro 500/day per account (new `TIERS.pro`), chosen by `publishRateLimit` from the caller's entitlements.
   - [ ] A signed-in free user over 2 MB or over the free rate gets 402 with `code: "plan_limit"` and `upgrade_url`; anonymous callers keep today's 400/429.
-- **Files:** `packages/core/src/validate.ts`, `packages/core/src/constants.ts`, `apps/worker/src/lib/rate-limit-tiers.ts`, `apps/worker/src/middleware/publish-limit.ts`, `apps/worker/src/routes/api.ts`, `apps/worker/src/routes/mcp.ts`
+- **Files:** `packages/core/src/validate.ts`, `packages/core/src/constants.ts`, `apps/worker/src/lib/rate-limit-tiers.ts`, `apps/worker/src/middleware/rate-limit.ts`, `apps/worker/src/routes/api.ts`, `apps/worker/src/routes/mcp.ts`
 - **Verification:** local dev: a 3 MB publish as a free signed-in user returns 402 JSON with `upgrade_url`; the same as a Pro user (`ent:` set by hand) returns 200; an anonymous 3 MB publish returns 400 as today.
 - **Dependencies:** Task 1.3
 
@@ -372,7 +387,7 @@ The smallest Pro that can charge: GitHub users can buy Pro and get no badge, 10 
   - [ ] When `/api/billing/status` reports billing on, Pro's "Coming soon" becomes "Get Pro" linking to `/upgrade?interval=<year|month>` from the toggle; otherwise it stays "Coming soon".
   - [ ] Copy follows "Pricing Page Copy" below: Pro list rewritten; "Plus view-limited links" removed; the API row says keys are free; analytics and custom domain marked "arriving soon" until Phases 6–7 ship; FAQ adds refunds, cancelling and taxes.
 - **Files:** `apps/web/pricing.html`, `apps/web/app.js`
-- **Verification:** local dev with `BILLING_ENABLED=1`: signed out, click "Get Pro" (yearly) → sign-in → hosted checkout shows $108/year; with it unset the button reads "Coming soon".
+- **Verification:** local dev with `BILLING_ENABLED=1` and test-mode keys: signed out, click "Get Pro" (yearly) → sign-in → Stripe Checkout shows $108.00 per year; with it unset the button reads "Coming soon".
 - **Dependencies:** Task 1.4
 
 #### Task 1.9: Show the Pro offer where the badge is seen
@@ -382,9 +397,9 @@ The smallest Pro that can charge: GitHub users can buy Pro and get no badge, 10 
   - [ ] Anonymous and Pro responses don't carry it; JSON output (`--json`) keeps the field but prints nothing extra.
 - **Files:** `apps/worker/src/routes/api.ts`, `apps/worker/src/routes/mcp.ts`, `apps/cli/src/commands/publish.ts`
 - **Verification:** local dev with `BILLING_ENABLED=1`: `aired publish x.html` signed in as free prints the line; as Pro (`ent:` set) it doesn't.
-- **Dependencies:** Task 1.6, Task 2.3
+- **Dependencies:** Task 1.6
 
-**Checkpoint after Phase 1:** `cd apps/worker && npm test` green; local D1 migrations apply clean; one sandbox purchase, cancellation and revoke round-trip updates `ent:<uid>`.
+**Checkpoint after Phase 1:** `cd apps/worker && npm test` green; local D1 migrations apply clean; a signed test event posted to the local webhook (with a local stand-in for the Stripe API) writes `subscriptions` and `ent:<uid>`, and a replay changes nothing.
 
 ### Phase 2: Claim pages and recover lost ones — [API] [UI]
 Independent of Phase 1; can run in parallel. Fixes the lost-token takedown class.
@@ -494,8 +509,8 @@ Independent of Phase 1; can run in parallel. Fixes the lost-token takedown class
 - **Acceptance criteria:**
   - [ ] `migrations/0003_api_keys.sql`; `POST /api/me/keys {name}` returns the key once; `GET` lists name, prefix, created and last used; `DELETE` revokes (D1 `revoked_at`, KV `apikey:` deleted). At most 5 active keys.
   - [ ] `authMiddleware` accepts `Authorization: Bearer aired_sk_…` (checksum, then KV `apikey:<hash>`), sets `c.get('user')`, and never treats `at_` update tokens as keys. `last_used_at` updates at most hourly via `waitUntil`.
-  - [ ] Key-authenticated requests don't need the CSRF header (no cookie involved); cookie requests still do.
-- **Files:** `apps/worker/migrations/0003_api_keys.sql`, `apps/worker/src/routes/keys.ts`, `apps/worker/src/middleware/auth.ts`, `apps/worker/src/middleware/csrf.ts`, `apps/worker/src/index.ts`
+  - [ ] Key-authenticated requests need no CSRF header; this already follows from `lib/csrf-rule.ts` (no session cookie), so only a test is added.
+- **Files:** `apps/worker/migrations/0003_api_keys.sql`, `apps/worker/src/routes/keys.ts`, `apps/worker/src/middleware/auth.ts`, `apps/worker/test/api-auth.test.ts`, `apps/worker/src/index.ts`
 - **Verification:** local dev: create a key, then `curl -s -X POST localhost:8787/api/publish -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' -d '{"html":"<h1>k</h1>"}'` → the page appears in `/api/me/pages`; after revoking, `GET /api/me` with the key returns 401.
 - **Dependencies:** Task 4.1, Task 1.1
 
@@ -619,9 +634,9 @@ FAQ additions:
 
 ## Verification Criteria
 - [ ] With `BILLING_ENABLED` unset: pricing shows "Coming soon", `POST /api/billing/checkout` returns 503, and pages render exactly as before (badge on).
-- [ ] Polar sandbox: a signed-in free user clicks "Get Pro" (yearly), pays with a test card, lands on `/dashboard?upgraded=1`, sees "Pro · renews <date>" within 30 s; their existing pages render without the badge within 5 minutes.
+- [ ] Stripe test mode: a signed-in free user clicks "Get Pro" (yearly), pays with a test card, lands on `/dashboard?upgraded=1`, sees "Pro · renews <date>" within 30 s; their existing pages render without the badge within 5 minutes.
 - [ ] Replaying the same webhook event returns 200 and changes nothing; a bad signature returns 400.
-- [ ] Cancelling in the portal keeps Pro until the period ends; after period end + 3 days (test clock or a forced `subscription.deleted`), the badge returns and no page is deleted.
+- [ ] Cancelling in the portal keeps Pro until the period ends; after period end + 3 days (Stripe test clock, or `stripe trigger customer.subscription.deleted`), the badge returns and no page is deleted.
 - [ ] A free signed-in user publishing 3 MB gets 402 with `upgrade_url`; an anonymous 3 MB publish gets 400 as today.
 - [ ] A Google-only user signs in, publishes, buys Pro, and logs in on the CLI via `/device`.
 - [ ] An anonymous publish's `claim_url` attaches the page after sign-in; browser-held pages attach from the dashboard banner.
@@ -644,7 +659,7 @@ FAQ additions:
 
 **Assumptions:**
 - Cloudflare Workers paid plan (already in use for the Rate Limiting bindings), with D1 and Analytics Engine available.
-- The billing provider has hosted checkout, a customer portal and signed webhooks.
+- Stripe Checkout, the customer portal and webhooks in test mode cover the whole flow.
 - Owner prerequisites P1–P9 happen on time. Billing and OAuth integrations are where estimates usually double.
 - No end-to-end test harness exists; verification is unit tests plus manual local and staging runs.
 
@@ -671,8 +686,8 @@ FAQ additions:
 ## Risks
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Provider unavailable in the owner's country, or account rejected | No way to charge | Decide P1 first; provider code isolated behind three functions; fallback named in `docs/growth/pro-plan.md`. |
-| Webhook missed or delayed | Paid user stays on Free | Providers retry for days; `/api/billing/status` reads D1; an admin script re-syncs one user from the provider. |
+| Tax obligations with Aired as the seller | Unpaid VAT or sales tax | `STRIPE_AUTOMATIC_TAX` is ready to switch on; the owner decides registration (P4e). A merchant of record (Paddle) stays the fallback if tax work becomes too much. |
+| Webhook missed or delayed | Paid user stays on Free | Stripe retries for 3 days; `/api/billing/status` reads D1; an admin script re-syncs one user from Stripe. |
 | KV `ent:` lag (up to ~60 s) after payment | Badge visible for a minute | Success page polls D1; copy says "within a minute". |
 | No `workspaceId` on pages | Team plan later needs an ownership migration | Accepted: Team is out of scope and gated on demand; Pro is per person, so `ownerId` fits. Revisit before Team. |
 | Account linking by email | Takeover through an unverified email | Link verified-to-verified only; never on GitHub noreply addresses. |
