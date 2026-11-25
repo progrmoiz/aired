@@ -13,6 +13,7 @@ function d1() {
   db.exec("PRAGMA foreign_keys = ON");
   db.exec(migration("0001_accounts_billing.sql"));
   db.exec(migration("0002_billing_customers.sql"));
+  db.exec(migration("0006_api_keys.sql"));
   const prepare = (sql: string) => {
     let args: unknown[] = [];
     const stmt = {
@@ -34,6 +35,7 @@ function seed(raw: DatabaseSync, uid: number, cus: string) {
   raw.prepare("INSERT INTO identities (provider, subject, user_id, email, created_at) VALUES ('github', ?, ?, ?, ?)").run(String(uid), uid, `u${uid}@example.com`, now);
   raw.prepare("INSERT INTO billing_customers (user_id, customer_id, created_at) VALUES (?, ?, ?)").run(uid, cus, now);
   raw.prepare("INSERT INTO subscriptions (user_id, provider, customer_id, subscription_id, plan, status, updated_at) VALUES (?, 'stripe', ?, ?, 'pro', 'active', ?)").run(uid, cus, `sub_${uid}`, now);
+  raw.prepare("INSERT INTO api_keys (id, user_id, name, prefix, key_hash, created_at) VALUES (?, ?, 'ci', 'aired_sk_x', ?, 1)").run(`key_${uid}`, uid, `hash_${uid}`);
 }
 
 const count = (raw: DatabaseSync, table: string, uid: number) =>
@@ -44,7 +46,7 @@ test("account deletion removes the user's billing and sign-in rows, and only the
   seed(raw, 1, "cus_1");
   seed(raw, 2, "cus_2");
   await deleteAccountRows(db, 1);
-  for (const table of ["subscriptions", "billing_customers", "identities", "users"]) {
+  for (const table of ["subscriptions", "billing_customers", "identities", "users", "api_keys"]) {
     assert.equal(count(raw, table, 1), 0, table);
     assert.equal(count(raw, table, 2), 1, table);
   }

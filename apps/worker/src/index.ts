@@ -10,6 +10,7 @@ import { og } from "./routes/og.js";
 import { auth } from "./routes/auth.js";
 import { dashboard } from "./routes/dashboard.js";
 import { billing, upgrade } from "./routes/billing.js";
+import { keys } from "./routes/keys.js";
 import { publishRateLimit } from "./middleware/rate-limit.js";
 import { corsMiddleware } from "./middleware/cors.js";
 import { authMiddleware } from "./middleware/auth.js";
@@ -72,7 +73,8 @@ app.route("/auth", auth);
 // Mount billing routes before api so /api/billing/* matches first
 app.route("/api/billing", billing);
 
-// Mount me routes before api so /api/me/* matches first
+// Mount key routes before me, and me before api, so the longer paths match first
+app.route("/api/me/keys", keys);
 app.route("/api/me", me);
 
 // Mount API routes

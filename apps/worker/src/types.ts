@@ -48,6 +48,10 @@ export type AppBindings = {
   Variables: {
     user: { id: number; login: string; email: string | null; name: string | null } | null;
     jti: string | null;
+    /** How the caller signed in: a session (cookie or CLI header), an API key, or not at all. */
+    authMethod: 'session' | 'key' | null;
+    /** The API key's id when authMethod is 'key'. */
+    apiKeyId: string | null;
   };
 };
 

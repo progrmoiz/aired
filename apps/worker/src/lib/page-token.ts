@@ -10,7 +10,9 @@ export function readUpdateToken(
   if (typeof bodyToken === "string" && bodyToken !== "") return bodyToken;
   if (authorization?.startsWith("Bearer ")) {
     const token = authorization.slice("Bearer ".length).trim();
-    if (token !== "") return token;
+    // An API key in the header signs the caller in (auth middleware); it's
+    // never a page's update token.
+    if (token !== "" && !token.startsWith("aired_sk_")) return token;
   }
   return null;
 }

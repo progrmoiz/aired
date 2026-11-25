@@ -1,6 +1,7 @@
 import type { Context, Next } from 'hono';
 import type { AppBindings } from '../types.js';
-import { AUTH_HEADER, kvKeys, redactNoreplyEmail } from '@aired/core';
+import { API_KEY_PREFIX, AUTH_HEADER, hashToHex, kvKeys, parseApiKey, redactNoreplyEmail } from '@aired/core';
+import { findActiveKey, lastUsedDue, touchKey } from '../lib/api-keys.js';
 import { verifySession, signSession, shouldReissue } from '../lib/jwt.js';
 import { readSessionCookie, setSessionCookie } from '../lib/cookies.js';
 
@@ -21,7 +22,20 @@ import { readSessionCookie, setSessionCookie } from '../lib/cookies.js';
 export async function authMiddleware(
   c: Context<AppBindings>,
   next: Next,
-): Promise<void> {
+): Promise<Response | void> {
+  c.set('authMethod', null);
+  c.set('apiKeyId', null);
+
+  // An API key (Authorization: Bearer aired_sk_…) wins over any session. A key
+  // that's sent but isn't valid is a 401, never a quiet fall back to
+  // anonymous: a CI job with a revoked key must not publish ownerless pages.
+  // Update tokens (at_…) also arrive as Bearer; they aren't keys and are left
+  // to the routes.
+  const authorization = c.req.header('Authorization');
+  if (authorization?.startsWith(`Bearer ${API_KEY_PREFIX}`)) {
+    return keyAuth(c, next, authorization.slice('Bearer '.length).trim());
+  }
+
   const cookieValue = readSessionCookie(c);
   const headerValue = c.req.header(AUTH_HEADER) ?? null;
   const isWebContext = cookieValue !== null;
@@ -128,7 +142,70 @@ export async function authMiddleware(
     name: claims.name,
   });
   c.set('jti', claims.jti);
+  c.set('authMethod', 'session');
 
+  await next();
+}
+
+/** Sign the request in with an API key, or answer 401/503. */
+async function keyAuth(c: Context<AppBindings>, next: Next, presented: string): Promise<Response | void> {
+  const parsed = parseApiKey(presented);
+  if (!parsed.ok) return c.json({ error: 'Invalid API key' }, 401);
+
+  let found: Awaited<ReturnType<typeof findActiveKey>>;
+  try {
+    found = await findActiveKey(c.env.DB, await hashToHex(parsed.key));
+  } catch (err) {
+    console.error('API key lookup failed', err);
+    return c.json({ error: 'Could not check the API key. Please try again.' }, 503);
+  }
+  if (found === null) return c.json({ error: 'Invalid or revoked API key' }, 401);
+
+  // The account behind the key. Account deletion removes it (and the key).
+  const raw = await c.env.PAGES_KV.get(kvKeys.user(found.userId));
+  type UserRecord = { login?: unknown; email?: unknown; name?: unknown };
+  let record: UserRecord | null = null;
+  try {
+    record = raw === null ? null : (JSON.parse(raw) as UserRecord);
+  } catch {
+    record = null;
+  }
+  if (record === null || typeof record.login !== 'string') {
+    return c.json({ error: 'Invalid or revoked API key' }, 401);
+  }
+
+  c.set('user', {
+    id: found.userId,
+    login: record.login,
+    email: redactNoreplyEmail(typeof record.email === 'string' ? record.email : null),
+    name: typeof record.name === 'string' ? record.name : null,
+  });
+  c.set('jti', null);
+  c.set('authMethod', 'key');
+  c.set('apiKeyId', found.id);
+
+  const now = Date.now();
+  if (lastUsedDue(found.lastUsedAt, now)) {
+    c.executionCtx.waitUntil(
+      touchKey(c.env.DB, found.id, now).catch((err) => console.error('API key last_used update failed', err)),
+    );
+  }
+  await next();
+}
+
+/**
+ * Guard middleware: only a signed-in session, not an API key. For managing
+ * keys, deleting the account and billing: things an agent or CI job holding a
+ * key shouldn't be able to do.
+ */
+export async function requireSession(
+  c: Context<AppBindings>,
+  next: Next,
+): Promise<Response | void> {
+  if (c.get('user') === null) return c.json({ error: 'Unauthorized' }, 401);
+  if (c.get('authMethod') !== 'session') {
+    return c.json({ error: 'Sign in to do this. API keys can\'t manage keys, billing or the account.' }, 403);
+  }
   await next();
 }
 

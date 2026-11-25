@@ -12,7 +12,7 @@ import {
   UNSORTED_PROJECT,
 } from '@aired/core';
 import type { PageMetadata } from '@aired/core';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireSession } from '../middleware/auth.js';
 import { requireCsrfHeader } from '../middleware/csrf.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { TIERS } from '../lib/rate-limit-tiers.js';
@@ -301,7 +301,7 @@ me.post(
 );
 
 // DELETE /api/me — delete the authenticated user's account
-me.delete('/', requireCsrfHeader, async (c) => {
+me.delete('/', requireSession, requireCsrfHeader, async (c) => {
   const user = c.get('user')!;
   const userId = user.id;
   const jti = c.get('jti');

@@ -6,6 +6,8 @@
 export async function deleteAccountRows(db: D1Database, uid: number): Promise<void> {
   // Children before the users row they reference.
   await db.batch([
+    // API keys stop working with the account.
+    db.prepare('DELETE FROM api_keys WHERE user_id = ?').bind(uid),
     db.prepare('DELETE FROM subscriptions WHERE user_id = ?').bind(uid),
     db.prepare('DELETE FROM billing_customers WHERE user_id = ?').bind(uid),
     db.prepare('DELETE FROM identities WHERE user_id = ?').bind(uid),
