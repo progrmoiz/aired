@@ -28,6 +28,7 @@ import {
 import { clearSessionCookie, readSessionCookie } from '../lib/cookies.js';
 import { billingEnabled, getEntitlements, isEntitled } from '../lib/entitlements.js';
 import { getSubscription } from '../lib/billing/store.js';
+import { deleteAccountRows } from '../lib/billing/forget.js';
 import type { StoredSubscription } from '../lib/billing/store.js';
 import { AUTH_HEADER } from '@aired/core';
 import { addClaimResult, runClaim } from '../lib/claim-decision.js';
@@ -397,6 +398,19 @@ me.delete('/', requireCsrfHeader, async (c) => {
   // Step 5: waitUntil — paginated sweep to null out ownerId on all pages
   c.executionCtx.waitUntil(
     (async () => {
+      // Billing and sign-in rows in D1 go too (Link keeps its own record of
+      // each sale), and so does the Pro projection in KV.
+      try {
+        await deleteAccountRows(c.env.DB, userId);
+      } catch (err) {
+        console.error('Failed to delete billing rows during account deletion:', err);
+      }
+      try {
+        await c.env.PAGES_KV.delete(`ent:${userId}`);
+      } catch (err) {
+        console.error('Failed to delete entitlement during account deletion:', err);
+      }
+
       // Claimed pages become anonymous pages again, like every other page.
       // Their D1 rows are released, not deleted, and keep the rotated hash:
       // the KV record may hold a stale pre-claim hash, which must not become

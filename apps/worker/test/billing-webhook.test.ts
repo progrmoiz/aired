@@ -264,12 +264,12 @@ test("checkoutGate doesn't look at the price", () => {
 });
 
 test("resolveWebhookUid: our customer mapping wins over metadata", () => {
-  assert.deepEqual(resolveWebhookUid(4242, 4242), { uid: 4242, conflict: false });
-  assert.deepEqual(resolveWebhookUid(4242, null), { uid: 4242, conflict: false });
-  assert.deepEqual(resolveWebhookUid(4242, 99), { uid: 4242, conflict: true });
+  assert.deepEqual(resolveWebhookUid(4242, 4242), { uid: 4242, conflict: false, deletedUser: false });
+  assert.deepEqual(resolveWebhookUid(4242, null), { uid: 4242, conflict: false, deletedUser: false });
+  assert.deepEqual(resolveWebhookUid(4242, 99), { uid: 4242, conflict: true, deletedUser: false });
 });
 
 test("resolveWebhookUid: metadata only when no row maps the customer", () => {
-  assert.deepEqual(resolveWebhookUid(null, 99), { uid: 99, conflict: false });
-  assert.deepEqual(resolveWebhookUid(null, null), { uid: null, conflict: false });
+  assert.deepEqual(resolveWebhookUid(null, 99), { uid: 99, conflict: false, deletedUser: false });
+  assert.deepEqual(resolveWebhookUid(null, null), { uid: null, conflict: false, deletedUser: false });
 });

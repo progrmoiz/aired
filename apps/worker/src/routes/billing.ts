@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppBindings } from '../types.js';
+import { kvKeys } from '@aired/core';
 import { requireAuth } from '../middleware/auth.js';
 import { requireCsrfHeader } from '../middleware/csrf.js';
 import { rateLimit } from '../middleware/rate-limit.js';
@@ -329,7 +330,17 @@ async function storeSubscription(
 async function webhookUid(c: Context<AppBindings>, evt: WebhookEvent, sub: NormalizedSubscription): Promise<number | null> {
   const dbUid = await findUidByCustomer(c.env.DB, sub.customerId);
   const metadataUid = sub.uid ?? uidFromEvent(evt.raw);
-  const { uid, conflict } = resolveWebhookUid(dbUid, metadataUid);
+  // Only reached for a customer we hold no row for. The account must still
+  // exist (its KV user record), or a late event would re-create the billing
+  // rows account deletion removed.
+  const metadataUserExists =
+    dbUid === null && metadataUid !== null
+      ? (await c.env.PAGES_KV.get(kvKeys.user(metadataUid))) !== null
+      : true;
+  const { uid, conflict, deletedUser } = resolveWebhookUid(dbUid, metadataUid, metadataUserExists);
+  if (deletedUser) {
+    console.log({ event: 'billing_webhook_deleted_account', eventId: evt.id, customerId: sub.customerId, metadataUid });
+  }
   if (conflict) {
     console.warn({
       event: 'billing_webhook_uid_mismatch',
