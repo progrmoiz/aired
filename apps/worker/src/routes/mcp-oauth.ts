@@ -54,8 +54,13 @@ export function mcpAuthServer(env: Env): OAuthAuthorizationServer<Env> {
       scopesSupported: [MCP_SCOPE, 'offline_access'],
       clientIdMetadataDocumentEnabled: true,
       // A retired grant can't be refreshed either: the client is told to sign in again.
-      tokenExchangeCallback: ({ props, env: e }) => {
-        if (grantRetired(e, (props as { issuedAt?: unknown } | null)?.issuedAt)) {
+      tokenExchangeCallback: async ({ props, env: e }) => {
+        const p = (props ?? {}) as { userId?: unknown; issuedAt?: unknown; authTime?: unknown };
+        const retired =
+          grantRetired(e, p.issuedAt) ||
+          (typeof p.userId === 'number' &&
+            retiredBy(await sessionsValidSince(e.PAGES_KV, p.userId, { fresh: true }), grantAuthTime(p)));
+        if (retired) {
           throw new OAuthError('invalid_grant', { description: 'This connection was signed out. Connect again.' });
         }
       },
@@ -67,6 +72,12 @@ export function mcpAuthServer(env: Env): OAuthAuthorizationServer<Env> {
 
 export type McpTokenUser = { userId: number; scope: string[]; issuedAt: number | null };
 
+/** When the person who approved a grant signed in (falls back to the approval time for older grants). */
+function grantAuthTime(props: { issuedAt?: unknown; authTime?: unknown }): number | null {
+  if (typeof props.authTime === 'number') return props.authTime;
+  return typeof props.issuedAt === 'number' ? props.issuedAt : null;
+}
+
 /** "Sign out everywhere" (SESSION_VALID_SINCE) also retires grants approved before it. */
 function grantRetired(env: Env, issuedAt: unknown): boolean {
   const since = Date.parse(env.SESSION_VALID_SINCE ?? '');
@@ -76,14 +87,14 @@ function grantRetired(env: Env, issuedAt: unknown): boolean {
 
 /** A token for this resource, or null. Expired, revoked or someone else's resource: null. */
 export async function validateMcpToken(env: Env, resource: string, token: string): Promise<McpTokenUser | null> {
-  const v = await mcpAuthServer(env).validateToken<{ userId?: unknown; issuedAt?: unknown }>(resource, token, env);
+  const v = await mcpAuthServer(env).validateToken<{ userId?: unknown; issuedAt?: unknown; authTime?: unknown }>(resource, token, env);
   if (v === null || v.audience !== resource) return null;
   if (typeof v.expiresAt === 'number' && v.expiresAt * 1000 <= Date.now()) return null;
   const userId = v.props?.userId;
   if (typeof userId !== 'number' || !Number.isSafeInteger(userId) || userId <= 0) return null;
   if (grantRetired(env, v.props?.issuedAt)) return null;
   // Account deleted or signed out everywhere since this was approved.
-  if (retiredBy(await sessionsValidSince(env.PAGES_KV, userId), typeof v.props?.issuedAt === 'number' ? v.props.issuedAt : null)) return null;
+  if (retiredBy(await sessionsValidSince(env.PAGES_KV, userId), grantAuthTime(v.props ?? {}))) return null;
   const issuedAt = typeof v.props?.issuedAt === 'number' ? v.props.issuedAt : null;
   return { userId, scope: v.scope, issuedAt };
 }
@@ -167,11 +178,11 @@ mcpOAuth.all('/oauth/*', rateLimit(TIERS.oauth_token), authServerFetch);
  * Signed in on the website (the same rule as requireWebSession), with an
  * account record: tokens are minted from it, so no record, no approval.
  */
-async function webAccount(c: Context<AppBindings>): Promise<{ id: number; login: string } | null> {
+async function webAccount(c: Context<AppBindings>): Promise<{ id: number; login: string; authTime: number } | null> {
   const user = c.get('user');
   if (user === null || c.get('via') !== 'cookie') return null;
   if ((await loadUserRecord(c.env.PAGES_KV, user.id)) === null) return null;
-  return { id: user.id, login: user.login };
+  return { id: user.id, login: user.login, authTime: c.get('authTime') ?? Math.floor(Date.now() / 1000) };
 }
 
 function html(body: string, status: number, headers?: Headers): Response {
@@ -230,7 +241,8 @@ mcpOAuth.post('/authorize', rateLimit(TIERS.oauth_init), async (c) => {
       userId: String(account.id),
       metadata: { login: account.login },
       scope: approved.request.scope,
-      props: { userId: account.id, issuedAt: Math.floor(Date.now() / 1000) },
+      // authTime: the grant is retired with the session that approved it.
+      props: { userId: account.id, issuedAt: Math.floor(Date.now() / 1000), authTime: account.authTime },
     });
     approved.headers.set('Location', redirectTo);
     return new Response(null, { status: 302, headers: approved.headers });

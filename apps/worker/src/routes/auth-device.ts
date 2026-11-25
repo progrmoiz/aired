@@ -8,6 +8,7 @@ import { requireCsrfHeader } from '../middleware/csrf.js';
 import { signSession } from '../lib/jwt.js';
 import { siteOrigin } from '../lib/billing/webhook-plan.js';
 import { loadUserRecord } from '../lib/user-record.js';
+import { retiredBy, sessionsValidSince } from '../lib/revocation.js';
 import {
   DEVICE_CODE_TTL_MS,
   DEVICE_POLL_INTERVAL,
@@ -80,7 +81,9 @@ authDevice.post(
     }
     let approved: boolean;
     try {
-      approved = await approveDeviceAuth(c.env.DB, userCode, userId, Date.now());
+      // The CLI token inherits when this person signed in (requireWebSession guarantees it's set).
+      const authTime = c.get('authTime') ?? Math.floor(Date.now() / 1000);
+      approved = await approveDeviceAuth(c.env.DB, userCode, userId, authTime, Date.now());
     } catch (err) {
       console.error('Failed to approve device code:', err);
       return c.json({ error: 'Could not approve the code. Please try again.' }, 503);
@@ -101,7 +104,7 @@ export async function pollNativeDevice(c: Context<AppBindings>, deviceCode: stri
 
   const deviceHash = await hashToHex(deviceCode);
   const now = Date.now();
-  let userId: number | null;
+  let collected: Awaited<ReturnType<typeof consumeDeviceAuth>>;
   try {
     const row = await readDeviceAuth(c.env.DB, deviceHash);
     if (row === null || row.expires_at <= now || row.consumed_at !== null) {
@@ -111,15 +114,21 @@ export async function pollNativeDevice(c: Context<AppBindings>, deviceCode: stri
       c.header('Retry-After', String(DEVICE_POLL_INTERVAL));
       return c.json({ status: 'authorization_pending' }, 202);
     }
-    userId = await consumeDeviceAuth(c.env.DB, deviceHash, now);
+    collected = await consumeDeviceAuth(c.env.DB, deviceHash, now);
   } catch (err) {
     console.error('Failed to read device code:', err);
     return c.json({ error: 'server error' }, 500);
   }
   // Collected by a poll that raced this one.
-  if (userId === null) return c.json({ error: 'device_code_expired' }, 400);
+  if (collected === null) return c.json({ error: 'device_code_expired' }, 400);
+  const userId = collected.userId;
+  const authTime = collected.authTime ?? Math.floor(now / 1000);
 
-  // The account was deleted after approving.
+  // The account was deleted, or its owner signed out everywhere, since the
+  // approval: no token. Read fresh, since this mints something new.
+  if (retiredBy(await sessionsValidSince(c.env.PAGES_KV, userId, { fresh: true }), authTime)) {
+    return c.json({ error: 'access_denied' }, 400);
+  }
   const record = await loadUserRecord(c.env.PAGES_KV, userId);
   if (record === null) return c.json({ error: 'access_denied' }, 400);
 
@@ -130,6 +139,7 @@ export async function pollNativeDevice(c: Context<AppBindings>, deviceCode: stri
       { sub: user.id, login: user.login, email: user.email, name: user.name },
       c.env.SESSION_SECRET,
       CLI_SESSION_MAX_AGE_SECONDS,
+      { kind: 'cli', authTime },
     );
   } catch (err) {
     console.error('Failed to mint JWT on device poll:', err);

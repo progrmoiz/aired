@@ -11,6 +11,9 @@ CREATE TABLE auth_tokens (
   expires_at INTEGER NOT NULL,
   -- Set when a signed-in person approves the code.
   approved_user_id INTEGER,
+  -- When that person signed in (Unix seconds). The CLI token inherits it, so
+  -- signing out everywhere retires tokens collected from earlier approvals.
+  approved_auth_time INTEGER,
   -- Set when the CLI collects its session; a code works once.
   consumed_at INTEGER
 );

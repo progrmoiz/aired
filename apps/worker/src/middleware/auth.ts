@@ -31,6 +31,7 @@ export async function authMiddleware(
 ): Promise<Response | void> {
   c.set('via', null);
   c.set('apiKeyId', null);
+  c.set('authTime', null);
 
   // An in-process API call for an MCP tool call made with an OAuth token.
   const mcpUser = c.env.AIRED_MCP_OAUTH_USER;
@@ -100,8 +101,10 @@ export async function authMiddleware(
     return;
   }
 
-  // Per-account revocation: account deleted, or its owner signed out everywhere.
-  if (retiredBy(await sessionsValidSince(c.env.PAGES_KV, claims.sub), claims.iat)) {
+  // Per-account revocation: account deleted, or its owner signed out
+  // everywhere. Compared with when the person signed in, not when this token
+  // was minted, so a reissue can't carry a session past the marker.
+  if (retiredBy(await sessionsValidSince(c.env.PAGES_KV, claims.sub), claims.authTime)) {
     setAnonymous();
     await next();
     return;
@@ -112,8 +115,12 @@ export async function authMiddleware(
   // the old jti but can only deliver the replacement via Set-Cookie, so a CLI
   // would revoke its own token and never receive the new one (silent 7-day death).
   // CLI tokens ride their full TTL instead.
+  // The website: a web token in the session cookie. A CLI token sent as the
+  // cookie stays a CLI caller and is never reissued as a web session.
+  const isWebSession = isWebContext && claims.kind === 'web';
+
   const now = Date.now();
-  if (isWebContext && shouldReissue(claims, now)) {
+  if (isWebSession && shouldReissue(claims, now)) {
     const oldJti = claims.jti;
     const oldExp = claims.exp;
     const nowSeconds = Math.floor(now / 1000);
@@ -137,6 +144,8 @@ export async function authMiddleware(
       const newJwt = await signSession(
         { sub: claims.sub, login: claims.login, email: claims.email, name: claims.name },
         c.env.SESSION_SECRET,
+        undefined,
+        { kind: 'web', authTime: claims.authTime },
       );
 
       // If web context (cookie was present), set new cookie
@@ -163,9 +172,10 @@ export async function authMiddleware(
     name: claims.name,
   });
   c.set('jti', claims.jti);
-  // The web cookie and the CLI's aired-Session header are different callers:
-  // only the cookie can manage keys, billing or the account (requireWebSession).
-  c.set('via', isWebContext ? 'cookie' : 'cli');
+  c.set('authTime', claims.authTime);
+  // The website and the CLI are different callers: only the website can
+  // manage keys, billing or the account (requireWebSession).
+  c.set('via', isWebSession ? 'cookie' : 'cli');
 
   await next();
 }

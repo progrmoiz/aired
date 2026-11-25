@@ -53,17 +53,17 @@ test("a code is approved once, collected once, and dies when it expires", async 
   // Not approved yet: nothing to collect.
   assert.equal(await consumeDeviceAuth(db, "h1", T + 1), null);
   assert.equal((await readDeviceAuth(db, "h1"))?.approved_user_id, null);
-  assert.equal(await approveDeviceAuth(db, "BCDF-GHJK", 42, T + 2), true);
+  assert.equal(await approveDeviceAuth(db, "BCDF-GHJK", 42, 1700, T + 2), true);
   // A second approval (someone else guessing the code) changes nothing.
-  assert.equal(await approveDeviceAuth(db, "BCDF-GHJK", 99, T + 3), false);
-  assert.equal(await consumeDeviceAuth(db, "h1", T + 4), 42);
+  assert.equal(await approveDeviceAuth(db, "BCDF-GHJK", 99, 1700, T + 3), false);
+  assert.deepEqual(await consumeDeviceAuth(db, "h1", T + 4), { userId: 42, authTime: 1700 }, "the token inherits when the approver signed in");
   assert.equal(await consumeDeviceAuth(db, "h1", T + 5), null, "once");
   assert.notEqual((await readDeviceAuth(db, "h1"))?.consumed_at, null);
 
   await createDeviceAuth(db, { deviceHash: "h2", userCode: "LMNP-QRST", now: T, expiresAt: T + 600_000 });
-  assert.equal(await approveDeviceAuth(db, "LMNP-QRST", 42, T + 600_001), false, "expired codes can't be approved");
+  assert.equal(await approveDeviceAuth(db, "LMNP-QRST", 42, 1700, T + 600_001), false, "expired codes can't be approved");
   await createDeviceAuth(db, { deviceHash: "h3", userCode: "VWXZ-BCDF", now: T, expiresAt: T + 600_000 });
-  await approveDeviceAuth(db, "VWXZ-BCDF", 42, T + 10);
+  await approveDeviceAuth(db, "VWXZ-BCDF", 42, 1700, T + 10);
   assert.equal(await consumeDeviceAuth(db, "h3", T + 600_001), null, "or collected after expiry");
 });
 

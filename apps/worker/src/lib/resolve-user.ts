@@ -103,7 +103,7 @@ export async function resolveWorkosUser(env: Env, profile: WorkosProfile): Promi
   if (workosIdentityUserId === null && githubId !== null) {
     githubAccountUserId =
       (await findIdentityUser(env.DB, 'github', String(githubId))) ??
-      ((await env.PAGES_KV.get(kvKeys.user(githubId))) !== null ? githubId : null);
+      ((await loadUserRecord(env.PAGES_KV, githubId)) !== null ? githubId : null);
   }
   let verifiedEmailOwner: number | null = null;
   if (workosIdentityUserId === null && githubAccountUserId === null && verifiedEmail !== null) {
@@ -180,7 +180,7 @@ export async function resolveGithubSignIn(env: Env, gh: SignedInUser): Promise<S
     accountId = (await findIdentityUser(env.DB, 'github', String(gh.id))) ?? gh.id;
   } catch (err) {
     console.error('Failed to read GitHub identity from D1:', err);
-    if ((await env.PAGES_KV.get(kvKeys.user(gh.id))) === null) throw err;
+    if ((await loadUserRecord(env.PAGES_KV, gh.id)) === null) throw err;
     accountId = gh.id;
   }
 

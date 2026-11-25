@@ -23,7 +23,9 @@ export async function resolve(spec, ctx, next) {
 );
 const { Hono } = await import("hono");
 const { authMiddleware, requireAuth, requireWebSession } = await import("../src/middleware/auth.ts");
-const { signSession } = await import("../src/lib/jwt.ts");
+const { signSession, verifySession } = await import("../src/lib/jwt.ts");
+const { SignJWT } = await import("jose");
+const { authDevice, pollNativeDevice } = await import("../src/routes/auth-device.ts");
 const { insertKey } = await import("../src/lib/api-keys.ts");
 const { revokeAllSessions, sessionsValidSinceKey } = await import("../src/lib/revocation.ts");
 const { parseUserRecord } = await import("../src/lib/user-record.ts");
@@ -69,8 +71,12 @@ function setup() {
   app.get("/who", (c) => c.json({ user: (c.get as (k: string) => unknown)("user"), via: (c.get as (k: string) => unknown)("via") }));
   app.get("/signed-in", requireAuth as never, (c) => c.json({ ok: true }));
   app.get("/web-only", requireWebSession as never, (c) => c.json({ ok: true }));
+  app.route("/auth", authDevice as never);
+  app.post("/auth/device/poll", async (c) => pollNativeDevice(c as never, ((await c.req.json()) as { device_code: string }).device_code));
   const call = (path: string, headers: Record<string, string> = {}, e: unknown = env) => app.request(path, { headers }, e as never, ctx);
-  return { env, call };
+  const post = (path: string, body: unknown, headers: Record<string, string> = {}) =>
+    app.request(path, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) }, env as never, ctx);
+  return { env, call, post };
 }
 
 async function who(res: Response) {
@@ -157,7 +163,7 @@ test("the user record is read in one place and rejects anything that isn't an ac
   assert.equal(parseUserRecord(1, "[1]"), null);
   assert.deepEqual(parseUserRecord(7, '{"login":"a","email":5,"name":"N","createdAt":"x"}'), { id: 7, login: "a", email: null, name: "N", createdAt: "x" });
   // No hand-rolled user:<id> parsing left in the routes that sign people in.
-  for (const f of ["src/index.ts", "src/middleware/auth.ts", "src/routes/auth-device.ts", "src/routes/mcp-oauth.ts"]) {
+  for (const f of ["src/index.ts", "src/middleware/auth.ts", "src/routes/auth-device.ts", "src/routes/mcp-oauth.ts", "src/lib/resolve-user.ts"]) {
     const code = readFileSync(new URL(`../${f}`, import.meta.url), "utf8");
     assert.ok(!/PAGES_KV\.get\(kvKeys\.user\(/.test(code), f);
   }
@@ -176,4 +182,90 @@ test("guards: keys, account deletion, billing, device approval and MCP consent a
   assert.match(src("routes/mcp-oauth.ts"), /if \(user === null \|\| c\.get\('via'\) !== 'cookie'\) return null;/);
   assert.match(src("routes/mcp-oauth.ts"), /return Object\.create\(env, \{ AIRED_MCP_OAUTH_USER: \{ value: userId, enumerable: false \} \}\) as Env;/);
   assert.ok(!/requireSession\b|authMethod/.test(Object.values({ a: src("middleware/auth.ts"), b: src("routes/me.ts"), c: src("routes/billing.ts"), d: src("index.ts") }).join("\n")));
+});
+
+const nowS = () => Math.floor(Date.now() / 1000);
+/** A token as older code minted it: no kind or auth_time claims. */
+async function legacyToken(lifetimeSeconds: number, iat = nowS()) {
+  return new SignJWT({ sub: "42", login: "kim", email: null, name: "Kim", jti: crypto.randomUUID(), v: 1 })
+    .setProtectedHeader({ alg: "HS256" }).setIssuedAt(iat).setExpirationTime(iat + lifetimeSeconds).sign(new TextEncoder().encode(SECRET));
+}
+
+test("a CLI token sent as the session cookie is still a CLI caller: no keys, billing or account", async () => {
+  const { call } = setup();
+  const cli = await signSession({ sub: 42, login: "kim", email: null, name: "Kim" }, SECRET, 365 * 86400);
+  const cookie = { Cookie: `aired_session=${cli}`, "X-Aired-Request": "1" };
+  assert.equal((await who(await call("/who", cookie))).via, "cli");
+  assert.equal((await call("/web-only", cookie)).status, 403);
+  // Tokens from before the kind claim: a CLI lifetime means CLI, a web lifetime means the website.
+  assert.equal((await who(await call("/who", { Cookie: `aired_session=${await legacyToken(365 * 86400)}` }))).via, "cli");
+  assert.equal((await who(await call("/who", { Cookie: `aired_session=${await legacyToken(30 * 86400)}` }))).via, "cookie");
+});
+
+test("signing out everywhere compares with when the person signed in, so a reissued or freshly minted token can't escape", async () => {
+  const { env, call } = setup();
+  const signedIn = nowS() - 100;
+  // Minted just now, but for a sign-in 100 seconds ago (a reissue, or a token minted during the propagation window).
+  const t = await signSession({ sub: 42, login: "kim", email: null, name: "Kim" }, SECRET, undefined, { kind: "web", authTime: signedIn });
+  env.PAGES_KV.m.set(sessionsValidSinceKey(42), String(signedIn + 10));
+  assert.equal((await who(await call("/who", { Cookie: `aired_session=${t}` }))).user, null);
+});
+
+test("a reissued web session keeps its kind and its original sign-in time", async () => {
+  const { call } = setup();
+  const signedIn = nowS() - 8 * 86400;
+  const old = await new SignJWT({ sub: "42", login: "kim", email: null, name: "Kim", jti: crypto.randomUUID(), v: 1, kind: "web", auth_time: signedIn })
+    .setProtectedHeader({ alg: "HS256" }).setIssuedAt(signedIn).setExpirationTime(signedIn + 30 * 86400).sign(new TextEncoder().encode(SECRET));
+  const res = await call("/who", { Cookie: `aired_session=${old}` });
+  assert.equal((await who(res)).via, "cookie");
+  const fresh = res.headers.get("set-cookie")?.match(/aired_session=([^;]+)/)?.[1];
+  assert.ok(fresh, "reissued");
+  const v = await verifySession(fresh, SECRET);
+  assert.ok(v.ok);
+  if (v.ok) {
+    assert.equal(v.claims.kind, "web");
+    assert.equal(v.claims.authTime, signedIn);
+    assert.ok(v.claims.iat > signedIn);
+  }
+  // A CLI token is never reissued as a web session, even from the cookie.
+  const oldCli = await legacyToken(365 * 86400, nowS() - 8 * 86400);
+  assert.equal((await call("/who", { Cookie: `aired_session=${oldCli}` })).headers.get("set-cookie"), null);
+});
+
+test("a device code approved before signing out everywhere yields no CLI token afterwards", async () => {
+  const { env, post } = setup();
+  const web = { Cookie: `aired_session=${await session()}`, "X-Aired-Request": "1" };
+  // A CLI token can't approve codes at all.
+  const start2 = (await (await post("/auth/device", {})).json()) as { user_code: string };
+  assert.equal((await post("/auth/device/approve", { user_code: start2.user_code }, { "aired-Session": await session() })).status, 403);
+  // Approved but not collected...
+  const start = (await (await post("/auth/device", {})).json()) as { device_code: string; user_code: string };
+  assert.equal((await post("/auth/device/approve", { user_code: start.user_code }, web)).status, 200);
+  // ...then the owner signs out everywhere.
+  await revokeAllSessions(env.PAGES_KV, 42, Date.now() + 1000);
+  const late = await post("/auth/device/poll", { device_code: start.device_code });
+  assert.equal(late.status, 400);
+  assert.deepEqual(await late.json(), { error: "access_denied" });
+});
+
+test("a collected device code makes a CLI token that inherits the approver's sign-in time", async () => {
+  const { env, post } = setup();
+  env.PAGES_KV.m.delete(sessionsValidSinceKey(42));
+  const web = { Cookie: `aired_session=${await session()}`, "X-Aired-Request": "1" };
+  const start = (await (await post("/auth/device", {})).json()) as { device_code: string; user_code: string };
+  await post("/auth/device/approve", { user_code: start.user_code }, web);
+  const got = (await (await post("/auth/device/poll", { device_code: start.device_code })).json()) as { jwt: string };
+  const v = await verifySession(got.jwt, SECRET);
+  assert.ok(v.ok);
+  if (v.ok) {
+    assert.equal(v.claims.kind, "cli");
+    assert.ok(v.claims.authTime <= nowS());
+  }
+});
+
+test("account deletion writes the revocation marker before deleting, and refuses if it can't", () => {
+  const me = readFileSync(new URL("../src/routes/me.ts", import.meta.url), "utf8");
+  const marker = me.indexOf("await revokeAllSessions(c.env.PAGES_KV, userId);\n  } catch (err) {\n    console.error('Failed to set the revocation marker during account deletion:', err);\n    return c.json(");
+  assert.ok(marker > 0, "fails closed");
+  assert.ok(marker < me.indexOf("await deleteAccountRows(c.env.DB, userId);"), "marker first");
 });

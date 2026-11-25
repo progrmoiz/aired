@@ -377,6 +377,16 @@ me.delete('/', requireWebSession, requireCsrfHeader, async (c) => {
   } catch (err) {
     console.error('Failed to read identity emails during account deletion:', err);
   }
+  // Every other session (other browsers, CLI tokens) and MCP connection of
+  // this account stops working, not just the one making this request. First,
+  // and fail closed: without the marker those sessions would outlive the
+  // account. Writing it again on a retry is harmless.
+  try {
+    await revokeAllSessions(c.env.PAGES_KV, userId);
+  } catch (err) {
+    console.error('Failed to set the revocation marker during account deletion:', err);
+    return c.json({ error: 'Could not delete your account. Please try again.' }, 503);
+  }
   try {
     await deleteAccountRows(c.env.DB, userId);
   } catch (err) {
@@ -387,13 +397,6 @@ me.delete('/', requireWebSession, requireCsrfHeader, async (c) => {
     await c.env.PAGES_KV.delete(`ent:${userId}`);
   } catch (err) {
     console.error('Failed to delete entitlement during account deletion:', err);
-  }
-  // Every other session (other browsers, CLI tokens) and MCP connection of
-  // this account stops working, not just the one making this request.
-  try {
-    await revokeAllSessions(c.env.PAGES_KV, userId);
-  } catch (err) {
-    console.error('Failed to set the revocation marker during account deletion:', err);
   }
 
   // Step 1: Revoke current JWT by writing revoked_jti to KV

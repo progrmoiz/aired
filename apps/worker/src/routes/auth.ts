@@ -398,6 +398,7 @@ auth.post('/device/poll', async (c) => {
         { sub: user.id, login: user.login, email: user.email, name: user.name },
         c.env.SESSION_SECRET,
         CLI_SESSION_MAX_AGE_SECONDS,
+        { kind: 'cli' },
       );
     } catch (err) {
       console.error('Failed to mint JWT on device poll:', err);

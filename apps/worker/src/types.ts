@@ -69,6 +69,8 @@ export type AppBindings = {
      * call made with an OAuth token). null when anonymous.
      */
     via: 'cookie' | 'cli' | 'key' | 'oauth' | null;
+    /** When the person signed in (Unix seconds), for 'cookie' and 'cli' callers. */
+    authTime: number | null;
     /** The API key's id when via is 'key'. */
     apiKeyId: string | null;
   };

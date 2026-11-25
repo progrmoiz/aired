@@ -78,7 +78,7 @@ test("CORS: protocol paths are open without credentials; the consent page and th
 
 test("MCP connections end with the account and with sign-out-everywhere; rate limits fit hosted clients", () => {
   const oauth = src("src/routes/mcp-oauth.ts");
-  assert.match(oauth, /props: \{ userId: account\.id, issuedAt: Math\.floor\(Date\.now\(\) \/ 1000\) \}/);
+  assert.match(oauth, /props: \{ userId: account\.id, issuedAt: Math\.floor\(Date\.now\(\) \/ 1000\), authTime: account\.authTime \}/);
   assert.match(oauth, /if \(grantRetired\(env, v\.props\?\.issuedAt\)\) return null;/);
   assert.match(oauth, /await oauth\.revokeGrant\(grant\.id, String\(userId\)\);/);
   const me = src("src/routes/me.ts");
@@ -99,7 +99,7 @@ test("the authorize return path survives characters URL leaves raw", () => {
 
 test("retired grants can't refresh, grants can't outlive their account, and deleting an account ends the AuthKit session", () => {
   const oauth = src("src/routes/mcp-oauth.ts");
-  assert.match(oauth, /tokenExchangeCallback: \(\{ props, env: e \}\) => \{\s*if \(grantRetired\(e,[\s\S]*?throw new OAuthError\('invalid_grant'/);
+  assert.match(oauth, /tokenExchangeCallback: async \(\{ props, env: e \}\) => \{[\s\S]*?grantRetired\(e, p\.issuedAt\) \|\|[\s\S]*?sessionsValidSince\(e\.PAGES_KV, p\.userId, \{ fresh: true \}\)[\s\S]*?throw new OAuthError\('invalid_grant'/);
   const index = src("src/index.ts");
   assert.match(index, /found\.issuedAt === null \|\| found\.issuedAt \* 1000 < created - 60_000/);
   const me = src("src/routes/me.ts");

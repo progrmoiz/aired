@@ -38,6 +38,7 @@ export async function finishSignIn(
       { sub: user.id, login: user.login, email: user.email, name: user.name },
       c.env.SESSION_SECRET,
       isCliFlow ? CLI_SESSION_MAX_AGE_SECONDS : undefined,
+      { kind: isCliFlow ? 'cli' : 'web' },
     );
   } catch (err) {
     console.error('Failed to mint JWT:', err);
