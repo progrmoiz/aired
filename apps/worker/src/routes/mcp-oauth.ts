@@ -3,6 +3,7 @@ import {
   AuthorizationError,
   CimdFetchError,
   OAuthAuthorizationServer,
+  OAuthError,
   type ConsentDescription,
 } from '@cloudflare/workers-oauth-provider';
 import { kvKeys } from '@aired/core';
@@ -52,13 +53,19 @@ export function mcpAuthServer(env: Env): OAuthAuthorizationServer<Env> {
       clientRegistrationEndpoint: '/oauth/register',
       scopesSupported: [MCP_SCOPE, 'offline_access'],
       clientIdMetadataDocumentEnabled: true,
+      // A retired grant can't be refreshed either: the client is told to sign in again.
+      tokenExchangeCallback: ({ props, env: e }) => {
+        if (grantRetired(e, (props as { issuedAt?: unknown } | null)?.issuedAt)) {
+          throw new OAuthError('invalid_grant', { description: 'This connection was signed out. Connect again.' });
+        }
+      },
     });
     servers.set(issuer, server);
   }
   return server;
 }
 
-export type McpTokenUser = { userId: number; scope: string[] };
+export type McpTokenUser = { userId: number; scope: string[]; issuedAt: number | null };
 
 /** "Sign out everywhere" (SESSION_VALID_SINCE) also retires grants approved before it. */
 function grantRetired(env: Env, issuedAt: unknown): boolean {
@@ -75,7 +82,8 @@ export async function validateMcpToken(env: Env, resource: string, token: string
   const userId = v.props?.userId;
   if (typeof userId !== 'number' || !Number.isSafeInteger(userId) || userId <= 0) return null;
   if (grantRetired(env, v.props?.issuedAt)) return null;
-  return { userId, scope: v.scope };
+  const issuedAt = typeof v.props?.issuedAt === 'number' ? v.props.issuedAt : null;
+  return { userId, scope: v.scope, issuedAt };
 }
 
 /** Revoke every MCP connection an account approved (account deletion). */

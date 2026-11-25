@@ -25,12 +25,13 @@ import {
   listProjectsForOwner,
   bumpProjectCount,
 } from '../lib/owner-index.js';
-import { clearSessionCookie, readSessionCookie } from '../lib/cookies.js';
+import { clearSessionCookie, readSessionCookie, readWorkosSessionCookie, clearWorkosSessionCookie } from '../lib/cookies.js';
 import { billingEnabled, getEntitlements, isEntitled } from '../lib/entitlements.js';
 import { getCustomerId, getSubscription } from '../lib/billing/store.js';
 import { blocksAccountDeletion, deleteAccountRows } from '../lib/billing/forget.js';
 import { identityEmails } from '../lib/users.js';
 import { revokeMcpGrants } from './mcp-oauth.js';
+import { workosEnabled, workosLogoutUrl } from '../lib/workos.js';
 import { listActiveSubscriptions } from '../lib/billing/stripe.js';
 import { isMissingCustomer } from '../lib/billing/stripe-shapes.js';
 import type { StoredSubscription } from '../lib/billing/store.js';
@@ -446,11 +447,18 @@ me.delete('/', requireSession, requireCsrfHeader, async (c) => {
     console.error('Failed to delete user record:', err);
   }
 
-  // Step 3: Clear session cookie
+  // Step 3: Clear session cookie, and end the AuthKit session too (as sign-out
+  // does), or the next Log in in this browser signs straight back in.
   clearSessionCookie(c);
+  const workosSession = readWorkosSessionCookie(c);
+  if (workosSession !== null) clearWorkosSessionCookie(c);
 
   // Step 4: Return immediately
-  const response = c.json({ ok: true });
+  const response = c.json(
+    workosSession !== null && workosEnabled(c.env)
+      ? { ok: true, redirect: workosLogoutUrl(c.env, workosSession) }
+      : { ok: true },
+  );
 
   // Step 5: waitUntil — paginated sweep to null out ownerId on all pages
   c.executionCtx.waitUntil(

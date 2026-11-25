@@ -96,3 +96,13 @@ test("the authorize return path survives characters URL leaves raw", () => {
   assert.equal(isAllowedReturn(back), true);
   assert.match(src("src/routes/mcp-oauth.ts"), /\.replace\(\/\[\|\[\\\]\{\}\^`"<> \]\/g, \(ch\) => encodeURIComponent\(ch\)\)/);
 });
+
+test("retired grants can't refresh, grants can't outlive their account, and deleting an account ends the AuthKit session", () => {
+  const oauth = src("src/routes/mcp-oauth.ts");
+  assert.match(oauth, /tokenExchangeCallback: \(\{ props, env: e \}\) => \{\s*if \(grantRetired\(e,[\s\S]*?throw new OAuthError\('invalid_grant'/);
+  const index = src("src/index.ts");
+  assert.match(index, /found\.issuedAt === null \|\| found\.issuedAt \* 1000 < created - 60_000/);
+  const me = src("src/routes/me.ts");
+  assert.match(me, /if \(workosSession !== null\) clearWorkosSessionCookie\(c\);/);
+  assert.match(me, /\? \{ ok: true, redirect: workosLogoutUrl\(c\.env, workosSession\) \}/);
+});

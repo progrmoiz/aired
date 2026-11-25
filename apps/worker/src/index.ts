@@ -94,6 +94,11 @@ function mcpCaller(which: "open" | "account") {
         record = null;
       }
       if (record === null || typeof record.login !== "string") return mcpChallenge(c, resource, "invalid_token");
+      // A grant can't outlive the account that approved it, even if revoking it on deletion failed.
+      const created = Date.parse(typeof (record as { createdAt?: unknown }).createdAt === "string" ? (record as { createdAt: string }).createdAt : "");
+      if (!isNaN(created) && (found.issuedAt === null || found.issuedAt * 1000 < created - 60_000)) {
+        return mcpChallenge(c, resource, "invalid_token");
+      }
       c.set("user", {
         id: found.userId,
         login: record.login,
