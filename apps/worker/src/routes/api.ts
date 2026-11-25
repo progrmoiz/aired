@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import type { AppBindings } from "../types.js";
-import { loadStats, saveStats } from "../lib/stats.js";
+import { loadStats, publicStats, saveStats } from "../lib/stats.js";
 import { rateLimit, publishRateLimit } from "../middleware/rate-limit.js";
 import { requireCsrfHeader } from "../middleware/csrf.js";
 import { readUpdateToken } from "../lib/page-token.js";
@@ -543,15 +543,10 @@ api.get("/pages/:id", async (c) => {
   });
 });
 
-// GET /api/stats — public stats
+// GET /api/stats — public stats: counters and per-country views only
 api.get("/stats", async (c) => {
   const stats = await loadStats(c.env.PAGES_KV);
-  return c.json({
-    publishes: stats.publishes,
-    views: stats.views,
-    recent: stats.recent,
-    geo: stats.geo,
-  });
+  return c.json(publicStats(stats));
 });
 
 export { api };
