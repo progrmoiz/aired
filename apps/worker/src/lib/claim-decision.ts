@@ -1,15 +1,17 @@
 /**
- * Who may claim, update or delete a page, and with which token. Pure (no
- * runtime imports), so tests can import it; hashing is passed in.
+ * Who may claim, update or delete a page, and with which token. No runtime
+ * imports, so tests can import it; D1, KV and hashing are passed in.
  *
  * A claimed page has a row in D1 `page_claims` (lib/page-claims.ts). That row,
  * not the KV page record, decides its owner and token: KV records get written
  * back stale (a view bumping the read count, an update racing the claim), and
- * a stale write must never bring back the token the claim retired.
+ * a stale write must never bring back the token the claim retired. Rows are
+ * released or tombstoned, never deleted, for the same reason.
  */
 
 export type ClaimRecord = {
-  ownerId: number;
+  /** Null once released (owner deleted their account, or page deleted). */
+  ownerId: number | null;
   /** Hash of the current token: the one the claim handed to the owner. */
   tokenHash: string;
   /** Hash of the pre-claim token, which travelled in claim links and output. */
@@ -25,8 +27,31 @@ export type ClaimRecord = {
  */
 export const CLAIM_RETRY_WINDOW_MS = 10 * 60 * 1000;
 
-/** Checks a token against a stored hash (verifyToken from @aired/core). */
+/** Checks the supplied token against a stored hash (verifyToken from @aired/core). */
 export type TokenMatcher = (storedHash: string) => Promise<boolean>;
+
+/** The owner and token hash that count for a page: the claim row wins. */
+export function pageCredentials(
+  kvOwnerId: number | null,
+  kvTokenHash: string,
+  record: ClaimRecord | null,
+): { ownerId: number | null; tokenHash: string } {
+  if (record !== null) return { ownerId: record.ownerId, tokenHash: record.tokenHash };
+  return { ownerId: kvOwnerId, tokenHash: kvTokenHash };
+}
+
+/**
+ * The one way update, delete, publish-update and MCP get a page's owner and
+ * token hash. `lookup` reads the claim row (getClaim); if it throws, so does
+ * this, and callers fail closed rather than trust a possibly stale KV hash.
+ */
+export async function authoritativeCredentials(
+  lookup: () => Promise<ClaimRecord | null>,
+  kvOwnerId: number | null,
+  kvTokenHash: string,
+): Promise<{ ownerId: number | null; tokenHash: string }> {
+  return pageCredentials(kvOwnerId, kvTokenHash, await lookup());
+}
 
 /**
  * - `deny`: someone else's page, or a token that doesn't match an unowned
@@ -50,7 +75,7 @@ export async function planClaim(input: {
   matches: TokenMatcher;
 }): Promise<ClaimPlan> {
   const { record, userId } = input;
-  const ownerId = record !== null ? record.ownerId : input.kvOwnerId;
+  const { ownerId, tokenHash } = pageCredentials(input.kvOwnerId, input.kvTokenHash, record);
 
   if (ownerId === userId) {
     if (
@@ -63,17 +88,65 @@ export async function planClaim(input: {
     return 'owned';
   }
   if (ownerId !== null) return 'deny';
-  return (await input.matches(input.kvTokenHash)) ? 'claim' : 'deny';
+  return (await input.matches(tokenHash)) ? 'claim' : 'deny';
 }
 
-/** The owner and token hash that count for a page: the claim row wins. */
-export function pageCredentials(
-  kvOwnerId: number | null,
-  kvTokenHash: string,
-  record: ClaimRecord | null,
-): { ownerId: number | null; tokenHash: string } {
-  if (record !== null) return { ownerId: record.ownerId, tokenHash: record.tokenHash };
-  return { ownerId: kvOwnerId, tokenHash: kvTokenHash };
+export type ClaimDeps = {
+  getClaim: () => Promise<ClaimRecord | null>;
+  /** Insert a row or take a released one; false if someone holds the page. */
+  upsertClaim: (record: ClaimRecord & { ownerId: number }) => Promise<boolean>;
+  /** Replace the token on the user's own row; false if it isn't theirs. */
+  replaceClaimToken: (tokenHash: string) => Promise<boolean>;
+  newToken: () => string;
+  hash: (token: string) => Promise<string>;
+  matches: TokenMatcher;
+  /** Copy owner and hash into the KV record. Must not throw. */
+  mirrorToKv: (ownerId: number, tokenHash: string) => Promise<void>;
+  /** Owner and project indexes, first claim only. Must not throw. */
+  indexPage: () => Promise<void>;
+};
+
+/** `token` is set only when a new token was issued. */
+export type ClaimOutcome = { ok: false } | { ok: true; token: string | null };
+
+/** The whole claim: plan, write D1, mirror to KV, index. */
+export async function runClaim(
+  input: { kvOwnerId: number | null; kvTokenHash: string; userId: number; now: number },
+  deps: ClaimDeps,
+): Promise<ClaimOutcome> {
+  const planFor = (record: ClaimRecord | null) =>
+    planClaim({ ...input, record, matches: deps.matches });
+
+  const record = await deps.getClaim();
+  let plan = await planFor(record);
+  if (plan === 'deny') return { ok: false };
+  if (plan === 'owned') return { ok: true, token: null };
+
+  const token = deps.newToken();
+  const tokenHash = await deps.hash(token);
+
+  if (plan === 'claim') {
+    const prevTokenHash = pageCredentials(input.kvOwnerId, input.kvTokenHash, record).tokenHash;
+    const won = await deps.upsertClaim({
+      ownerId: input.userId,
+      tokenHash,
+      prevTokenHash,
+      claimedAt: input.now,
+    });
+    if (!won) {
+      // Another claim got there first. Re-plan against its row. A same-user
+      // race lands on 'reissue'; treat it as 'owned' so this request doesn't
+      // retire the token the winning request just handed out.
+      plan = await planFor(await deps.getClaim());
+      return plan === 'deny' ? { ok: false } : { ok: true, token: null };
+    }
+  } else if (!(await deps.replaceClaimToken(tokenHash))) {
+    return { ok: false };
+  }
+
+  await deps.mirrorToKv(input.userId, tokenHash);
+  if (plan === 'claim') await deps.indexPage();
+  return { ok: true, token };
 }
 
 export type WriteAuth =

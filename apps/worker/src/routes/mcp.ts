@@ -18,7 +18,7 @@ import {
   DEFAULT_TTL,
 } from "@aired/core";
 import type { PageMetadata } from "@aired/core";
-import { pageCredentials } from "../lib/claim-decision.js";
+import { authoritativeCredentials } from "../lib/claim-decision.js";
 import { getClaim } from "../lib/page-claims.js";
 
 function createAiredMcpServer(env: {
@@ -104,10 +104,12 @@ function createAiredMcpServer(env: {
         // written back stale. Fail closed if D1 can't be read.
         let tokenHash: string;
         try {
-          tokenHash = pageCredentials(
-            metadata.ownerId,
-            metadata.tokenHash,
-            await getClaim(env.DB, existingId),
+          tokenHash = (
+            await authoritativeCredentials(
+              () => getClaim(env.DB, existingId),
+              metadata.ownerId,
+              metadata.tokenHash,
+            )
           ).tokenHash;
         } catch (err) {
           console.error("page_claims lookup failed on MCP update", { id: existingId, err });

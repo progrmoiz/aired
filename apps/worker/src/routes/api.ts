@@ -7,8 +7,8 @@ import { readUpdateToken } from "../lib/page-token.js";
 import { TIERS } from "../lib/rate-limit-tiers.js";
 import { detectSpam, SPAM_REJECTION } from "../lib/spam.js";
 import { claimUrl } from "../lib/claim-url.js";
-import { authorizePageWrite, pageCredentials } from "../lib/claim-decision.js";
-import { deleteClaim, getClaim } from "../lib/page-claims.js";
+import { authoritativeCredentials, authorizePageWrite } from "../lib/claim-decision.js";
+import { getClaim, tombstoneClaim } from "../lib/page-claims.js";
 import { billingEnabled, getEntitlements, planLimitError, UPGRADE_URL } from "../lib/entitlements.js";
 import type { Entitlements } from "../lib/entitlements.js";
 import {
@@ -42,7 +42,7 @@ const api = new Hono<AppBindings>();
  * can't be read: callers fail closed rather than trust a possibly stale hash.
  */
 async function credentialsFor(db: D1Database, id: string, metadata: PageMetadata) {
-  return pageCredentials(metadata.ownerId, metadata.tokenHash, await getClaim(db, id));
+  return authoritativeCredentials(() => getClaim(db, id), metadata.ownerId, metadata.tokenHash);
 }
 
 const CREDENTIALS_UNAVAILABLE = "Could not check this page's credentials. Please try again.";
@@ -479,10 +479,12 @@ api.delete("/pages/:id", requireCsrfHeader, async (c) => {
     c.env.PAGES_BUCKET.delete(`pages/${id}/index.html`),
     c.env.PAGES_KV.delete(`page:${id}`),
   ]);
+  // Keep a tombstone row: a stale KV copy of the page, still readable in
+  // other regions for a while, must not let its old token bring it back.
   try {
-    await deleteClaim(c.env.DB, id);
+    await tombstoneClaim(c.env.DB, id);
   } catch (err) {
-    console.error("page_claims delete failed", { id, err });
+    console.error("page_claims tombstone failed", { id, err });
   }
 
   // Remove from owner index (best-effort)

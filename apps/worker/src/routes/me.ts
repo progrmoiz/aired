@@ -30,9 +30,9 @@ import { billingEnabled, getEntitlements, isEntitled } from '../lib/entitlements
 import { getSubscription } from '../lib/billing/store.js';
 import type { StoredSubscription } from '../lib/billing/store.js';
 import { AUTH_HEADER } from '@aired/core';
-import { addClaimResult, planClaim } from '../lib/claim-decision.js';
+import { addClaimResult, runClaim } from '../lib/claim-decision.js';
 import type { ClaimBatchResult } from '../lib/claim-decision.js';
-import { claimedIds, deleteClaimsForOwner, getClaim, insertClaim, replaceClaimToken } from '../lib/page-claims.js';
+import { claimedIds, getClaim, releaseClaimsForOwner, replaceClaimToken, upsertClaim } from '../lib/page-claims.js';
 
 const me = new Hono<AppBindings>();
 
@@ -398,11 +398,32 @@ me.delete('/', requireCsrfHeader, async (c) => {
   c.executionCtx.waitUntil(
     (async () => {
       // Claimed pages become anonymous pages again, like every other page.
+      // Their D1 rows are released, not deleted, and keep the rotated hash:
+      // the KV record may hold a stale pre-claim hash, which must not become
+      // the authority again. `released` mirrors the right hash into KV below.
+      let released = new Map<string, string>();
       try {
-        await deleteClaimsForOwner(c.env.DB, userId);
+        released = await releaseClaimsForOwner(c.env.DB, userId);
       } catch (err) {
-        console.error('Failed to delete page claims during account deletion:', err);
+        console.error('Failed to release page claims during account deletion:', err);
       }
+      const mirrorAnonymous = async (pageId: string) => {
+        const raw = await c.env.PAGES_KV.get(kvKeys.page(pageId));
+        if (raw === null) return;
+        const metadata = parseMetadata(raw);
+        if (metadata === null) return;
+        const updated: PageMetadata = {
+          ...metadata,
+          ownerId: null,
+          tokenHash: released.get(pageId) ?? metadata.tokenHash,
+        };
+        const kvOptions: KVNamespacePutOptions = {};
+        if (metadata.expiresAt !== null) {
+          kvOptions.expiration = Math.floor(Date.parse(metadata.expiresAt) / 1000);
+        }
+        await c.env.PAGES_KV.put(kvKeys.page(pageId), serializeMetadata(updated), kvOptions);
+      };
+      const swept = new Set<string>();
 
       let sweepCursor: string | undefined = undefined;
 
@@ -429,18 +450,8 @@ me.delete('/', requireCsrfHeader, async (c) => {
           if (pageId === undefined) continue;
 
           try {
-            const raw = await c.env.PAGES_KV.get(kvKeys.page(pageId));
-            if (raw !== null) {
-              const metadata = parseMetadata(raw);
-              if (metadata !== null) {
-                const updated: PageMetadata = { ...metadata, ownerId: null };
-                const kvOptions: KVNamespacePutOptions = {};
-                if (metadata.expiresAt !== null) {
-                  kvOptions.expiration = Math.floor(Date.parse(metadata.expiresAt) / 1000);
-                }
-                await c.env.PAGES_KV.put(kvKeys.page(pageId), serializeMetadata(updated), kvOptions);
-              }
-            }
+            swept.add(pageId);
+            await mirrorAnonymous(pageId);
           } catch (err) {
             console.error('Failed to null ownerId on page during deletion sweep:', { pageId, err });
           }
@@ -457,6 +468,16 @@ me.delete('/', requireCsrfHeader, async (c) => {
           break;
         }
         sweepCursor = list.cursor ?? undefined;
+      }
+
+      // Claimed pages missing from the owner index (a failed index write).
+      for (const pageId of released.keys()) {
+        if (swept.has(pageId)) continue;
+        try {
+          await mirrorAnonymous(pageId);
+        } catch (err) {
+          console.error('Failed to null ownerId on claimed page during deletion sweep:', { pageId, err });
+        }
       }
 
       // Second sweep: delete the owner's project-index entries (page records were
@@ -526,91 +547,58 @@ async function claimPage(
   const metadata = parseMetadata(raw);
   if (metadata === null) return denied();
 
-  const matches = (hash: string) => verifyToken(updateToken, hash);
-  const now = Date.now();
-  let record = await getClaim(env.DB, pageId);
-  let plan = await planClaim({
-    kvOwnerId: metadata.ownerId,
-    kvTokenHash: metadata.tokenHash,
-    record,
-    userId,
-    now,
-    matches,
+  const outcome = await runClaim(
+    { kvOwnerId: metadata.ownerId, kvTokenHash: metadata.tokenHash, userId, now: Date.now() },
+    {
+      getClaim: () => getClaim(env.DB, pageId),
+      upsertClaim: (record) => upsertClaim(env.DB, pageId, record),
+      replaceClaimToken: (hash) => replaceClaimToken(env.DB, pageId, userId, hash),
+      newToken: generateToken,
+      hash: hashToken,
+      matches: (hash) => verifyToken(updateToken, hash),
+      // KV is a cache for the viewer and dashboard; D1 already holds the
+      // claim, so a failure here can't revive the old token.
+      mirrorToKv: async (ownerId, tokenHash) => {
+        try {
+          const updated: PageMetadata = { ...metadata, ownerId, tokenHash };
+          const kvOptions: KVNamespacePutOptions = {};
+          if (metadata.expiresAt !== null) {
+            kvOptions.expiration = Math.floor(Date.parse(metadata.expiresAt) / 1000);
+          }
+          await kv.put(kvKeys.page(pageId), serializeMetadata(updated), kvOptions);
+        } catch (err) {
+          console.error('page metadata write failed during claim', { pageId, userId, err });
+        }
+      },
+      indexPage: async () => {
+        try {
+          await addPageToOwner(kv, userId, pageId, metadata.createdAt, metadata.expiresAt);
+        } catch (err) {
+          console.error('owner-index write failed during claim', { pageId, userId, err });
+        }
+        if (metadata.project !== null) {
+          try {
+            await addPageToOwnerProject(kv, userId, metadata.project, pageId, metadata.createdAt, metadata.expiresAt);
+            await bumpProjectCount(kv, userId, metadata.project, 1);
+          } catch (err) {
+            console.error('owner-project-index write failed during claim', { pageId, userId, project: metadata.project, err });
+          }
+        }
+      },
+    },
+  );
+
+  if (!outcome.ok) return denied();
+  return Response.json({
+    ok: true,
+    page: {
+      id: metadata.id,
+      title: metadata.title,
+      createdAt: metadata.createdAt,
+      expiresAt: metadata.expiresAt,
+    },
+    ...(outcome.token !== null ? { update_token: outcome.token } : {}),
   });
-
-  const pageInfo = {
-    id: metadata.id,
-    title: metadata.title,
-    createdAt: metadata.createdAt,
-    expiresAt: metadata.expiresAt,
-  };
-  if (plan === 'deny') return denied();
-  if (plan === 'owned') return Response.json({ ok: true, page: pageInfo });
-
-  const newToken = generateToken();
-  const newHash = await hashToken(newToken);
-
-  if (plan === 'claim') {
-    // Serializes claims: of two claims racing on stale KV reads, only one
-    // inserts. The loser re-plans against the row the winner wrote.
-    const inserted = await insertClaim(env.DB, pageId, {
-      ownerId: userId,
-      tokenHash: newHash,
-      prevTokenHash: metadata.tokenHash,
-      claimedAt: now,
-    });
-    if (!inserted) {
-      record = await getClaim(env.DB, pageId);
-      plan = await planClaim({
-        kvOwnerId: metadata.ownerId,
-        kvTokenHash: metadata.tokenHash,
-        record,
-        userId,
-        now,
-        matches,
-      });
-      if (plan === 'deny') return denied();
-      if (plan === 'owned') return Response.json({ ok: true, page: pageInfo });
-      if (plan === 'claim') return denied(); // a row exists, so this can't happen
-    }
-  }
-
-  if (plan === 'reissue') {
-    if (!(await replaceClaimToken(env.DB, pageId, userId, newHash))) return denied();
-  }
-
-  // Mirror the owner and hash into KV for the viewer and dashboard. D1 is
-  // the authority, so a failure here (or a later stale write-back) can't
-  // revive the old token.
-  try {
-    const updated: PageMetadata = { ...metadata, ownerId: userId, tokenHash: newHash };
-    const kvOptions: KVNamespacePutOptions = {};
-    if (metadata.expiresAt !== null) {
-      kvOptions.expiration = Math.floor(Date.parse(metadata.expiresAt) / 1000);
-    }
-    await kv.put(kvKeys.page(pageId), serializeMetadata(updated), kvOptions);
-  } catch (err) {
-    console.error('page metadata write failed during claim', { pageId, userId, err });
-  }
-
-  // Indexes only on the first claim; a reissue is the same page again.
-  if (plan === 'claim') {
-    try {
-      await addPageToOwner(kv, userId, pageId, metadata.createdAt, metadata.expiresAt);
-    } catch (err) {
-      console.error('owner-index write failed during claim', { pageId, userId, err });
-    }
-    if (metadata.project !== null) {
-      try {
-        await addPageToOwnerProject(kv, userId, metadata.project, pageId, metadata.createdAt, metadata.expiresAt);
-        await bumpProjectCount(kv, userId, metadata.project, 1);
-      } catch (err) {
-        console.error('owner-project-index write failed during claim', { pageId, userId, project: metadata.project, err });
-      }
-    }
-  }
-
-  return Response.json({ ok: true, page: pageInfo, update_token: newToken });
 }
 
 export { me };

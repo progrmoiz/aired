@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
   addClaimResult,
+  authoritativeCredentials,
   authorizePageWrite,
+  runClaim,
+  type ClaimDeps,
   CLAIM_RETRY_WINDOW_MS,
   pageCredentials,
   planClaim,
@@ -165,9 +168,132 @@ test("claim-batch keeps claimed as ids and puts new tokens in a separate map", (
   addClaimResult(acc, "b", { ok: true }); // already owned: no token
   addClaimResult(acc, "c", { ok: false });
   addClaimResult(acc, "d", { ok: true, update_token: 42 });
+  addClaimResult(acc, "e", {}); // claimPage threw
   assert.deepEqual(acc, {
     claimed: ["a", "b", "d"],
-    failed: [{ id: "c", reason: "claim failed" }],
+    failed: [{ id: "c", reason: "claim failed" }, { id: "e", reason: "claim failed" }],
     tokens: { a: NEW },
   });
+});
+
+// --- released and deleted rows -------------------------------------------------
+
+test("a released row (owner deleted their account) is claimable only with its rotated token", async () => {
+  const released = record({ ownerId: null });
+  // The stale KV record still has the pre-claim hash: it must not count.
+  assert.equal(
+    await planClaim({ kvOwnerId: null, kvTokenHash: sha(OLD), record: released, userId: OTHER, now: NOW, matches: matcherFor(OLD).matches }),
+    "deny",
+  );
+  assert.equal(
+    await planClaim({ kvOwnerId: null, kvTokenHash: sha(OLD), record: released, userId: OTHER, now: NOW, matches: matcherFor(NEW).matches }),
+    "claim",
+  );
+});
+
+test("a tombstoned row (page deleted) matches no token and no owner", async () => {
+  const gone = record({ ownerId: null, tokenHash: "deleted", prevTokenHash: "deleted" });
+  for (const token of [OLD, NEW, "deleted"]) {
+    assert.equal(
+      await planClaim({ kvOwnerId: null, kvTokenHash: sha(OLD), record: gone, userId: ME, now: NOW, matches: matcherFor(token).matches }),
+      "deny",
+    );
+    const creds = pageCredentials(ME, sha(OLD), gone);
+    assert.deepEqual(
+      await authorizePageWrite({ ...creds, token, userId: ME, allowSession: true, matches: matcherFor(token).matches }),
+      { ok: false, reason: "bad_token" },
+    );
+  }
+});
+
+test("authoritativeCredentials reads the claim row and fails closed when it can't", async () => {
+  assert.deepEqual(await authoritativeCredentials(async () => record(), null, sha(OLD)), { ownerId: ME, tokenHash: sha(NEW) });
+  assert.deepEqual(await authoritativeCredentials(async () => null, OTHER, sha(OLD)), { ownerId: OTHER, tokenHash: sha(OLD) });
+  await assert.rejects(authoritativeCredentials(async () => { throw new Error("D1 down"); }, null, sha(OLD)), /D1 down/);
+});
+
+// --- runClaim ------------------------------------------------------------------
+
+/** An in-memory claim store and KV page, with a log of every side effect. */
+function fakeClaim(opts: { kvOwnerId: number | null; kvTokenHash: string; row?: ClaimRecord | null; userId: number; token: string; loseRaceTo?: ClaimRecord }) {
+  let row: ClaimRecord | null = opts.row ?? null;
+  const log: string[] = [];
+  let n = 0;
+  const deps: ClaimDeps = {
+    getClaim: async () => row,
+    upsertClaim: async (rec) => {
+      if (opts.loseRaceTo !== undefined && row === null) {
+        row = opts.loseRaceTo;
+        log.push("upsert:lost");
+        return false;
+      }
+      if (row !== null && (row.ownerId !== null || row.tokenHash === "deleted")) {
+        log.push("upsert:held");
+        return false;
+      }
+      row = rec;
+      log.push(`upsert:${rec.ownerId}`);
+      return true;
+    },
+    replaceClaimToken: async (hash) => {
+      if (row === null || row.ownerId !== opts.userId) return false;
+      row = { ...row, tokenHash: hash };
+      log.push("replace");
+      return true;
+    },
+    newToken: () => `at_issued_${++n}`,
+    hash: async (t) => sha(t),
+    matches: async (hash) => sha(opts.token) === hash,
+    mirrorToKv: async (ownerId, hash) => { log.push(`kv:${ownerId}:${hash === row?.tokenHash ? "row" : "other"}`); },
+    indexPage: async () => { log.push("index"); },
+  };
+  const run = (now = NOW) => runClaim({ kvOwnerId: opts.kvOwnerId, kvTokenHash: opts.kvTokenHash, userId: opts.userId, now }, deps);
+  return { run, log, row: () => row };
+}
+
+test("runClaim: first claim stores the old hash as prev, mirrors the new hash and indexes once", async () => {
+  const f = fakeClaim({ kvOwnerId: null, kvTokenHash: sha(OLD), userId: ME, token: OLD });
+  const out = await f.run();
+  assert.deepEqual(out, { ok: true, token: "at_issued_1" });
+  assert.deepEqual(f.row(), { ownerId: ME, tokenHash: sha("at_issued_1"), prevTokenHash: sha(OLD), claimedAt: NOW });
+  assert.deepEqual(f.log, [`upsert:${ME}`, `kv:${ME}:row`, "index"]);
+});
+
+test("runClaim: a retry with the old token inside the window reissues without indexing again", async () => {
+  const f = fakeClaim({ kvOwnerId: null, kvTokenHash: sha(OLD), userId: ME, token: OLD });
+  await f.run();
+  const again = await f.run(NOW + 1000);
+  assert.deepEqual(again, { ok: true, token: "at_issued_2" });
+  assert.equal(f.row()?.tokenHash, sha("at_issued_2"));
+  assert.equal(f.row()?.prevTokenHash, sha(OLD));
+  assert.deepEqual(f.log, [`upsert:${ME}`, `kv:${ME}:row`, "index", "replace", `kv:${ME}:row`]);
+});
+
+test("runClaim: on your own page with any other token, nothing is written and no token returned", async () => {
+  const f = fakeClaim({ kvOwnerId: ME, kvTokenHash: sha(NEW), row: record(), userId: ME, token: "at_made_up" });
+  assert.deepEqual(await f.run(), { ok: true, token: null });
+  assert.deepEqual(f.log, []);
+});
+
+test("runClaim: losing the insert race to someone else is a deny, with no KV or index writes", async () => {
+  const f = fakeClaim({ kvOwnerId: null, kvTokenHash: sha(OLD), userId: ME, token: OLD, loseRaceTo: record({ ownerId: OTHER }) });
+  assert.deepEqual(await f.run(), { ok: false });
+  assert.deepEqual(f.log, ["upsert:lost"]);
+});
+
+test("runClaim: losing the race to your own other request returns ok without retiring its token", async () => {
+  const winner = record({ ownerId: ME, tokenHash: sha("at_winner") });
+  const f = fakeClaim({ kvOwnerId: null, kvTokenHash: sha(OLD), userId: ME, token: OLD, loseRaceTo: winner });
+  assert.deepEqual(await f.run(), { ok: true, token: null });
+  assert.equal(f.row()?.tokenHash, sha("at_winner"));
+  assert.deepEqual(f.log, ["upsert:lost"]);
+});
+
+test("runClaim: a released row is claimed with its rotated token; the old link token is refused", async () => {
+  const released = record({ ownerId: null });
+  const old = fakeClaim({ kvOwnerId: null, kvTokenHash: sha(OLD), row: released, userId: OTHER, token: OLD });
+  assert.deepEqual(await old.run(), { ok: false });
+  const fresh = fakeClaim({ kvOwnerId: null, kvTokenHash: sha(OLD), row: released, userId: OTHER, token: NEW });
+  assert.deepEqual(await fresh.run(), { ok: true, token: "at_issued_1" });
+  assert.equal(fresh.row()?.prevTokenHash, sha(NEW));
 });
