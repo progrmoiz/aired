@@ -1,15 +1,17 @@
 # aired Design System
 
-*Version 1.0 — 2026-05-09*
+*Version 2.0 — 2026-11-25*
 
 The single reference for building any UI in aired. Read before writing any component, page, or layout. Updated when patterns evolve.
 
-**Stack:** pnpm monorepo. Web app is vanilla HTML + JS + Tailwind 3 (`apps/web/`). No React, no shadcn — utility classes against the tokens in `tailwind.config.js`.
+**Stack:** pnpm monorepo. Web app is vanilla HTML + JS (`apps/web/`). Tool pages (dashboard, docs, guides, abuse) use Tailwind 3 utilities against the tokens in `tailwind.config.js`. Marketing pages (homepage, `/pricing`) use plain CSS in `apps/web/site.css` with the same tokens as CSS variables. No React, no shadcn.
 **Icons:** Inline SVG, hand-picked. No library.
 **Fonts:** Inter (400, 500, 600), JetBrains Mono (400, 500). Both via Google Fonts `<link>`.
 **Voice:** see §10 below
-**Audience:** Developer mid-task. Pasted HTML from Claude, ran a script, generated an artifact — they want a shareable URL right now, then leaving in 30 seconds. Indie hackers shipping prototypes are a superset of the same need.
-**Brand keywords:** Instant. Terminal. Quiet.
+**Audience:** Anyone who made a page with an AI tool and needs to send it: agency people sending client reports, makers sharing a game, developers whose agent publishes. Also developer mid-task. Pasted HTML from Claude, ran a script, generated an artifact — they want a shareable URL right now, then leaving in 30 seconds. Indie hackers shipping prototypes are a superset of the same need.
+**Brand keywords:** Instant. Trustworthy. Quiet.
+
+**Two surfaces:** *tool pages* follow the dense rules below (14px body, 24px max heading). *Marketing pages* (homepage, `/pricing`) are allowed larger type and standard landing-page blocks so aired reads as a product people pay for. See §9.2.
 
 ---
 
@@ -18,8 +20,8 @@ The single reference for building any UI in aired. Read before writing any compo
 Numbered, ordered by priority. When unsure, run the decision through these.
 
 1. **Speed is the feature.** Anything that delays the URL — modal, signup, toast, animation — is wrong. The page exists to turn HTML into a link in seconds.
-2. **Dense, not loud.** Body text is 14px. Max heading is 24px. No giant marketing typography. The page should read like a CLI man page, not a SaaS landing.
-3. **Quiet by default.** Neutrals carry the layout. Brand purple appears only on the primary action and the result. One purple thing per view.
+2. **Dense, not loud.** On tool pages body text is 14px and the max heading is 24px. Marketing pages may go to 15px body and a 44px H1, but stay quiet: no gradient text, no glow, no emoji.
+3. **Quiet by default.** Neutrals carry the layout. The primary button is light (`text-primary` fill, `bg` text), not purple. Brand purple is the logo mark, focus rings and section eyebrows.
 4. **States are not optional.** Every interactive element: default, hover, active, focus, disabled. Every async action: idle, pending, success, error.
 5. **Strong defaults, no configuration.** TTL has a default. Visibility has a default. Pin is empty. The form should produce a URL with one click.
 
@@ -38,8 +40,8 @@ aired: {
   border:           '#222225',  // 1px outlines, dividers
   'border-focus':   '#3b3b40',  // focused input border
   'text-primary':   '#ededef',  // body, headings
-  'text-secondary': '#8a8a8e',  // labels, captions
-  'text-tertiary':  '#56565a',  // placeholders, disabled, kbd
+  'text-secondary': '#a1a1a6',  // labels, captions (7.9:1 on bg)
+  'text-tertiary':  '#84848a',  // placeholders, helper text (5.3:1 on bg)
   accent:           '#7c6aef',  // brand purple — see usage table below
   'accent-hover':   '#8b7bf2',  // hover state on primary action only
 }
@@ -56,7 +58,8 @@ Status colors are not in the config (intentional — aired is mostly purple-or-n
 
 | Context | How |
 |---------|-----|
-| Primary CTA ("Publish") | `bg-aired-accent` text white, hover `bg-aired-accent-hover` |
+| Logo mark | `#7c6aef` on the signal icon only |
+| Section eyebrow (marketing pages) | 13px medium, `#7c6aef` |
 | Focus ring (form-container glow) | `rgba(124, 106, 239, 0.4)` at 2px outside, on `:focus-visible` |
 | Result URL link | `text-aired-accent` |
 | Form-container ambient glow on focus-within | `0 0 40px -12px rgba(124, 106, 239, 0.08)` |
@@ -253,6 +256,17 @@ No decorative empty-state cards — no illustrations, no big "Get started" panel
 
 The web app is one page (`apps/web/index.html`). The pattern below is what that page is.
 
+### 9.2 Marketing pages (homepage, /pricing)
+
+Wide layout, max-width 1120px, built from standard landing-page blocks in `apps/web/site.css`:
+
+- Header: logo mark + Pricing / Docs / Guides, "Log in", light "Start free" button
+- Hero: H1 + the real publish form on the left, an example published page on the right
+- "Works with" strip of real tool logos (Simple Icons paths, `currentColor`)
+- Animated beam (tools → aired → devices), bento grid of features, split section with a dashboard example, hairline feature grid, live numbers from `/api/stats`, plan cards, FAQ accordion, logo-wall CTA
+- Cards: 16px radius, `1px solid rgba(255,255,255,.08)`, inset top glow `0 -20px 80px -20px rgba(255,255,255,.07)`
+- Features that don't exist yet are labelled "soon"; plans that aren't open show "Coming soon" instead of a buy button
+
 ### 9.1 Single-page tool layout
 
 Vertical stack, max-width 640px, centered. Sections separated by 40-48px.
@@ -272,7 +286,7 @@ Vertical stack, max-width 640px, centered. Sections separated by 40-48px.
 └──────────────────────────┘
 ```
 
-There is no nav, no sidebar, no footer chrome. The page is the tool.
+Tool pages have minimal nav and footer chrome. The page is the tool.
 
 ### When to add a second page
 
@@ -333,5 +347,6 @@ Append-only record of design decisions. One line per entry. Append on every nota
 ```
 2026-05-09 — DESIGN.md bootstrapped from existing tokens in apps/web/tailwind.config.js. Dark-only, purple-accent (#7c6aef), 14px body, ease-out-expo motion.
 2026-05-10 — Empty-state rule softened: one inline factual line allowed (required) when user has no breadcrumb to the next action; decorative cards still forbidden. Dashboard 0-pages state is the canonical example.
+2026-11-25 — Homepage and /pricing rebuilt as marketing pages (site.css): wide layout, bento and feature grids, plan cards, logo-wall CTA. Primary button is now light; purple limited to the mark, focus and eyebrows. Text tokens raised for contrast (secondary #a1a1a6, tertiary #84848a). Globe and live title ticker removed.
 2026-11-21 — Guide pages added (/html-to-link, /share-claude-artifacts, /tiiny-host-alternative). They reuse the homepage form and tokens, keep 14px body and 18px h2, and exist for search traffic from non-technical visitors. Homepage H1 and button now use font-medium and "Publish" per §3 and §8.1.
 ```

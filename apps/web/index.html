@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>aired — turn any HTML file into a shareable link</title>
   <meta name="description" content="Made a page, report or game with Claude or ChatGPT? Paste the HTML or drop the file and get a link anyone can open. Free, no account needed." />
   <link rel="canonical" href="https://aired.sh/" />
@@ -53,12 +53,12 @@
         "@type": "FAQPage",
         "@id": "https://aired.sh/#faq",
         "mainEntity": [
-          { "@type": "Question", "name": "Do I need an account to share an HTML file?", "acceptedAnswer": { "@type": "Answer", "text": "No. Paste the HTML or drop the file and you get a link right away. Sign in with GitHub only if you want a dashboard of your pages that works from any device." } },
-          { "@type": "Question", "name": "How long does the link last?", "acceptedAnswer": { "@type": "Answer", "text": "Seven days by default. You can pick 1 hour, 1 day, 30 days or permanent before you publish." } },
-          { "@type": "Question", "name": "Can I password-protect a page?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Add a PIN before you publish and visitors must enter it to see the page." } },
-          { "@type": "Question", "name": "Who can see my page?", "acceptedAnswer": { "@type": "Answer", "text": "Anyone you send the link to. Pages published without an account are hidden from search engines." } },
-          { "@type": "Question", "name": "What can I publish?", "acceptedAnswer": { "@type": "Answer", "text": "Any HTML page up to 2 MB: reports, dashboards, slides, landing pages, games and anything Claude, ChatGPT or another AI tool builds for you. Scripts and styles run as written." } },
-          { "@type": "Question", "name": "Is aired free?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Publishing and viewing are free, and the code is open source on GitHub." } }
+          { "@type": "Question", "name": "Do I need an account to share an HTML file?", "acceptedAnswer": { "@type": "Answer", "text": "No. Paste the HTML or drop the file and you get a link right away. Sign in with GitHub only if you want your pages in one place." } },
+          { "@type": "Question", "name": "Does the person I send it to need anything?", "acceptedAnswer": { "@type": "Answer", "text": "Just a browser. No account, no app, no sign-in." } },
+          { "@type": "Question", "name": "How long does the link last?", "acceptedAnswer": { "@type": "Answer", "text": "Seven days by default. You can pick 1 hour, 1 day, 30 days or never before you publish." } },
+          { "@type": "Question", "name": "Can I keep a page private?", "acceptedAnswer": { "@type": "Answer", "text": "Add a password before you publish. Pages published without an account are hidden from search engines." } },
+          { "@type": "Question", "name": "What can I publish?", "acceptedAnswer": { "@type": "Answer", "text": "Any single HTML page up to 2 MB: reports, dashboards, decks and games. Scripts and styles run as written." } },
+          { "@type": "Question", "name": "Is aired free?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Publishing and viewing are free, and the code is open source. Paid plans for your own domain and open tracking are coming." } }
         ]
       }
     ]
@@ -68,592 +68,258 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
   <link rel="icon" href="/favicon-16.png" type="image/png" sizes="16x16" />
-  <link rel="stylesheet" href="/style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <style>
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background-color: #0a0a0b;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
-
-    /* Textarea */
-    textarea { resize: none; }
-    textarea:focus { outline: none; }
-    textarea::placeholder { color: #56565a; }
-
-    /* Number input spinners */
-    input[type="number"]::-webkit-inner-spin-button,
-    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-    input[type="number"] { -moz-appearance: textfield; }
-
-    /* Select arrow override */
-    select { background-image: none; }
-
-    /* Hidden file input */
-    #file-input { display: none; }
-
-    /* Drag state */
-    .paste-area { position: relative; }
-    .drag-hint { display: none; }
-    .paste-area.drag-over .drag-hint {
-      display: flex;
-    }
-
-    /* Subtle glow on form focus */
-    .form-container:focus-within {
-      box-shadow: 0 0 0 1px #3b3b40, 0 0 40px -12px rgba(124, 106, 239, 0.08);
-    }
-
-    /* Smooth transitions */
-    .btn-primary {
-      transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .btn-primary:not(:disabled):hover {
-      background-color: #8b7bf2;
-    }
-    .btn-primary:disabled {
-      opacity: 0.3;
-      cursor: not-allowed;
-    }
-
-    /* Copy button states */
-    .copy-btn {
-      transition: all 120ms cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .copy-btn:hover {
-      background-color: #18181b;
-      border-color: #3b3b40;
-    }
-    .copy-btn.copied {
-      color: #34d399;
-      border-color: rgba(52, 211, 153, 0.3);
-    }
-
-    /* Result card animation */
-    .result-card {
-      transition: opacity 200ms cubic-bezier(0.16, 1, 0.3, 1),
-                  transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    /* Install card hover */
-    .install-card {
-      transition: border-color 150ms ease, background-color 150ms ease;
-    }
-    .install-card:hover {
-      border-color: #3b3b40;
-      background-color: rgba(17, 17, 19, 0.5);
-    }
-
-    /* Keyboard shortcut badge */
-    kbd {
-      font-family: 'Inter', sans-serif;
-      font-size: 0.6875rem;
-      padding: 1px 5px;
-      border-radius: 4px;
-      border: 1px solid #222225;
-      background: #111113;
-      color: #56565a;
-    }
-
-    /* Focus ring utility */
-    .focus-ring:focus-visible {
-      outline: none;
-      box-shadow: 0 0 0 2px #0a0a0b, 0 0 0 4px rgba(124, 106, 239, 0.4);
-    }
-
-    /* Hero globe */
-    .hero-section { position: relative; overflow: visible; }
-    .hero-globe {
-      position: absolute;
-      right: -180px;
-      top: 50%;
-      transform: translateY(-55%);
-      width: 550px;
-      height: 550px;
-      opacity: 0.35;
-      pointer-events: none;
-      z-index: 0;
-      filter: saturate(1.2);
-    }
-    .hero-section::after {
-      content: '';
-      position: absolute;
-      right: -60px;
-      top: 50%;
-      transform: translateY(-55%);
-      width: 500px;
-      height: 500px;
-      background: radial-gradient(circle, rgba(124, 106, 239, 0.06) 0%, rgba(124, 106, 239, 0.02) 40%, transparent 70%);
-      pointer-events: none;
-      z-index: 0;
-    }
-    @media (max-width: 640px) {
-      .hero-globe, .hero-section::after { display: none; }
-    }
-
-    /* Form sits above globe */
-    .form-container, #air-form, .result-card, #error-msg { position: relative; z-index: 10; }
-
-    /* Marquee feed */
-    .marquee-wrapper {
-      overflow: hidden;
-      mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
-      -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
-    }
-    .marquee-track {
-      display: flex;
-      gap: 2rem;
-      white-space: nowrap;
-      animation: marquee-scroll 30s linear infinite;
-    }
-    @keyframes marquee-scroll {
-      0% { transform: translateX(0); }
-      100% { transform: translateX(-50%); }
-    }
-
-    /* Setup-copy button */
-    .setup-btn {
-      transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1), transform 120ms ease;
-    }
-    .setup-btn:hover { background-color: #ffffff; }
-    .setup-btn:active { transform: translateY(1px); }
-    .setup-btn.copied { background-color: #34d399; color: #0a0a0b; }
-    .setup-btn .setup-btn-icon { opacity: 0.7; }
-
-    /* Agent icons */
-    .agent-icon {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 24px;
-      height: 24px;
-      transition: color 150ms ease;
-    }
-    .agent-icon:hover { color: #ededef; }
-  </style>
+  <link rel="stylesheet" href="/site.css" />
 </head>
-<body class="min-h-screen flex flex-col text-aired-text-primary">
+<body>
+<header><div class="wrap">
+  <a class="logo" href="/" aria-label="aired home"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>aired</a>
+  <nav aria-label="Main"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link">Guides</a></nav>
+  <div class="right"><a class="login" id="nav-auth" href="/auth/github?return=/dashboard">Log in</a><a class="start" href="#publish" data-publish>Start free</a></div>
+</div></header>
 
-  <!-- ─── Header ─── -->
-  <header class="w-full px-6 h-14 flex items-center justify-between max-w-2xl mx-auto">
-    <a href="/" class="text-base font-semibold tracking-tight text-aired-text-primary hover:text-white transition-colors duration-150">aired</a>
-    <nav class="flex items-center gap-5 text-sm text-aired-text-secondary">
-      <a href="/docs" class="hover:text-aired-text-primary transition-colors duration-150">Docs</a>
-      <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener"
-         class="flex items-center gap-1.5 hover:text-aired-text-primary transition-colors duration-150">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-        GitHub
-      </a>
-      <a id="nav-auth" href="/auth/github?return=/dashboard"
-         class="hidden hover:text-aired-text-primary transition-colors duration-150 focus-ring rounded-sm">sign in</a>
-    </nav>
-  </header>
-
-  <!-- ─── Main ─── -->
-  <main class="flex-1 w-full max-w-2xl mx-auto px-6">
-
-    <!-- ─── Title + Form (single visual unit) ─── -->
-    <section class="hero-section mt-12 sm:mt-20">
-      <!-- Globe behind hero -->
-      <canvas id="globe-canvas" width="1000" height="1000" class="hero-globe"></canvas>
-
-      <!-- Tagline -->
-      <div class="mb-8 relative z-10">
-        <h1 class="text-xl font-medium tracking-tight text-aired-text-primary">Turn HTML into a link anyone can open.</h1>
-        <p class="mt-2 text-sm text-aired-text-secondary leading-relaxed">
-          Made a report, page or game with Claude, ChatGPT or another AI tool? Paste the HTML or drop the file. You get a link to send in seconds. Free, no account.
-          <span id="live-stat" class="hidden"> · <span id="stat-count" class="text-aired-text-primary tabular-nums"></span> pages aired<span id="stat-countries-inline"></span></span>
-        </p>
-      </div>
-
-      <!-- Form -->
-      <form id="air-form">
-        <div class="form-container border border-aired-border rounded-lg bg-aired-surface overflow-hidden transition-shadow duration-200">
-
-          <!-- Editor area -->
-          <div class="paste-area">
-            <!-- Empty state hint (shown when textarea is empty) -->
-            <div id="empty-hint" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-[1] transition-opacity duration-150">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-aired-text-tertiary mb-2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
-              <span class="text-sm text-aired-text-tertiary">Paste HTML or drop a file</span>
-              <span class="text-2xs text-aired-text-tertiary mt-1">⌘V to paste · 2 MB max</span>
-            </div>
-            <!-- Textarea -->
-            <textarea
-              id="html-input"
-              name="html"
-              spellcheck="false"
-              autocomplete="off"
-              rows="8"
-              class="relative z-[2] w-full bg-transparent p-4 font-mono text-sm text-aired-text-primary leading-relaxed focus:outline-none"
-              aria-label="HTML content"
-            ></textarea>
-            <!-- Drag overlay -->
-            <div class="drag-hint absolute inset-0 items-center justify-center bg-aired-bg/90 border-2 border-dashed border-aired-accent/30 rounded-lg z-10">
-              <span class="text-sm text-aired-text-secondary">Drop .html file</span>
-            </div>
-          </div>
-
-          <!-- Divider -->
-          <div class="border-t border-aired-border"></div>
-
-          <!-- Options bar -->
-          <div class="flex items-center gap-3 px-3 py-2.5 text-sm">
-            <!-- Upload -->
-            <button type="button" id="upload-btn"
-                    class="flex items-center gap-1.5 px-2 py-1 rounded-sm text-aired-text-secondary hover:text-aired-text-primary hover:bg-aired-surface-hover transition-all duration-150 focus-ring"
-                    title="Upload .html file">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              <span class="hidden sm:inline">Upload</span>
-            </button>
-            <input class="hidden" id="file-input" type="file" accept=".html,.htm,text/html" />
-
-            <!-- Separator -->
-            <div class="w-px h-4 bg-aired-border"></div>
-
-            <!-- TTL -->
-            <div class="flex items-center gap-1.5">
-              <label for="ttl-select" class="text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider">TTL</label>
-              <select id="ttl-select"
-                      class="bg-transparent text-aired-text-secondary text-sm py-0.5 pl-1 pr-5 rounded-sm border-0 focus:ring-0 focus-ring cursor-pointer appearance-none hover:text-aired-text-primary transition-colors duration-150">
-                <option value="3600">1 hour</option>
-                <option value="86400">1 day</option>
-                <option value="604800" selected>7 days</option>
-                <option value="2592000">30 days</option>
-                <option value="permanent">Permanent</option>
-              </select>
-            </div>
-
-            <!-- Separator -->
-            <div class="w-px h-4 bg-aired-border"></div>
-
-            <!-- PIN -->
-            <div class="flex items-center gap-1.5 flex-1 min-w-0">
-              <label for="pin-input" class="text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider flex-shrink-0">PIN</label>
-              <input
-                type="password"
-                id="pin-input"
-                name="pin"
-                placeholder="optional"
-                maxlength="20"
-                inputmode="numeric"
-                autocomplete="new-password"
-                class="w-full min-w-0 bg-transparent text-sm text-aired-text-secondary placeholder:text-aired-text-tertiary py-0.5 border-0 focus:ring-0 focus:outline-none"
-              />
-            </div>
-
-            <!-- Spacer -->
-            <div class="flex-1"></div>
-
-            <!-- Char count -->
-            <span id="char-count" class="text-2xs text-aired-text-tertiary tabular-nums flex-shrink-0"></span>
-          </div>
+<main class="wrap">
+  <section class="hero" id="publish">
+    <div>
+      <h1>Turn HTML into a link anyone can open.</h1>
+      <p class="lede">Made a report, page or game with Claude, ChatGPT or another AI tool? Drop the file and send the link. Free, no account.</p>
+      <form id="air-form" class="form" aria-label="Publish HTML">
+        <div class="paste-area">
+          <div id="empty-hint" class="hint" aria-hidden="true">Paste HTML or drop a file<small>⌘V to paste · 2 MB max</small></div>
+          <textarea id="html-input" name="html" spellcheck="false" autocomplete="off" aria-label="HTML content"></textarea>
+          <div class="drag-hint">Drop .html file</div>
         </div>
-
-        <!-- Submit -->
-        <button
-          type="submit"
-          id="submit-btn"
-          disabled
-          class="btn-primary mt-3 w-full h-10 flex items-center justify-center rounded-sm bg-aired-accent text-white text-sm font-medium focus-ring"
-        >
-          Publish
-        </button>
+        <div class="opts">
+          <button type="button" id="upload-btn" class="upl" title="Upload an .html file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg>Upload</button>
+          <input id="file-input" type="file" accept=".html,.htm,text/html" hidden />
+          <span><label for="ttl-select">Expires</label><select id="ttl-select"><option value="3600">1 hour</option><option value="86400">1 day</option><option value="604800" selected>7 days</option><option value="2592000">30 days</option><option value="permanent">Never</option></select></span>
+          <span><label for="pin-input">Password</label><input type="password" id="pin-input" name="pin" placeholder="none" maxlength="20" inputmode="numeric" autocomplete="new-password" /></span>
+          <span id="char-count" class="kb"></span>
+          <button class="publish" type="submit" id="submit-btn" disabled>Publish</button>
+        </div>
       </form>
-
-      <!-- Error -->
-      <div class="hidden mt-3" id="error-msg" role="alert">
-        <p class="px-3 py-2 text-sm text-red-400 border border-red-500/20 bg-red-500/5 rounded-sm"></p>
+      <div id="error-msg" class="err hidden" role="alert"></div>
+      <div id="result-card" class="result" aria-live="polite" style="display:none">
+        <div class="box">
+          <div class="row2"><div class="lbl"><span>Your link</span><span class="live2">Live</span></div>
+            <div class="line"><a id="result-url" href="#" target="_blank" rel="noopener"></a><button type="button" id="copy-url-btn" class="copy-btn">Copy</button></div></div>
+          <div class="row2"><div class="lbl"><span>Update token</span><span id="result-expiry"></span></div>
+            <div class="line"><code id="result-token"></code><button type="button" id="copy-token-btn" class="copy-btn">Copy</button></div>
+            <p class="note">Save this token. You need it to update or delete the page.</p></div>
+        </div>
+        <button type="button" id="new-btn" class="again">Publish another</button>
       </div>
-
-      <!-- ─── Result Card ─── -->
-      <div class="result-card hidden flex-col mt-6" id="result-card" aria-live="polite"
-           style="display:none; opacity:0; transform:translateY(8px);">
-
-        <div class="border border-aired-border rounded-lg bg-aired-surface overflow-hidden">
-          <!-- URL row -->
-          <div class="p-4">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider">Live URL</span>
-              <span class="flex items-center gap-1 text-2xs text-emerald-400">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                Live
-              </span>
-            </div>
-            <div class="flex items-center gap-2">
-              <a id="result-url" href="#" target="_blank"
-                 class="flex-1 font-mono text-sm text-aired-text-primary hover:text-white truncate transition-colors duration-150"></a>
-              <button type="button" id="copy-url-btn"
-                      class="copy-btn flex-shrink-0 px-2.5 py-1 text-sm text-aired-text-secondary border border-aired-border rounded-sm focus-ring">
-                Copy
-              </button>
-            </div>
-          </div>
-
-          <div class="border-t border-aired-border"></div>
-
-          <!-- Token row -->
-          <div class="p-4">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider">Update token</span>
-              <span class="text-2xs text-aired-text-tertiary" id="result-expiry"></span>
-            </div>
-            <div class="flex items-center gap-2">
-              <code id="result-token" class="flex-1 font-mono text-sm text-aired-text-tertiary truncate"></code>
-              <button type="button" id="copy-token-btn"
-                      class="copy-btn flex-shrink-0 px-2.5 py-1 text-sm text-aired-text-secondary border border-aired-border rounded-sm focus-ring">
-                Copy
-              </button>
-            </div>
-            <p class="mt-2 text-2xs text-aired-text-tertiary">Save this token — you need it to update or delete.</p>
-          </div>
-        </div>
-
-        <!-- New button -->
-        <button type="button" id="new-btn"
-                class="mt-3 w-full h-10 flex items-center justify-center rounded-sm border border-aired-border text-sm text-aired-text-secondary hover:text-aired-text-primary hover:border-aired-border-focus transition-all duration-150 focus-ring">
-          Publish another
-        </button>
+      <p class="proof"><b data-stat="publishes">10,827</b> pages published · opened <b data-stat="views">102,156</b> times</p>
+    </div>
+    <div>
+      <div class="seen-cap"><span>What they open</span><span class="mono">aired.sh/p/q3-northwind</span></div>
+      <div class="crop" aria-label="Example of a published page"><div class="report">
+        <h4>Q3 performance — Northwind Dental</h4><p>Prepared for Sam Ortiz · Oct 2026</p>
+        <div class="kpis"><div class="kpi">Leads<b>1,284</b><small>+18%</small></div><div class="kpi">Calls<b>412</b><small>+9%</small></div><div class="kpi">Cost / lead<b>$21</b><small>−12%</small></div></div>
+        <div class="bars"><i style="height:38%"></i><i style="height:52%"></i><i style="height:45%"></i><i style="height:61%"></i><i style="height:58%"></i><i style="height:74%"></i><i style="height:69%"></i><i style="height:88%"></i><i style="height:80%"></i><i style="height:93%"></i></div>
       </div>
+      <span class="badge"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>Shared with aired</span></div>
+    </div>
+  </section>
 
-      <!-- Agent divider -->
-      <div class="relative mt-12 mb-8 z-10" aria-hidden="true">
-        <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-aired-border"></div></div>
-        <div class="relative flex justify-center"><span class="px-3 bg-aired-bg text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider">Or let your agent publish it</span></div>
+  <div class="works"><p>Works with whatever made your page</p><div class="logos"><span class="lg"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg>Claude</span><span class="lg"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.0719.0719 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.4069-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg>ChatGPT</span><span class="lg"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81"/></svg>Gemini</span><span class="lg"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23"/></svg>Cursor</span><span class="lg"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.55 5.067c-1.2038-.002-2.1806.973-2.1806 2.1765v4.8676c0 .972-.8035 1.7594-1.7597 1.7594-.568 0-1.1352-.286-1.4718-.7659l-4.9713-7.1003c-.4125-.5896-1.0837-.941-1.8103-.941-1.1334 0-2.1533.9635-2.1533 2.153v4.8957c0 .972-.7969 1.7594-1.7596 1.7594-.57 0-1.1363-.286-1.4728-.7658L.4076 5.1598C.2822 4.9798 0 5.0688 0 5.2882v4.2452c0 .2147.0656.4228.1884.599l5.4748 7.8183c.3234.462.8006.8052 1.3509.9298 1.3771.313 2.6446-.747 2.6446-2.0977v-4.893c0-.972.7875-1.7593 1.7596-1.7593h.003a1.798 1.798 0 0 1 1.4718.7658l4.9723 7.0994c.4135.5905 1.05.941 1.8093.941 1.1587 0 2.1515-.9645 2.1515-2.153v-4.8948c0-.972.7875-1.7594 1.7596-1.7594h.194a.22.22 0 0 0 .2204-.2202v-4.622a.22.22 0 0 0-.2203-.2203Z"/></svg>Windsurf</span><span class="lg"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.922 16.997C23.061 18.492 18.063 22.02 12 22.02 5.937 22.02.939 18.492.078 16.997A.641.641 0 0 1 0 16.741v-2.869a.883.883 0 0 1 .053-.22c.372-.935 1.347-2.292 2.605-2.656.167-.429.414-1.055.644-1.517a10.098 10.098 0 0 1-.052-1.086c0-1.331.282-2.499 1.132-3.368.397-.406.89-.717 1.474-.952C7.255 2.937 9.248 1.98 11.978 1.98c2.731 0 4.767.957 6.166 2.093.584.235 1.077.546 1.474.952.85.869 1.132 2.037 1.132 3.368 0 .368-.014.733-.052 1.086.23.462.477 1.088.644 1.517 1.258.364 2.233 1.721 2.605 2.656a.841.841 0 0 1 .053.22v2.869a.641.641 0 0 1-.078.256Zm-11.75-5.992h-.344a4.359 4.359 0 0 1-.355.508c-.77.947-1.918 1.492-3.508 1.492-1.725 0-2.989-.359-3.782-1.259a2.137 2.137 0 0 1-.085-.104L4 11.746v6.585c1.435.779 4.514 2.179 8 2.179 3.486 0 6.565-1.4 8-2.179v-6.585l-.098-.104s-.033.045-.085.104c-.793.9-2.057 1.259-3.782 1.259-1.59 0-2.738-.545-3.508-1.492a4.359 4.359 0 0 1-.355-.508Zm2.328 3.25c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm-5 0c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm3.313-6.185c.136 1.057.403 1.913.878 2.497.442.544 1.134.938 2.344.938 1.573 0 2.292-.337 2.657-.751.384-.435.558-1.15.558-2.361 0-1.14-.243-1.847-.705-2.319-.477-.488-1.319-.862-2.824-1.025-1.487-.161-2.192.138-2.533.529-.269.307-.437.808-.438 1.578v.021c0 .265.021.562.063.893Zm-1.626 0c.042-.331.063-.628.063-.894v-.02c-.001-.77-.169-1.271-.438-1.578-.341-.391-1.046-.69-2.533-.529-1.505.163-2.347.537-2.824 1.025-.462.472-.705 1.179-.705 2.319 0 1.211.175 1.926.558 2.361.365.414 1.084.751 2.657.751 1.21 0 1.902-.394 2.344-.938.475-.584.742-1.44.878-2.497Z"/></svg>Copilot</span><span class="lg"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14.066 6.028v2.22h5.729q.075-.001.148.005l-5.853 5.752a2 2 0 0 1-.024-.309V8.247h-2.353v5.45c0 2.322 1.935 4.222 4.258 4.222h5.675v-2.22h-5.675q-.03 0-.059-.003l5.729-5.629q.006.082.006.166v5.465H24v-5.465a4.204 4.204 0 0 0-4.205-4.205zM0 8.245l8.28 9.266c.839.94 2.396.346 2.396-.914V8.245H8.19v5.44l-4.86-5.44Z"/></svg>v0</span></div></div>
+
+  <section class="sec">
+    <div class="sec-head">
+      <p class="eyebrow">How it works</p>
+      <h2>From any AI tool to anyone</h2>
+      <p>You or your agent publish. They open a link.</p>
+    </div>
+    <div class="beam" id="beam">
+      <svg class="lines" aria-hidden="true"><defs><linearGradient id="beamgrad" x1="0" x2="1"><stop offset="0" stop-color="#7c6aef" stop-opacity="0"/><stop offset=".5" stop-color="#a99bf6"/><stop offset="1" stop-color="#ededef" stop-opacity="0"/></linearGradient></defs></svg>
+      <div class="col l"><span class="node" data-beam><span class="dot"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg></span>Claude</span><span class="node" data-beam><span class="dot"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.0719.0719 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.4069-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg></span>ChatGPT</span><span class="node" data-beam><span class="dot"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23"/></svg></span>Cursor</span><span class="node" data-beam><span class="dot"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81"/></svg></span>Gemini</span></div>
+      <div class="hub" data-hub><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span>aired.sh</span></div>
+      <div class="col r"><span class="node" data-beam><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/></svg></span>Opened on iPhone</span><span class="node" data-beam><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/></svg></span>Opened on Mac</span><span class="node" data-beam><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/></svg></span>Opened on iPad</span><span class="node" data-beam><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span>Sent to a client</span></div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-head">
+      <p class="eyebrow">Share anything</p>
+      <h2>Everything you need to send a page</h2>
+      <p>One link that works for the person you send it to, on any device.</p>
+    </div>
+    <div class="bento">
+      <div class="card tall">
+        <div class="card-text"><h3>Same link, new version</h3><p>Publish an update and everyone with the link sees it.</p></div>
+        <div class="vis"><div class="vers" aria-hidden="true">
+          <div class="vlink"><span class="mono">aired.sh/p/q3-northwind</span></div>
+          <div class="v live"><i></i><div><b>Final numbers</b><span>Today, 9:41 · live</span></div></div>
+          <div class="v"><i></i><div><b>Added call data</b><span>Yesterday, 18:02</span></div></div>
+          <div class="v"><i></i><div><b>Fixed chart labels</b><span>Mon, 11:15</span></div></div>
+          <div class="v"><i></i><div><b>First draft</b><span>Mon, 10:30</span></div></div>
+        </div></div>
       </div>
-
-      <!-- Agent flow -->
-      <div class="mb-8 relative z-10">
-        <ol class="space-y-2.5">
-          <li class="flex items-start gap-3">
-            <span class="flex-shrink-0 inline-flex items-center justify-center w-5 h-5 mt-px rounded-sm bg-aired-surface border border-aired-border text-2xs font-medium text-aired-text-secondary tabular-nums">1</span>
-            <span class="text-sm text-aired-text-secondary leading-relaxed">Tell your agent to publish to <code class="font-mono text-aired-text-primary">aired.sh</code>.</span>
-          </li>
-          <li class="flex items-start gap-3">
-            <span class="flex-shrink-0 inline-flex items-center justify-center w-5 h-5 mt-px rounded-sm bg-aired-surface border border-aired-border text-2xs font-medium text-aired-text-secondary tabular-nums">2</span>
-            <span class="text-sm text-aired-text-secondary leading-relaxed">It is online at <code class="font-mono text-aired-text-primary">aired.sh/p/{slug}</code>, no account needed.</span>
-          </li>
-        </ol>
-
-        <div class="mt-6 flex flex-col sm:flex-row sm:items-end gap-5 sm:gap-8">
-          <!-- TRY IT NOW + Copy button -->
-          <div class="flex-1 min-w-0">
-            <div class="text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider mb-2">Try it now</div>
-            <button type="button" id="setup-copy-btn"
-                    class="setup-btn w-full sm:w-auto group flex items-center justify-center gap-2 h-10 px-4 rounded bg-aired-text-primary text-aired-bg text-sm font-medium focus-ring transition-all duration-150"
-                    title="Copy setup instructions for any AI agent">
-              <span class="setup-btn-label">Copy setup instructions for my agent</span>
-              <svg class="setup-btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-            </button>
-          </div>
-
-          <!-- WORKS WITH EVERY AGENT + icons -->
-          <div class="flex-shrink-0">
-            <div class="text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider mb-2">Works with every agent</div>
-            <div class="flex items-center gap-3 h-10 text-aired-text-secondary">
-              <span title="Claude Code" class="agent-icon" aria-label="Claude">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true"><title>Claude</title><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg>
-              </span>
-              <span title="Cursor" class="agent-icon" aria-label="Cursor">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true"><title>Cursor</title><path d="M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23"/></svg>
-              </span>
-              <span title="Codex / ChatGPT (OpenAI)" class="agent-icon" aria-label="OpenAI">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true"><title>OpenAI</title><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.0719.0719 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.4069-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg>
-              </span>
-              <span title="Windsurf" class="agent-icon" aria-label="Windsurf">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true"><title>Windsurf</title><path d="M23.55 5.067c-1.2038-.002-2.1806.973-2.1806 2.1765v4.8676c0 .972-.8035 1.7594-1.7597 1.7594-.568 0-1.1352-.286-1.4718-.7659l-4.9713-7.1003c-.4125-.5896-1.0837-.941-1.8103-.941-1.1334 0-2.1533.9635-2.1533 2.153v4.8957c0 .972-.7969 1.7594-1.7596 1.7594-.57 0-1.1363-.286-1.4728-.7658L.4076 5.1598C.2822 4.9798 0 5.0688 0 5.2882v4.2452c0 .2147.0656.4228.1884.599l5.4748 7.8183c.3234.462.8006.8052 1.3509.9298 1.3771.313 2.6446-.747 2.6446-2.0977v-4.893c0-.972.7875-1.7593 1.7596-1.7593h.003a1.798 1.798 0 0 1 1.4718.7658l4.9723 7.0994c.4135.5905 1.05.941 1.8093.941 1.1587 0 2.1515-.9645 2.1515-2.153v-4.8948c0-.972.7875-1.7594 1.7596-1.7594h.194a.22.22 0 0 0 .2204-.2202v-4.622a.22.22 0 0 0-.2203-.2203Z"/></svg>
-              </span>
-              <span title="Any agent that can curl" class="agent-icon" aria-label="Any agent">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-              </span>
-            </div>
-          </div>
-        </div>
+      <div class="card">
+        <div class="card-text"><h3>Password on any page</h3><p>Add a PIN and only people you tell can open it.</p></div>
+        <div class="vis nofade"><div class="pin" aria-hidden="true"><div class="pin-dots"><i>•</i><i>•</i><i>•</i><i class="cur"></i></div><button type="button" tabindex="-1">Open page</button></div></div>
       </div>
-    </section>
+      <div class="card tall">
+        <div class="card-text"><h3>Publish from your agent</h3><p>CLI, MCP server or HTTP API. No account needed.</p></div>
+        <div class="vis"><div class="code" aria-hidden="true">
+          <div class="code-tabs" role="tablist" aria-label="Ways to publish"><button type="button" role="tab" aria-selected="true" data-code="cli">CLI</button><button type="button" role="tab" aria-selected="false" data-code="mcp">MCP</button><button type="button" role="tab" aria-selected="false" data-code="api">API</button></div>
+<pre data-code-panel="cli"><span class="p">$</span> <span class="c">npx aired report.html</span>
+<span class="ok">✓</span> https://aired.sh/p/x7k2m9
 
-    <!-- ─── Install Section ─── -->
-    <section id="install" class="mt-20 sm:mt-28 mb-20">
-      <div class="mb-6 flex items-end justify-between gap-4">
-        <div>
-          <h2 class="text-lg font-semibold tracking-tight text-aired-text-primary">Wire it up yourself.</h2>
-          <p class="mt-1 text-sm text-aired-text-secondary">Skill, CLI, MCP, or raw HTTP — pick a path.</p>
-        </div>
-        <a href="/docs" class="text-sm text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150 whitespace-nowrap">Full docs →</a>
+<span class="p"># or give your agent the skill:</span>
+<span class="p">$</span> <span class="c">npx skills add progrmoiz/aired -g</span>
+
+<span class="p"># then ask it:</span>
+<span class="s">"publish this as a link"</span></pre>
+<pre data-code-panel="mcp" hidden><span class="p">$</span> <span class="c">claude mcp add aired \</span>
+<span class="c">    --transport http \</span>
+<span class="c">    https://aired.sh/mcp</span>
+
+<span class="p"># Cursor, VS Code, Windsurf, Codex:</span>
+<span class="p"># see aired.sh/docs#mcp</span>
+
+<span class="p"># tool:</span> <span class="k">publish_html</span></pre>
+<pre data-code-panel="api" hidden><span class="p">$</span> <span class="c">curl -X POST \</span>
+<span class="c">    https://aired.sh/api/publish \</span>
+<span class="c">    -H "Content-Type: application/json" \</span>
+<span class="c">    -d '{"html":"&lt;h1&gt;Hi&lt;/h1&gt;"}'</span>
+
+<span class="p"># returns</span>
+<span class="k">{ url, update_token, expiresAt }</span></pre>
+        </div></div>
       </div>
-
-      <div class="border border-aired-border rounded-lg bg-aired-surface overflow-hidden">
-        <!-- Top tabs -->
-        <div class="flex flex-wrap gap-1 px-3 py-2 border-b border-aired-border" id="install-tabs" role="tablist">
-          <button type="button" role="tab" aria-selected="true" data-install-tab="skill" class="install-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 bg-aired-accent/10 text-aired-accent">Skill</button>
-          <button type="button" role="tab" aria-selected="false" data-install-tab="cli" class="install-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 text-aired-text-tertiary hover:text-aired-text-secondary">CLI</button>
-          <button type="button" role="tab" aria-selected="false" data-install-tab="mcp" class="install-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 text-aired-text-tertiary hover:text-aired-text-secondary">MCP</button>
-          <button type="button" role="tab" aria-selected="false" data-install-tab="api" class="install-tab px-2.5 py-1 text-2xs font-medium rounded-sm transition-colors duration-150 text-aired-text-tertiary hover:text-aired-text-secondary">API</button>
-        </div>
-
-        <!-- Skill panel -->
-        <div id="install-panel-skill" class="install-panel p-4 space-y-3" role="tabpanel">
-          <div class="flex items-center justify-between bg-aired-bg rounded-sm px-3 py-2.5">
-            <code class="font-mono text-sm text-aired-accent select-all">npx skills add progrmoiz/aired -g</code>
-            <button type="button" class="copy-snippet copy-btn flex-shrink-0 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy="npx skills add progrmoiz/aired -g">Copy</button>
-          </div>
-          <p class="text-2xs text-aired-text-tertiary">
-            Adds a <code class="text-aired-text-secondary">SKILL.md</code> via <a href="https://skills.sh" target="_blank" rel="noopener" class="hover:text-aired-text-secondary underline decoration-aired-border">skills.sh</a>. Any AI agent (Claude Code, Cursor, Windsurf, Codex) discovers and uses <code class="text-aired-text-secondary">aired</code> automatically.
-          </p>
-        </div>
-
-        <!-- CLI panel -->
-        <div id="install-panel-cli" class="install-panel hidden p-4 space-y-3" role="tabpanel">
-          <div class="flex items-center justify-between bg-aired-bg rounded-sm px-3 py-2.5">
-            <code class="font-mono text-sm text-aired-accent select-all">npx aired dashboard.html</code>
-            <button type="button" class="copy-snippet copy-btn flex-shrink-0 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy="npx aired dashboard.html">Copy</button>
-          </div>
-          <div class="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-aired-text-tertiary">
-            <span><code class="text-aired-text-secondary">aired ./dir/</code> Bundle directory</span>
-            <span><code class="text-aired-text-secondary">--json</code> Structured output</span>
-            <span><code class="text-aired-text-secondary">--pin secret</code> PIN-protect</span>
-            <span><code class="text-aired-text-secondary">--ttl 24h</code> Custom expiry</span>
-          </div>
-          <p class="text-2xs text-aired-text-tertiary">
-            Files or directories. Inlines CSS, JS, images automatically. JSON when piped.
-          </p>
-        </div>
-
-        <!-- MCP panel -->
-        <div id="install-panel-mcp" class="install-panel hidden p-4 space-y-3" role="tabpanel">
-          <div class="flex items-center justify-between bg-aired-bg rounded-sm px-3 py-2.5">
-            <code class="font-mono text-sm text-aired-accent select-all truncate">claude mcp add aired --transport http https://aired.sh/mcp</code>
-            <button type="button" class="copy-snippet copy-btn flex-shrink-0 ml-2 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy="claude mcp add aired --transport http https://aired.sh/mcp">Copy</button>
-          </div>
-          <p class="text-2xs text-aired-text-tertiary">
-            Streamable HTTP at <code class="text-aired-text-secondary">https://aired.sh/mcp</code>. Exposes a <code class="text-aired-text-secondary">publish_html</code> tool. Cursor, VS Code, Windsurf, Codex configs in <a href="/docs#mcp" class="hover:text-aired-text-secondary underline decoration-aired-border">/docs</a>.
-          </p>
-        </div>
-
-        <!-- API panel -->
-        <div id="install-panel-api" class="install-panel hidden p-4 space-y-3" role="tabpanel">
-          <div class="bg-aired-bg rounded-sm px-3 py-2.5">
-            <code class="font-mono text-sm text-aired-text-secondary block whitespace-pre select-all">curl -X POST https://aired.sh/api/publish \
-  -H "Content-Type: application/json" \
-  -d '{"html": "&lt;h1&gt;Hello&lt;/h1&gt;"}'</code>
-          </div>
-          <div class="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-aired-text-tertiary">
-            <span>Returns <code class="text-aired-text-secondary">{ url, update_token, expiresAt }</code></span>
-            <span>No auth</span>
-            <span>2 MB max</span>
-            <span>5 uploads/hour</span>
-          </div>
-        </div>
+      <div class="card">
+        <div class="card-text"><h3>Links that expire</h3><p>From an hour to forever. Seven days by default.</p></div>
+        <div class="vis nofade"><div class="seg" aria-hidden="true"><span>1h</span><span>1d</span><span class="on">7d</span><span>30d</span><span>∞</span></div><p class="exp-note">Expires 30 Nov · update or delete anytime</p></div>
       </div>
-    </section>
+      <div class="card wide">
+        <div class="card-text"><h3>See who opened it <span class="pro-tag">Pro · soon</span></h3><p>Opens over time, where and on what device.</p></div>
+        <div class="vis"><div class="chart" aria-hidden="true">
+          <div class="area"><div class="top"><span>Q3 performance · 14 days</span><b>14 opens</b></div>
+            <svg viewBox="0 0 400 110" preserveAspectRatio="none"><path d="M0 100 L30 96 L60 98 L90 80 L120 88 L150 70 L180 92 L210 60 L240 66 L270 50 L300 72 L330 40 L360 34 L400 10 L400 110 L0 110Z" fill="rgba(237,237,239,.08)"/><path d="M0 100 L30 96 L60 98 L90 80 L120 88 L150 70 L180 92 L210 60 L240 66 L270 50 L300 72 L330 40 L360 34 L400 10" fill="none" stroke="#ededef" stroke-width="1.5"/></svg></div>
+          <div class="list"><div class="new"><span>Chicago · iPhone</span><span>12m</span></div><div><span>Chicago · Mac</span><span>1d</span></div><div><span>Austin · Windows</span><span>Mon</span></div><div><span>London · Android</span><span>Sun</span></div></div>
+        </div></div>
+      </div>
+      <div class="card">
+        <div class="card-text"><h3>Your own domain <span class="pro-tag">Pro · soon</span></h3><p>Send it under your name, without our badge.</p></div>
+        <div class="vis nofade"><div class="domain" aria-hidden="true">
+          <div class="urlbar old">aired.sh/p/q3-northwind</div>
+          <div class="urlbar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>reports.youragency.com/q3</div>
+        </div></div>
+      </div>
+    </div>
+  </section>
 
-
-    <!-- ─── Use cases ─── -->
-    <section id="use-cases" class="mb-16">
-      <h2 class="text-lg font-medium tracking-tight text-aired-text-primary">What people share</h2>
-      <p class="mt-1 text-sm text-aired-text-secondary">Anything that is one HTML page. If it opens in your browser, it opens for them.</p>
-      <ul class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <li><a href="/share-claude-artifacts" class="install-card block h-full border border-aired-border rounded-lg bg-aired-surface p-4 focus-ring">
-          <span class="block text-sm font-medium text-aired-text-primary">Claude artifacts</span>
-          <span class="mt-1 block text-xs text-aired-text-secondary leading-relaxed">Send what Claude made to someone without a Claude account.</span>
-        </a></li>
-        <li><a href="/html-to-link" class="install-card block h-full border border-aired-border rounded-lg bg-aired-surface p-4 focus-ring">
-          <span class="block text-sm font-medium text-aired-text-primary">Any HTML file</span>
-          <span class="mt-1 block text-xs text-aired-text-secondary leading-relaxed">Reports, dashboards, slides and games from ChatGPT or anywhere else.</span>
-        </a></li>
-        <li><a href="/tiiny-host-alternative" class="install-card block h-full border border-aired-border rounded-lg bg-aired-surface p-4 focus-ring">
-          <span class="block text-sm font-medium text-aired-text-primary">Switching hosts</span>
-          <span class="mt-1 block text-xs text-aired-text-secondary leading-relaxed">How aired compares with Tiiny Host and Netlify Drop.</span>
-        </a></li>
-      </ul>
-    </section>
-
-    <!-- ─── FAQ (mirrors the FAQPage schema in <head>) ─── -->
-    <section id="faq" class="mb-16">
-      <h2 class="text-lg font-medium tracking-tight text-aired-text-primary">Questions</h2>
-      <dl class="mt-6 divide-y divide-aired-border border-y border-aired-border">
-        <div class="py-4"><dt class="text-sm font-medium text-aired-text-primary">Do I need an account to share an HTML file?</dt><dd class="mt-1 text-sm text-aired-text-secondary leading-relaxed">No. Paste the HTML or drop the file and you get a link right away. Sign in with GitHub only if you want a dashboard of your pages that works from any device.</dd></div>
-        <div class="py-4"><dt class="text-sm font-medium text-aired-text-primary">How long does the link last?</dt><dd class="mt-1 text-sm text-aired-text-secondary leading-relaxed">Seven days by default. You can pick 1 hour, 1 day, 30 days or permanent before you publish.</dd></div>
-        <div class="py-4"><dt class="text-sm font-medium text-aired-text-primary">Can I password-protect a page?</dt><dd class="mt-1 text-sm text-aired-text-secondary leading-relaxed">Yes. Add a PIN before you publish and visitors must enter it to see the page.</dd></div>
-        <div class="py-4"><dt class="text-sm font-medium text-aired-text-primary">Who can see my page?</dt><dd class="mt-1 text-sm text-aired-text-secondary leading-relaxed">Anyone you send the link to. Pages published without an account are hidden from search engines.</dd></div>
-        <div class="py-4"><dt class="text-sm font-medium text-aired-text-primary">What can I publish?</dt><dd class="mt-1 text-sm text-aired-text-secondary leading-relaxed">Any HTML page up to 2 MB: reports, dashboards, slides, landing pages, games and anything Claude, ChatGPT or another AI tool builds for you. Scripts and styles run as written.</dd></div>
-        <div class="py-4"><dt class="text-sm font-medium text-aired-text-primary">Is aired free?</dt><dd class="mt-1 text-sm text-aired-text-secondary leading-relaxed">Yes. Publishing and viewing are free, and the code is open source on <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener" class="text-aired-text-primary underline decoration-aired-border hover:decoration-aired-text-secondary">GitHub</a>.</dd></div>
+  <section class="split">
+    <div>
+      <p class="eyebrow">Your pages</p>
+      <h2>Every link you've sent, in one place</h2>
+      <p>Sign in with GitHub and your pages follow you to any device.</p>
+      <dl>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h6l2 2h10v10H3z"/></svg><dt>Projects</dt><dd>Group pages by client or by the thing you're building.</dd></div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4"/></svg><dt>Update without a new link</dt><dd>Publish a new version and the same link shows it.</dd></div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><dt>Take it down anytime</dt><dd>Delete a page in one click, or let it expire.</dd></div>
       </dl>
-    </section>
-
-    <!-- ─── Sign in (optional, opt-in — hidden when authenticated) ─── -->
-    <section id="auth-section" class="mt-16 pt-8 border-t border-aired-border">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 class="text-sm font-medium text-aired-text-primary">Track every page you publish.</h2>
-          <p class="text-xs text-aired-text-tertiary mt-1">Optional. Sign in to manage, update, or delete pages from any device.</p>
-        </div>
-        <a id="auth-link" href="/auth/github?return=/dashboard"
-           class="inline-flex items-center gap-2 self-start sm:self-auto h-9 px-3 rounded bg-aired-surface border border-aired-border text-sm text-aired-text-primary hover:bg-aired-surface-hover hover:border-aired-border-focus transition-colors duration-150 focus-ring whitespace-nowrap">
-          <svg id="auth-link-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-          <span id="auth-link-label">sign in with github</span>
-        </a>
-      </div>
-    </section>
-
-    <!-- ─── Live Feed Marquee ─── -->
-    <div class="mt-16 mb-8 marquee-wrapper" id="marquee-section" style="display: none;">
-      <div class="marquee-track text-2xs text-aired-text-tertiary" id="marquee-track">
-      </div>
     </div>
-
-  </main>
-
-  <!-- ─── Footer ─── -->
-  <footer class="w-full max-w-2xl mx-auto px-6 py-8">
-    <nav aria-label="Guides" class="mb-4 flex flex-wrap justify-center sm:justify-start gap-x-4 gap-y-1 text-2xs">
-      <a href="/html-to-link" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">HTML to link</a>
-      <a href="/share-claude-artifacts" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Share Claude artifacts</a>
-      <a href="/tiiny-host-alternative" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Tiiny Host alternative</a>
-      <a href="/docs" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Docs</a>
-    </nav>
-    <div class="flex flex-col sm:flex-row items-center justify-between gap-2 text-2xs text-aired-text-tertiary">
-      <p>
-        Built by <a href="https://x.com/iammoizfarooq" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">@iammoizfarooq</a>
-      </p>
-      <div class="flex items-center gap-4">
-        <a href="/abuse" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Report abuse</a>
-        <a href="/llms.txt" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150 font-mono">llms.txt</a>
-        <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">GitHub</a>
-        <a href="https://workers.cloudflare.com" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Cloudflare</a>
-      </div>
+    <div class="dash" role="img" aria-label="Example of the pages dashboard">
+      <div class="dash-top"><span><b style="color:var(--text-1)">Your pages</b> · 9 pages</span><span class="new">Publish</span></div>
+      <div class="grp"><span>Northwind Dental</span><span>3</span></div>
+      <div class="row"><div class="t"><b>Q3 performance report</b><span>aired.sh/p/q3-northwind</span></div><span class="v">14 views</span><span class="e perm">Permanent</span></div>
+      <div class="row"><div class="t"><b>Website refresh proposal</b><span>aired.sh/p/proposal-refresh</span></div><span class="v">6 views</span><span class="e">30 Nov</span></div>
+      <div class="row"><div class="t"><b>Landing page draft v2</b><span>aired.sh/p/nw-landing-v2</span></div><span class="v">22 views</span><span class="e">2 Dec</span></div>
+      <div class="grp"><span>Side projects</span><span>2</span></div>
+      <div class="row"><div class="t"><b>Snake, made with ChatGPT</b><span>aired.sh/p/snake-v2</span></div><span class="v">88 views</span><span class="e perm">Permanent</span></div>
+      <div class="row"><div class="t"><b>Spring launch plan (deck)</b><span>aired.sh/p/launch-deck</span></div><span class="v">31 views</span><span class="e">in 6 days</span></div>
     </div>
-  </footer>
+  </section>
 
-  <script src="/app.js"></script>
-  <script type="module">
-    import createGlobe from 'https://esm.sh/cobe@0.6.3';
-    window.__createGlobe = createGlobe;
-    window.dispatchEvent(new Event('cobe-ready'));
-  </script>
-  <script>
-    // ── Empty state hint ──
-    (function() {
-      var textarea = document.getElementById('html-input');
-      var hint = document.getElementById('empty-hint');
+  <section class="sec">
+    <div class="sec-head">
+      <p class="eyebrow">Built for sharing</p>
+      <h2>The small things that matter</h2>
+      <p>The details that make a link safe to send to a client.</p>
+    </div>
+    <div class="fgrid" id="fgrid">
+      <div class="feat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><b>No sign-up for viewers</b><span>The people you send it to just open the link.</span><em class="tag">0 accounts needed</em></div>
+      <div class="feat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></span><b>No cap on views</b><span>Free pages can be opened as often as you like.</span><em class="tag">views: <em>unlimited</em></em></div>
+      <div class="feat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></span><b>Decks, docs and reports</b><span>Present slides from a link, read docs, share dashboards.</span><em class="tag">← → to present</em></div>
+      <div class="feat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9-4 3 4 3M16 9l4 3-4 3M14 5l-4 14"/></svg></span><b>Scripts run as written</b><span>Charts, games and interactive pages work as they did for you.</span><em class="tag">&lt;script&gt; <em>✓</em></em></div>
+      <div class="feat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 22 12s-1 2-3 4M6.6 6.6C4 8.3 2 12 2 12s3.5 7 10 7c1.7 0 3.2-.4 4.5-1"/></svg></span><b>Hidden from search</b><span>Pages published without an account aren't indexed.</span><em class="tag">noindex</em></div>
+      <div class="feat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></span><b>Fast everywhere</b><span>Served from Cloudflare's network in 300+ cities.</span><em class="tag">300+ cities</em></div>
+    </div>
+  </section>
 
-      function toggleHint() {
-        hint.style.opacity = textarea.value.length === 0 ? '1' : '0';
-      }
+  <section class="sec">
+    <div class="sec-head">
+      <p class="live"><i></i>Live from aired.sh</p>
+      <h2>Pages people actually open</h2>
+    </div>
+    <div class="nums">
+      <div class="num"><span>Pages published</span><b data-stat="publishes">10,827</b>
+        <div class="viz"><svg viewBox="0 0 300 70" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="sp" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ededef" stop-opacity=".18"/><stop offset="1" stop-color="#ededef" stop-opacity="0"/></linearGradient></defs><path d="M0 64 L25 62 L50 60 L75 61 L100 55 L125 52 L150 50 L175 44 L200 40 L225 33 L250 26 L275 16 L300 6 L300 70 L0 70Z" fill="url(#sp)"/><path d="M0 64 L25 62 L50 60 L75 61 L100 55 L125 52 L150 50 L175 44 L200 40 L225 33 L250 26 L275 16 L300 6" fill="none" stroke="#ededef" stroke-width="1.5"/></svg></div></div>
+      <div class="num"><span>Times opened</span><b data-stat="views">102,156</b>
+        <div class="viz"><div class="mbars" aria-hidden="true"><i style="height:22%"></i><i style="height:30%"></i><i style="height:26%"></i><i style="height:34%"></i><i style="height:31%"></i><i style="height:40%"></i><i style="height:38%"></i><i style="height:45%"></i><i style="height:43%"></i><i style="height:52%"></i><i style="height:50%"></i><i style="height:58%"></i><i style="height:55%"></i><i style="height:64%"></i><i style="height:61%"></i><i style="height:70%"></i><i style="height:68%"></i><i style="height:78%"></i><i style="height:74%"></i><i style="height:86%"></i><i style="height:82%"></i><i style="height:90%"></i><i style="height:88%"></i><i style="height:100%"></i></div></div></div>
+      <div class="num"><span>Countries</span><b data-stat="countries">141</b>
+        <div class="viz" style="height:auto"><div class="dots" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div></div></div>
+    </div>
+  </section>
 
-      textarea.addEventListener('input', toggleHint);
-      textarea.addEventListener('focus', function() {
-        if (textarea.value.length === 0) hint.style.opacity = '0.5';
-      });
-      textarea.addEventListener('blur', function() {
-        toggleHint();
-      });
-      toggleHint();
-    })();
-  </script>
+  <section class="sec">
+    <div class="sec-head">
+      <p class="eyebrow">Pricing</p>
+      <h2>Free to share. Pay for your name on it.</h2>
+      <p class="note2">Free works today. Paid plans open soon.</p>
+    </div>
+    <div class="billing"><div role="group" aria-label="Billing period"><button type="button" class="on" data-bill="y">Yearly <small>−25%</small></button><button type="button" data-bill="m">Monthly</button></div></div>
+    <div class="plans">
+      <div class="plan"><h3>Free</h3><p>For sending a page now.</p><div class="price">$0</div><p class="per">Free forever</p><a class="go" href="#publish" data-publish>Start free</a>
+        <ul><li class="lead">Includes</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Unlimited views</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Password on any page</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Links that never expire</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>CLI, MCP and HTTP API</span></li></ul></div>
+      <div class="plan pro"><h3>Pro <span>For client work</span></h3><p>Your name on every link.</p><div class="price"><span data-y="$9" data-m="$12">$9</span> <small>/ month</small></div><p class="per" data-y="Billed yearly, $108" data-m="Billed monthly">Billed yearly, $108</p><span class="go soon">Coming soon</span>
+        <ul><li class="lead">Everything in Free, plus</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Your own domain</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>No badge, or your logo</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Who opened it, and when</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Unlimited permanent pages</span></li></ul></div>
+      <div class="plan"><h3>Team</h3><p>One workspace for the team.</p><div class="price"><span data-y="$12" data-m="$15">$12</span> <small>/ editor / mo</small></div><p class="per">Min 2 editors · guests free</p><span class="go soon">Coming soon</span>
+        <ul><li class="lead">Everything in Pro, plus</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Shared workspace and folders</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Roles and comments</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Brand kit</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>5 custom domains</span></li></ul></div>
+      <div class="plan"><h3>Business</h3><p>Control for larger teams.</p><div class="price"><span data-y="$20" data-m="$25">$20</span> <small>/ editor / mo</small></div><p class="per">Min 3 editors</p><span class="go soon">Coming soon</span>
+        <ul><li class="lead">Everything in Team, plus</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>SSO: SAML, Okta, Google</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Sharing policies</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>90-day audit log</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Unlimited custom domains</span></li></ul></div>
+    </div>
+    <p class="viewers">People you send links to never pay. <a href="/pricing">Compare all plans →</a></p>
+  </section>
+
+  <section class="faqwrap">
+    <div class="side">
+      <p class="eyebrow">Questions</p>
+      <h2>Frequently asked</h2>
+      <p>More on publishing from code is in the docs.</p>
+      <a class="ask" href="/docs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>Read the docs</a>
+    </div>
+    <div class="acc">
+      <details open><summary>Do I need an account?<i></i></summary><p>No. Paste or drop the file and you get a link. Sign in with GitHub only if you want your pages in one place.</p></details>
+      <details><summary>Does the person I send it to need anything?<i></i></summary><p>Just a browser. No account, no app, no sign-in.</p></details>
+      <details><summary>How long does a link last?<i></i></summary><p>Seven days by default. You can pick 1 hour, 1 day, 30 days, or never before you publish.</p></details>
+      <details><summary>Can I keep a page private?<i></i></summary><p>Add a password before you publish. Pages without an account are hidden from search engines.</p></details>
+      <details><summary>What can I publish?<i></i></summary><p>Any single HTML page up to 2 MB: reports, dashboards, decks, games. Scripts and styles run as written.</p></details>
+      <details><summary>Is aired free?<i></i></summary><p>Yes. Publishing and viewing are free, and the code is open source. Paid plans for your own domain and open tracking are coming.</p></details>
+    </div>
+  </section>
+
+  <section class="cta4s" style="margin-top:112px">
+    <div>
+      <p class="eyebrow">Works with your tools</p>
+      <h2>Whatever made it, send it with aired.</h2>
+      <p class="sub">Claude, ChatGPT, Cursor, Gemini, or your own agent.</p>
+      <div class="btns"><a class="solid" href="#publish" data-publish>Publish a page</a><a href="/docs">Add to your agent</a></div>
+      <div class="ticks"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>Free</span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>No account</span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>Viewers need nothing</span></div>
+    </div>
+    <div class="wall" aria-hidden="true"><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14.066 6.028v2.22h5.729q.075-.001.148.005l-5.853 5.752a2 2 0 0 1-.024-.309V8.247h-2.353v5.45c0 2.322 1.935 4.222 4.258 4.222h5.675v-2.22h-5.675q-.03 0-.059-.003l5.729-5.629q.006.082.006.166v5.465H24v-5.465a4.204 4.204 0 0 0-4.205-4.205zM0 8.245l8.28 9.266c.839.94 2.396.346 2.396-.914V8.245H8.19v5.44l-4.86-5.44Z"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.922 16.997C23.061 18.492 18.063 22.02 12 22.02 5.937 22.02.939 18.492.078 16.997A.641.641 0 0 1 0 16.741v-2.869a.883.883 0 0 1 .053-.22c.372-.935 1.347-2.292 2.605-2.656.167-.429.414-1.055.644-1.517a10.098 10.098 0 0 1-.052-1.086c0-1.331.282-2.499 1.132-3.368.397-.406.89-.717 1.474-.952C7.255 2.937 9.248 1.98 11.978 1.98c2.731 0 4.767.957 6.166 2.093.584.235 1.077.546 1.474.952.85.869 1.132 2.037 1.132 3.368 0 .368-.014.733-.052 1.086.23.462.477 1.088.644 1.517 1.258.364 2.233 1.721 2.605 2.656a.841.841 0 0 1 .053.22v2.869a.641.641 0 0 1-.078.256Zm-11.75-5.992h-.344a4.359 4.359 0 0 1-.355.508c-.77.947-1.918 1.492-3.508 1.492-1.725 0-2.989-.359-3.782-1.259a2.137 2.137 0 0 1-.085-.104L4 11.746v6.585c1.435.779 4.514 2.179 8 2.179 3.486 0 6.565-1.4 8-2.179v-6.585l-.098-.104s-.033.045-.085.104c-.793.9-2.057 1.259-3.782 1.259-1.59 0-2.738-.545-3.508-1.492a4.359 4.359 0 0 1-.355-.508Zm2.328 3.25c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm-5 0c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm3.313-6.185c.136 1.057.403 1.913.878 2.497.442.544 1.134.938 2.344.938 1.573 0 2.292-.337 2.657-.751.384-.435.558-1.15.558-2.361 0-1.14-.243-1.847-.705-2.319-.477-.488-1.319-.862-2.824-1.025-1.487-.161-2.192.138-2.533.529-.269.307-.437.808-.438 1.578v.021c0 .265.021.562.063.893Zm-1.626 0c.042-.331.063-.628.063-.894v-.02c-.001-.77-.169-1.271-.438-1.578-.341-.391-1.046-.69-2.533-.529-1.505.163-2.347.537-2.824 1.025-.462.472-.705 1.179-.705 2.319 0 1.211.175 1.926.558 2.361.365.414 1.084.751 2.657.751 1.21 0 1.902-.394 2.344-.938.475-.584.742-1.44.878-2.497Z"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.0719.0719 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.4069-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.55 5.067c-1.2038-.002-2.1806.973-2.1806 2.1765v4.8676c0 .972-.8035 1.7594-1.7597 1.7594-.568 0-1.1352-.286-1.4718-.7659l-4.9713-7.1003c-.4125-.5896-1.0837-.941-1.8103-.941-1.1334 0-2.1533.9635-2.1533 2.153v4.8957c0 .972-.7969 1.7594-1.7596 1.7594-.57 0-1.1363-.286-1.4728-.7658L.4076 5.1598C.2822 4.9798 0 5.0688 0 5.2882v4.2452c0 .2147.0656.4228.1884.599l5.4748 7.8183c.3234.462.8006.8052 1.3509.9298 1.3771.313 2.6446-.747 2.6446-2.0977v-4.893c0-.972.7875-1.7593 1.7596-1.7593h.003a1.798 1.798 0 0 1 1.4718.7658l4.9723 7.0994c.4135.5905 1.05.941 1.8093.941 1.1587 0 2.1515-.9645 2.1515-2.153v-4.8948c0-.972.7875-1.7594 1.7596-1.7594h.194a.22.22 0 0 0 .2204-.2202v-4.622a.22.22 0 0 0-.2203-.2203Z"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23"/></svg></span><span class="me"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14.066 6.028v2.22h5.729q.075-.001.148.005l-5.853 5.752a2 2 0 0 1-.024-.309V8.247h-2.353v5.45c0 2.322 1.935 4.222 4.258 4.222h5.675v-2.22h-5.675q-.03 0-.059-.003l5.729-5.629q.006.082.006.166v5.465H24v-5.465a4.204 4.204 0 0 0-4.205-4.205zM0 8.245l8.28 9.266c.839.94 2.396.346 2.396-.914V8.245H8.19v5.44l-4.86-5.44Z"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.922 16.997C23.061 18.492 18.063 22.02 12 22.02 5.937 22.02.939 18.492.078 16.997A.641.641 0 0 1 0 16.741v-2.869a.883.883 0 0 1 .053-.22c.372-.935 1.347-2.292 2.605-2.656.167-.429.414-1.055.644-1.517a10.098 10.098 0 0 1-.052-1.086c0-1.331.282-2.499 1.132-3.368.397-.406.89-.717 1.474-.952C7.255 2.937 9.248 1.98 11.978 1.98c2.731 0 4.767.957 6.166 2.093.584.235 1.077.546 1.474.952.85.869 1.132 2.037 1.132 3.368 0 .368-.014.733-.052 1.086.23.462.477 1.088.644 1.517 1.258.364 2.233 1.721 2.605 2.656a.841.841 0 0 1 .053.22v2.869a.641.641 0 0 1-.078.256Zm-11.75-5.992h-.344a4.359 4.359 0 0 1-.355.508c-.77.947-1.918 1.492-3.508 1.492-1.725 0-2.989-.359-3.782-1.259a2.137 2.137 0 0 1-.085-.104L4 11.746v6.585c1.435.779 4.514 2.179 8 2.179 3.486 0 6.565-1.4 8-2.179v-6.585l-.098-.104s-.033.045-.085.104c-.793.9-2.057 1.259-3.782 1.259-1.59 0-2.738-.545-3.508-1.492a4.359 4.359 0 0 1-.355-.508Zm2.328 3.25c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm-5 0c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm3.313-6.185c.136 1.057.403 1.913.878 2.497.442.544 1.134.938 2.344.938 1.573 0 2.292-.337 2.657-.751.384-.435.558-1.15.558-2.361 0-1.14-.243-1.847-.705-2.319-.477-.488-1.319-.862-2.824-1.025-1.487-.161-2.192.138-2.533.529-.269.307-.437.808-.438 1.578v.021c0 .265.021.562.063.893Zm-1.626 0c.042-.331.063-.628.063-.894v-.02c-.001-.77-.169-1.271-.438-1.578-.341-.391-1.046-.69-2.533-.529-1.505.163-2.347.537-2.824 1.025-.462.472-.705 1.179-.705 2.319 0 1.211.175 1.926.558 2.361.365.414 1.084.751 2.657.751 1.21 0 1.902-.394 2.344-.938.475-.584.742-1.44.878-2.497Z"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.0719.0719 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.4069-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.55 5.067c-1.2038-.002-2.1806.973-2.1806 2.1765v4.8676c0 .972-.8035 1.7594-1.7597 1.7594-.568 0-1.1352-.286-1.4718-.7659l-4.9713-7.1003c-.4125-.5896-1.0837-.941-1.8103-.941-1.1334 0-2.1533.9635-2.1533 2.153v4.8957c0 .972-.7969 1.7594-1.7596 1.7594-.57 0-1.1363-.286-1.4728-.7658L.4076 5.1598C.2822 4.9798 0 5.0688 0 5.2882v4.2452c0 .2147.0656.4228.1884.599l5.4748 7.8183c.3234.462.8006.8052 1.3509.9298 1.3771.313 2.6446-.747 2.6446-2.0977v-4.893c0-.972.7875-1.7593 1.7596-1.7593h.003a1.798 1.798 0 0 1 1.4718.7658l4.9723 7.0994c.4135.5905 1.05.941 1.8093.941 1.1587 0 2.1515-.9645 2.1515-2.153v-4.8948c0-.972.7875-1.7594 1.7596-1.7594h.194a.22.22 0 0 0 .2204-.2202v-4.622a.22.22 0 0 0-.2203-.2203Z"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14.066 6.028v2.22h5.729q.075-.001.148.005l-5.853 5.752a2 2 0 0 1-.024-.309V8.247h-2.353v5.45c0 2.322 1.935 4.222 4.258 4.222h5.675v-2.22h-5.675q-.03 0-.059-.003l5.729-5.629q.006.082.006.166v5.465H24v-5.465a4.204 4.204 0 0 0-4.205-4.205zM0 8.245l8.28 9.266c.839.94 2.396.346 2.396-.914V8.245H8.19v5.44l-4.86-5.44Z"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.922 16.997C23.061 18.492 18.063 22.02 12 22.02 5.937 22.02.939 18.492.078 16.997A.641.641 0 0 1 0 16.741v-2.869a.883.883 0 0 1 .053-.22c.372-.935 1.347-2.292 2.605-2.656.167-.429.414-1.055.644-1.517a10.098 10.098 0 0 1-.052-1.086c0-1.331.282-2.499 1.132-3.368.397-.406.89-.717 1.474-.952C7.255 2.937 9.248 1.98 11.978 1.98c2.731 0 4.767.957 6.166 2.093.584.235 1.077.546 1.474.952.85.869 1.132 2.037 1.132 3.368 0 .368-.014.733-.052 1.086.23.462.477 1.088.644 1.517 1.258.364 2.233 1.721 2.605 2.656a.841.841 0 0 1 .053.22v2.869a.641.641 0 0 1-.078.256Zm-11.75-5.992h-.344a4.359 4.359 0 0 1-.355.508c-.77.947-1.918 1.492-3.508 1.492-1.725 0-2.989-.359-3.782-1.259a2.137 2.137 0 0 1-.085-.104L4 11.746v6.585c1.435.779 4.514 2.179 8 2.179 3.486 0 6.565-1.4 8-2.179v-6.585l-.098-.104s-.033.045-.085.104c-.793.9-2.057 1.259-3.782 1.259-1.59 0-2.738-.545-3.508-1.492a4.359 4.359 0 0 1-.355-.508Zm2.328 3.25c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm-5 0c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm3.313-6.185c.136 1.057.403 1.913.878 2.497.442.544 1.134.938 2.344.938 1.573 0 2.292-.337 2.657-.751.384-.435.558-1.15.558-2.361 0-1.14-.243-1.847-.705-2.319-.477-.488-1.319-.862-2.824-1.025-1.487-.161-2.192.138-2.533.529-.269.307-.437.808-.438 1.578v.021c0 .265.021.562.063.893Zm-1.626 0c.042-.331.063-.628.063-.894v-.02c-.001-.77-.169-1.271-.438-1.578-.341-.391-1.046-.69-2.533-.529-1.505.163-2.347.537-2.824 1.025-.462.472-.705 1.179-.705 2.319 0 1.211.175 1.926.558 2.361.365.414 1.084.751 2.657.751 1.21 0 1.902-.394 2.344-.938.475-.584.742-1.44.878-2.497Z"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.0719.0719 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.4069-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.55 5.067c-1.2038-.002-2.1806.973-2.1806 2.1765v4.8676c0 .972-.8035 1.7594-1.7597 1.7594-.568 0-1.1352-.286-1.4718-.7659l-4.9713-7.1003c-.4125-.5896-1.0837-.941-1.8103-.941-1.1334 0-2.1533.9635-2.1533 2.153v4.8957c0 .972-.7969 1.7594-1.7596 1.7594-.57 0-1.1363-.286-1.4728-.7658L.4076 5.1598C.2822 4.9798 0 5.0688 0 5.2882v4.2452c0 .2147.0656.4228.1884.599l5.4748 7.8183c.3234.462.8006.8052 1.3509.9298 1.3771.313 2.6446-.747 2.6446-2.0977v-4.893c0-.972.7875-1.7593 1.7596-1.7593h.003a1.798 1.798 0 0 1 1.4718.7658l4.9723 7.0994c.4135.5905 1.05.941 1.8093.941 1.1587 0 2.1515-.9645 2.1515-2.153v-4.8948c0-.972.7875-1.7594 1.7596-1.7594h.194a.22.22 0 0 0 .2204-.2202v-4.622a.22.22 0 0 0-.2203-.2203Z"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14.066 6.028v2.22h5.729q.075-.001.148.005l-5.853 5.752a2 2 0 0 1-.024-.309V8.247h-2.353v5.45c0 2.322 1.935 4.222 4.258 4.222h5.675v-2.22h-5.675q-.03 0-.059-.003l5.729-5.629q.006.082.006.166v5.465H24v-5.465a4.204 4.204 0 0 0-4.205-4.205zM0 8.245l8.28 9.266c.839.94 2.396.346 2.396-.914V8.245H8.19v5.44l-4.86-5.44Z"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.922 16.997C23.061 18.492 18.063 22.02 12 22.02 5.937 22.02.939 18.492.078 16.997A.641.641 0 0 1 0 16.741v-2.869a.883.883 0 0 1 .053-.22c.372-.935 1.347-2.292 2.605-2.656.167-.429.414-1.055.644-1.517a10.098 10.098 0 0 1-.052-1.086c0-1.331.282-2.499 1.132-3.368.397-.406.89-.717 1.474-.952C7.255 2.937 9.248 1.98 11.978 1.98c2.731 0 4.767.957 6.166 2.093.584.235 1.077.546 1.474.952.85.869 1.132 2.037 1.132 3.368 0 .368-.014.733-.052 1.086.23.462.477 1.088.644 1.517 1.258.364 2.233 1.721 2.605 2.656a.841.841 0 0 1 .053.22v2.869a.641.641 0 0 1-.078.256Zm-11.75-5.992h-.344a4.359 4.359 0 0 1-.355.508c-.77.947-1.918 1.492-3.508 1.492-1.725 0-2.989-.359-3.782-1.259a2.137 2.137 0 0 1-.085-.104L4 11.746v6.585c1.435.779 4.514 2.179 8 2.179 3.486 0 6.565-1.4 8-2.179v-6.585l-.098-.104s-.033.045-.085.104c-.793.9-2.057 1.259-3.782 1.259-1.59 0-2.738-.545-3.508-1.492a4.359 4.359 0 0 1-.355-.508Zm2.328 3.25c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm-5 0c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm3.313-6.185c.136 1.057.403 1.913.878 2.497.442.544 1.134.938 2.344.938 1.573 0 2.292-.337 2.657-.751.384-.435.558-1.15.558-2.361 0-1.14-.243-1.847-.705-2.319-.477-.488-1.319-.862-2.824-1.025-1.487-.161-2.192.138-2.533.529-.269.307-.437.808-.438 1.578v.021c0 .265.021.562.063.893Zm-1.626 0c.042-.331.063-.628.063-.894v-.02c-.001-.77-.169-1.271-.438-1.578-.341-.391-1.046-.69-2.533-.529-1.505.163-2.347.537-2.824 1.025-.462.472-.705 1.179-.705 2.319 0 1.211.175 1.926.558 2.361.365.414 1.084.751 2.657.751 1.21 0 1.902-.394 2.344-.938.475-.584.742-1.44.878-2.497Z"/></svg></span><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.0719.0719 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.4069-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg></span></div>
+  </section>
+
+</main>
+
+<footer><div class="wrap">
+  <span>aired</span>
+  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
+</div></footer>
+<script src="/app.js"></script>
 </body>
 </html>
