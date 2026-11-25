@@ -41,6 +41,11 @@ export type Env = {
   STRIPE_API_BASE?: string;
   /** Site origin for Stripe success/cancel/portal return URLs. Default https://aired.sh; set only for local dev. */
   SITE_ORIGIN?: string;
+  /** WorkOS AuthKit sign-in: on only when both are set (lib/workos.ts). */
+  WORKOS_CLIENT_ID?: string;
+  WORKOS_API_KEY?: string;
+  /** Local tests point this at a mock. */
+  WORKOS_API_BASE?: string;
 };
 
 export type AppBindings = {

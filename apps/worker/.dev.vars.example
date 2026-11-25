@@ -22,3 +22,14 @@ STRIPE_AUTOMATIC_TAX=
 # STRIPE_API_BASE=http://localhost:12111
 # Optional, local dev only: where Stripe sends the user back. Default https://aired.sh.
 # SITE_ORIGIN=http://localhost:8787
+
+# WorkOS AuthKit sign-in (Phase 3). Off unless BOTH are set; then /auth/login
+# and the CLI use AuthKit instead of GitHub. Staging: environment
+# environment_01M89KX95ZKTZB0B7QP19VTTF8, redirect URI
+# http://localhost:8787/auth/workos/callback (set SITE_ORIGIN to match).
+# The API key is the staging sk_test_... from the WorkOS dashboard
+# (API keys page); put it here, never in a committed file.
+# WORKOS_CLIENT_ID=client_01M89KX9DYCW9Z8J3TEDHEDSD2
+# WORKOS_API_KEY=sk_test_...
+# Optional, local tests: point at a mock.
+# WORKOS_API_BASE=http://localhost:12141

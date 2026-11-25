@@ -27,43 +27,11 @@ import { requireCsrfHeader } from '../middleware/csrf.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { TIERS } from '../lib/rate-limit-tiers.js';
 import { recordGithubSignIn, upsertUserRecord } from '../lib/resolve-user.js';
+import { constantTimeEqual, finishSignIn, isAllowedReturn, type AuthState } from '../lib/sign-in.js';
+import { workosEnabled } from '../lib/workos.js';
+import { startWorkosSignIn } from './auth-workos.js';
 
 const auth = new Hono<AppBindings>();
-
-// Valid return paths for post-login redirect
-const ALLOWED_RETURN_PATHS = [
-  '/dashboard',
-  '/',
-  '/upgrade',
-  '/upgrade?interval=year',
-  '/upgrade?interval=month',
-  '/claim',
-];
-const ALLOWED_RETURN_PREFIX = '/p/';
-
-function isAllowedReturn(path: string): boolean {
-  return ALLOWED_RETURN_PATHS.includes(path) || path.startsWith(ALLOWED_RETURN_PREFIX);
-}
-
-/**
- * Constant-time string comparison to prevent timing attacks.
- */
-async function constantTimeEqual(a: string, b: string): Promise<boolean> {
-  if (a.length !== b.length) {
-    // Still iterate to avoid early exit
-    let diff = 0;
-    const minLen = Math.min(a.length, b.length);
-    for (let i = 0; i < minLen; i++) {
-      diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-    }
-    return false;
-  }
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return diff === 0;
-}
 
 /**
  * Save a GitHub sign-in: the KV user record (as before), then the D1 identity
@@ -127,6 +95,11 @@ auth.get('/cli', rateLimit(TIERS.oauth_init), async (c) => {
     return c.json({ error: 'port must be an integer in [1024, 65535]' }, 400);
   }
 
+  // With WorkOS on, the CLI signs in through AuthKit too (any method).
+  if (workosEnabled(c.env)) {
+    return startWorkosSignIn(c, { port: portNum, client_state: clientState });
+  }
+
   const stateWorker = generateOpaqueId();
 
   try {
@@ -173,7 +146,7 @@ auth.get('/callback', rateLimit(TIERS.oauth_init), async (c) => {
     );
   }
 
-  const statesMatch = await constantTimeEqual(urlState, cookieState);
+  const statesMatch = constantTimeEqual(urlState, cookieState);
   if (!statesMatch) {
     return new Response(
       '<!DOCTYPE html><html><body><h1>Authentication Error</h1><p>State mismatch. Please try signing in again.</p></body></html>',
@@ -192,11 +165,15 @@ auth.get('/callback', rateLimit(TIERS.oauth_init), async (c) => {
   // Delete auth_state (one-shot)
   await c.env.PAGES_KV.delete(kvKeys.authState(urlState)).catch(() => {});
 
-  let authState: { port?: number; client_state?: string; return?: string };
+  let authState: AuthState & { provider?: string };
   try {
     authState = JSON.parse(authStateRaw) as typeof authState;
   } catch {
     return c.redirect('/?login_failed=1', 302);
+  }
+  // A state minted for the WorkOS flow can't finish here.
+  if (authState.provider === 'workos') {
+    return c.redirect('/?login_failed=state', 302);
   }
 
   const code = url.searchParams.get('code');
@@ -231,50 +208,7 @@ auth.get('/callback', rateLimit(TIERS.oauth_init), async (c) => {
     return c.redirect('/?login_failed=1', 302);
   }
 
-  // CLI flow (port present) gets a long-lived, non-rotating token; the web
-  // cookie keeps the default sliding 30-day lifetime.
-  const isCliFlow = typeof authState.port === 'number';
-
-  // Mint JWT
-  let jwt: string;
-  try {
-    jwt = await signSession(
-      { sub: user.id, login: user.login, email: user.email, name: user.name },
-      c.env.SESSION_SECRET,
-      isCliFlow ? CLI_SESSION_MAX_AGE_SECONDS : undefined,
-    );
-  } catch (err) {
-    console.error('Failed to mint JWT:', err);
-    return c.redirect('/?login_failed=1', 302);
-  }
-
-  clearOAuthStateCookie(c);
-
-  // Determine flow: CLI (port present) or web
-  if (isCliFlow) {
-    // CLI flow
-    const cliCode = generateOpaqueId();
-    const clientState = authState.client_state ?? '';
-
-    try {
-      await c.env.PAGES_KV.put(
-        kvKeys.cliCode(cliCode),
-        JSON.stringify({ jwt, client_state: clientState }),
-        { expirationTtl: 60 },
-      );
-    } catch (err) {
-      console.error('Failed to write cli_code KV:', err);
-      return c.redirect('/?login_failed=1', 302);
-    }
-
-    const redirectUrl = `http://localhost:${authState.port}/?code=${encodeURIComponent(cliCode)}&state=${encodeURIComponent(clientState)}`;
-    return c.redirect(redirectUrl, 302);
-  } else {
-    // Web flow
-    setSessionCookie(c, jwt);
-    const returnPath = isAllowedReturn(authState.return ?? '') ? (authState.return ?? '/dashboard') : '/dashboard';
-    return c.redirect(returnPath, 302);
-  }
+  return finishSignIn(c, user, authState);
 });
 
 // POST /auth/cli/exchange — exchange one-time CLI code for JWT
@@ -309,7 +243,7 @@ auth.post('/cli/exchange', rateLimit(TIERS.oauth_init), async (c) => {
   }
 
   // Constant-time compare body.state to stored client_state
-  const statesMatch = await constantTimeEqual(state, cliCodeData.client_state ?? '');
+  const statesMatch = constantTimeEqual(state, cliCodeData.client_state ?? '');
   if (!statesMatch) {
     return c.json({ error: 'invalid code' }, 400);
   }

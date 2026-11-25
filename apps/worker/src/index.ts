@@ -11,6 +11,7 @@ import { auth } from "./routes/auth.js";
 import { dashboard } from "./routes/dashboard.js";
 import { billing, upgrade } from "./routes/billing.js";
 import { keys } from "./routes/keys.js";
+import { authWorkos } from "./routes/auth-workos.js";
 import { publishRateLimit } from "./middleware/rate-limit.js";
 import { corsMiddleware } from "./middleware/cors.js";
 import { authMiddleware } from "./middleware/auth.js";
@@ -81,7 +82,8 @@ app.on(["GET", "DELETE", "OPTIONS"], "/mcp", (c) => handleMcp(c, (req) => app.fe
 // OG image route
 app.route("/", og);
 
-// Mount auth routes
+// Mount auth routes (WorkOS first: /auth/login and /auth/workos/callback)
+app.route("/auth", authWorkos);
 app.route("/auth", auth);
 
 // Mount billing routes before api so /api/billing/* matches first
