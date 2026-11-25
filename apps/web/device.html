@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>aired — sign in the CLI</title>
+  <meta name="robots" content="noindex" />
+  <meta name="referrer" content="no-referrer" />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="preload" href="/fonts/inter-latin-v20.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/fonts/fonts.css" />
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #0a0a0b;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    @keyframes skeleton-pulse { from { opacity: 1; } to { opacity: 0.4; } }
+    .skeleton-row { animation: skeleton-pulse 1.2s linear infinite alternate; }
+    .device-btn {
+      display: inline-flex;
+      align-items: center;
+      transition: opacity 120ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .device-btn:hover:not(:disabled) { opacity: 0.9; }
+    .device-btn:active:not(:disabled) { opacity: 0.8; }
+    .device-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    @media (pointer: coarse) { .device-btn, .device-code { min-height: 44px; } }
+    @media (prefers-reduced-motion: reduce) {
+      .skeleton-row { animation: none; opacity: 0.7; }
+      .device-btn { transition: none; }
+    }
+    .device-code { letter-spacing: 0.15em; }
+    /* Not in the committed style.css yet; same values as Tailwind's. */
+    .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+    .max-w-sm { max-width: 24rem; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col text-aired-text-primary">
+
+  <header class="w-full px-6 h-14 flex items-center justify-between max-w-2xl mx-auto">
+    <a href="/" class="text-base font-semibold tracking-tight text-aired-text-primary hover:text-white transition-colors duration-150">aired</a>
+    <nav class="flex items-center gap-5 text-sm text-aired-text-secondary">
+      <a href="/docs" class="hover:text-aired-text-primary transition-colors duration-150">Docs</a>
+    </nav>
+  </header>
+
+  <main class="flex-1 w-full max-w-2xl mx-auto px-6 py-10">
+    <h1 class="text-xl font-medium tracking-tight">Sign in the aired CLI</h1>
+    <p class="mt-2 text-sm text-aired-text-secondary">
+      Enter the code <code class="font-mono text-aired-text-primary">aired login --device</code> showed in your terminal.
+    </p>
+
+    <p id="status" class="sr-only" role="status" aria-live="polite"></p>
+
+    <section id="state-loading" class="mt-8" aria-hidden="true">
+      <div class="skeleton-row h-4 w-56 rounded-sm bg-aired-border"></div>
+      <div class="skeleton-row mt-3 h-3 w-32 rounded-sm bg-aired-border"></div>
+    </section>
+
+    <section id="state-signed-out" class="hidden mt-8">
+      <h2 class="text-lg font-medium">Sign in first</h2>
+      <p class="mt-2 text-sm text-aired-text-secondary">You come back here to approve the code after you sign in.</p>
+      <div class="mt-6">
+        <a id="sign-in" href="/auth/login?return=/device"
+           class="device-btn focus-ring px-4 py-2.5 rounded bg-aired-text-primary text-aired-bg text-sm font-medium">Sign in</a>
+      </div>
+    </section>
+
+    <section id="state-approve" class="hidden mt-8">
+      <form id="approve-form" class="max-w-sm">
+        <label for="user-code" class="block text-sm text-aired-text-primary">Code</label>
+        <input id="user-code" name="user_code" type="text" inputmode="text" autocomplete="off" autocapitalize="characters"
+               spellcheck="false" maxlength="9" placeholder="BCDF-GHJK" required
+               class="device-code mt-2 w-full rounded px-3 py-2 font-mono text-lg uppercase border border-aired-border bg-aired-bg text-aired-text-primary focus-ring"
+               aria-describedby="who approve-error" />
+        <p id="who" class="mt-3 text-xs text-aired-text-tertiary"></p>
+        <p id="approve-error" class="hidden mt-3 text-sm text-red-400" role="alert"></p>
+        <div class="mt-6">
+          <button id="approve" type="submit" class="device-btn focus-ring px-4 py-2.5 rounded bg-aired-text-primary text-aired-bg text-sm font-medium">Approve</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="state-done" class="hidden mt-8">
+      <h2 class="text-lg font-medium" tabindex="-1" id="done-heading">The CLI is signed in</h2>
+      <p class="mt-2 text-sm text-aired-text-secondary">Go back to your terminal. You can close this tab.</p>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      'use strict';
+      var $ = function (id) { return document.getElementById(id); };
+      function show(id) {
+        ['state-loading', 'state-signed-out', 'state-approve', 'state-done'].forEach(function (s) {
+          $(s).classList.toggle('hidden', s !== id);
+        });
+      }
+      // Codes look like BCDF-GHJK: no vowels, no 0/O or 1/I.
+      function normalize(v) {
+        var s = String(v || '').toUpperCase().replace(/[\s-]/g, '');
+        return /^[BCDFGHJKLMNPQRSTVWXZ]{8}$/.test(s) ? s.slice(0, 4) + '-' + s.slice(4) : null;
+      }
+      var fromUrl = normalize(new URLSearchParams(location.search).get('code'));
+      var input = $('user-code');
+      if (fromUrl) {
+        input.value = fromUrl;
+        $('sign-in').href = '/auth/login?return=' + encodeURIComponent('/device?code=' + fromUrl);
+      }
+
+      function showError(text) {
+        $('approve-error').textContent = text || '';
+        $('approve-error').classList.toggle('hidden', !text);
+        input.setAttribute('aria-invalid', text ? 'true' : 'false');
+      }
+
+      fetch('/api/me', { credentials: 'same-origin' })
+        .then(function (res) { return res.status === 200 ? res.json() : null; })
+        .then(function (user) {
+          if (!user || !user.login) { show('state-signed-out'); return; }
+          $('who').textContent = 'The CLI will be signed in as @' + user.login + '. Only approve a code you just got from your own terminal.';
+          show('state-approve');
+          input.focus();
+        })
+        .catch(function () { show('state-signed-out'); });
+
+      $('approve-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var code = normalize(input.value);
+        if (!code) { showError('Codes look like BCDF-GHJK.'); input.focus(); return; }
+        var btn = $('approve');
+        btn.disabled = true;
+        btn.textContent = 'Approving…';
+        showError('');
+        fetch('/auth/device/approve', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'X-Aired-Request': '1' },
+          body: JSON.stringify({ user_code: code }),
+        })
+          .then(function (res) {
+            return res.json().catch(function () { return {}; }).then(function (data) { return { ok: res.ok, data: data }; });
+          })
+          .then(function (r) {
+            if (!r.ok) throw new Error(r.data.error || 'Could not approve the code. Please try again.');
+            show('state-done');
+            $('status').textContent = 'The CLI is signed in. Go back to your terminal.';
+            $('done-heading').focus();
+          })
+          .catch(function (err) {
+            btn.disabled = false;
+            btn.textContent = 'Approve';
+            showError(err.message || 'Could not approve the code. Please try again.');
+            input.focus();
+          });
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -30,6 +30,8 @@ import { resolveGithubSignIn } from '../lib/resolve-user.js';
 import { constantTimeEqual, finishSignIn, isAllowedReturn, type AuthState } from '../lib/sign-in.js';
 import { workosEnabled } from '../lib/workos.js';
 import { startWorkosSignIn } from './auth-workos.js';
+import { pollNativeDevice } from './auth-device.js';
+import { isNativeDeviceCode } from '../lib/device-code.js';
 
 const auth = new Hono<AppBindings>();
 
@@ -283,7 +285,7 @@ auth.post('/logout', requireAuth, requireCsrfHeader, async (c) => {
   return c.json({ ok: true });
 });
 
-// GET /auth/device — initiate device flow
+// GET /auth/device — GitHub's device flow, for CLI versions before aired's own (POST /auth/device)
 auth.get('/device', rateLimit(TIERS.oauth_init), async (c) => {
   let deviceResponse: Record<string, unknown>;
   try {
@@ -317,7 +319,8 @@ auth.get('/device', rateLimit(TIERS.oauth_init), async (c) => {
 });
 
 // POST /auth/device/poll — poll device flow token
-auth.post('/device/poll', rateLimit(TIERS.oauth_init), async (c) => {
+const githubPollLimit = rateLimit(TIERS.oauth_init);
+auth.post('/device/poll', async (c) => {
   let body: unknown;
   try {
     body = await c.req.json();
@@ -334,6 +337,11 @@ auth.post('/device/poll', rateLimit(TIERS.oauth_init), async (c) => {
   if (typeof device_code !== 'string') {
     return c.json({ error: 'invalid request' }, 400);
   }
+
+  // aired's own device codes (current CLIs); GitHub's for older ones.
+  if (isNativeDeviceCode(device_code)) return pollNativeDevice(c, device_code);
+  const limited = await githubPollLimit(c, async () => {});
+  if (limited) return limited;
 
   const stateRaw = await c.env.PAGES_KV.get(kvKeys.deviceCode(device_code));
   if (stateRaw === null) {

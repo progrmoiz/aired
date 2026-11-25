@@ -12,6 +12,7 @@ import { dashboard } from "./routes/dashboard.js";
 import { billing, upgrade } from "./routes/billing.js";
 import { keys } from "./routes/keys.js";
 import { authWorkos } from "./routes/auth-workos.js";
+import { authDevice } from "./routes/auth-device.js";
 import { publishRateLimit } from "./middleware/rate-limit.js";
 import { corsMiddleware } from "./middleware/cors.js";
 import { authMiddleware } from "./middleware/auth.js";
@@ -82,8 +83,10 @@ app.on(["GET", "DELETE", "OPTIONS"], "/mcp", (c) => handleMcp(c, (req) => app.fe
 // OG image route
 app.route("/", og);
 
-// Mount auth routes (WorkOS first: /auth/login and /auth/workos/callback)
+// Mount auth routes (WorkOS first: /auth/login and /auth/workos/callback;
+// then aired's device sign-in: POST /auth/device and /auth/device/approve)
 app.route("/auth", authWorkos);
+app.route("/auth", authDevice);
 app.route("/auth", auth);
 
 // Mount billing routes before api so /api/billing/* matches first

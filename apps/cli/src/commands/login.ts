@@ -165,8 +165,12 @@ async function deviceFlow(baseUrl: string): Promise<void> {
     process.exit(1)
   }
 
-  const { user_code, verification_uri, interval, device_code } = deviceInfo
-  process.stderr.write(`Open ${verification_uri} and enter code: ${user_code}\n`)
+  const { user_code, verification_uri, verification_uri_complete, interval, device_code } = deviceInfo
+  if (verification_uri_complete) {
+    process.stderr.write(`Open ${verification_uri_complete}\nand check the code matches: ${user_code}\n`)
+  } else {
+    process.stderr.write(`Open ${verification_uri} and enter code: ${user_code}\n`)
+  }
 
   const pollInterval = Math.max(interval, 2)
   const TIMEOUT_MS = 15 * 60 * 1000 // 15 minutes
