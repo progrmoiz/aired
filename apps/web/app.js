@@ -368,64 +368,28 @@
       return Math.floor(s / 86400) + "d ago";
     }
 
-    // The last 20 opens on a timeline: oldest on the left, now on the right.
+    // The latest opens, newest first: country and how long ago.
     function renderOpens(recent) {
-      var box = document.getElementById("opens");
-      if (!box) return;
-      var opens = recent.filter(function (r) { return r && typeof r.ts === "number"; }).sort(function (a, b) { return a.ts - b.ts; });
+      var list = document.getElementById("opens");
+      if (!list) return;
+      var opens = recent.filter(function (r) { return r && typeof r.ts === "number"; }).sort(function (a, b) { return b.ts - a.ts; });
       if (!opens.length) return;
-      var now = Date.now(), first = opens[0].ts, span = Math.max(60000, now - first);
-      var from = document.getElementById("opens-from");
-      if (from) from.textContent = ago(now - first);
-      box.innerHTML = "";
-      var tip = document.createElement("span");
-      tip.className = "tip";
-      tip.hidden = true;
-      opens.forEach(function (o, i) {
-        var b = document.createElement("button");
-        b.type = "button";
-        b.setAttribute("role", "listitem");
-        var place = o.country && o.country !== "XX" ? regionName(o.country) : "Somewhere";
-        b.setAttribute("aria-label", "Opened in " + place + ", " + ago(now - o.ts));
-        b.style.left = (4 + 92 * (o.ts - first) / span) + "%";
-        var bar = document.createElement("i");
-        bar.style.height = (30 + 70 * (i + 1) / opens.length) + "%";
-        b.appendChild(bar);
-        if (i === opens.length - 1) b.classList.add("latest");
-        function show() {
-          tip.innerHTML = "";
-          tip.appendChild(document.createTextNode(place));
-          var sm = document.createElement("small");
-          sm.textContent = ago(Date.now() - o.ts);
-          tip.appendChild(sm);
-          tip.style.left = b.style.left;
-          tip.hidden = false;
-          box.querySelectorAll("button.on").forEach(function (x) { x.classList.remove("on"); });
-          b.classList.add("on");
-        }
-        function hide() { tip.hidden = true; b.classList.remove("on"); }
-        b.addEventListener("mouseenter", show);
-        b.addEventListener("focus", show);
-        b.addEventListener("click", show);
-        b.addEventListener("mouseleave", hide);
-        b.addEventListener("blur", hide);
-        box.appendChild(b);
+      var rows = opens.slice(0, 4).map(function (o) {
+        var li = document.createElement("li");
+        var place = document.createElement("span");
+        place.textContent = o.country && o.country !== "XX" ? regionName(o.country) : "Somewhere";
+        var when = document.createElement("time");
+        when.dateTime = new Date(o.ts).toISOString();
+        li.appendChild(place);
+        li.appendChild(when);
+        list.appendChild(li);
+        return { el: when, ts: o.ts };
       });
-      box.appendChild(tip);
-
-      // "Last opened Xs ago", ticking every second.
-      var last = document.getElementById("last-open"), lastAgo = document.getElementById("last-open-ago");
-      if (last && lastAgo) {
-        var latest = opens[opens.length - 1].ts;
-        var tick = function () {
-          var d = Date.now() - latest;
-          lastAgo.textContent = ago(d);
-          last.classList.toggle("fresh", d < 5 * 60000);
-        };
-        tick();
-        last.hidden = false;
-        setInterval(tick, 1000);
-      }
+      var refresh = function () { rows.forEach(function (r) { r.el.textContent = ago(Date.now() - r.ts); }); };
+      refresh();
+      setInterval(refresh, 1000);
+      var last = document.getElementById("last-open");
+      if (last) last.hidden = false;
     }
 
     // Top countries by opens, with a bar for each one's share.

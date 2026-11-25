@@ -272,14 +272,17 @@
       <p class="live"><i></i>Live from aired.sh</p>
       <h2>Pages people actually open</h2>
     </div>
-    <div class="nums" id="nums">
-      <div class="num"><span>Pages published</span><b data-stat="publishes" data-count>10,827</b>
-        <div class="viz"><svg viewBox="0 0 300 70" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="sp" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ededef" stop-opacity=".18"/><stop offset="1" stop-color="#ededef" stop-opacity="0"/></linearGradient></defs><path d="M0 64 L25 62 L50 60 L75 61 L100 55 L125 52 L150 50 L175 44 L200 40 L225 33 L250 26 L275 16 L300 6 L300 70 L0 70Z" fill="url(#sp)"/><path d="M0 64 L25 62 L50 60 L75 61 L100 55 L125 52 L150 50 L175 44 L200 40 L225 33 L250 26 L275 16 L300 6" fill="none" stroke="#ededef" stroke-width="1.5"/></svg></div></div>
-      <div class="num"><span>Times opened</span><b data-stat="views" data-count>102,156</b>
-        <p class="last" id="last-open" hidden><i></i>Last opened <time id="last-open-ago">just now</time></p>
-        <div class="viz"><div class="opens" id="opens" role="list" aria-label="Most recent opens"></div><div class="opens-axis"><span id="opens-from"></span><span>now</span></div></div></div>
+    <div class="nums nums2" id="nums">
+      <div class="num">
+        <div class="pair">
+          <div><span>Pages published</span><b data-stat="publishes" data-count>10,827</b></div>
+          <div><span>Times opened</span><b data-stat="views" data-count>102,156</b></div>
+        </div>
+        <p class="last" id="last-open" hidden><i></i>Latest opens</p>
+        <ol class="feed" id="opens" aria-label="Latest opens"></ol>
+      </div>
       <div class="num"><span>Countries</span><b data-stat="countries" data-count>141</b>
-        <div class="viz" style="height:auto"><ol class="geo" id="geo" aria-label="Where pages are opened"></ol></div></div>
+        <ol class="geo" id="geo" aria-label="Where pages are opened"></ol></div>
     </div>
   </section>
 
