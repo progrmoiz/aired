@@ -30,14 +30,14 @@ Agents should read the live docs at https://github.com/progrmoiz/aired before an
 ## Authentication
 - No account or API key is required to publish.
 - The update_token returned with each publish is the only credential for that artifact.
-- PUT /api/pages/:id takes the token in the JSON body as `update_token`.
+- PUT /api/pages/:id takes the token in the JSON body as `update_token`, or as an `Authorization: Bearer <token>` header.
 - DELETE /api/pages/:id takes the token in `Authorization: Bearer <token>` header.
 - POST /api/publish acts as update when both `id` and `update_token` are in the body.
 - Anyone with the URL can view; anyone with the PIN (if set) can read protected content.
 
 ## Important API endpoints
 - POST /api/publish — publish HTML and receive `{ id, url, update_token, expiresAt }`. Body fields: `html` (required), `title?`, `ttl?` (seconds), `permanent?`, `pin?`, `reads?`. Pass `id` + `update_token` in the same body to update in one call.
-- PUT /api/pages/:id — update an artifact. Pass `update_token` in the JSON body (not header).
+- PUT /api/pages/:id — update an artifact. Pass `update_token` in the JSON body or as `Authorization: Bearer <update_token>`.
 - DELETE /api/pages/:id — delete an artifact. Pass `Authorization: Bearer <update_token>` header.
 - GET /api/pages/:id — public metadata: `{ id, title, size, readCount, expiresAt }`.
 - GET /api/stats — aggregate counts plus recent publishes for the homepage feed.
@@ -45,16 +45,16 @@ Agents should read the live docs at https://github.com/progrmoiz/aired before an
 - POST /p/:id/verify-pin — body `{ pin }`, sets a 1-hour cookie scoped to the page.
 
 ## Pricing and limits
-- Free, no account.
+- Free. No account needed; optional GitHub sign-in adds a dashboard of your pages.
 - 2 MB max per publish.
-- 5 publishes per hour per IP.
+- 5 publishes per hour per IP, or 30 per hour when signed in.
 - Default TTL is 7 days. Permanent TTL available; artifacts may be removed for abuse.
 
 ## Limitations and non-goals
 - Static HTML only. No server-side compute, no databases, no long-running jobs.
 - No file types other than HTML at the entry point. CSS, JS, images get inlined into the HTML at publish time.
 - No editing in-browser after publish — update via the API with the update_token.
-- No custom domains, no team accounts, no analytics dashboard.
+- No custom domains and no team accounts. The dashboard shows view counts per page, not detailed analytics.
 
 ## Error recovery
 - Errors are JSON: `{ "error": "<message>" }`.

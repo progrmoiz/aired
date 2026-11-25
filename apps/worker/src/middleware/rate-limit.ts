@@ -1,7 +1,7 @@
 import type { Context, Next } from "hono";
 import type { AppBindings } from "../types.js";
 import { hashToHex } from "@aired/core";
-import type { RateLimitTier } from "../lib/rate-limit-tiers.js";
+import { TIERS, publishTier, type RateLimitTier } from "../lib/rate-limit-tiers.js";
 import { underBurstLimit } from "../lib/burst-limit.js";
 
 /**
@@ -110,6 +110,20 @@ export function rateLimit(
 
     await next();
   };
+}
+
+const publishLimits = {
+  anonymous: rateLimit(TIERS.anonymous),
+  authenticated: rateLimit(TIERS.authenticated),
+};
+
+/** Publish limit: per account when signed in, per IP otherwise. */
+export function publishRateLimit(
+  c: Context<AppBindings>,
+  next: Next,
+): Promise<Response | void> {
+  const tier = publishTier(c.get("user"));
+  return (tier === TIERS.authenticated ? publishLimits.authenticated : publishLimits.anonymous)(c, next);
 }
 
 /**

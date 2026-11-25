@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import type { AppBindings } from "../types.js";
 import { loadStats, saveStats } from "../lib/stats.js";
-import { rateLimit } from "../middleware/rate-limit.js";
+import { rateLimit, publishRateLimit } from "../middleware/rate-limit.js";
 import { requireCsrfHeader } from "../middleware/csrf.js";
+import { readUpdateToken } from "../lib/page-token.js";
 import { TIERS } from "../lib/rate-limit-tiers.js";
 import { detectSpam, SPAM_REJECTION } from "../lib/spam.js";
 import {
@@ -29,7 +30,7 @@ import {
 const api = new Hono<AppBindings>();
 
 // POST /api/publish — create a new page or update an existing one via update_token
-api.post("/publish", rateLimit(TIERS.anonymous), async (c) => {
+api.post("/publish", publishRateLimit, async (c) => {
   let body: unknown;
   try {
     body = await c.req.json();
@@ -231,7 +232,7 @@ api.post("/publish", rateLimit(TIERS.anonymous), async (c) => {
   });
 });
 
-// PUT /api/pages/:id — update by token (from body) or owner JWT
+// PUT /api/pages/:id — update by token (body or Bearer header) or owner JWT
 api.put("/pages/:id", requireCsrfHeader, async (c) => {
   const id = c.req.param("id");
 
@@ -246,7 +247,11 @@ api.put("/pages/:id", requireCsrfHeader, async (c) => {
     return c.json({ error: "Request body must be a JSON object" }, 400);
   }
 
-  const { html, title, update_token } = body as Record<string, unknown>;
+  const { html, title } = body as Record<string, unknown>;
+  const update_token = readUpdateToken(
+    (body as Record<string, unknown>).update_token,
+    c.req.header("Authorization"),
+  );
 
   if (typeof html !== "string") {
     return c.json({ error: "html is required and must be a string" }, 400);
@@ -271,9 +276,9 @@ api.put("/pages/:id", requireCsrfHeader, async (c) => {
     return c.json({ error: "Page metadata is corrupted" }, 500);
   }
 
-  // Authorization: update_token from body wins (R6); else owner JWT
+  // Authorization: update_token (body, else Bearer header) wins (R6); else owner JWT
   const putUser = c.get('user');
-  const hasToken = typeof update_token === "string";
+  const hasToken = update_token !== null;
   let authorized = false;
   let tokenValid = false;
 
@@ -358,9 +363,16 @@ api.delete("/pages/:id", requireCsrfHeader, async (c) => {
   const deleteUser = c.get('user');
   let authorized = false;
 
-  // Primary path: Authorization: Bearer <update_token>
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    const token = authHeader.slice("Bearer ".length).trim();
+  // Primary path: Authorization: Bearer <update_token>, or update_token in a
+  // JSON body for clients that send it the same way as PUT.
+  let bodyToken: unknown;
+  try {
+    bodyToken = ((await c.req.json()) as Record<string, unknown> | null)?.update_token;
+  } catch {
+    bodyToken = undefined;
+  }
+  const token = readUpdateToken(bodyToken, authHeader);
+  if (token !== null) {
     const valid = await verifyToken(token, metadata.tokenHash);
     if (valid) {
       authorized = true;
@@ -380,10 +392,10 @@ api.delete("/pages/:id", requireCsrfHeader, async (c) => {
   }
 
   if (!authorized) {
-    if (authHeader && authHeader.startsWith("Bearer ")) {
+    if (token !== null) {
       return c.json({ error: "Invalid token" }, 403);
     }
-    return c.json({ error: "Authorization: Bearer <token> is required" }, 401);
+    return c.json({ error: "Authorization: Bearer <update_token> is required" }, 401);
   }
 
   await Promise.all([

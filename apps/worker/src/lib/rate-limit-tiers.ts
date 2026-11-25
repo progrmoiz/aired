@@ -19,3 +19,8 @@ export const TIERS = {
   // requests (init + callback + retries on stale browser tabs).
   oauth_init:    { bucketPrefix: 'rl:oauth',  limit: 60, windowSeconds: 3600 },
 } as const satisfies Record<string, RateLimitTier>;
+
+/** Signed-in publishes count against the account; anonymous ones against the IP. */
+export function publishTier(user: unknown): RateLimitTier {
+  return user !== null && user !== undefined ? TIERS.authenticated : TIERS.anonymous;
+}
