@@ -43,7 +43,7 @@ npx aired report.html --ttl 24h --pin secret123
 | `-p, --pin <pin>` | PIN-protect the page |
 | `--ttl <duration>` | Expiry: `1h`, `24h`, `7d`, `30d` |
 | `--permanent` | No expiry |
-| `--reads <n>` | Auto-delete after N views |
+| `--reads <n>` | Stop opening after N views |
 
 ## Global Flags
 

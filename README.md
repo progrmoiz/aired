@@ -202,11 +202,12 @@ Response:
 
 ```
 PUT /api/pages/:id
-Authorization: Bearer at_xK9mN2pQr7...
 Content-Type: application/json
 
 { "html": "<html>...v2...</html>", "update_token": "at_..." }
 ```
+
+The token can go in the body (above) or as `Authorization: Bearer at_...`.
 
 ### Delete a page
 

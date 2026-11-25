@@ -9,10 +9,9 @@ import { handleMcp } from "./routes/mcp.js";
 import { og } from "./routes/og.js";
 import { auth } from "./routes/auth.js";
 import { dashboard } from "./routes/dashboard.js";
-import { rateLimit } from "./middleware/rate-limit.js";
+import { publishRateLimit } from "./middleware/rate-limit.js";
 import { corsMiddleware } from "./middleware/cors.js";
 import { authMiddleware } from "./middleware/auth.js";
-import { TIERS } from "./lib/rate-limit-tiers.js";
 import { isMcpToolCall } from "./lib/mcp-rpc.js";
 
 const app = new Hono<AppBindings>();
@@ -43,7 +42,6 @@ app.get("/health", (c) => c.json({ status: "ok" }));
 // MCP Streamable HTTP endpoint
 // Every JSON-RPC message is a POST, so only tool calls (publishes) are
 // rate-limited; initialize, tools/list and notifications pass through.
-const mcpPublishLimit = rateLimit(TIERS.anonymous);
 app.post(
   "/mcp",
   async (c, next) => {
@@ -53,7 +51,7 @@ app.post(
     } catch {
       // Malformed body: let the MCP handler return the JSON-RPC error.
     }
-    if (isMcpToolCall(body)) return mcpPublishLimit(c, next);
+    if (isMcpToolCall(body)) return publishRateLimit(c, next);
     await next();
   },
   handleMcp,

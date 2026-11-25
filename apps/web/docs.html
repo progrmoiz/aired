@@ -241,7 +241,7 @@
             <tr><td><code>--permanent</code></td><td>No expiry</td></tr>
             <tr><td><code>--pin &lt;pin&gt;</code></td><td>PIN-protect viewing</td></tr>
             <tr><td><code>-t, --title &lt;title&gt;</code></td><td>Custom page title</td></tr>
-            <tr><td><code>--reads &lt;n&gt;</code></td><td>Auto-delete after N views</td></tr>
+            <tr><td><code>--reads &lt;n&gt;</code></td><td>Stop opening after N views</td></tr>
             <tr><td><code>--json</code></td><td>Print <code>{ url, update_token, expiresAt }</code></td></tr>
           </tbody>
         </table>
@@ -360,7 +360,7 @@ url = "https://aired.sh/mcp"</code></pre>
   "ttl": 604800,                  // optional seconds (default 604800 = 7 days)
   "permanent": false,             // optional, true = no expiry (overrides ttl)
   "pin": "1234",                  // optional, viewer must enter to view
-  "reads": 10,                    // optional, auto-delete after N views
+  "reads": 10,                    // optional, stop opening after N views
 
   // To update an existing page in one call, also include:
   "id": "a1b2c3d4e5",
@@ -371,7 +371,7 @@ url = "https://aired.sh/mcp"</code></pre>
 <pre><code>{
   "html": "&lt;!doctype html&gt;...",   // required
   "title": "Optional new title",  // optional
-  "update_token": "tok_..."       // required, in body (not header)
+  "update_token": "tok_..."       // required (or send Authorization: Bearer)
 }</code></pre>
 
         <h3>Update via curl</h3>
@@ -390,7 +390,7 @@ url = "https://aired.sh/mcp"</code></pre>
         <ul>
           <li>Publishing is anonymous — no API key required.</li>
           <li>Every publish returns an <code>update_token</code>. It is the only credential for that page.</li>
-          <li><strong>PUT</strong> takes the token in the JSON body as <code>update_token</code>.</li>
+          <li><strong>PUT</strong> takes the token in the JSON body as <code>update_token</code>, or as an <code>Authorization: Bearer &lt;token&gt;</code> header.</li>
           <li><strong>DELETE</strong> takes the token as <code>Authorization: Bearer &lt;token&gt;</code> header.</li>
           <li><strong>POST</strong> can act as update when <code>id</code> and <code>update_token</code> are both in the body.</li>
           <li>Lose the token and you can't mutate the page (you can still publish a fresh one).</li>
@@ -407,9 +407,9 @@ url = "https://aired.sh/mcp"</code></pre>
             <tr><td><code>400</code></td><td>Invalid JSON body, missing <code>html</code>, validation failed.</td></tr>
             <tr><td><code>401</code></td><td>DELETE missing <code>Authorization: Bearer</code> header.</td></tr>
             <tr><td><code>403</code></td><td><code>update_token</code> does not match the page.</td></tr>
-            <tr><td><code>404</code></td><td>Page id does not exist (or expired).</td></tr>
-            <tr><td><code>410</code></td><td>Page exists but has expired.</td></tr>
-            <tr><td><code>429</code></td><td>Rate limit (5 publishes/hour/IP). Wait an hour.</td></tr>
+            <tr><td><code>404</code></td><td>Page id does not exist, or the page expired.</td></tr>
+            <tr><td><code>410</code></td><td>Page reached its view limit (<code>reads</code>).</td></tr>
+            <tr><td><code>429</code></td><td>Rate limit: 5 publishes an hour per IP, or 30 an hour when signed in.</td></tr>
             <tr><td><code>503</code></td><td>Storage write limit reached. Retry shortly.</td></tr>
           </tbody>
         </table>
