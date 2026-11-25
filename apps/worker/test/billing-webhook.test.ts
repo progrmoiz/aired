@@ -2,6 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   billingStatus,
+  checkoutGate,
+  isProPrice,
+  siteOrigin,
   parseInterval,
   parseWebhookEvent,
   planWebhookEvent,
@@ -134,4 +137,48 @@ test("billingStatus: billing off → never pro, row fields hidden", () => {
     enabled: false, plan: "free", status: null, interval: null, renewsAt: null, cancelAtPeriodEnd: null,
   });
   assert.equal(billingStatus({ enabled: false, signedIn: false, row: null, entitled: false }).plan, null);
+});
+
+const prices = { STRIPE_PRICE_MONTHLY: "price_m", STRIPE_PRICE_YEARLY: "price_y" };
+
+test("isProPrice accepts only the configured Pro prices", () => {
+  assert.equal(isProPrice("price_m", prices), true);
+  assert.equal(isProPrice("price_y", prices), true);
+  assert.equal(isProPrice("price_other", prices), false);
+  assert.equal(isProPrice(null, prices), false);
+  assert.equal(isProPrice("", prices), false);
+});
+
+test("isProPrice grants nothing when prices are unset", () => {
+  assert.equal(isProPrice("price_y", {}), false);
+  assert.equal(isProPrice("price_y", { STRIPE_PRICE_YEARLY: "" }), false);
+  // an unset monthly price doesn't make a null or empty price match
+  assert.equal(isProPrice(null, { STRIPE_PRICE_YEARLY: "price_y" }), false);
+  assert.equal(isProPrice("", { STRIPE_PRICE_MONTHLY: "" }), false);
+});
+
+test("siteOrigin defaults to https://aired.sh and drops a trailing slash", () => {
+  assert.equal(siteOrigin({}), "https://aired.sh");
+  assert.equal(siteOrigin({ SITE_ORIGIN: "" }), "https://aired.sh");
+  assert.equal(siteOrigin({ SITE_ORIGIN: "http://localhost:8787/" }), "http://localhost:8787");
+});
+
+test("checkoutGate: no live subscription → go ahead", () => {
+  assert.equal(checkoutGate([]), null);
+});
+
+test("checkoutGate: a paying subscription → pro, with that subscription", () => {
+  for (const status of ["active", "trialing", "past_due"]) {
+    const sub = { id: "sub_1", status };
+    assert.deepEqual(checkoutGate([sub]), { kind: "pro", sub }, status);
+  }
+});
+
+test("checkoutGate: only an incomplete one → processing", () => {
+  assert.deepEqual(checkoutGate([{ id: "sub_1", status: "incomplete" }]), { kind: "processing" });
+});
+
+test("checkoutGate: a paying one wins over an incomplete one", () => {
+  const paying = { id: "sub_2", status: "active" };
+  assert.deepEqual(checkoutGate([{ id: "sub_1", status: "incomplete" }, paying]), { kind: "pro", sub: paying });
 });

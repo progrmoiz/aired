@@ -4,6 +4,8 @@ import {
   HANDLED_EVENTS,
   STRIPE_API_VERSION,
   checkoutParams,
+  LIVE_STATUSES,
+  liveSubscriptions,
   normalizeSubscription,
   shouldStoreSubscription,
   subscriptionIdFromEvent,
@@ -195,6 +197,7 @@ test("normalizes a basil subscription (period end on the item)", () => {
     currentPeriodEnd: new Date(1_813_536_000 * 1000).toISOString(),
     cancelAtPeriodEnd: false,
     uid: 583231,
+    priceId: "price_1RyearlyPro",
   });
 });
 
@@ -207,6 +210,7 @@ test("normalizes an older subscription (top-level period end, expanded customer)
     currentPeriodEnd: "2026-01-01T00:00:00.000Z",
     cancelAtPeriodEnd: true,
     uid: 1000000000007,
+    priceId: "price_1OmonthlyPro",
   });
 });
 
@@ -231,6 +235,7 @@ test("missing or odd fields normalize to null rather than guesses", () => {
     currentPeriodEnd: null,
     cancelAtPeriodEnd: false,
     uid: null,
+    priceId: null,
   });
   for (const uid of ["0", "1.5", "12abc", "", 0, 3.2, -1, "9007199254740993", true, null]) {
     const s = normalizeSubscription({ ...basilSubscription, metadata: { uid } });
@@ -410,4 +415,40 @@ test("when neither is entitled, the incoming one is stored", () => {
   assert.equal(shouldStoreSubscription(lapsed, incomingSub("sub_A", "canceled", lastMonth), nowS), true);
   const noEnd = { subscriptionId: "sub_B", status: "active", currentPeriodEnd: null };
   assert.equal(shouldStoreSubscription(noEnd, incomingSub("sub_A", "canceled", lastMonth), nowS), true);
+});
+
+test("normalize carries the first item's price id, null when absent or not a string", () => {
+  assert.equal(normalizeSubscription(basilSubscription)?.priceId, "price_1RyearlyPro");
+  assert.equal(normalizeSubscription({ ...basilSubscription, items: { data: [] } })?.priceId, null);
+  assert.equal(normalizeSubscription({ ...basilSubscription, items: undefined })?.priceId, null);
+  assert.equal(
+    normalizeSubscription({ ...basilSubscription, items: { data: [{ price: { id: 42 } }] } })?.priceId,
+    null,
+  );
+});
+
+test("live statuses are the paying ones plus incomplete", () => {
+  assert.deepEqual([...LIVE_STATUSES].sort(), ["active", "incomplete", "past_due", "trialing"]);
+});
+
+test("liveSubscriptions keeps live, normalizable entries of a list response", () => {
+  const list = {
+    object: "list",
+    data: [
+      basilSubscription,
+      { ...basilSubscription, id: "sub_canceled", status: "canceled" },
+      { ...basilSubscription, id: "sub_expired", status: "incomplete_expired" },
+      { ...basilSubscription, id: "sub_pending", status: "incomplete" },
+      { ...basilSubscription, id: undefined },
+      "junk",
+    ],
+    has_more: false,
+  };
+  assert.deepEqual(liveSubscriptions(list).map((s) => [s.id, s.status]), [
+    ["sub_1RbasilA2b3C4d5E", "active"],
+    ["sub_pending", "incomplete"],
+  ]);
+  for (const bad of [null, undefined, {}, { data: "x" }, [], "list"]) {
+    assert.deepEqual(liveSubscriptions(bad), [], JSON.stringify(bad));
+  }
 });

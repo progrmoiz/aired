@@ -27,6 +27,8 @@ export type Env = {
   STRIPE_AUTOMATIC_TAX?: string;
   /** Stripe API origin. Default https://api.stripe.com; override only for local mocks. */
   STRIPE_API_BASE?: string;
+  /** Site origin for Stripe success/cancel/portal return URLs. Default https://aired.sh; set only for local dev. */
+  SITE_ORIGIN?: string;
 };
 
 export type AppBindings = {

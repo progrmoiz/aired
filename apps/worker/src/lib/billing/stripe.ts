@@ -2,6 +2,7 @@ import type { Env } from '../../types.js';
 import {
   STRIPE_API_VERSION,
   checkoutParams,
+  liveSubscriptions,
   normalizeSubscription,
   type NormalizedSubscription,
 } from './stripe-shapes.js';
@@ -23,7 +24,8 @@ type StripeEnv = Pick<
 export type CheckoutInput = {
   uid: number;
   interval: 'month' | 'year';
-  customerId: string | null;
+  /** Always set: every Checkout runs on the user's one Stripe customer (see createCustomer). */
+  customerId: string;
   email: string | null;
   /** Site origin for the success and cancel URLs, e.g. https://aired.sh */
   origin: string;
@@ -48,6 +50,32 @@ export async function createPortal(env: StripeEnv, customerId: string, returnUrl
   return { url: urlOf(data, 'portal session') };
 }
 
+/**
+ * Create the user's Stripe customer. The idempotency key makes a retry, or a
+ * second checkout racing the first, get the same customer back within Stripe's
+ * 24-hour key window; after that, the saved billing_customers row is used.
+ */
+export async function createCustomer(
+  env: StripeEnv,
+  input: { uid: number; email: string | null },
+): Promise<{ id: string }> {
+  const body = new URLSearchParams({ 'metadata[uid]': String(input.uid) });
+  if (input.email) body.set('email', input.email);
+  const { data } = await stripeRequest(env, 'POST', '/v1/customers', body, [], {
+    'Idempotency-Key': `aired-customer-${input.uid}`,
+  });
+  const id = (data as { id?: unknown } | null)?.id;
+  if (typeof id !== 'string' || !id) throw new Error('Stripe customer has no id');
+  return { id };
+}
+
+/** The customer's subscriptions that are paying or have a payment in progress. */
+export async function listActiveSubscriptions(env: StripeEnv, customerId: string): Promise<NormalizedSubscription[]> {
+  const q = new URLSearchParams({ customer: customerId, status: 'all', limit: '10' });
+  const { data } = await stripeRequest(env, 'GET', `/v1/subscriptions?${q.toString()}`, null);
+  return liveSubscriptions(data);
+}
+
 /** Current state of a subscription; null when Stripe has no such subscription. */
 export async function fetchSubscription(env: StripeEnv, id: string): Promise<NormalizedSubscription | null> {
   const { status, data } = await stripeRequest(
@@ -63,6 +91,7 @@ async function stripeRequest(
   path: string,
   body: URLSearchParams | null,
   allowStatuses: number[] = [],
+  extraHeaders: Record<string, string> = {},
 ): Promise<{ status: number; data: unknown }> {
   const key = env.STRIPE_SECRET_KEY;
   if (!key) throw new Error('Stripe is not configured (STRIPE_SECRET_KEY missing)');
@@ -72,6 +101,7 @@ async function stripeRequest(
     'Authorization': `Bearer ${key}`,
     'Stripe-Version': STRIPE_API_VERSION,
     'Content-Type': 'application/x-www-form-urlencoded',
+    ...extraHeaders,
   };
 
   let res: Response;

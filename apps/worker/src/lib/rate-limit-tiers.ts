@@ -16,6 +16,8 @@ export const TIERS = {
   pro:           { bucketPrefix: 'rl:pro',    limit: 500, windowSeconds: 86400 },
   claim_batch:   { bucketPrefix: 'rl:claim',  limit: 5,  windowSeconds: 3600 },
   delete:        { bucketPrefix: 'rl:delete', limit: 10, windowSeconds: 3600 },
+  // Checkout, portal and /upgrade each call Stripe.
+  billing:       { bucketPrefix: 'rl:billing', limit: 10, windowSeconds: 3600 },
   // OAuth init endpoints need higher limits — each sign-in attempt fires multiple
   // requests (init + callback + retries on stale browser tabs).
   oauth_init:    { bucketPrefix: 'rl:oauth',  limit: 60, windowSeconds: 3600 },

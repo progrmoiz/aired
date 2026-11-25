@@ -20,6 +20,8 @@ export type NormalizedSubscription = {
   cancelAtPeriodEnd: boolean;
   /** aired user id from `metadata.uid`, or null. */
   uid: number | null;
+  /** Price of the first item (`items.data[0].price.id`), or null. */
+  priceId: string | null;
 };
 
 export const HANDLED_EVENTS: readonly string[] = [
@@ -83,7 +85,26 @@ export function normalizeSubscription(obj: unknown): NormalizedSubscription | nu
     currentPeriodEnd: periodEnd,
     cancelAtPeriodEnd: sub.cancel_at_period_end === true,
     uid: parseUid(record(sub.metadata)?.uid),
+    priceId: str(price?.id),
   };
+}
+
+/** Subscription statuses that block a new Checkout: paying now, or payment in progress. */
+export const LIVE_STATUSES: readonly string[] = ['active', 'trialing', 'past_due', 'incomplete'];
+
+/**
+ * The live subscriptions in a `GET /v1/subscriptions` list response,
+ * normalized. Entries that don't normalize, or have another status, are dropped.
+ */
+export function liveSubscriptions(list: unknown): NormalizedSubscription[] {
+  const data = record(list)?.data;
+  if (!Array.isArray(data)) return [];
+  const out: NormalizedSubscription[] = [];
+  for (const item of data) {
+    const sub = normalizeSubscription(item);
+    if (sub && LIVE_STATUSES.includes(sub.status)) out.push(sub);
+  }
+  return out;
 }
 
 export function subscriptionIdFromEvent(evt: unknown): string | null {

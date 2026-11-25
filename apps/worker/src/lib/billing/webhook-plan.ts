@@ -77,3 +77,36 @@ export function billingStatus(input: {
     cancelAtPeriodEnd: row ? row.cancelAtPeriodEnd : null,
   };
 }
+
+/**
+ * Whether a subscription's price is one of ours. Only the configured Pro
+ * prices grant Pro; any other subscription on the Stripe account is ignored.
+ */
+export function isProPrice(
+  priceId: string | null,
+  env: { STRIPE_PRICE_MONTHLY?: string; STRIPE_PRICE_YEARLY?: string },
+): boolean {
+  if (!priceId) return false;
+  return priceId === env.STRIPE_PRICE_MONTHLY || priceId === env.STRIPE_PRICE_YEARLY;
+}
+
+/** Origin for the URLs Stripe sends the user back to. Never taken from the request. */
+export function siteOrigin(env: { SITE_ORIGIN?: string }): string {
+  return (env.SITE_ORIGIN || 'https://aired.sh').replace(/\/+$/, '');
+}
+
+const PAYING = new Set(['active', 'trialing', 'past_due']);
+
+/**
+ * Whether the customer's live subscriptions (see liveSubscriptions) rule out a
+ * new Checkout: one that pays (store it and say Pro), or one whose first
+ * payment is still in progress. null → go ahead.
+ */
+export function checkoutGate<S extends { status: string }>(
+  subs: readonly S[],
+): { kind: 'pro'; sub: S } | { kind: 'processing' } | null {
+  const paying = subs.find((s) => PAYING.has(s.status));
+  if (paying) return { kind: 'pro', sub: paying };
+  if (subs.some((s) => s.status === 'incomplete')) return { kind: 'processing' };
+  return null;
+}

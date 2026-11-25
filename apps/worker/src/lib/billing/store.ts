@@ -49,7 +49,19 @@ export async function ensureUser(
     .run();
 }
 
-/** Record a webhook event id. Returns false when it was already recorded (a duplicate delivery). */
+/** Whether a webhook event id was already handled. */
+export async function hasEvent(db: D1Database, id: string): Promise<boolean> {
+  const row = await db
+    .prepare('SELECT 1 AS seen FROM billing_events WHERE event_id = ?')
+    .bind(id)
+    .first<{ seen: number }>();
+  return row !== null;
+}
+
+/**
+ * Record a webhook event id once it has been handled. Returns false when it was
+ * already recorded (a duplicate delivery handled concurrently).
+ */
 export async function recordEvent(db: D1Database, id: string, type: string): Promise<boolean> {
   const res = await db
     .prepare('INSERT OR IGNORE INTO billing_events (event_id, type, received_at) VALUES (?, ?, ?)')
@@ -58,9 +70,24 @@ export async function recordEvent(db: D1Database, id: string, type: string): Pro
   return (res.meta.changes ?? 0) > 0;
 }
 
-/** Drop a recorded event so Stripe's retry gets processed (used when handling fails). */
-export async function forgetEvent(db: D1Database, id: string): Promise<void> {
-  await db.prepare('DELETE FROM billing_events WHERE event_id = ?').bind(id).run();
+/** The user's Stripe customer id, saved before their first Checkout. */
+export async function getCustomerId(db: D1Database, uid: number): Promise<string | null> {
+  const row = await db
+    .prepare('SELECT customer_id FROM billing_customers WHERE user_id = ?')
+    .bind(uid)
+    .first<{ customer_id: string }>();
+  return row ? row.customer_id : null;
+}
+
+/**
+ * Save the user's Stripe customer id. Keeps an existing row (first writer
+ * wins), so callers should read it back with getCustomerId.
+ */
+export async function saveCustomerId(db: D1Database, uid: number, customerId: string): Promise<void> {
+  await db
+    .prepare('INSERT OR IGNORE INTO billing_customers (user_id, customer_id, created_at) VALUES (?, ?, ?)')
+    .bind(uid, customerId, new Date().toISOString())
+    .run();
 }
 
 export async function getSubscription(db: D1Database, uid: number): Promise<StoredSubscription | null> {
@@ -73,7 +100,12 @@ export async function getSubscription(db: D1Database, uid: number): Promise<Stor
 
 export async function findUidByCustomer(db: D1Database, customerId: string): Promise<number | null> {
   const row = await db
-    .prepare('SELECT user_id FROM subscriptions WHERE customer_id = ?')
+    .prepare(
+      `SELECT user_id FROM subscriptions WHERE customer_id = ?1
+       UNION ALL
+       SELECT user_id FROM billing_customers WHERE customer_id = ?1
+       LIMIT 1`,
+    )
     .bind(customerId)
     .first<{ user_id: number }>();
   return row ? row.user_id : null;
