@@ -15,6 +15,7 @@ import { corsMiddleware } from "./middleware/cors.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { isMcpToolCall } from "./lib/mcp-rpc.js";
 import { sweepExpiredPages } from "./lib/expired-sweep.js";
+import { kvKeys } from "@aired/core";
 import type { Env } from "./types.js";
 
 const app = new Hono<AppBindings>();
@@ -97,8 +98,8 @@ app.notFound(async (c) => {
 
 /**
  * Cron Trigger (wrangler.toml [triggers]): delete the R2 files of expired
- * pages, a batch per run (lib/expired-sweep.ts). The cursor lives in D1
- * sweep_state, not KV, to stay clear of KV's daily write limit.
+ * pages, a batch per run (lib/expired-sweep.ts). The cursor and candidates
+ * live in D1, not KV, to stay clear of KV's daily write limit.
  */
 async function runExpiredSweep(env: Env): Promise<void> {
   const name = "expired_pages";
@@ -107,28 +108,58 @@ async function runExpiredSweep(env: Env): Promise<void> {
       list: async (cursor, limit) => {
         const res = await env.PAGES_BUCKET.list({ prefix: "pages/", limit, ...(cursor ? { cursor } : {}) });
         return {
-          objects: res.objects.map((o) => ({ key: o.key, uploaded: o.uploaded })),
+          objects: res.objects.map((o) => ({ key: o.key, uploaded: o.uploaded, etag: o.etag })),
           truncated: res.truncated,
           cursor: res.truncated ? res.cursor : null,
         };
       },
-      pageExists: async (id) => (await env.PAGES_KV.get(`page:${id}`)) !== null,
+      pageExists: async (id) => (await env.PAGES_KV.get(kvKeys.page(id))) !== null,
       deleteKeys: (keys) => env.PAGES_BUCKET.delete(keys),
       loadCursor: async () =>
         (await env.DB.prepare("SELECT cursor FROM sweep_state WHERE name = ?").bind(name).first<{ cursor: string | null }>())?.cursor ?? null,
-      saveCursor: async (cursor) => {
+      saveCursor: async (cursor, passDone) => {
+        const now = Date.now();
+        const prev = await env.DB
+          .prepare("SELECT pass_started_at FROM sweep_state WHERE name = ?")
+          .bind(name)
+          .first<{ pass_started_at: number | null }>();
+        const started = prev?.pass_started_at ?? now;
+        if (passDone) {
+          console.log({ event: "expired_sweep_pass_done", hours: Math.round((now - started) / 3_600_000) });
+        }
         await env.DB
           .prepare(
-            "INSERT INTO sweep_state (name, cursor, updated_at) VALUES (?, ?, ?) ON CONFLICT (name) DO UPDATE SET cursor = excluded.cursor, updated_at = excluded.updated_at",
+            "INSERT INTO sweep_state (name, cursor, updated_at, pass_started_at) VALUES (?, ?, ?, ?) ON CONFLICT (name) DO UPDATE SET cursor = excluded.cursor, updated_at = excluded.updated_at, pass_started_at = excluded.pass_started_at",
           )
-          .bind(name, cursor, Date.now())
+          .bind(name, cursor, now, passDone ? now : started)
           .run();
+      },
+      loadCandidates: async (keys) => {
+        const found = new Map<string, { etag: string; firstSeen: number }>();
+        if (keys.length === 0) return found;
+        const { results } = await env.DB
+          .prepare(`SELECT key, etag, first_seen FROM sweep_candidates WHERE key IN (${keys.map(() => "?").join(", ")})`)
+          .bind(...keys)
+          .all<{ key: string; etag: string; first_seen: number }>();
+        for (const r of results) found.set(r.key, { etag: r.etag, firstSeen: r.first_seen });
+        return found;
+      },
+      saveCandidates: async (put, drop) => {
+        const stmts = [
+          ...[...put].map(([key, c]) =>
+            env.DB
+              .prepare("INSERT INTO sweep_candidates (key, etag, first_seen) VALUES (?, ?, ?) ON CONFLICT (key) DO UPDATE SET etag = excluded.etag, first_seen = excluded.first_seen")
+              .bind(key, c.etag, c.firstSeen),
+          ),
+          ...drop.map((key) => env.DB.prepare("DELETE FROM sweep_candidates WHERE key = ?").bind(key)),
+        ];
+        if (stmts.length > 0) await env.DB.batch(stmts);
       },
       log: (entry) => console.warn(entry),
     },
     Date.now(),
   );
-  console.log({ event: "expired_sweep", scanned: result.scanned, deleted: result.deleted.length });
+  console.log({ event: "expired_sweep", scanned: result.scanned, marked: result.marked, deleted: result.deleted.length });
 }
 
 export default {

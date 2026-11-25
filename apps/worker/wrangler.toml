@@ -54,8 +54,9 @@ zone_name = "aired.sh"
 pattern = "aired.sh"
 zone_name = "aired.sh"
 
-# Expired-page file cleanup (src/lib/expired-sweep.ts): a small batch every
-# 30 minutes, so a full pass over the bucket takes days, well inside the
-# privacy policy's "within 30 days".
+# Expired-page file cleanup (src/lib/expired-sweep.ts): 40 files every 5
+# minutes (11,520 a day). A file goes after two sightings a day or more
+# apart, so deletion takes about two passes; the run logs each pass's length
+# (expired_sweep_pass_done) to check against the privacy policy's 30 days.
 [triggers]
-crons = ["*/30 * * * *"]
+crons = ["*/5 * * * *"]
