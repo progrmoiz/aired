@@ -30,6 +30,7 @@ import { billingEnabled, getEntitlements, isEntitled } from '../lib/entitlements
 import { getCustomerId, getSubscription } from '../lib/billing/store.js';
 import { blocksAccountDeletion, deleteAccountRows } from '../lib/billing/forget.js';
 import { identityEmails } from '../lib/users.js';
+import { revokeMcpGrants } from './mcp-oauth.js';
 import { listActiveSubscriptions } from '../lib/billing/stripe.js';
 import { isMissingCustomer } from '../lib/billing/stripe-shapes.js';
 import type { StoredSubscription } from '../lib/billing/store.js';
@@ -406,6 +407,13 @@ me.delete('/', requireSession, requireCsrfHeader, async (c) => {
     } catch (err) {
       console.error('Failed to revoke jti on account deletion:', err);
     }
+  }
+
+  // MCP connections the account approved stop working with it.
+  try {
+    await revokeMcpGrants(c.env, userId);
+  } catch (err) {
+    console.error('Failed to revoke MCP grants during account deletion:', err);
   }
 
   // Step 2: Delete user record and email index entries. An entry is deleted

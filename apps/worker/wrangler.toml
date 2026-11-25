@@ -75,6 +75,12 @@ name = "DEVICE_BURST"
 namespace_id = "1005"
 simple = { limit = 5, period = 60 }
 
+# MCP OAuth dynamic client registrations (POST /oauth/register): each writes KV.
+[[ratelimits]]
+name = "OAUTH_BURST"
+namespace_id = "1006"
+simple = { limit = 5, period = 60 }
+
 # Custom domain
 [[routes]]
 pattern = "aired.sh/*"

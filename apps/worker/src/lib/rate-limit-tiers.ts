@@ -6,7 +6,7 @@ export type RateLimitTier = {
    * Workers Rate Limiting binding that also caps anonymous requests per
    * minute (see lib/burst-limit.ts). Signed-in users skip it.
    */
-  burst?: 'PUBLISH_BURST' | 'REPORT_BURST' | 'DEVICE_BURST';
+  burst?: 'PUBLISH_BURST' | 'REPORT_BURST' | 'DEVICE_BURST' | 'OAUTH_BURST';
 };
 
 export const TIERS = {
@@ -27,6 +27,10 @@ export const TIERS = {
   // CLI device sign-in starts write to D1: an hourly cap plus a per-minute
   // flood guard counted by Cloudflare, not per isolate.
   device_start:  { bucketPrefix: 'rl:devstart', limit: 30, windowSeconds: 3600, burst: 'DEVICE_BURST' },
+  // MCP OAuth: dynamic client registration writes KV for anyone.
+  oauth_register: { bucketPrefix: 'rl:oauthreg', limit: 20, windowSeconds: 3600, burst: 'OAUTH_BURST' },
+  // MCP OAuth token endpoint: hosted clients refresh for many people from few IPs.
+  oauth_token:   { bucketPrefix: 'rl:oauthtok', limit: 5000, windowSeconds: 3600 },
   // CLI device sign-in polls: one every 5 seconds for up to 10 minutes.
   device_poll:   { bucketPrefix: 'rl:devpoll', limit: 400, windowSeconds: 3600 },
 } as const satisfies Record<string, RateLimitTier>;

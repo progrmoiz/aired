@@ -60,14 +60,38 @@ export function mcpAuthServer(env: Env): OAuthAuthorizationServer<Env> {
 
 export type McpTokenUser = { userId: number; scope: string[] };
 
+/** "Sign out everywhere" (SESSION_VALID_SINCE) also retires grants approved before it. */
+function grantRetired(env: Env, issuedAt: unknown): boolean {
+  const since = Date.parse(env.SESSION_VALID_SINCE ?? '');
+  if (isNaN(since)) return false;
+  return typeof issuedAt !== 'number' || issuedAt * 1000 < since;
+}
+
 /** A token for this resource, or null. Expired, revoked or someone else's resource: null. */
 export async function validateMcpToken(env: Env, resource: string, token: string): Promise<McpTokenUser | null> {
-  const v = await mcpAuthServer(env).validateToken<{ userId?: unknown }>(resource, token, env);
+  const v = await mcpAuthServer(env).validateToken<{ userId?: unknown; issuedAt?: unknown }>(resource, token, env);
   if (v === null || v.audience !== resource) return null;
   if (typeof v.expiresAt === 'number' && v.expiresAt * 1000 <= Date.now()) return null;
   const userId = v.props?.userId;
   if (typeof userId !== 'number' || !Number.isSafeInteger(userId) || userId <= 0) return null;
+  if (grantRetired(env, v.props?.issuedAt)) return null;
   return { userId, scope: v.scope };
+}
+
+/** Revoke every MCP connection an account approved (account deletion). */
+export async function revokeMcpGrants(env: Env, userId: number): Promise<number> {
+  const oauth = mcpAuthServer(env).getOAuthApi(env);
+  let revoked = 0;
+  let cursor: string | undefined;
+  do {
+    const page = await oauth.listUserGrants(String(userId), { limit: 1000, ...(cursor ? { cursor } : {}) });
+    for (const grant of page.items) {
+      await oauth.revokeGrant(grant.id, String(userId));
+      revoked++;
+    }
+    cursor = page.cursor;
+  } while (cursor);
+  return revoked;
 }
 
 function metadataUrl(env: Env, resource: string): string {
@@ -122,7 +146,12 @@ for (const path of ['/mcp', '/mcp/account'] as const) {
 // Protocol endpoints owned by the library: discovery, token, registration, revocation.
 mcpOAuth.all('/.well-known/oauth-authorization-server', (c) => mcpAuthServer(c.env).fetch(c.req.raw, c.env, c.executionCtx));
 mcpOAuth.all('/.well-known/oauth-authorization-server/*', (c) => mcpAuthServer(c.env).fetch(c.req.raw, c.env, c.executionCtx));
-mcpOAuth.all('/oauth/*', rateLimit(TIERS.oauth_init), (c) => mcpAuthServer(c.env).fetch(c.req.raw, c.env, c.executionCtx));
+// Registration writes KV for anyone: an hourly cap plus a per-minute flood
+// guard. The token endpoint is called by hosted clients (many people behind
+// a few IPs, refreshing hourly), so its per-IP cap is far higher.
+const authServerFetch = (c: Context<AppBindings>) => mcpAuthServer(c.env).fetch(c.req.raw, c.env, c.executionCtx);
+mcpOAuth.post('/oauth/register', rateLimit(TIERS.oauth_register), authServerFetch);
+mcpOAuth.all('/oauth/*', rateLimit(TIERS.oauth_token), authServerFetch);
 
 /** Signed in on the website (the session cookie), not with a CLI token or an API key. */
 async function webAccount(c: Context<AppBindings>): Promise<{ id: number; login: string } | null> {
@@ -157,7 +186,8 @@ mcpOAuth.get('/authorize', rateLimit(TIERS.oauth_init), async (c) => {
     const request = await oauth.parseAuthRequest(c.req.raw);
     const account = await webAccount(c);
     if (account === null) {
-      const back = `/authorize${new URL(c.req.url).search}`;
+      // Characters URL leaves raw in a query get encoded, so the return path is allowed.
+      const back = `/authorize${new URL(c.req.url).search}`.replace(/[|[\]{}^`"<> ]/g, (ch) => encodeURIComponent(ch));
       return c.redirect(`/auth/login?return=${encodeURIComponent(back)}`, 302);
     }
     const details: ConsentDescription = await oauth.describeConsent(request);
@@ -188,7 +218,7 @@ mcpOAuth.post('/authorize', rateLimit(TIERS.oauth_init), async (c) => {
       userId: String(account.id),
       metadata: { login: account.login },
       scope: approved.request.scope,
-      props: { userId: account.id },
+      props: { userId: account.id, issuedAt: Math.floor(Date.now() / 1000) },
     });
     approved.headers.set('Location', redirectTo);
     return new Response(null, { status: 302, headers: approved.headers });

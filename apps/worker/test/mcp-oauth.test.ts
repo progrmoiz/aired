@@ -75,3 +75,24 @@ test("CORS: protocol paths are open without credentials; the consent page and th
   const cors = src("src/middleware/cors.ts");
   assert.match(cors, /c\.res\.headers\.delete\('Access-Control-Allow-Credentials'\);/);
 });
+
+test("MCP connections end with the account and with sign-out-everywhere; rate limits fit hosted clients", () => {
+  const oauth = src("src/routes/mcp-oauth.ts");
+  assert.match(oauth, /props: \{ userId: account\.id, issuedAt: Math\.floor\(Date\.now\(\) \/ 1000\) \}/);
+  assert.match(oauth, /if \(grantRetired\(env, v\.props\?\.issuedAt\)\) return null;/);
+  assert.match(oauth, /await oauth\.revokeGrant\(grant\.id, String\(userId\)\);/);
+  const me = src("src/routes/me.ts");
+  assert.match(me, /await revokeMcpGrants\(c\.env, userId\);/);
+  assert.match(oauth, /mcpOAuth\.post\('\/oauth\/register', rateLimit\(TIERS\.oauth_register\), authServerFetch\);/);
+  assert.match(oauth, /mcpOAuth\.all\('\/oauth\/\*', rateLimit\(TIERS\.oauth_token\), authServerFetch\);/);
+  const tiers = src("src/lib/rate-limit-tiers.ts");
+  assert.match(tiers, /oauth_register: \{[^}]*burst: 'OAUTH_BURST' \}/);
+  assert.match(src("wrangler.toml"), /name = "OAUTH_BURST"/);
+});
+
+test("the authorize return path survives characters URL leaves raw", () => {
+  const search = "?response_type=code&state=a|b[c]{d}^e";
+  const back = `/authorize${search}`.replace(/[|[\]{}^`"<> ]/g, (ch) => encodeURIComponent(ch));
+  assert.equal(isAllowedReturn(back), true);
+  assert.match(src("src/routes/mcp-oauth.ts"), /\.replace\(\/\[\|\[\\\]\{\}\^`"<> \]\/g, \(ch\) => encodeURIComponent\(ch\)\)/);
+});
