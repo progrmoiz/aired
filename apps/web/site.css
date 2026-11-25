@@ -377,18 +377,16 @@ nav a.on { color: var(--text-1); }
 .code-tabs .code-copy:hover { color: var(--text-1); border-color: var(--border-2); }
 .code-tabs .code-copy.copied { color: var(--ok); border-color: rgba(52,211,153,.35); }
 
-/* Live numbers, two cards: totals with latest opens, and countries */
-.nums2 { grid-template-columns: 1fr 1fr; }
-@media (max-width: 760px) { .nums2 { grid-template-columns: 1fr; } }
-.nums2 .num { padding: 22px; }
-.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.pair > div + div { border-left: 1px solid var(--border); padding-left: 16px; }
-.nums2 .last { margin-top: 18px; }
+/* Live numbers: three cards, real data, no charts */
+.nums3 .num { padding: 22px; }
+.nums3 .sub, .nums3 .last { margin-top: 18px; font-size: 12px; color: var(--text-3); display: flex; align-items: center; gap: 7px; }
+.kinds { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.kinds li { font-size: 12.5px; color: var(--text-2); padding: 4px 9px; border: 1px solid var(--border-2); border-radius: 6px; background: var(--bg); }
 .feed { list-style: none; padding: 0; margin: 10px 0 0; border-top: 1px solid var(--border); }
-.feed li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 2px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-2); }
+.feed li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 2px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-2); }
 .feed li:last-child { border-bottom: 0; }
-.feed li time { color: var(--text-3); font-variant-numeric: tabular-nums; }
+.feed li time { color: var(--text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .feed li:first-child { color: var(--text-1); }
 .feed li:first-child time { color: var(--ok); }
-.nums2 .geo { margin-top: 14px; padding-bottom: 0; }
-.nums2 .geo li { padding: 6px 10px; font-size: 13px; }
+.nums3 .geo { margin-top: 14px; padding-bottom: 0; gap: 3px; }
+.nums3 .geo li { padding: 5px 9px; font-size: 13px; }

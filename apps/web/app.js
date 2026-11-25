@@ -374,7 +374,7 @@
       if (!list) return;
       var opens = recent.filter(function (r) { return r && typeof r.ts === "number"; }).sort(function (a, b) { return b.ts - a.ts; });
       if (!opens.length) return;
-      var rows = opens.slice(0, 4).map(function (o) {
+      var rows = opens.slice(0, 3).map(function (o) {
         var li = document.createElement("li");
         var place = document.createElement("span");
         place.textContent = o.country && o.country !== "XX" ? regionName(o.country) : "Somewhere";
@@ -400,7 +400,7 @@
         .map(function (cc) { return [cc, geo[cc]]; })
         .sort(function (a, b) { return b[1] - a[1]; });
       if (!rows.length) return;
-      var total = rows.reduce(function (n, r) { return n + r[1]; }, 0), top = rows.slice(0, 5);
+      var total = rows.reduce(function (n, r) { return n + r[1]; }, 0), top = rows.slice(0, 4);
       list.innerHTML = "";
       top.forEach(function (r) {
         var li = document.createElement("li");
