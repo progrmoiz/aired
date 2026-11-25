@@ -391,7 +391,9 @@ me.delete('/', requireWebSession, requireCsrfHeader, async (c) => {
     await deleteAccountRows(c.env.DB, userId);
   } catch (err) {
     console.error('Failed to delete account rows during account deletion:', err);
-    return c.json({ error: 'Could not delete your account records. Please try again.' }, 503);
+    // The marker above already ended every session, this one included.
+    clearSessionCookie(c);
+    return c.json({ error: 'Could not delete your account records. Sign in again and retry.' }, 503);
   }
   try {
     await c.env.PAGES_KV.delete(`ent:${userId}`);

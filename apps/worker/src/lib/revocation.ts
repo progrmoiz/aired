@@ -13,9 +13,10 @@ const MARKER_TTL_SECONDS = 400 * 24 * 60 * 60;
 export const sessionsValidSinceKey = (uid: number) => `svs:${uid}`;
 
 /**
- * The account's marker. `fresh` skips the edge cache: use it before minting
- * something new (a CLI token, a refreshed grant), where a stale read would let
- * it escape the marker.
+ * The account's marker. `fresh` asks for the shortest cache KV allows (not a
+ * consistent read: KV writes take up to a minute to reach every location).
+ * Revocation doesn't depend on it: anything minted from a stale read keeps
+ * the original sign-in time and is retired once the marker is seen.
  */
 export async function sessionsValidSince(kv: KVNamespace, uid: number, opts: { fresh?: boolean } = {}): Promise<number | null> {
   const raw = await kv.get(sessionsValidSinceKey(uid), opts.fresh ? undefined : { cacheTtl: 60 });

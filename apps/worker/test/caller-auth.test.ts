@@ -251,7 +251,9 @@ test("a device code approved before signing out everywhere yields no CLI token a
 test("a collected device code makes a CLI token that inherits the approver's sign-in time", async () => {
   const { env, post } = setup();
   env.PAGES_KV.m.delete(sessionsValidSinceKey(42));
-  const web = { Cookie: `aired_session=${await session()}`, "X-Aired-Request": "1" };
+  const signedIn = nowS() - 1000;
+  const approver = await signSession({ sub: 42, login: "kim", email: null, name: "Kim" }, SECRET, undefined, { kind: "web", authTime: signedIn });
+  const web = { Cookie: `aired_session=${approver}`, "X-Aired-Request": "1" };
   const start = (await (await post("/auth/device", {})).json()) as { device_code: string; user_code: string };
   await post("/auth/device/approve", { user_code: start.user_code }, web);
   const got = (await (await post("/auth/device/poll", { device_code: start.device_code })).json()) as { jwt: string };
@@ -259,7 +261,7 @@ test("a collected device code makes a CLI token that inherits the approver's sig
   assert.ok(v.ok);
   if (v.ok) {
     assert.equal(v.claims.kind, "cli");
-    assert.ok(v.claims.authTime <= nowS());
+    assert.equal(v.claims.authTime, signedIn, "exactly the approver's sign-in time");
   }
 });
 

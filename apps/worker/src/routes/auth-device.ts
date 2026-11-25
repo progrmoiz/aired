@@ -125,7 +125,8 @@ export async function pollNativeDevice(c: Context<AppBindings>, deviceCode: stri
   const authTime = collected.authTime ?? Math.floor(now / 1000);
 
   // The account was deleted, or its owner signed out everywhere, since the
-  // approval: no token. Read fresh, since this mints something new.
+  // approval: no token. (The token would carry the approval's sign-in time
+  // anyway, so a stale read here only delays its retirement.)
   if (retiredBy(await sessionsValidSince(c.env.PAGES_KV, userId, { fresh: true }), authTime)) {
     return c.json({ error: 'access_denied' }, 400);
   }
