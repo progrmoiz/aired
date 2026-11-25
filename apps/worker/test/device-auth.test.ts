@@ -83,6 +83,15 @@ test("wiring: the poll route sends aired codes to the native flow; approving nee
   const device = readFileSync(new URL("../src/routes/auth-device.ts", import.meta.url), "utf8");
   assert.match(device, /'\/device\/approve',\s*requireAuth,\s*requireSession,\s*requireCsrfHeader,/);
   assert.match(device, /CLI_SESSION_MAX_AGE_SECONDS/);
+  // Only the web cookie approves: a CLI token can't renew itself through the device flow.
+  assert.match(device, /if \(readSessionCookie\(c\) === null\) \{\s*return c\.json\(\{ error: 'Approve the code on the aired website, signed in\.' \}, 403\);/);
+  // Starting a sign-in writes to D1, so it has a flood guard counted by Cloudflare.
+  assert.match(device, /authDevice\.post\('\/device', rateLimit\(TIERS\.device_start\)/);
+  assert.match(readFileSync(new URL("../src/lib/rate-limit-tiers.ts", import.meta.url), "utf8"), /device_start: +\{[^}]*burst: 'DEVICE_BURST' \}/);
+  assert.match(readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8"), /name = "DEVICE_BURST"/);
+  assert.match(readFileSync(new URL("../migrations/0007_auth.sql", import.meta.url), "utf8"), /CREATE INDEX auth_tokens_expires_at ON auth_tokens \(expires_at\);/);
+  // The approval page can't be framed.
+  assert.match(device, /headers\.set\('Content-Security-Policy', "frame-ancestors 'none'"\);/);
   const index = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
   assert.ok(index.includes('app.route("/auth", authDevice);'));
 });

@@ -14,6 +14,8 @@ CREATE TABLE auth_tokens (
   -- Set when the CLI collects its session; a code works once.
   consumed_at INTEGER
 );
+-- Starting a device sign-in clears expired rows first.
+CREATE INDEX auth_tokens_expires_at ON auth_tokens (expires_at);
 
 -- "Sign out everywhere" for one person (Phase 8 reads it). Unix seconds.
 ALTER TABLE users ADD COLUMN sessions_valid_since INTEGER;

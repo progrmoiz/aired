@@ -195,6 +195,12 @@ async function deviceFlow(baseUrl: string): Promise<void> {
       continue
     }
 
+    if (result.status === 429) {
+      // Rate limited: wait longer, then keep polling until the deadline.
+      await wait(30_000)
+      continue
+    }
+
     // Error cases
     const errorData = result.data as { error: string } | null
     const errorCode = errorData?.error ?? ''

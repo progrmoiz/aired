@@ -7,6 +7,7 @@ import { requireAuth, requireSession } from '../middleware/auth.js';
 import { requireCsrfHeader } from '../middleware/csrf.js';
 import { signSession } from '../lib/jwt.js';
 import { siteOrigin } from '../lib/billing/webhook-plan.js';
+import { readSessionCookie } from '../lib/cookies.js';
 import {
   DEVICE_CODE_TTL_MS,
   DEVICE_POLL_INTERVAL,
@@ -29,7 +30,7 @@ import { approveDeviceAuth, consumeDeviceAuth, createDeviceAuth, readDeviceAuth 
 const authDevice = new Hono<AppBindings>();
 
 // POST /auth/device — start a device sign-in.
-authDevice.post('/device', rateLimit(TIERS.oauth_init), async (c) => {
+authDevice.post('/device', rateLimit(TIERS.device_start), async (c) => {
   const deviceCode = generateDeviceCode();
   const deviceHash = await hashToHex(deviceCode);
   const now = Date.now();
@@ -60,8 +61,8 @@ authDevice.post('/device', rateLimit(TIERS.oauth_init), async (c) => {
 });
 
 // POST /auth/device/approve {user_code} — a signed-in person approves a code
-// from aired.sh/device. A session, not an API key: a key mustn't be able to
-// mint CLI sessions.
+// from aired.sh/device. Only the web session cookie counts: an API key or a
+// CLI token mustn't be able to mint (or keep renewing) CLI sessions.
 authDevice.post(
   '/device/approve',
   requireAuth,
@@ -69,6 +70,9 @@ authDevice.post(
   requireCsrfHeader,
   rateLimit(TIERS.oauth_init),
   async (c) => {
+    if (readSessionCookie(c) === null) {
+      return c.json({ error: 'Approve the code on the aired website, signed in.' }, 403);
+    }
     const body = (await c.req.json().catch(() => null)) as { user_code?: unknown } | null;
     const userCode = normalizeUserCode(body?.user_code);
     if (userCode === null) return c.json({ error: 'That isn’t a sign-in code. It looks like BCDF-GHJK.' }, 400);
@@ -143,6 +147,17 @@ export async function pollNativeDevice(c: Context<AppBindings>, deviceCode: stri
   }
   c.header('Cache-Control', 'no-store');
   return c.json({ jwt, user });
+}
+
+/** GET /device — the approval page, never inside someone else's frame. */
+export async function devicePage(c: Context<AppBindings>): Promise<Response> {
+  if (!c.env.ASSETS) return c.text('Not found', 404);
+  const res = await c.env.ASSETS.fetch(c.req.raw);
+  const headers = new Headers(res.headers);
+  headers.set('X-Frame-Options', 'DENY');
+  headers.set('Content-Security-Policy', "frame-ancestors 'none'");
+  headers.set('Cache-Control', 'no-store');
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
 }
 
 export { authDevice };

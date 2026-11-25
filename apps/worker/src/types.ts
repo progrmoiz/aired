@@ -11,6 +11,7 @@ export type Env = {
   /** Workers Rate Limiting bindings (wrangler.toml [[ratelimits]]). Optional so tests run without them. */
   PUBLISH_BURST?: RateLimit;
   REPORT_BURST?: RateLimit;
+  DEVICE_BURST?: RateLimit;
   PIN_GUESS?: RateLimit;
   PIN_GUESS_PAGE?: RateLimit;
   /** D1 database for accounts and billing state (wrangler.toml [[d1_databases]]). */

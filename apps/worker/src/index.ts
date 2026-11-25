@@ -12,7 +12,7 @@ import { dashboard } from "./routes/dashboard.js";
 import { billing, upgrade } from "./routes/billing.js";
 import { keys } from "./routes/keys.js";
 import { authWorkos } from "./routes/auth-workos.js";
-import { authDevice } from "./routes/auth-device.js";
+import { authDevice, devicePage } from "./routes/auth-device.js";
 import { publishRateLimit } from "./middleware/rate-limit.js";
 import { corsMiddleware } from "./middleware/cors.js";
 import { authMiddleware } from "./middleware/auth.js";
@@ -105,6 +105,8 @@ app.route("/", upgrade);
 
 // Mount dashboard route (authenticated HTML shell)
 app.route("/", dashboard);
+// The CLI device sign-in page (served with no-framing headers)
+app.get("/device", devicePage);
 
 // Mount viewer routes
 app.route("/", viewer);
