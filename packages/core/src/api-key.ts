@@ -17,7 +17,8 @@ const KEY_SHAPE = new RegExp(`^${API_KEY_PREFIX}[0-9A-Za-z]{${BODY_LENGTH + CHEC
 
 let crcTable: Uint32Array | null = null;
 
-function crc32(text: string): number {
+/** CRC-32 (IEEE). Exported for its known-answer test only. */
+export function crc32(text: string): number {
   if (crcTable === null) {
     crcTable = new Uint32Array(256);
     for (let n = 0; n < 256; n++) {
@@ -53,7 +54,7 @@ function randomBase62(length: number): string {
   return out;
 }
 
-/** A new API key. Show it once; store only hashApiKey's result. */
+/** A new API key. Show it once; store only its SHA-256 (hashToHex). */
 export function generateApiKey(): string {
   const body = randomBase62(BODY_LENGTH);
   return `${API_KEY_PREFIX}${body}${checksum(body)}`;
