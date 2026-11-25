@@ -1151,8 +1151,12 @@
           method: 'POST',
           headers: { 'X-Aired-Request': '1' },
           credentials: 'same-origin',
-        }).then(function () {
-          window.location.href = '/';
+        }).then(function (res) {
+          return res.json().catch(function () { return {}; });
+        }).then(function (data) {
+          // Signed in through AuthKit: end that session too (it comes back to /).
+          var next = data && typeof data.redirect === 'string' && /^https:\/\/api\.workos\.com\//.test(data.redirect) ? data.redirect : '/';
+          window.location.href = next;
         }).catch(function () {
           window.location.href = '/';
         });

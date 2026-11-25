@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
-import { authorizeUrl, parseAuthenticateResponse, workosEnabled, workosRedirectUri } from "../src/lib/workos.ts";
+import { authorizeUrl, parseAuthenticateResponse, sessionIdFromAccessToken, workosEnabled, workosLogoutUrl, workosRedirectUri } from "../src/lib/workos.ts";
 import { isAllowedReturn } from "../src/lib/return-path.ts";
 
 test("WorkOS stays off until both the client id and the API key are set", () => {
@@ -32,7 +32,7 @@ test("the authenticate answer is read, including provider tokens when present", 
       oauth_tokens: { access_token: "gho_x", provider: "GitHubOAuth" },
       access_token: "eyJ...",
     }),
-    { userId: "user_01", email: "kim@example.com", emailVerified: true, firstName: "Kim", lastName: null, authenticationMethod: "GitHubOAuth", providerAccessToken: "gho_x" },
+    { userId: "user_01", email: "kim@example.com", emailVerified: true, firstName: "Kim", lastName: null, authenticationMethod: "GitHubOAuth", providerAccessToken: "gho_x", sessionId: null },
   );
   const noTokens = parseAuthenticateResponse({ user: { id: "user_02", email: "a@b.co", email_verified: false }, authentication_method: "MagicAuth" });
   assert.equal(noTokens?.providerAccessToken, null);
@@ -79,8 +79,26 @@ test("every Log in link and signed-out redirect goes through /auth/login", () =>
   assert.match(workos, /authWorkos\.get\('\/login', \(c, next\) => \(workosEnabled\(c\.env\) \? loginRateLimit\(c, next\) : next\(\)\)/);
 });
 
-test("a GitHub sign-in through WorkOS whose GitHub id can't be read fails instead of making a new account", () => {
+test("a GitHub sign-in through WorkOS whose GitHub id can't be read may only reach an existing account", () => {
   const workos = readFileSync(new URL("../src/routes/auth-workos.ts", import.meta.url), "utf8");
-  assert.match(workos, /if \(auth\.result\.authenticationMethod === 'GitHubOAuth'\) \{\s*if \(!auth\.result\.providerAccessToken\) \{[\s\S]*?return failed\(c, 'github_unavailable'\);/);
-  assert.match(workos, /catch \(err\) \{\s*console\.error\('GitHub lookup through WorkOS tokens failed:', err\);\s*return failed\(c, 'github_unavailable'\);/);
+  assert.match(workos, /if \(!auth\.result\.providerAccessToken\) \{[\s\S]*?githubUnreadable = true;/);
+  assert.match(workos, /requireExisting: githubUnreadable,/);
+  assert.match(workos, /if \(err instanceof NoExistingAccountError\) return failed\(c, 'github_unavailable'\);/);
+});
+
+test("signing out of aired also ends the AuthKit session", () => {
+  const jwt = (claims: object) => `h.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.sig`;
+  assert.equal(sessionIdFromAccessToken(jwt({ sid: "session_01ABC", sub: "user_1" })), "session_01ABC");
+  assert.equal(sessionIdFromAccessToken(jwt({ sub: "user_1" })), null);
+  assert.equal(sessionIdFromAccessToken(jwt({ sid: "a/../b" })), null, "only id-shaped values");
+  assert.equal(sessionIdFromAccessToken("not-a-jwt"), null);
+  assert.equal(parseAuthenticateResponse({ user: { id: "u" }, access_token: jwt({ sid: "session_9" }) })?.sessionId, "session_9");
+  const url = new URL(workosLogoutUrl({ SITE_ORIGIN: "https://aired.sh" }, "session_9"));
+  assert.equal(url.origin + url.pathname, "https://api.workos.com/user_management/sessions/logout");
+  assert.equal(url.searchParams.get("session_id"), "session_9");
+  assert.equal(url.searchParams.get("return_to"), "https://aired.sh/");
+  const auth = readFileSync(new URL("../src/routes/auth.ts", import.meta.url), "utf8");
+  assert.match(auth, /if \(workosEnabled\(c\.env\)\) return c\.json\(\{ ok: true, redirect: workosLogoutUrl\(c\.env, workosSession\) \}\);/);
+  const dash = readFileSync(new URL("../../web/dashboard.js", import.meta.url), "utf8");
+  assert.match(dash, /\/\^https:\\\/\\\/api\\\.workos\\\.com\\\/\/\.test\(data\.redirect\)/, "the dashboard only follows WorkOS logout URLs");
 });

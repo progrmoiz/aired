@@ -2,12 +2,12 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppBindings } from '../types.js';
 import { kvKeys, generateOpaqueId } from '@aired/core';
-import { readOAuthStateCookie, setOAuthStateCookie } from '../lib/cookies.js';
+import { readOAuthStateCookie, setOAuthStateCookie, setWorkosSessionCookie } from '../lib/cookies.js';
 import { fetchUser } from '../lib/github.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { TIERS } from '../lib/rate-limit-tiers.js';
 import { authenticateWithCode, authorizeUrl, workosEnabled } from '../lib/workos.js';
-import { resolveWorkosUser } from '../lib/resolve-user.js';
+import { NoExistingAccountError, resolveWorkosUser } from '../lib/resolve-user.js';
 import { isGithubId } from '../lib/user-link.js';
 import { constantTimeEqual, finishSignIn, isAllowedReturn, type AuthState } from '../lib/sign-in.js';
 
@@ -78,21 +78,24 @@ authWorkos.get('/workos/callback', rateLimit(TIERS.oauth_init), async (c) => {
 
   // A GitHub sign-in tells us the GitHub id (through the provider token),
   // which is how GitHub-era accounts are keyed. Without it a GitHub-era
-  // account could be missed and a new one made in its place, so a GitHub
-  // sign-in whose id can't be read fails instead.
+  // account could be missed and a new one made in its place, so when the id
+  // can't be read, the sign-in may only reach an account that already exists
+  // (this WorkOS identity, or a verified email); it never makes a new one.
   let githubId: number | null = null;
+  let githubUnreadable = false;
   if (auth.result.authenticationMethod === 'GitHubOAuth') {
     if (!auth.result.providerAccessToken) {
-      console.error('WorkOS returned no GitHub token: turn on returning OAuth tokens for the GitHub connection');
-      return failed(c, 'github_unavailable');
-    }
-    try {
-      const gh = await fetchUser(auth.result.providerAccessToken);
-      if (!isGithubId(gh.id)) throw new Error('GitHub returned no user id');
-      githubId = gh.id;
-    } catch (err) {
-      console.error('GitHub lookup through WorkOS tokens failed:', err);
-      return failed(c, 'github_unavailable');
+      console.warn('WorkOS returned no GitHub token: turn on returning OAuth tokens for the GitHub connection');
+      githubUnreadable = true;
+    } else {
+      try {
+        const gh = await fetchUser(auth.result.providerAccessToken);
+        if (!isGithubId(gh.id)) throw new Error('GitHub returned no user id');
+        githubId = gh.id;
+      } catch (err) {
+        console.error('GitHub lookup through WorkOS tokens failed:', err);
+        githubUnreadable = true;
+      }
     }
   }
 
@@ -105,11 +108,15 @@ authWorkos.get('/workos/callback', rateLimit(TIERS.oauth_init), async (c) => {
       firstName: auth.result.firstName,
       lastName: auth.result.lastName,
       githubId,
+      requireExisting: githubUnreadable,
     });
   } catch (err) {
+    if (err instanceof NoExistingAccountError) return failed(c, 'github_unavailable');
     console.error('Failed to resolve WorkOS user:', err);
     return failed(c);
   }
+  // Web sign-ins: remember the AuthKit session so signing out of aired ends it too.
+  if (typeof authState.port !== 'number' && auth.result.sessionId) setWorkosSessionCookie(c, auth.result.sessionId);
   return finishSignIn(c, user, authState);
 });
 

@@ -70,7 +70,20 @@ export type WorkosProfile = {
    * the person signing in can set.
    */
   githubId: number | null;
+  /**
+   * A GitHub sign-in whose GitHub id couldn't be read: only an existing
+   * account may be used (a new one could split a GitHub-era account).
+   */
+  requireExisting?: boolean;
 };
+
+/** resolveWorkosUser found no existing account and wasn't allowed to make one. */
+export class NoExistingAccountError extends Error {
+  constructor() {
+    super('No existing account for this sign-in');
+    this.name = 'NoExistingAccountError';
+  }
+}
 
 /**
  * The account a GitHub-era email index entry points at, if it still holds
@@ -118,6 +131,8 @@ export async function resolveWorkosUser(env: Env, profile: WorkosProfile): Promi
     emailVerified: profile.emailVerified,
     verifiedEmailOwner,
   });
+
+  if (decision.kind === 'new' && profile.requireExisting === true) throw new NoExistingAccountError();
 
   let user: SignedInUser;
   if (decision.kind === 'existing') {

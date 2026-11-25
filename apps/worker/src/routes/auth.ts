@@ -15,6 +15,8 @@ import {
   readOAuthStateCookie,
   setOAuthStateCookie,
   clearOAuthStateCookie,
+  readWorkosSessionCookie,
+  clearWorkosSessionCookie,
 } from '../lib/cookies.js';
 import {
   exchangeCode,
@@ -28,7 +30,7 @@ import { rateLimit } from '../middleware/rate-limit.js';
 import { TIERS } from '../lib/rate-limit-tiers.js';
 import { resolveGithubSignIn } from '../lib/resolve-user.js';
 import { constantTimeEqual, finishSignIn, isAllowedReturn, type AuthState } from '../lib/sign-in.js';
-import { workosEnabled } from '../lib/workos.js';
+import { workosEnabled, workosLogoutUrl } from '../lib/workos.js';
 import { startWorkosSignIn } from './auth-workos.js';
 import { pollNativeDevice } from './auth-device.js';
 import { isNativeDeviceCode } from '../lib/device-code.js';
@@ -282,6 +284,13 @@ auth.post('/logout', requireAuth, requireCsrfHeader, async (c) => {
   }
 
   clearSessionCookie(c);
+  // Signed in through AuthKit: the browser also has to end the WorkOS session,
+  // or the next "Log in" signs straight back in as the same person.
+  const workosSession = readWorkosSessionCookie(c);
+  if (workosSession !== null) {
+    clearWorkosSessionCookie(c);
+    if (workosEnabled(c.env)) return c.json({ ok: true, redirect: workosLogoutUrl(c.env, workosSession) });
+  }
   return c.json({ ok: true });
 });
 

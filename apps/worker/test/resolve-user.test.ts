@@ -21,7 +21,7 @@ export async function resolve(spec, ctx, next) {
   return next(spec, ctx);
 }`),
 );
-const { resolveWorkosUser, resolveGithubSignIn } = await import("../src/lib/resolve-user.ts");
+const { resolveWorkosUser, resolveGithubSignIn, NoExistingAccountError } = await import("../src/lib/resolve-user.ts");
 const { ensureUserRow, linkIdentity, findIdentityUser } = await import("../src/lib/users.ts");
 
 function d1(): D1Database {
@@ -220,4 +220,19 @@ test("account deletion clears only email index entries that still point at the a
   const me = readFileSync(new URL("../src/routes/me.ts", import.meta.url), "utf8");
   assert.match(me, /linkedEmails = await identityEmails\(c\.env\.DB, userId\);[\s\S]*await deleteAccountRows\(c\.env\.DB, userId\);/);
   assert.match(me, /if \(\(await c\.env\.PAGES_KV\.get\(kvKeys\.emailIndex\(email\)\)\) === String\(userId\)\) \{/);
+});
+
+test("a GitHub sign-in with no readable GitHub id reaches an existing account but never makes a new one", async () => {
+  const e = env();
+  // Known WorkOS identity (signed in by email before): fine.
+  const a = await resolveWorkosUser(e, profile());
+  assert.equal((await resolveWorkosUser(e, profile({ requireExisting: true }))).id, a.id);
+  // A verified email held by a GitHub-era account: fine.
+  githubEra(e, 4242, "lee@example.com");
+  e.PAGES_KV.m.set("email:lee@example.com", "4242");
+  assert.equal((await resolveWorkosUser(e, profile({ workosUserId: "user_lee", email: "lee@example.com", requireExisting: true }))).id, 4242);
+  // Nobody to link to: refused, and nothing is written for this WorkOS identity.
+  await assert.rejects(resolveWorkosUser(e, profile({ workosUserId: "user_new", email: "new@example.com", requireExisting: true })), NoExistingAccountError);
+  assert.equal(e.PAGES_KV.m.has("email:new@example.com"), false);
+  assert.equal(await findIdentityUser(e.DB, "workos", "user_new"), null);
 });

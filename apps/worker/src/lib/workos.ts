@@ -47,7 +47,31 @@ export type WorkosAuthResult = {
   authenticationMethod: string | null;
   /** The provider's access token, when "return OAuth tokens" is on for that connection. */
   providerAccessToken: string | null;
+  /** The AuthKit session (the access token's `sid`), so signing out of aired can end it too. */
+  sessionId: string | null;
 };
+
+/** The `sid` claim of a WorkOS access token (a JWT), or null. Read only to sign the session out. */
+export function sessionIdFromAccessToken(token: unknown): string | null {
+  if (typeof token !== 'string') return null;
+  const payload = token.split('.')[1];
+  if (!payload) return null;
+  try {
+    const b64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const claims = JSON.parse(atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4))) as { sid?: unknown };
+    return typeof claims.sid === 'string' && /^[A-Za-z0-9_]{1,128}$/.test(claims.sid) ? claims.sid : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Where to send the browser to end the AuthKit session, then come back to aired's home page. */
+export function workosLogoutUrl(env: WorkosEnv, sessionId: string): string {
+  const url = new URL(`${base(env)}/user_management/sessions/logout`);
+  url.searchParams.set('session_id', sessionId);
+  url.searchParams.set('return_to', `${(env.SITE_ORIGIN ?? 'https://aired.sh').replace(/\/+$/, '')}/`);
+  return url.toString();
+}
 
 type Obj = Record<string, unknown>;
 const str = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
@@ -67,6 +91,7 @@ export function parseAuthenticateResponse(data: unknown): WorkosAuthResult | nul
     lastName: str(user.last_name),
     authenticationMethod: str(d.authentication_method),
     providerAccessToken: tokens ? str(tokens.access_token) : null,
+    sessionId: sessionIdFromAccessToken(d.access_token),
   };
 }
 
