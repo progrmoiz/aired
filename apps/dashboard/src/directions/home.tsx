@@ -1,8 +1,7 @@
 // Direction B: Home. A warm home screen: a greeting, one big "Publish
 // something" card, what got opened today, and recent pages as rich cards.
-// Settings and billing live in the avatar menu. It runs on the "warm" token
-// set (data-theme="warm"), which would re-skin the marketing site too.
-import { useEffect } from 'react'
+// Settings and billing live in the avatar menu. It starts on the "warm"
+// token set; the style bar switches between all the proposed sets.
 import { ClipboardPasteIcon, SparklesIcon, UploadIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -14,17 +13,8 @@ import { PagePreview } from '@/components/page-preview'
 import { PageSummaryCard } from '@/components/page-summary-card'
 import { TopBar } from '@/components/top-bar'
 import { PAGES, USER, origin } from './data'
+import { StyleBar, useStyle } from './style'
 import { cn } from '@/lib/utils'
-
-/** Switch the whole page to the warm token set while this view is up. */
-function useWarmTheme() {
-  useEffect(() => {
-    const html = document.documentElement
-    html.dataset.theme = 'warm'
-    html.classList.remove('dark')
-    return () => { delete html.dataset.theme; html.classList.add('dark') }
-  }, [])
-}
 
 function PublishCard({ big }: { big?: boolean }) {
   return (
@@ -46,7 +36,7 @@ function PublishCard({ big }: { big?: boolean }) {
 }
 
 export function HomeDirection({ empty }: { empty: boolean }) {
-  useWarmTheme()
+  const style = useStyle('warm')
   const opened = [...PAGES].sort((a, b) => b.today - a.today).slice(0, 4)
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -89,6 +79,7 @@ export function HomeDirection({ empty }: { empty: boolean }) {
           </>
         )}
       </main>
+      <StyleBar style={style} />
     </div>
   )
 }

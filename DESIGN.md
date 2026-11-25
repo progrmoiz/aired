@@ -39,7 +39,7 @@ Numbered, ordered by priority. When unsure, run the decision through these.
 
 Token groups: surfaces (`--aired-bg`, `-surface`, `-surface-2`, `-popover`, `-sidebar`, `-code-bg`), lines and overlays (`-border`, `-border-strong`, `-hairline`, `-hairline-strong`, `-glow`, `-tint`), text (`-text-1/2/3`), actions and states (`-primary`, `-on-primary`, `-mark`, `-ring`, `-ok`, `-warn`, `-warn-bg`, `-danger`, `-chip-bg`, `-chip-text`, `-avatar-*`), type (`-font-sans`, `-font-mono`, `-text-xs` … `-text-display`), radius (`-radius-sm` 6 → `-radius-full`), spacing (`-space` 4px, `-page-max`, `-gutter`), shadow (`-shadow-glow`, `-shadow-pop`) and motion (`-ease`, `-dur-fast`, `-dur`).
 
-**Palettes are token sets.** Dark is the default (`:root`). `:root[data-theme="warm"]` is a proposed light, warm set (Direction B): same names, new values, all text at WCAG AA. Setting `data-theme="warm"` on `<html>` re-skins the site and the dashboard together. Choosing it is a product decision; until then the site stays dark.
+**Palettes are token sets.** Midnight (dark) is the default (`:root`). Four proposed sets sit beside it, same names and new values, every text colour at WCAG AA on bg, surface and surface-2: `ink` (deep navy, purple primary), `daylight` (neutral light, tighter corners), `warm` (paper light) and `violet` (light, purple primary, rounder corners). Setting `data-theme="…"` on `<html>` re-skins the site and the dashboard together; light sets also drop the `dark` class. Choosing one is a product decision; until then the site stays Midnight. The dashboard mockups switch between them with `?style=`.
 
 Illustration colours inside example artwork (the sample report, the code card) stay fixed on purpose: they depict a person's page, not aired.
 
@@ -344,9 +344,10 @@ Everything in the dashboard is built from shadcn/ui on Base UI, restyled through
   - `Card`: `variant="panel" | "hero" | "bare"`;
   - `Toggle`/`ToggleGroup`: `pill` (filter chips), `segment` (segmented controls).
 - **Reusable components (`apps/dashboard/src/components/`), each on those primitives:**
-  - pages: `PagePreview` (live sandboxed render), `QrPlaceholder`, `PageChips`, `PageTile`, `PageSummaryCard`, `PageListItem`;
+  - pages: `PagePreview` (live sandboxed render), `QrPlaceholder`, `PageChips`, `PageTile` (optional `meta`/`actions` for team tiles), `PageSummaryCard`;
   - publishing: `DropZone` (+ `AiToolLinks`);
-  - chrome: `AccountMenu` (DropdownMenu), `TopBar`, `BrowserFrame`;
+  - chrome: `AccountMenu` (DropdownMenu), `TopBar` (optional `switcher`; section links become a scrolling row under 768px), `WorkspaceSwitcher` (DropdownMenu);
+  - people and sharing: `PersonAvatar`/`AvatarStack`, `ShareDialog` (Dialog: invite, who has access, link access, PIN, end date, view limit), `ChoicePicker` (DropdownMenu radio);
   - controls: `IconAction`/`CopyLinkAction` (Button + Tooltip + Sonner), `Segmented`, `MeterRow`.
 - **tailwind-merge** is told that `text-body`, `text-md`, `text-heading`, `text-subheading`, `text-title` and `text-display` are font sizes (`lib/utils.ts`), so they never knock out a text colour.
 
@@ -439,4 +440,5 @@ Append-only record of design decisions. One line per entry. Append on every nota
 2026-11-25 — Dashboard rebuilt as an app: sidebar shell (tabs on mobile), hash views for Pages / Connect your AI tools / Plan & billing / Account, summary tiles, search and filter chips over all pages loaded at once (cap 1,000), "…" row menu, tool setup cards with developer keys collapsed, account card with typed-DELETE account deletion. Exceptions: the row menu has a drop shadow (popovers need separation), and destructive actions (Delete page, Delete my account) use red-400.
 2026-11-25 — Remaining narrow pages moved to the wide layout: 7 guides, docs, dashboard, claim, abuse, 404. Shared kit in site.css (.btn, .panel, .field, .prose, .toc, ol.steps, .gcard, .strip, .chip, .duo). Dashboard v2: plain-language chips per page, project cards, empty state with an example (exception to §8.7). Tailwind build no longer loaded. Homepage `.v` timeline rules scoped to `.vers` so they stop hitting `.row .v`.
 2026-11-21 — Guide pages added (/html-to-link, /share-claude-artifacts, /tiiny-host-alternative). They reuse the homepage form and tokens, keep 14px body and 18px h2, and exist for search traffic from non-technical visitors. Homepage H1 and button now use font-medium and "Publish" per §3 and §8.1.
+2026-11-26 — Direction C (Studio) dropped. Direction A gained a team mockup: workspace switcher next to the logo, folders, owner and access on each tile, a list view, a share dialog (people, groups, guests, link rules) and a settings area with a left menu (members, groups, domains, plan and seats, security, audit log, AI keys). Four more proposed token sets (ink, daylight, warm, violet) behind a floating style bar.
 ```
