@@ -463,9 +463,12 @@
 
     // ── Yearly / monthly price toggle (homepage plans and /pricing) ──
     var billBtns = document.querySelectorAll("[data-bill]");
+    var billMode = "y";
     billBtns.forEach(function (b) {
       b.addEventListener("click", function () {
         var mode = b.getAttribute("data-bill");
+        billMode = mode;
+        syncProLink();
         billBtns.forEach(function (x) {
           x.classList.toggle("on", x === b);
           x.setAttribute("aria-pressed", String(x === b));
@@ -475,6 +478,36 @@
         });
       });
     });
+
+    // ── Pro button: "Coming soon" until billing is on ──
+    // The static HTML says "Coming soon"; this only upgrades it when the server says billing is live.
+    var proGo = document.querySelector("[data-pro-go]");
+    var proPlan = null; // "pro" once we know the visitor already has Pro
+    function syncProLink() {
+      if (!proGo || proGo.tagName !== "A" || proPlan === "pro") return;
+      proGo.href = "/upgrade?interval=" + (billMode === "m" ? "month" : "year");
+    }
+    if (proGo) {
+      fetch("/api/billing/status", { credentials: "same-origin" })
+        .then(function (res) { return res.ok ? res.json() : null; })
+        .then(function (status) {
+          if (!status || status.enabled !== true) return;
+          var a = document.createElement("a");
+          a.className = proGo.className.replace(/\bsoon\b/, "").trim();
+          a.setAttribute("data-pro-go", "");
+          if (status.plan === "pro") {
+            proPlan = "pro";
+            a.href = "/dashboard";
+            a.textContent = "Manage in dashboard";
+          } else {
+            a.textContent = "Get Pro";
+          }
+          proGo.replaceWith(a);
+          proGo = a;
+          syncProLink();
+        })
+        .catch(function () {}); // keep "Coming soon"
+    }
 
     // ── Animated beam: curved path from each node to the hub ──
     var box = document.getElementById("beam");
