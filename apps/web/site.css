@@ -386,3 +386,13 @@ nav a.on { color: var(--text-1); }
 .nums3 .geo li { padding: 3px 8px; font-size: 12.5px; }
 .geo li .flag { display: inline-flex; align-items: center; gap: 9px; }
 .geo li .flag img { width: 16px; height: 12px; border-radius: 2px; box-shadow: 0 0 0 1px rgba(255,255,255,.08); object-fit: cover; flex: none; }
+
+/* Shorter live-number cards */
+.nums3 .num { padding: 18px 20px 0; }
+.nums3 .num > b { font-size: clamp(30px, 3.4vw, 36px); margin-top: 2px; }
+.nums3 .num .viz { padding-top: 10px; height: 96px; }
+.nums3 .num svg, .nums3 .mbars { height: 86px; }
+.nums3 .num.geo-card { padding-bottom: 14px; }
+.nums3 .geo { margin-top: 8px; gap: 1px; }
+.nums3 .geo li { padding: 2px 8px; line-height: 1.5; }
+.nums3 .geo li.more { display: none; }
