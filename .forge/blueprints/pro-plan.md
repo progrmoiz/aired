@@ -139,7 +139,7 @@ Where this blueprint and `docs/research/workspace-membership.md` disagree, this 
 | Email sign-in | WorkOS Magic Auth (no Aired email sender) | Same | The earlier Cloudflare Email Sending prerequisite is dropped. |
 
 ### Open after Phase 2 review (2026-11-25)
-- Claiming doesn't rotate `tokenHash` (pre-existing in `claimPage`, `apps/worker/src/routes/me.ts`). Since claim links put the token in more places, rotate it on claim and let owners update by session. Needs a CLI change (`aired update` falls back to the session for owned pages). Owner decision; candidate Task 2.5.
+- ~~Claiming doesn't rotate `tokenHash`.~~ Done as Task 2.5 (owner said yes, 2026-11-25). Still open: pages claimed before Task 2.5 ships keep their original token; a sweep can't tell them from pages owned since publish, whose tokens CI may use. Owner decision.
 - `claim-batch` returns a generic "claim failed", so the dashboard can't drop entries for expired pages. Store `expiresAt` with each browser entry and prune past it, or return a distinct "gone" reason.
 
 ### Deferred to Implementation
@@ -459,6 +459,18 @@ Independent of Phase 1; can run in parallel. Fixes the lost-token takedown class
 - **Verification:** submit the form with that reason in local dev; the local listing from `abuse.mjs` shows it first with `owner_removal`.
 - **Dependencies:** None
 
+#### Task 2.5: Give a page a new update token when it's claimed — DONE f800bad, bc07f32, 6ec52ef, 10b9b51
+- **Size:** M
+- **Owner decision (2026-11-25):** rotate the token on claim, so the token in claim links, CLI output and transcripts stops working.
+- **Acceptance criteria:**
+  - [x] A first claim stores a new token hash and returns the new token (`update_token` on `/api/me/claim`, a `tokens` map on `/api/me/claim-batch`, so `claimed` stays a list of ids for old clients). The old token fails on PUT, DELETE, POST publish-update and MCP.
+  - [x] D1 `page_claims` (migration 0003) is the authority for claimed pages, because KV records get written back stale (the viewer's read-count write, an update racing the claim). Claims are a conditional upsert (first claim wins); every token check reads the row and fails closed on a D1 error; writes copy the row's owner and hash back into KV; the dashboard list overlays the row.
+  - [x] Rows are never deleted: account deletion releases them (owner NULL, rotated hash kept, mirrored into KV); page deletion leaves a tombstone for every page, claimed or not.
+  - [x] A token is reissued only when the claimer retries with the pre-claim token within 10 minutes (lost response). Claiming a page you already own otherwise changes nothing and returns no token, so a session can't mint tokens and pages owned from the start keep the token their CI uses.
+  - [x] CLI: `aired claim` stores the new token; `aired update` keeps the stored record when an update goes through the session; `aired update --json` doesn't print the token.
+- **Files:** `apps/worker/migrations/0003_page_claims.sql`, `apps/worker/src/lib/claim-decision.ts`, `apps/worker/src/lib/page-claims.ts`, `apps/worker/src/routes/{me,api,mcp}.ts`, `apps/worker/test/{claim-decision,page-claims,claim-wiring}.test.ts`, `apps/cli/src/commands/{claim,update}.ts`, `apps/cli/src/core/{client,store}.ts`
+- **Known gaps (follow-ups):** pages claimed before this ships have no row and keep their original token (owner decision on a sweep); the viewer still reads the owner from KV, so a claimed page whose KV record was reverted shows the badge and noindex until its next update; a second client claiming within 10 minutes retires the first client's new token (it keeps working through the session).
+
 **Checkpoint after Phase 2:** `npm test` green; the three claim paths (browser banner, claim link, CLI `aired claim --all`) each attach a page in local dev.
 
 ### Phase 3: Sign in with WorkOS AuthKit — [API] [UI]
@@ -479,8 +491,8 @@ The `users.id` never changes, so `ownerId` in KV, owner indexes, `subscriptions`
 - **Acceptance criteria:**
   - [ ] `resolveUser(env, identity)` applies the four linking steps above and returns `{id, login, email, name}`; new users get an id ≥ 10^12; `identities.provider` accepts `workos` (plus the existing `github`); a KV `user:<id>` record is written when missing.
   - [ ] The legacy GitHub callback also calls it (provider `github`, subject = GitHub id, `users.id = githubId` on first sight), so old CLI versions and the 30-day fallback route keep working.
-  - [ ] `migrations/0003_auth.sql` creates `auth_tokens` (CLI device codes, Task 3.5) and adds `users.sessions_valid_since INTEGER` (used by Phase 8).
-- **Files:** `apps/worker/src/lib/users.ts`, `apps/worker/src/lib/user-link.ts`, `apps/worker/src/routes/auth.ts`, `apps/worker/migrations/0003_auth.sql`, `apps/worker/test/user-link.test.ts`
+  - [ ] `migrations/0004_auth.sql` creates `auth_tokens` (CLI device codes, Task 3.5) and adds `users.sessions_valid_since INTEGER` (used by Phase 8).
+- **Files:** `apps/worker/src/lib/users.ts`, `apps/worker/src/lib/user-link.ts`, `apps/worker/src/routes/auth.ts`, `apps/worker/migrations/0004_auth.sql`, `apps/worker/test/user-link.test.ts`
 - **Verification:** `npm test` passes; `user-link.ts` is the pure decision (inputs: WorkOS profile, GitHub id or null, matches found) with cases: known workos identity; GitHub id match; verified email match; noreply email → new user; unverified email → new user.
 - **Dependencies:** Task 1.1
 
@@ -536,10 +548,10 @@ The `users.id` never changes, so `ownerId` in KV, owner indexes, `subscriptions`
 #### Task 4.2: Store keys and accept them in the auth middleware
 - **Size:** M
 - **Acceptance criteria:**
-  - [ ] `migrations/0004_api_keys.sql`; `POST /api/me/keys {name}` returns the key once; `GET` lists name, prefix, created and last used; `DELETE` revokes (D1 `revoked_at`, KV `apikey:` deleted). At most 5 active keys.
+  - [ ] `migrations/0005_api_keys.sql`; `POST /api/me/keys {name}` returns the key once; `GET` lists name, prefix, created and last used; `DELETE` revokes (D1 `revoked_at`, KV `apikey:` deleted). At most 5 active keys.
   - [ ] `authMiddleware` accepts `Authorization: Bearer aired_sk_…` (checksum, then KV `apikey:<hash>`), sets `c.get('user')`, and never treats `at_` update tokens as keys. `last_used_at` updates at most hourly via `waitUntil`.
   - [ ] Key-authenticated requests need no CSRF header; this already follows from `lib/csrf-rule.ts` (no session cookie), so only a test is added.
-- **Files:** `apps/worker/migrations/0004_api_keys.sql`, `apps/worker/src/routes/keys.ts`, `apps/worker/src/middleware/auth.ts`, `apps/worker/test/api-auth.test.ts`, `apps/worker/src/index.ts`
+- **Files:** `apps/worker/migrations/0005_api_keys.sql`, `apps/worker/src/routes/keys.ts`, `apps/worker/src/middleware/auth.ts`, `apps/worker/test/api-auth.test.ts`, `apps/worker/src/index.ts`
 - **Verification:** local dev: create a key, then `curl -s -X POST localhost:8787/api/publish -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' -d '{"html":"<h1>k</h1>"}'` → the page appears in `/api/me/pages`; after revoking, `GET /api/me` with the key returns 401.
 - **Dependencies:** Task 4.1, Task 1.1
 
@@ -612,9 +624,9 @@ Requires `.forge/blueprints/content-domain.md` Phase 1 (host classifier) to be m
 #### Task 7.1: Create and verify a customer hostname
 - **Size:** M
 - **Acceptance criteria:**
-  - [ ] `migrations/0005_custom_domains.sql`; `POST /api/me/domain {hostname}` (Pro only, subdomains only, one per user) creates a Cloudflare custom hostname and returns `{status: "pending", cname_target}`; `GET` refreshes status from Cloudflare; `DELETE` removes it.
+  - [ ] `migrations/0006_custom_domains.sql`; `POST /api/me/domain {hostname}` (Pro only, subdomains only, one per user) creates a Cloudflare custom hostname and returns `{status: "pending", cname_target}`; `GET` refreshes status from Cloudflare; `DELETE` removes it.
   - [ ] On `active` it writes KV `host:<hostname>`; on delete or lapse it deletes it.
-- **Files:** `apps/worker/migrations/0005_custom_domains.sql`, `apps/worker/src/routes/domains.ts`, `apps/worker/src/lib/cf-custom-hostnames.ts`, `apps/worker/src/index.ts`
+- **Files:** `apps/worker/migrations/0006_custom_domains.sql`, `apps/worker/src/routes/domains.ts`, `apps/worker/src/lib/cf-custom-hostnames.ts`, `apps/worker/src/index.ts`
 - **Verification:** staging zone: add a test subdomain, create the shown CNAME, and `GET /api/me/domain` reaches `active` within 10 minutes.
 - **Dependencies:** Task 1.3
 
@@ -648,21 +660,22 @@ Folded in from `docs/research/workspace-membership.md` (parity session, 2026-11-
 |---|---|---|
 | 0001 | `0001_accounts_billing.sql` (Phase 1, done) | users, identities, subscriptions, billing_events |
 | 0002 | `0002_billing_customers.sql` (Phase 1, done) | billing_customers |
-| 0003 | `0003_auth.sql` (Phase 3) | auth_tokens, `users.sessions_valid_since` |
-| 0004 | `0004_api_keys.sql` (Phase 4) | api_keys (with a nullable `workspace_id` from the start, no FK yet) |
-| 0005 | `0005_custom_domains.sql` (Phase 7) | custom_domains |
-| 0006 | `0006_workspaces.sql` (Phase 8) | workspaces, memberships, workspace_billing, audit_events |
-| 0007 | `0007_invites.sql` (Phase 8) | invites, invite_links |
-| 0008 | `0008_page_grants.sql` (Phase 10) | page_grants, guests |
-| 0009 | `0009_groups.sql` (Phase 11) | groups, group_members |
-| 0010 | `0010_domains.sql` (Phase 12) | domains |
-| 0011 | `0011_sso_scim.sql` (Phase 13) | sso_connections, scim_directories |
+| 0003 | `0003_page_claims.sql` (Task 2.5, done) | page_claims: owner and current token hash of claimed pages; released or tombstoned, never deleted |
+| 0004 | `0004_auth.sql` (Phase 3) | auth_tokens, `users.sessions_valid_since` |
+| 0005 | `0005_api_keys.sql` (Phase 4) | api_keys (with a nullable `workspace_id` from the start, no FK yet) |
+| 0006 | `0006_custom_domains.sql` (Phase 7) | custom_domains |
+| 0007 | `0007_workspaces.sql` (Phase 8) | workspaces, memberships, workspace_billing, audit_events |
+| 0008 | `0008_invites.sql` (Phase 8) | invites, invite_links |
+| 0009 | `0009_page_grants.sql` (Phase 10) | page_grants, guests |
+| 0010 | `0010_groups.sql` (Phase 11) | groups, group_members |
+| 0011 | `0011_domains.sql` (Phase 12) | domains |
+| 0012 | `0012_sso_scim.sql` (Phase 13) | sso_connections, scim_directories |
 
 **Personal workspaces without a backfill.** A page with no `workspaceId` belongs to its owner's personal workspace (`ws_p_<uid>`, row created lazily on first need). Existing pages are not rewritten: rewriting ~11,000 KV records on a namespace that has hit write limits buys nothing a derived rule can't do. New pages published into a team workspace carry `workspaceId` (an additive, optional `PageMetadata` field — Ask First). This differs from the spec, which moves every page; see Open Questions.
 
 ### Phase 8: Workspaces and members — [DB] [API]
 Goal: a person can create a team workspace, invite people by email or link, switch between workspaces in web, CLI and MCP, and pay for editor seats.
-- Task 8.1 (M): `0006_workspaces.sql` (workspaces with `kind`, `slug`, `name`, `plan`, `seat_limit`, `policies` JSON, `primary_owner_id`, `deleted_at`; memberships with `role`, `status` active/suspended/deactivated, `source`, never hard-deleted; workspace_billing; audit_events) and a pure `permissions.ts` (role → permission bundle, `can(role, perm)`), with tests.
+- Task 8.1 (M): `0007_workspaces.sql` (workspaces with `kind`, `slug`, `name`, `plan`, `seat_limit`, `policies` JSON, `primary_owner_id`, `deleted_at`; memberships with `role`, `status` active/suspended/deactivated, `source`, never hard-deleted; workspace_billing; audit_events) and a pure `permissions.ts` (role → permission bundle, `can(role, perm)`), with tests.
 - Task 8.2 (M): per-user sign-out: auth middleware rejects sessions issued before `users.sessions_valid_since`, read through a KV projection `svs:<uid>` (cacheTtl 30) so the hot path stays on KV; "Sign out everywhere" in the dashboard.
 - Task 8.3 (M): create a team workspace, active-workspace switcher (dashboard, `aired workspace use <slug>`, optional `workspace` argument on MCP tools); publishing goes to the active workspace, personal by default; `pages_by_workspace:` KV index for team pages.
 - Task 8.4 (M): email invites (hashed single-use token, 7 days, accepted only by a verified matching email) and one rotating invite link (Member or Viewer only); invites rate-limited per workspace per day; invite emails carry only the workspace name. Uses the existing claim-style one-time-token pattern.
@@ -678,7 +691,7 @@ Goal: Owner, Admin, Member, Viewer and Guest behave as specified, with the guard
 
 ### Phase 10: Page access levels and the Share dialog — [DB] [API] [UI]
 Goal: every page has an access list: people, "Everyone at <workspace>", guest emails and the existing link, each at view, comment, edit or full.
-- Task 10.1 (M): `0008_page_grants.sql` and a pure `access.ts` deciding access in order: policy ceiling → explicit grants → space grants (later) → role baseline (publisher, Owners and Admins have full). Viewers and guests are capped at comment ("Jun needs a Member seat to edit. Ask an admin.").
+- Task 10.1 (M): `0009_page_grants.sql` and a pure `access.ts` deciding access in order: policy ceiling → explicit grants → space grants (later) → role baseline (publisher, Owners and Admins have full). Viewers and guests are capped at comment ("Jun needs a Member seat to edit. Ask an admin.").
 - Task 10.2 (M): view path: link pages stay on KV only; workspace-only or restricted pages do one D1 read (membership/grant), cached per viewer for 30 s.
 - Task 10.3 (M): guests by email: a 6-digit WorkOS Magic Auth code, no account setup and no seat; guest invites expire after 30 days; emails carry no sender text.
 - Task 10.4 (M): Share dialog (people, "Everyone at", guests, link with PIN, expiry and view limit, greyed by policy) plus `aired share <page> --with … --level …` and an MCP `share_page` tool.
@@ -686,13 +699,13 @@ Goal: every page has an access list: people, "Everyone at <workspace>", guest em
 
 ### Phase 11: Groups made by hand — [DB] [API] [UI]
 Goal: Admins create groups ("Design") and share with a group once; new members of the group see what it was given. No SAML needed.
-- Task 11.1 (S): `0009_groups.sql` (`source` manual | scim; scim groups read-only in Aired).
+- Task 11.1 (S): `0010_groups.sql` (`source` manual | scim; scim groups read-only in Aired).
 - Task 11.2 (M): group CRUD and membership for Admins; groups as grant targets in `access.ts` and the Share dialog.
 - Verification: share a page with "Design" at comment; add C to Design; C can open and comment without a new share.
 
 ### Phase 12: Invites by company domain — [DB] [API]
 Goal: an Owner verifies `acme.com` with a DNS TXT record and picks a join mode: off, request to join (an Admin approves), or auto-join as Viewer or Member.
-- Task 12.1 (M): `0010_domains.sql`, TXT verification and a daily re-check (Cron Trigger); a domain belongs to one workspace only.
+- Task 12.1 (M): `0011_domains.sql`, TXT verification and a daily re-check (Cron Trigger); a domain belongs to one workspace only.
 - Task 12.2 (S): join on sign-in: a verified email at a verified domain sees "Join Acme" (request mode) or joins automatically; source `domain`.
 - Task 12.3 (S): workspace policy "require Google sign-in for @acme.com" through WorkOS organization auth policies (free).
 - Verification: verify a local test domain with a stubbed DNS lookup; a new user with that domain joins as Viewer automatically.
