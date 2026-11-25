@@ -66,6 +66,10 @@ Agents should read the live docs at https://github.com/progrmoiz/aired before an
 - https://aired.sh — homepage with a paste-and-publish form.
 - https://aired.sh/html-to-link — guide: turn an HTML file into a shareable link.
 - https://aired.sh/share-claude-artifacts — guide: share a Claude artifact with people who do not use Claude.
+- https://aired.sh/share-chatgpt-html — guide: share HTML that ChatGPT made as a link.
+- https://aired.sh/password-protect-html — guide: put a PIN on an HTML page; checked on the server.
+- https://aired.sh/share-html-privately — guide: PIN, expiry, view limits and what stays private.
+- https://aired.sh/share-html-with-client — guide: send a report or mockup to a client and update it at the same link.
 - https://aired.sh/tiiny-host-alternative — comparison with Tiiny Host and Netlify Drop.
 - https://aired.sh/docs — install and API reference.
 - https://aired.sh/llms.txt — this file, concise agent context.
