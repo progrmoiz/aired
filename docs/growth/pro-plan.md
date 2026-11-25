@@ -9,10 +9,10 @@
 | **Price** | **$9/month billed yearly ($108), or $12 monthly.** One plan. |
 | **Trial** | None. Free is the trial. 14-day full refund instead. |
 | **What people pay for** | Their name on the work: no badge, their own domain, who opened it. |
-| **Status** | Decided 2026-11-25. Phase 1 is being built. |
+| **Status** | Decided 2026-11-25. Phases 1 and 2 are built; Phase 1 passed a real Stripe sandbox checkout. |
 | **What stays free** | Publishing, viewing, PIN, read limits, expiry, permanent pages, the dashboard, CLI, MCP and API keys. |
 | **First thing to build** | Checkout + webhook + "no badge, 10 MB, 500 publishes a day". About 2–3 days. |
-| **How to get paid** | **Stripe** (decided): Checkout for paying, the customer portal for cancelling and switching plans. |
+| **How to get paid** | **Stripe with Managed Payments** (decided): Link, Stripe's checkout, is the seller and handles tax. Checkout for paying, the customer portal for cancelling and switching plans. |
 
 ## Free vs Pro
 
@@ -84,7 +84,7 @@ Phases 1–7 total about 12–19 working days including review and testing. Phas
 
 ## Decided (2026-11-25)
 
-1. **Billing: Stripe.** Aired is the seller, so tax registration and filing are yours. Stripe Tax is built in but switched off (see below).
+1. **Billing: Stripe with Managed Payments.** Link, Stripe's checkout, is the merchant of record: it collects and files sales tax, VAT and GST, so you don't register anywhere. It costs a Managed Payments fee on top of Stripe's usual fees. Customers see "Sold through Link", their local currency, tax as its own line, and Link on their receipt and card statement. Your account already has it on (you picked "Let us handle it" in Stripe onboarding). Stripe Tax is not used.
 2. **Price: $9/month billed yearly ($108), or $12 monthly.**
 3. **API keys are free.**
 4. **Refunds: 14 days, full, no questions.** Issued by hand in the Stripe dashboard. **Until the refund handling on this branch is deployed: refund the payment and cancel the subscription immediately** (Subscriptions → Cancel → Immediately). After it's deployed, a full refund, a dispute or an early fraud warning cancels the subscription and ends Pro automatically; a partial refund doesn't.
@@ -94,11 +94,10 @@ Phases 1–7 total about 12–19 working days including review and testing. Phas
 
 ## Still yours to decide
 
-- **Standard Stripe or Stripe Managed Payments.** Both are now a setting. Standard: Aired is the seller; you handle tax (optionally with Stripe Tax). Managed Payments (`STRIPE_MANAGED_PAYMENTS=1`): Stripe is the merchant of record and handles tax, for an extra fee; the terms and refund pages then have to say Stripe is the seller of record. The two tax settings can't both be on.
 - **How refunds, disputes and fraud warnings behave (built, check you agree).** A *full* refund of any invoice of a subscription cancels that subscription at once, even if you refund an earlier month as a goodwill gesture, so only fully refund when you mean to end Pro (refund part of a payment for goodwill instead). A dispute cancels Pro as soon as it opens, including an inquiry that never becomes a chargeback, and winning it doesn't restore Pro. An early fraud warning cancels Pro but doesn't refund; Stripe usually recommends refunding those to head off a dispute, which you'd do by hand.
-- **Price tax behaviour.** Set `tax_behavior` on both prices: *exclusive* (tax added on top of $12/$108) or *inclusive* (tax taken out of $12/$108). If it's left unset, Managed Payments adds tax on top.
-- **Tax code.** `txcd_10103000` (SaaS, personal use) or `txcd_10103001` (SaaS, business use). The generic `txcd_10000000` is not the SaaS code.
-- **Stripe Tax: on or off.** Off by default. Turning it on (`STRIPE_AUTOMATIC_TAX=1`) makes Checkout add and collect tax for 0.5% per sale. Stripe does **not** register you or file returns; you do that wherever you're registered. Stripe Tax's threshold monitoring shows where registration becomes due. Selling digital services to EU and UK consumers usually needs registration from the first sale for sellers based outside those regions.
+- **Price tax behaviour.** Set `tax_behavior` on both prices: *exclusive* (tax added on top of $12/$108) or *inclusive* (tax taken out of $12/$108). If it's left unset, Managed Payments adds tax on top, which is what the sandbox showed. The terms draft has a marked line to match your choice.
+- **Tax code.** `txcd_10103000` (SaaS, personal use; the sandbox used this) or `txcd_10103001` (SaaS, business use). Setting one is required (checklist step 1). The generic `txcd_10000000` is not the SaaS code.
+- **Stripe can refund without you.** As the seller, Stripe may refund a payment within 60 days, for example to settle a complaint. It asks your support email first; if nobody answers within 48 hours, it may refund anyway. A full refund also ends Pro automatically, the same as one you issue.
 
 - **Workspace pricing (Team, Business, Enterprise).** Recommended, not decided:
   - **SSO (SAML/OIDC, e.g. Okta, Entra): a $150/mo add-on on Business, included in Enterprise.** It replaces the earlier idea of SSO inside Business, and the live pricing page still lists "SSO: SAML, Okta, Google" under Business, so that line changes when you decide.
@@ -115,14 +114,15 @@ Phases 1–7 total about 12–19 working days including review and testing. Phas
 - **Moving old pages into workspaces.** Recommended: don't. Every existing page counts as being in its owner's personal workspace, with no rewrite of about 11,000 records. The workspace spec moves them; this plan avoids the rewrite.
 
 - **Rotate the update token when a page is claimed?** Today a claimed page still accepts its original update token, which now also travels inside claim links, CLI output and chat transcripts. Recommended: yes, rotate it on claim and let owners update through their sign-in. It changes how `aired update` works for claimed pages (it would use the session instead of the stored token), so it's a small CLI change too. Not built yet.
-- **Legal pages (drafts at /terms, /privacy, /refunds, noindex).** Before they go live you need to fill in: the legal entity name and address; a contact email (aired.sh has no email routing yet); governing law and venue; the minimum age (13 or 16); the liability cap; how users hear about changes and with how much notice; whether the 14-day refund also covers renewals; how fast refunds are issued; whether to self-host the fonts (Google Fonts currently sees visitors' IPs) or keep the disclosure; (Cloudflare Web Analytics is on for aired.sh's own pages and is now disclosed); whether deleting an account should also clear billing records; and a cleanup rule for expired page files in R2 (nothing deletes them today). Also check the promises the drafts make: no price rises for existing subscribers, "Soon" features free to early buyers, pages never used to train AI, no refund for accounts closed for abuse, no marketing email, Stripe's fees absorbed on refunds.
+- **Legal pages (drafts at /terms, /privacy, /refunds, noindex).** Before they go live you need to fill in: the legal entity name and address; the support email (a launch blocker, see Set up); governing law and venue; the minimum age (13 or 16); the liability cap; how users hear about changes and with how much notice; whether the 14-day refund also covers renewals; how fast refunds are issued; whether to self-host the fonts (Google Fonts currently sees visitors' IPs) or keep the disclosure; (Cloudflare Web Analytics is on for aired.sh's own pages and is now disclosed); whether deleting an account should also clear billing records; and a cleanup rule for expired page files in R2 (nothing deletes them today). Also check the promises the drafts make: no price rises for existing subscribers, "Soon" features free to early buyers, pages never used to train AI, no refund for accounts closed for abuse, no marketing email. The terms and refund drafts now say Link is the seller of record, that receipts and statements show Link, that Stripe may refund within 60 days, and that local cooling-off rights apply; the "we cover Stripe's fees" line is gone.
 
 ## Set up (only you can)
 
 | When | What |
 |---|---|
 | Before phase 1 goes live | Everything in the Stripe checklist below |
-| Before phase 1 goes live | Refund policy, terms and privacy updated to name Stripe as the payment processor |
+| Before phase 1 goes live | **A real support email**, e.g. `support@aired.sh`. Managed Payments sends customer refund requests and escalations to the support email in Stripe (Settings → Business → Public details), and refunds on its own after 48 hours without an answer. aired.sh has no mail yet: turn on **Cloudflare Email Routing** (free) for the zone and forward `support@` to your inbox. Use the same address in the terms, refund and privacy pages. |
+| Before phase 1 goes live | Terms, refund and privacy drafts filled in and taken out of draft (the list above) |
 | Before the next deploy of this branch | `wrangler d1 create aired`, paste the id into `apps/worker/wrangler.toml` (a placeholder today, so `wrangler deploy` fails until it's replaced), then `wrangler d1 migrations apply aired --remote` (migrations 0001 and 0002) |
 | Before phase 3 | WorkOS account (staging first, free): turn on Google, GitHub (with "return OAuth tokens") and Magic Auth in AuthKit; redirect URI `https://aired.sh/auth/workos/callback`; `wrangler secret put WORKOS_API_KEY` and `WORKOS_CLIENT_ID` |
 | Before phase 6 | Cloudflare API token that can read Analytics Engine |
@@ -135,20 +135,26 @@ Use a separate Stripe **sandbox** for each environment (local, staging), not the
 
 | # | Where in Stripe | What |
 |---|---|---|
-| 1 | Product catalog → Add product | **Aired Pro**, two recurring prices: **$12.00 USD monthly** and **$108.00 USD yearly**. Copy both `price_…` ids. |
+| 1 | Product catalog → Add product | **Aired Pro**, two recurring prices: **$12.00 USD monthly** and **$108.00 USD yearly**. **Required: set the product tax code** to `txcd_10103000` or `txcd_10103001`; without it every checkout fails with a 400 ("product tax code is missing … required for Managed Payments"). Set `tax_behavior` on both prices. Copy both `price_…` ids. |
 | 2 | Developers → Webhooks → Add endpoint | URL `https://aired.sh/api/billing/webhook`. Events: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, `invoice.payment_failed`, `charge.refunded`, `charge.dispute.created`, `radar.early_fraud_warning.created`. Copy the signing secret (`whsec_…`). |
 | 3 | Developers → API keys → Create restricted key (or edit the one you made earlier: it needs the new permissions before this version is deployed, or refund events fail for 3 days and are then dropped) | Permissions: Checkout Sessions **write**, Customer portal **write**, Customers **write**, Subscriptions **write** (cancels after a refund, dispute or fraud warning), Invoices **read** (and Invoice Payments read, if the Dashboard lists it separately), Charges **read**. Nothing else. Copy the `rk_…` key. The Worker refuses `sk_` keys. |
 | 4 | Settings → Billing → Customer portal | Allow cancel (at the end of the period), switching between the two Pro prices, updating the payment method and seeing invoices. Default return link `https://aired.sh/dashboard`. |
 | 5 | Settings → Billing → Subscriptions and emails | Turn on Smart Retries and the failed-payment emails, and set "cancel the subscription" when retries run out. |
-| 6 | Settings → Tax (only if you turn Stripe Tax on, standard Stripe only) | Origin address; default tax code `txcd_10103000` or `txcd_10103001`; `tax_behavior` on both prices; **add a tax registration for every place you're registered**: Stripe collects zero tax, with no error, until a registration exists. Then set `STRIPE_AUTOMATIC_TAX=1`. Subscriptions created before tax was on are never taxed. |
-| 7 | Terminal | `wrangler secret put STRIPE_SECRET_KEY` (the `rk_…` key), `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_MONTHLY`, `STRIPE_PRICE_YEARLY`, then set `BILLING_ENABLED=1` and deploy. |
+| 6 | Settings → Business → Public details | Support email: the real address from Set up. Managed Payments sends refund requests there. No tax registrations are needed: Link files tax as the seller. |
+| 7 | Terminal | `wrangler secret put STRIPE_SECRET_KEY` (the `rk_…` key), `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_MONTHLY`, `STRIPE_PRICE_YEARLY`, then set `STRIPE_MANAGED_PAYMENTS=1` and `BILLING_ENABLED=1` and deploy. Leave `STRIPE_AUTOMATIC_TAX` unset. |
 | 8 | Later, if you ever change the price | Create the new prices, put the **old** price ids in `STRIPE_LEGACY_PRICE_IDS` (comma-separated) **before** switching `STRIPE_PRICE_MONTHLY`/`YEARLY`, so existing subscribers stay Pro. |
 
-Check in the sandbox before live: `stripe listen --forward-to localhost:8787/api/billing/webhook`, buy with card `4242 4242 4242 4242`, and confirm the dashboard says "Pro".
+Check in the sandbox before live (Stripe CLI 1.55+ won't run `stripe listen` without `--events`):
+
+```bash
+stripe listen --events checkout.session.completed,customer.subscription.created,customer.subscription.updated,customer.subscription.deleted,invoice.paid,invoice.payment_failed,charge.refunded,charge.dispute.created,radar.early_fraud_warning.created --forward-to localhost:8787/api/billing/webhook
+```
+
+Buy with card `4242 4242 4242 4242` and confirm the dashboard says "Pro". **Done once on 2026-11-25:** checkout, the three webhooks, the dashboard ("Pro · renews 25 Nov 2027") and the portal all worked under Managed Payments. **Not yet tried:** a refund, a dispute and switching monthly↔yearly in the portal; try those in the sandbox before live.
 
 ## Open questions
 
-- **Stripe API version.** The code pins `2025-03-31.basil`. Moving to the latest (`2026-11-18.endive`) waits for a real sandbox run.
+- **Stripe API version.** The code pins `2025-03-31.basil`, but sandbox events already arrive as `2026-11-18.endive`. That works because aired re-fetches every object from Stripe instead of trusting the event. Moving the pin to endive is a follow-up, with its own sandbox run of refunds, disputes and plan switches.
 
 - **Apex domains (`yourco.com`).** Cloudflare only supports them on Enterprise. v1 offers subdomains (`share.yourco.com`).
 - **Team plan.** Pro is per person. Team billing is per workspace (one Stripe subscription with a seat count), planned in phase 8.
