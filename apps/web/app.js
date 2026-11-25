@@ -23,6 +23,7 @@
   const resultToken = document.getElementById("result-token");
   const copyTokenBtn = document.getElementById("copy-token-btn");
   const resultExpiry = document.getElementById("result-expiry");
+  const savedRow = document.getElementById("result-saved");
   const newBtn = document.getElementById("new-btn");
   const pasteArea = document.querySelector(".paste-area");
   const dragHint = document.querySelector(".drag-hint");
@@ -151,6 +152,7 @@
       currentUrl = data.url;
       currentToken = data.update_token || "";
       showResult(data);
+      rememberPublish(data, html);
     } catch (err) {
       showError(err.message || "Network error. Please try again.");
     } finally {
@@ -161,6 +163,7 @@
   // ── Result display ──
   function showResult(data) {
     // Populate
+    if (savedRow) savedRow.classList.add("hidden");
     resultUrl.href = data.url;
     resultUrl.textContent = data.url;
     resultToken.textContent = data.update_token || "";
@@ -184,6 +187,56 @@
 
     // Scroll to result
     resultCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  // ── Keep the update token in this browser for signed-out publishers ──
+  var PAGES_KEY = "aired.pages";
+  var PAGES_CAP = 200;
+
+  function pageIdFrom(data) {
+    if (data && typeof data.id === "string" && data.id) return data.id;
+    try {
+      var m = new URL(data.url, location.href).pathname.match(/^\/p\/([^/]+)\/?$/);
+      return m ? decodeURIComponent(m[1]) : "";
+    } catch (e) { return ""; }
+  }
+
+  function pageTitleFrom(html) {
+    var m = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html || "");
+    return m ? m[1].replace(/\s+/g, " ").trim().slice(0, 120) : "";
+  }
+
+  function isSignedIn() {
+    return fetch("/api/me", { credentials: "same-origin" })
+      .then(function (res) { return res.status === 200; })
+      .catch(function () { return false; });
+  }
+
+  function rememberPublish(data, html) {
+    var id = pageIdFrom(data);
+    var token = data.update_token || "";
+    isSignedIn().then(function (signedIn) {
+      // Signed-in publishers' pages are already owned; nothing to keep.
+      if (signedIn || !savedRow) return;
+      if (!id || !token) return;
+      try {
+        var list = [];
+        try {
+          var parsed = JSON.parse(localStorage.getItem(PAGES_KEY) || "[]");
+          if (Array.isArray(parsed)) list = parsed;
+        } catch (e) { list = []; }
+        list = list.filter(function (p) { return p && p.id !== id; });
+        list.unshift({
+          id: id,
+          token: token,
+          title: pageTitleFrom(html),
+          url: data.url,
+          createdAt: new Date().toISOString(),
+        });
+        localStorage.setItem(PAGES_KEY, JSON.stringify(list.slice(0, PAGES_CAP)));
+        savedRow.classList.remove("hidden");
+      } catch (e) { /* private mode or quota: publishing already succeeded */ }
+    });
   }
 
   function hideResult() {
