@@ -78,3 +78,9 @@ test("every Log in link and signed-out redirect goes through /auth/login", () =>
   const workos = readFileSync(new URL("../src/routes/auth-workos.ts", import.meta.url), "utf8");
   assert.match(workos, /authWorkos\.get\('\/login', \(c, next\) => \(workosEnabled\(c\.env\) \? loginRateLimit\(c, next\) : next\(\)\)/);
 });
+
+test("a GitHub sign-in through WorkOS whose GitHub id can't be read fails instead of making a new account", () => {
+  const workos = readFileSync(new URL("../src/routes/auth-workos.ts", import.meta.url), "utf8");
+  assert.match(workos, /if \(auth\.result\.authenticationMethod === 'GitHubOAuth'\) \{\s*if \(!auth\.result\.providerAccessToken\) \{[\s\S]*?return failed\(c, 'github_unavailable'\);/);
+  assert.match(workos, /catch \(err\) \{\s*console\.error\('GitHub lookup through WorkOS tokens failed:', err\);\s*return failed\(c, 'github_unavailable'\);/);
+});

@@ -8,6 +8,7 @@ import { rateLimit } from '../middleware/rate-limit.js';
 import { TIERS } from '../lib/rate-limit-tiers.js';
 import { authenticateWithCode, authorizeUrl, workosEnabled } from '../lib/workos.js';
 import { resolveWorkosUser } from '../lib/resolve-user.js';
+import { isGithubId } from '../lib/user-link.js';
 import { constantTimeEqual, finishSignIn, isAllowedReturn, type AuthState } from '../lib/sign-in.js';
 
 /**
@@ -75,15 +76,23 @@ authWorkos.get('/workos/callback', rateLimit(TIERS.oauth_init), async (c) => {
   const auth = await authenticateWithCode(c.env, code);
   if (!auth.ok) return failed(c, auth.reason === 'unavailable' ? 'workos_unavailable' : '1');
 
-  // A GitHub sign-in with provider tokens tells us the GitHub id, which is
-  // how GitHub-era accounts are keyed. Without tokens, email linking applies.
+  // A GitHub sign-in tells us the GitHub id (through the provider token),
+  // which is how GitHub-era accounts are keyed. Without it a GitHub-era
+  // account could be missed and a new one made in its place, so a GitHub
+  // sign-in whose id can't be read fails instead.
   let githubId: number | null = null;
-  if (auth.result.authenticationMethod === 'GitHubOAuth' && auth.result.providerAccessToken) {
+  if (auth.result.authenticationMethod === 'GitHubOAuth') {
+    if (!auth.result.providerAccessToken) {
+      console.error('WorkOS returned no GitHub token: turn on returning OAuth tokens for the GitHub connection');
+      return failed(c, 'github_unavailable');
+    }
     try {
       const gh = await fetchUser(auth.result.providerAccessToken);
-      if (Number.isSafeInteger(gh.id) && gh.id > 0) githubId = gh.id;
+      if (!isGithubId(gh.id)) throw new Error('GitHub returned no user id');
+      githubId = gh.id;
     } catch (err) {
-      console.warn('GitHub lookup through WorkOS tokens failed; linking by email instead', err);
+      console.error('GitHub lookup through WorkOS tokens failed:', err);
+      return failed(c, 'github_unavailable');
     }
   }
 

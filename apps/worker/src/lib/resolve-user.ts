@@ -137,15 +137,10 @@ export async function resolveWorkosUser(env: Env, profile: WorkosProfile): Promi
     user = { id: await createUser(env.DB, { login, email: verifiedEmail, name }, now), login, email: verifiedEmail, name };
   }
 
-  const linkedTo = await linkIdentity(
-    env.DB,
-    { provider: 'workos', subject: profile.workosUserId, userId: user.id, email, emailVerified: verifiedEmail !== null },
-    now,
-  );
-  // Two first sign-ins racing: the other one linked first. Fail; the retry finds it.
-  if (linkedTo !== user.id) throw new Error('WorkOS identity is linked to another account');
-  // The GitHub id now signs in as this account the legacy GitHub way too.
-  if (githubId !== null && (decision.kind === 'new' || decision.via === 'github')) {
+  // The GitHub id signs in as this account the legacy GitHub way too. It goes
+  // in before the WorkOS identity: if this fails, nothing ties the WorkOS
+  // identity to the account yet, and the next sign-in decides afresh.
+  if (githubId !== null && !(decision.kind === 'existing' && decision.via === 'workos')) {
     const githubLinkedTo = await linkIdentity(
       env.DB,
       { provider: 'github', subject: String(githubId), userId: user.id, email, emailVerified: verifiedEmail !== null },
@@ -153,6 +148,13 @@ export async function resolveWorkosUser(env: Env, profile: WorkosProfile): Promi
     );
     if (githubLinkedTo !== user.id) throw new Error('GitHub identity is linked to another account');
   }
+  const linkedTo = await linkIdentity(
+    env.DB,
+    { provider: 'workos', subject: profile.workosUserId, userId: user.id, email, emailVerified: verifiedEmail !== null },
+    now,
+  );
+  // Two first sign-ins racing: the other one linked first. Fail; the retry finds it.
+  if (linkedTo !== user.id) throw new Error('WorkOS identity is linked to another account');
   await upsertUserRecord(env.PAGES_KV, user, user.email !== null && user.email === verifiedEmail);
   return user;
 }
@@ -162,16 +164,20 @@ export async function resolveWorkosUser(env: Env, profile: WorkosProfile): Promi
  * is the GitHub id; but when this GitHub identity was first seen through
  * WorkOS it belongs to a newer account, and it signs in as that one.
  * GitHub only returns a verified email (lib/github.ts), so it counts as
- * verified. The D1 parts are best-effort: if D1 is down, sign-in works as it
- * did before D1 knew about identities.
+ * verified. If D1 can't be read, a GitHub-era account (KV user:<GitHub id>)
+ * still signs in as before; anyone else is refused rather than guessed at,
+ * since their GitHub id may belong to a newer account.
  */
 export async function resolveGithubSignIn(env: Env, gh: SignedInUser): Promise<SignedInUser> {
+  if (!isGithubId(gh.id)) throw new Error('GitHub returned no user id');
   const now = new Date().toISOString();
-  let accountId = gh.id;
+  let accountId: number;
   try {
     accountId = (await findIdentityUser(env.DB, 'github', String(gh.id))) ?? gh.id;
   } catch (err) {
     console.error('Failed to read GitHub identity from D1:', err);
+    if ((await env.PAGES_KV.get(kvKeys.user(gh.id))) === null) throw err;
+    accountId = gh.id;
   }
 
   if (accountId !== gh.id) {

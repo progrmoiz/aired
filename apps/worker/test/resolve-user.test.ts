@@ -169,12 +169,51 @@ test("the legacy GitHub sign-in stores the email lower-cased, so a later WorkOS 
   assert.equal((await resolveWorkosUser(e, profile())).id, 4242);
 });
 
-test("the legacy GitHub sign-in still works when D1 is down", async () => {
+test("with D1 down, a GitHub-era account still signs in the legacy way; anyone else is refused", async () => {
   const e = env();
   const broken = { prepare() { throw new Error("D1 down"); } } as unknown as D1Database;
+  githubEra(e, 4242, null);
   const u = await resolveGithubSignIn({ DB: broken, PAGES_KV: e.PAGES_KV }, { id: 4242, login: "kim-gh", email: null, name: null });
   assert.equal(u.id, 4242);
-  assert.ok(e.PAGES_KV.m.has("user:4242"));
+  // 777 may belong to a newer account D1 can't be asked about: no guessing.
+  await assert.rejects(resolveGithubSignIn({ DB: broken, PAGES_KV: e.PAGES_KV }, { id: 777, login: "lee", email: null, name: null }));
+  assert.equal(e.PAGES_KV.m.has("user:777"), false);
+});
+
+test("the legacy GitHub sign-in refuses a missing GitHub id", async () => {
+  await assert.rejects(resolveGithubSignIn(env(), { id: 0, login: "", email: null, name: null }));
+});
+
+test("a GitHub sign-in through WorkOS that links by email also links the GitHub id", async () => {
+  const e = env();
+  const a = await resolveWorkosUser(e, profile({ workosUserId: "user_google" })); // Google first: new account
+  const viaGithub = await resolveWorkosUser(e, profile({ workosUserId: "user_gh", githubId: 31337 }));
+  assert.equal(viaGithub.id, a.id);
+  assert.equal((await resolveGithubSignIn(e, { id: 31337, login: "kim-gh", email: "kim@example.com", name: null })).id, a.id);
+});
+
+test("if the GitHub link can't be made, the WorkOS identity isn't tied to the new account either", async () => {
+  const e = env();
+  // GitHub id 555 already belongs to another account.
+  const other = await resolveWorkosUser(e, profile({ workosUserId: "user_other", email: "o@example.com", githubId: 555 }));
+  // A clash (a race or bad data): refuse, and leave user_new unlinked so the next sign-in decides afresh.
+  await ensureUserRow(e.DB, { id: 600, login: "x", email: null, name: null }, NOW);
+  await linkIdentity(e.DB, { provider: "github", subject: "556", userId: 600, email: null, emailVerified: false }, NOW);
+  const real = e.DB.prepare.bind(e.DB);
+  let calls = 0;
+  // The lookup of GitHub id 556 (the second identity read) misses, as if another sign-in hadn't landed yet.
+  const racing = {
+    prepare(sql: string) {
+      if (sql.includes("SELECT user_id FROM identities") && ++calls === 2) return real("SELECT user_id FROM identities WHERE provider = ? AND subject = ? AND 0");
+      return real(sql);
+    },
+  } as unknown as D1Database;
+  await assert.rejects(
+    resolveWorkosUser({ DB: racing, PAGES_KV: e.PAGES_KV }, profile({ workosUserId: "user_new", email: "n@example.com", githubId: 556 })),
+    /GitHub identity is linked to another account/,
+  );
+  assert.equal(await findIdentityUser(e.DB, "workos", "user_new"), null);
+  assert.ok(other.id >= 1_000_000_000_000);
 });
 
 test("account deletion clears only email index entries that still point at the account", () => {
