@@ -110,6 +110,9 @@ Phases 1–7 total about 12–19 working days including review and testing. Phas
   - **Seats:** Owner, Admin and Member are paid editor seats; Viewer and Guest are free.
 - **Moving old pages into workspaces.** Recommended: don't. Every existing page counts as being in its owner's personal workspace, with no rewrite of about 11,000 records. The workspace spec moves them; this plan avoids the rewrite.
 
+- **Rotate the update token when a page is claimed?** Today a claimed page still accepts its original update token, which now also travels inside claim links, CLI output and chat transcripts. Recommended: yes, rotate it on claim and let owners update through their sign-in. It changes how `aired update` works for claimed pages (it would use the session instead of the stored token), so it's a small CLI change too. Not built yet.
+- **Legal pages (drafts at /terms, /privacy, /refunds, noindex).** Before they go live you need to fill in: the legal entity name and address; a contact email (aired.sh has no email routing yet); governing law and venue; the minimum age (13 or 16); the liability cap; how users hear about changes and with how much notice; whether the 14-day refund also covers renewals; how fast refunds are issued; whether to self-host the fonts (Google Fonts currently sees visitors' IPs) or keep the disclosure; whether deleting an account should also clear billing records; and a cleanup rule for expired page files in R2 (nothing deletes them today). Also check the promises the drafts make: no price rises for existing subscribers, "Soon" features free to early buyers, pages never used to train AI, no refund for accounts closed for abuse, no marketing email, Stripe's fees absorbed on refunds.
+
 ## Set up (only you can)
 
 | When | What |

@@ -135,6 +135,10 @@ Where this blueprint and `docs/research/workspace-membership.md` disagree, this 
 | Sessions | Aired's own HS256 cookie after AuthKit; per-user `sessions_valid_since` in Phase 8 | JWT with `sid`, `amr`, `sso_conn`; AuthKit sessions considered | Keeps Phase 1–7 auth untouched; `amr`/`sso_conn` claims are added in Phase 13 when Require SSO needs them. |
 | Email sign-in | WorkOS Magic Auth (no Aired email sender) | Same | The earlier Cloudflare Email Sending prerequisite is dropped. |
 
+### Open after Phase 2 review (2026-11-25)
+- Claiming doesn't rotate `tokenHash` (pre-existing in `claimPage`, `apps/worker/src/routes/me.ts`). Since claim links put the token in more places, rotate it on claim and let owners update by session. Needs a CLI change (`aired update` falls back to the session for owned pages). Owner decision; candidate Task 2.5.
+- `claim-batch` returns a generic "claim failed", so the dashboard can't drop entries for expired pages. Store `expiresAt` with each browser entry and prune past it, or return a distinct "gone" reason.
+
 ### Deferred to Implementation
 - Which events Stripe sends for a plan switch in the portal (expected: `customer.subscription.updated` only); the handler re-fetches either way.
 - Whether `GET /api/me` reads the plan from D1 or KV `ent:`. KV is fine unless a just-paid user sees "Free" for up to 60 s; the checkout success page polls D1 through `/api/billing/status`.
@@ -414,7 +418,7 @@ The smallest Pro that can charge: GitHub users can buy Pro and get no badge, 10 
 ### Phase 2: Claim pages and recover lost ones — [API] [UI]
 Independent of Phase 1; can run in parallel. Fixes the lost-token takedown class.
 
-#### Task 2.1: Keep publish tokens in the publisher's browser
+#### Task 2.1: Keep publish tokens in the publisher's browser — DONE e040ed5
 - **Size:** S
 - **Acceptance criteria:**
   - [ ] After a successful anonymous web publish, `app.js` adds `{id, token, title, createdAt}` to `localStorage["aired.pages"]` (newest first, cap 200).
@@ -423,7 +427,7 @@ Independent of Phase 1; can run in parallel. Fixes the lost-token takedown class
 - **Verification:** publish from `localhost:8787/` signed out; in devtools `localStorage["aired.pages"]` holds the id and token; after a reload the entry is still there.
 - **Dependencies:** None
 
-#### Task 2.2: Offer to add browser-held pages after sign-in
+#### Task 2.2: Offer to add browser-held pages after sign-in — DONE b53bebe
 - **Size:** S
 - **Acceptance criteria:**
   - [ ] On dashboard load, entries from `aired.pages` show a banner "N pages you published in this browser · Add to my account"; the button calls `/api/me/claim-batch`, removes claimed entries, and lists failures as "Couldn't add".
@@ -432,7 +436,7 @@ Independent of Phase 1; can run in parallel. Fixes the lost-token takedown class
 - **Verification:** with two saved entries, sign in and click "Add to my account": both rows appear in the list, the banner disappears and the page count rises by 2.
 - **Dependencies:** Task 2.1
 
-#### Task 2.3: Return a claim link from anonymous API and MCP publishes
+#### Task 2.3: Return a claim link from anonymous API and MCP publishes — DONE d25bcf7
 - **Size:** M
 - **Acceptance criteria:**
   - [ ] Anonymous `POST /api/publish` responses add `claim_url: "https://aired.sh/claim#<id>.<token>"` (a fragment, so it never reaches server logs).
@@ -442,7 +446,7 @@ Independent of Phase 1; can run in parallel. Fixes the lost-token takedown class
 - **Verification:** local dev: an anonymous curl publish returns `claim_url`; open it signed out → sign in → land on the dashboard with the page listed.
 - **Dependencies:** None
 
-#### Task 2.4: Add a "remove my page" request for lost tokens
+#### Task 2.4: Add a "remove my page" request for lost tokens — DONE e754340
 - **Size:** S
 - **Model:** sonnet
 - **Acceptance criteria:**
