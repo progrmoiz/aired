@@ -6,14 +6,15 @@ export type ValidationResult =
 
 /**
  * Validate HTML content for upload.
- * Checks size limit and presence of relative path references that could break in isolation.
+ * Checks size limit (default MAX_SIZE; the worker passes the caller's plan limit)
+ * and presence of relative path references that could break in isolation.
  */
-export function validateHtml(html: string): ValidationResult {
+export function validateHtml(html: string, maxBytes: number = MAX_SIZE): ValidationResult {
   const byteSize = new TextEncoder().encode(html).byteLength;
-  if (byteSize > MAX_SIZE) {
+  if (byteSize > maxBytes) {
     return {
       ok: false,
-      error: `HTML exceeds maximum size of ${MAX_SIZE / 1024 / 1024}MB (got ${(byteSize / 1024 / 1024).toFixed(2)}MB)`,
+      error: `HTML exceeds maximum size of ${maxBytes / 1024 / 1024}MB (got ${(byteSize / 1024 / 1024).toFixed(2)}MB)`,
     };
   }
 

@@ -36,3 +36,17 @@ test("signed-in publishes get the account limit, not the per-IP one", () => {
   assert.equal(publishTier(null), TIERS.anonymous);
   assert.equal(publishTier(undefined), TIERS.anonymous);
 });
+
+test("Pro publishes get 500 a day per account", () => {
+  assert.deepEqual(TIERS.pro, { bucketPrefix: "rl:pro", limit: 500, windowSeconds: 86400 });
+});
+
+test("the publish tier follows the caller's plan", () => {
+  assert.equal(publishTier({ id: 1 }, { publishTier: "pro" }), TIERS.pro);
+  assert.equal(publishTier({ id: 1 }, { publishTier: "authenticated" }), TIERS.authenticated);
+  assert.equal(publishTier({ id: 1 }, null), TIERS.authenticated);
+  assert.equal(publishTier({ id: 1 }), TIERS.authenticated);
+  // A plan without a user can't happen, but it must not lift the per-IP limit.
+  assert.equal(publishTier(null, { publishTier: "pro" }), TIERS.anonymous);
+  assert.equal(publishTier(null), TIERS.anonymous);
+});
