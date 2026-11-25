@@ -20,6 +20,15 @@ bucket_name = "aired-pages"
 binding = "PAGES_KV"
 id = "6388d6b3b6c04fe5ad8529ae029e723e"
 
+# Accounts and billing state (users, identities, subscriptions, billing_events).
+# Owner: run `wrangler d1 create aired` and paste the returned id below.
+# Local dev/tests: `wrangler d1 migrations apply aired --local`.
+[[d1_databases]]
+binding = "DB"
+database_name = "aired"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
 # Per-minute flood guards for anonymous traffic, counted by Cloudflare per
 # location (no KV writes). The hourly limits live in middleware/rate-limit.ts.
 # Real spam ran at most 2 publishes a minute, so 6 only catches floods.

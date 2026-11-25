@@ -11,6 +11,22 @@ export type Env = {
   /** Workers Rate Limiting bindings (wrangler.toml [[ratelimits]]). Optional so tests run without them. */
   PUBLISH_BURST?: RateLimit;
   REPORT_BURST?: RateLimit;
+  /** D1 database for accounts and billing state (wrangler.toml [[d1_databases]]). */
+  DB: D1Database;
+  /** "1" turns billing on (checkout, portal, Pro limits). Unset or anything else: off. */
+  BILLING_ENABLED?: string;
+  /** Stripe secret or restricted API key (rk_… / sk_…). */
+  STRIPE_SECRET_KEY?: string;
+  /** Stripe webhook signing secret (whsec_…). */
+  STRIPE_WEBHOOK_SECRET?: string;
+  /** Stripe price id for the monthly Pro plan (price_…). */
+  STRIPE_PRICE_MONTHLY?: string;
+  /** Stripe price id for the yearly Pro plan (price_…). */
+  STRIPE_PRICE_YEARLY?: string;
+  /** "1" turns on Stripe automatic tax in checkout. Unset: off. */
+  STRIPE_AUTOMATIC_TAX?: string;
+  /** Stripe API origin. Default https://api.stripe.com; override only for local mocks. */
+  STRIPE_API_BASE?: string;
 };
 
 export type AppBindings = {
