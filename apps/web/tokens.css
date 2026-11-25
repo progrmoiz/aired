@@ -1,0 +1,125 @@
+/* aired design tokens: the one source for colour, type, radius, spacing,
+   shadow and motion. Read by the marketing site (apps/web/site.css, via the
+   synced copy apps/web/tokens.css) and the dashboard (apps/dashboard
+   index.css). Edit here, then run `pnpm --filter @aired/ui-tokens sync`
+   (the Worker's build does it too; a test fails if the copy drifts).
+
+   Dark is the default. [data-theme="warm"] on <html> is a proposed light
+   palette: switching it re-skins the site and the dashboard together. */
+
+:root {
+  color-scheme: dark;
+
+  /* Colour: surfaces */
+  --aired-bg: #0a0a0b;
+  --aired-surface: #111113;
+  --aired-surface-2: #18181b;
+  --aired-popover: #151518;
+  --aired-sidebar: #0c0c0e;
+  --aired-code-bg: #070708;
+
+  /* Colour: lines and overlays */
+  --aired-border: #222225;
+  --aired-border-strong: #34343a;
+  --aired-hairline: rgba(255, 255, 255, 0.08);
+  --aired-hairline-strong: rgba(255, 255, 255, 0.18);
+  --aired-glow: rgba(255, 255, 255, 0.07);
+  --aired-tint: rgba(255, 255, 255, 0.04);
+
+  /* Colour: text (all pass WCAG AA on bg and surface) */
+  --aired-text-1: #ededef;
+  --aired-text-2: #a1a1a6;
+  --aired-text-3: #84848a;
+
+  /* Colour: actions and states */
+  --aired-primary: #ededef;          /* the light primary button */
+  --aired-primary-hover: #ffffff;
+  --aired-on-primary: #0a0a0b;
+  --aired-mark: #7c6aef;             /* purple: logo mark, eyebrows, focus only */
+  --aired-ring: #7c6aef;
+  --aired-ok: #34d399;
+  --aired-warn: #fbbf24;
+  --aired-warn-bg: rgba(251, 191, 36, 0.12);
+  --aired-danger: #f87171;
+  --aired-chip-bg: #18181b;
+  --aired-chip-text: #a1a1a6;
+  --aired-avatar-from: #8b7bf2;
+  --aired-avatar-to: #5b4bd0;
+  --aired-avatar-text: #ffffff;
+
+  /* Type */
+  --aired-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --aired-font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  --aired-text-xs: 12px;
+  --aired-text-sm: 13px;
+  --aired-text-base: 14px;           /* dashboard body */
+  --aired-text-body: 15px;           /* marketing body */
+  --aired-text-md: 16px;
+  --aired-text-lg: 18px;
+  --aired-text-xl: 22px;
+  --aired-text-2xl: 26px;
+  --aired-text-3xl: 34px;
+  --aired-text-display: clamp(32px, 4.2vw, 44px);
+  --aired-weight-regular: 400;
+  --aired-weight-medium: 500;
+  --aired-leading-body: 1.6;
+  --aired-tracking-tight: -0.025em;
+
+  /* Radius */
+  --aired-radius-sm: 6px;
+  --aired-radius-md: 8px;            /* controls */
+  --aired-radius-lg: 12px;           /* small cards, inputs groups */
+  --aired-radius-xl: 16px;           /* cards */
+  --aired-radius-2xl: 22px;          /* panels */
+  --aired-radius-3xl: 28px;          /* hero areas */
+  --aired-radius-full: 999px;        /* pills, avatars */
+
+  /* Spacing: one 4px step; layouts use multiples */
+  --aired-space: 4px;
+  --aired-page-max: 1120px;
+  --aired-gutter: 24px;
+
+  /* Shadow (only popovers and the card glow) */
+  --aired-shadow-glow: 0 -20px 80px -20px var(--aired-glow) inset;
+  --aired-shadow-pop: 0 18px 40px -14px rgba(0, 0, 0, 0.85);
+
+  /* Motion */
+  --aired-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --aired-dur-fast: 120ms;
+  --aired-dur: 200ms;
+}
+
+/* Proposed light, warm palette (Direction B). Same names, new values. */
+:root[data-theme="warm"] {
+  color-scheme: light;
+  --aired-bg: #f6f1e9;
+  --aired-surface: #fffdf9;
+  --aired-surface-2: #f6efe4;
+  --aired-popover: #fffdf9;
+  --aired-sidebar: #f1ebe1;
+  --aired-code-bg: #f1ebe1;
+  --aired-border: #e9e0d3;
+  --aired-border-strong: #d9cbb6;
+  --aired-hairline: rgba(60, 40, 10, 0.10);
+  --aired-hairline-strong: rgba(60, 40, 10, 0.22);
+  --aired-glow: rgba(255, 255, 255, 0.6);
+  --aired-tint: rgba(60, 40, 10, 0.04);
+  --aired-text-1: #1f1b16;
+  --aired-text-2: #6b6257;
+  --aired-text-3: #756b5f;
+  --aired-primary: #1f1b16;
+  --aired-primary-hover: #000000;
+  --aired-on-primary: #fffdf9;
+  --aired-mark: #5b4bd0;
+  --aired-ring: #5b4bd0;
+  --aired-ok: #15803d;
+  --aired-warn: #8a4b0f;
+  --aired-warn-bg: #fdebd3;
+  --aired-danger: #dc2626;
+  --aired-chip-bg: #efe9df;
+  --aired-chip-text: #5b5248;
+  --aired-avatar-from: #f6cfa9;
+  --aired-avatar-to: #eeb184;
+  --aired-avatar-text: #5a2e0e;
+  --aired-shadow-pop: 0 20px 50px -20px rgba(60, 40, 10, 0.35);
+}

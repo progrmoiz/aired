@@ -1,17 +1,34 @@
 /* aired dashboard. Tailwind v4 + shadcn/ui (Base UI), scoped to apps/dashboard.
-   The marketing site keeps site.css; the tokens below are DESIGN.md's palette
-   under shadcn's variable names. Dark only. Inter and JetBrains Mono come from
-   /fonts/fonts.css (self-hosted, linked in dashboard.html). */
+   Every value comes from the shared tokens (@aired/ui-tokens, the same file
+   the marketing site reads); below they're mapped onto shadcn's variable
+   names. Inter and JetBrains Mono come from /fonts/fonts.css (self-hosted,
+   linked in dashboard.html). */
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "./styles/shadcn-base.css";
+@import "@aired/ui-tokens/tokens.css";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
     --font-heading: var(--font-sans);
-    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    --font-sans: var(--aired-font-sans);
+    --font-mono: var(--aired-font-mono);
+    --color-warn: var(--warn);
+    --color-warn-bg: var(--warn-bg);
+    --color-chip: var(--chip);
+    --color-chip-foreground: var(--chip-foreground);
+    --color-hairline: var(--hairline);
+    --color-hairline-strong: var(--hairline-strong);
+    --color-tint: var(--tint);
+    --text-display: var(--aired-text-display);
+    --text-body: var(--aired-text-body);
+    --text-md: var(--aired-text-md);
+    --text-heading: var(--aired-text-2xl);
+    --text-subheading: var(--aired-text-xl);
+    --text-title: var(--aired-text-3xl);
+    --shadow-pop: var(--aired-shadow-pop);
+    --shadow-glow: var(--aired-shadow-glow);
     --color-mark: var(--mark);
     --color-ok: var(--ok);
     --color-subtle: var(--subtle);
@@ -46,52 +63,58 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
-    --radius-sm: calc(var(--radius) * 0.6);
-    --radius-md: calc(var(--radius) * 0.8);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) * 1.4);
-    --radius-2xl: calc(var(--radius) * 1.8);
-    --radius-3xl: calc(var(--radius) * 2.2);
-    --radius-4xl: calc(var(--radius) * 2.6);
+    --radius-sm: var(--aired-radius-sm);
+    --radius-md: var(--aired-radius-md);
+    --radius-lg: var(--aired-radius-lg);
+    --radius-xl: var(--aired-radius-xl);
+    --radius-2xl: var(--aired-radius-2xl);
+    --radius-3xl: var(--aired-radius-3xl);
+    --radius-4xl: var(--aired-radius-full);
 }
 
 :root {
-    color-scheme: dark;
-    --background: #0a0a0b;          /* bg */
-    --foreground: #ededef;          /* text-primary */
-    --card: #111113;                /* surface */
-    --card-foreground: #ededef;
-    --popover: #151518;
-    --popover-foreground: #ededef;
-    --primary: #ededef;             /* light primary button, as on the site */
-    --primary-foreground: #0a0a0b;
-    --secondary: #18181b;           /* surface-hover */
-    --secondary-foreground: #ededef;
-    --muted: #18181b;
-    --muted-foreground: #a1a1a6;    /* text-secondary */
-    --subtle: #84848a;              /* text-tertiary */
-    --accent: #18181b;
-    --accent-foreground: #ededef;
-    --destructive: #f87171;         /* red-400, destructive actions and errors only */
-    --border: #222225;
-    --input: #34343a;
-    --ring: #7c6aef;                 /* purple: focus only (components use it at 50%) */
-    --mark: #7c6aef;                /* purple: logo mark and eyebrows */
-    --ok: #34d399;
-    --chart-1: #ededef;
-    --chart-2: #a1a1a6;
-    --chart-3: #84848a;
-    --chart-4: #34343a;
-    --chart-5: #222225;
-    --radius: 0.75rem;              /* cards 12px; controls use rounded-md/lg */
-    --sidebar: #0c0c0e;
-    --sidebar-foreground: #a1a1a6;
-    --sidebar-primary: #ededef;
-    --sidebar-primary-foreground: #0a0a0b;
-    --sidebar-accent: #18181b;
-    --sidebar-accent-foreground: #ededef;
-    --sidebar-border: #222225;
-    --sidebar-ring: #7c6aef;
+    --background: var(--aired-bg);
+    --foreground: var(--aired-text-1);
+    --card: var(--aired-surface);
+    --card-foreground: var(--aired-text-1);
+    --popover: var(--aired-popover);
+    --popover-foreground: var(--aired-text-1);
+    --primary: var(--aired-primary);
+    --primary-foreground: var(--aired-on-primary);
+    --secondary: var(--aired-surface-2);
+    --secondary-foreground: var(--aired-text-1);
+    --muted: var(--aired-surface-2);
+    --muted-foreground: var(--aired-text-2);
+    --subtle: var(--aired-text-3);
+    --accent: var(--aired-surface-2);
+    --accent-foreground: var(--aired-text-1);
+    --destructive: var(--aired-danger);
+    --border: var(--aired-border);
+    --input: var(--aired-border-strong);
+    --ring: var(--aired-ring);
+    --mark: var(--aired-mark);
+    --ok: var(--aired-ok);
+    --warn: var(--aired-warn);
+    --warn-bg: var(--aired-warn-bg);
+    --chip: var(--aired-chip-bg);
+    --chip-foreground: var(--aired-chip-text);
+    --hairline: var(--aired-hairline);
+    --hairline-strong: var(--aired-hairline-strong);
+    --tint: var(--aired-tint);
+    --chart-1: var(--aired-text-1);
+    --chart-2: var(--aired-text-2);
+    --chart-3: var(--aired-text-3);
+    --chart-4: var(--aired-border-strong);
+    --chart-5: var(--aired-border);
+    --radius: var(--aired-radius-lg);
+    --sidebar: var(--aired-sidebar);
+    --sidebar-foreground: var(--aired-text-2);
+    --sidebar-primary: var(--aired-primary);
+    --sidebar-primary-foreground: var(--aired-on-primary);
+    --sidebar-accent: var(--aired-surface-2);
+    --sidebar-accent-foreground: var(--aired-text-1);
+    --sidebar-border: var(--aired-border);
+    --sidebar-ring: var(--aired-ring);
 }
 
 @layer base {

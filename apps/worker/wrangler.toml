@@ -11,7 +11,7 @@ workers_dev = true
 # ../web/dashboard.html and ../web/dashboard-assets/ before every `wrangler dev`
 # and `wrangler deploy`, so a deploy can never ship a stale or missing dashboard.
 [build]
-command = "pnpm --filter @aired/dashboard build"
+command = "pnpm --filter @aired/ui-tokens sync && pnpm --filter @aired/dashboard build"
 
 [assets]
 directory = "../web"

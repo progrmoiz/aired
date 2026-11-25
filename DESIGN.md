@@ -27,7 +27,23 @@ Numbered, ordered by priority. When unsure, run the decision through these.
 
 ---
 
-## 2. Color Tokens
+## 2. Design tokens: one source of truth
+
+**`packages/ui-tokens/tokens.css` is the only place colour, type, radius, spacing, shadow and motion values are defined.** Everything else reads from it:
+
+| Consumer | How it reads the tokens |
+|---|---|
+| Marketing site (`apps/web/site.css`) | `@import url("/tokens.css")`. `apps/web/tokens.css` is a synced copy made by `pnpm --filter @aired/ui-tokens sync`, which the Worker's `[build]` runs. Short aliases (`--bg`, `--text-1`, `--btn`…) point at `--aired-*`. |
+| Dashboard (`apps/dashboard/src/index.css`) | `@import "@aired/ui-tokens/tokens.css"`. shadcn's variables (`--background`, `--primary`, `--ring`, `--radius-*`…) and Tailwind theme sizes (`text-body`, `text-heading`, `text-title`, `text-display`) point at `--aired-*`. |
+| Guard | `apps/worker/test/tokens-sync.test.ts` fails if the copy drifts, or if either side stops mapping onto the tokens or puts a raw hex value in the dashboard theme. |
+
+Token groups: surfaces (`--aired-bg`, `-surface`, `-surface-2`, `-popover`, `-sidebar`, `-code-bg`), lines and overlays (`-border`, `-border-strong`, `-hairline`, `-hairline-strong`, `-glow`, `-tint`), text (`-text-1/2/3`), actions and states (`-primary`, `-on-primary`, `-mark`, `-ring`, `-ok`, `-warn`, `-warn-bg`, `-danger`, `-chip-bg`, `-chip-text`, `-avatar-*`), type (`-font-sans`, `-font-mono`, `-text-xs` … `-text-display`), radius (`-radius-sm` 6 → `-radius-full`), spacing (`-space` 4px, `-page-max`, `-gutter`), shadow (`-shadow-glow`, `-shadow-pop`) and motion (`-ease`, `-dur-fast`, `-dur`).
+
+**Palettes are token sets.** Dark is the default (`:root`). `:root[data-theme="warm"]` is a proposed light, warm set (Direction B): same names, new values, all text at WCAG AA. Setting `data-theme="warm"` on `<html>` re-skins the site and the dashboard together. Choosing it is a product decision; until then the site stays dark.
+
+Illustration colours inside example artwork (the sample report, the code card) stay fixed on purpose: they depict a person's page, not aired.
+
+## 2.1 Color Tokens (dark set)
 
 Dark only. No light mode. All values come from `apps/web/tailwind.config.js` under `theme.extend.colors.aired`. Never hardcode hex in markup — use the token classes (`bg-aired-bg`, `text-aired-text-primary`, etc.).
 
@@ -318,6 +334,22 @@ The signed-in dashboard is the one page not built from `site.css`. It's a Vite +
 - **Generated files:** `src/components/ui/*` is shadcn's generated source and can be edited (see `sidebar.tsx`). `src/styles/shadcn-base.css` is vendored from `shadcn@4.23.0`, so the CLI isn't a runtime dependency.
 - **Dependencies:** every direct dependency is an exact version published at least two weeks before it was added. Base UI's `@babel/runtime` is overridden to 8.1.0 for the same reason.
 
+### 9.5 Dashboard components (one library)
+
+Everything in the dashboard is built from shadcn/ui on Base UI, restyled through tokens and variants, never hand-rolled widgets:
+
+- **aired variants on shadcn primitives:**
+  - `Button`: `size="xl"`, `shape="pill"`;
+  - `Badge`: `chip`, `warn`, `overlay`;
+  - `Card`: `variant="panel" | "hero" | "bare"`;
+  - `Toggle`/`ToggleGroup`: `pill` (filter chips), `segment` (segmented controls).
+- **Reusable components (`apps/dashboard/src/components/`), each on those primitives:**
+  - pages: `PagePreview` (live sandboxed render), `QrPlaceholder`, `PageChips`, `PageTile`, `PageSummaryCard`, `PageListItem`;
+  - publishing: `DropZone` (+ `AiToolLinks`);
+  - chrome: `AccountMenu` (DropdownMenu), `TopBar`, `BrowserFrame`;
+  - controls: `IconAction`/`CopyLinkAction` (Button + Tooltip + Sonner), `Segmented`, `MeterRow`.
+- **tailwind-merge** is told that `text-body`, `text-md`, `text-heading`, `text-subheading`, `text-title` and `text-display` are font sizes (`lib/utils.ts`), so they never knock out a text colour.
+
 ### 9.1 Single-page tool layout (retired)
 
 No page uses this any more; kept for history.
@@ -402,6 +434,7 @@ Append-only record of design decisions. One line per entry. Append on every nota
 2026-05-10 — Empty-state rule softened: one inline factual line allowed (required) when user has no breadcrumb to the next action; decorative cards still forbidden. Dashboard 0-pages state is the canonical example.
 2026-11-25 — Live numbers: count up on view, static charts on the totals, the top three countries from /api/stats with SVG flags from flag-icons (images, not emoji, so they render on Windows).
 2026-11-25 — Homepage and /pricing rebuilt as marketing pages (site.css): wide layout, bento and feature grids, plan cards, logo-wall CTA. Primary button is now light; purple limited to the mark, focus and eyebrows. Text tokens raised for contrast (secondary #a1a1a6, tertiary #84848a). Globe and live title ticker removed.
+2026-11-26 — One token source: packages/ui-tokens/tokens.css feeds site.css (via /tokens.css) and the dashboard theme; a dark default and a proposed warm light set ([data-theme="warm"]). Dashboard directions A/B/C rebuilt only from shadcn primitives + aired variants + shared components (§9.5). Test guards the copy and the mappings.
 2026-11-25 — Dashboard moved to React + shadcn/ui (Base UI) + Tailwind v4 in apps/dashboard, built by wrangler into apps/web. Same sections and flows as the vanilla app shell below; page list is now a shadcn Data Table, confirmations are Alert Dialogs, new keys use a Dialog. See §9.4.
 2026-11-25 — Dashboard rebuilt as an app: sidebar shell (tabs on mobile), hash views for Pages / Connect your AI tools / Plan & billing / Account, summary tiles, search and filter chips over all pages loaded at once (cap 1,000), "…" row menu, tool setup cards with developer keys collapsed, account card with typed-DELETE account deletion. Exceptions: the row menu has a drop shadow (popovers need separation), and destructive actions (Delete page, Delete my account) use red-400.
 2026-11-25 — Remaining narrow pages moved to the wide layout: 7 guides, docs, dashboard, claim, abuse, 404. Shared kit in site.css (.btn, .panel, .field, .prose, .toc, ol.steps, .gcard, .strip, .chip, .duo). Dashboard v2: plain-language chips per page, project cards, empty state with an example (exception to §8.7). Tailwind build no longer loaded. Homepage `.v` timeline rules scoped to `.vers` so they stop hitting `.row .v`.

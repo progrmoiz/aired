@@ -18,6 +18,11 @@ const badgeVariants = cva(
         ghost:
           "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
         link: "text-primary underline-offset-4 hover:underline",
+        // aired: plain-words facts about a page ("Expires Friday", "PIN", "14 views")
+        chip: "h-7 rounded-full bg-chip px-3 text-chip-foreground [&>svg]:size-3!",
+        warn: "h-7 rounded-full bg-warn-bg px-3 text-warn [&>svg]:size-3!",
+        // aired: sits on top of a page preview
+        overlay: "h-6 rounded-full bg-black/70 px-2 text-white backdrop-blur-sm",
       },
     },
     defaultVariants: {

@@ -1,17 +1,29 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
+// aired variants: "panel" (raised, token glow), "hero" (publish areas),
+// "bare" (no padding or gap: frames around previews).
+const CARD_VARIANTS = {
+  default: "",
+  panel: "rounded-2xl ring-hairline shadow-glow",
+  hero: "rounded-3xl ring-hairline shadow-glow",
+  bare: "gap-0 py-0 ring-hairline",
+} as const
+
 function Card({
   className,
   size = "default",
+  variant = "default",
   ...props
-}: React.ComponentProps<"div"> & { size?: "default" | "sm" }) {
+}: React.ComponentProps<"div"> & { size?: "default" | "sm"; variant?: keyof typeof CARD_VARIANTS }) {
   return (
     <div
       data-slot="card"
       data-size={size}
+      data-variant={variant}
       className={cn(
         "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl bg-card py-(--card-spacing) text-sm text-card-foreground ring-1 ring-foreground/10 [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        CARD_VARIANTS[variant],
         className
       )}
       {...props}

@@ -100,3 +100,5 @@ ${'GIRAF_E'.split('').map((ch) => `<div style="width:96px;height:110px;border-ra
 
 export const USER = { first: 'Moiz', login: 'moiz', initial: 'M', plan: 'Free' }
 export const host = 'aired.sh'
+
+export const origin = 'https://aired.sh'

@@ -66,6 +66,9 @@ importers:
 
   apps/dashboard:
     dependencies:
+      '@aired/ui-tokens':
+        specifier: workspace:*
+        version: link:../../packages/ui-tokens
       '@base-ui/react':
         specifier: 1.9.0
         version: 1.9.0(@types/react@19.3.0)(react-dom@19.1.10(react@19.1.10))(react@19.1.10)
@@ -183,6 +186,8 @@ importers:
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
+
+  packages/ui-tokens: {}
 
 packages:
 
