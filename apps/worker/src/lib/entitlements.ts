@@ -52,3 +52,30 @@ export function planLimitError(
 export function billingEnabled(env: { BILLING_ENABLED?: string }): boolean {
   return env.BILLING_ENABLED === '1';
 }
+
+/** The slice of Env that getEntitlements reads; structural so this module stays import-free. */
+export type EntitlementsEnv = {
+  BILLING_ENABLED?: string;
+  PAGES_KV: { get(key: string, options: { type: 'json'; cacheTtl?: number }): Promise<unknown> };
+};
+
+/**
+ * The caller's plan, from the KV projection `ent:<uid>` the billing webhook writes.
+ * Free when signed out, when billing is off, or when the record is missing or unreadable.
+ */
+export async function getEntitlements(env: EntitlementsEnv, uid: number | null): Promise<Entitlements> {
+  if (uid === null || !billingEnabled(env)) return entitlementsFor(null, new Date());
+  let state: SubscriptionState | null = null;
+  try {
+    const raw = await env.PAGES_KV.get(`ent:${uid}`, { type: 'json', cacheTtl: 300 });
+    if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+      const { status, currentPeriodEnd } = raw as Record<string, unknown>;
+      if (typeof status === 'string' && (typeof currentPeriodEnd === 'string' || currentPeriodEnd === null)) {
+        state = { status, currentPeriodEnd };
+      }
+    }
+  } catch {
+    state = null;
+  }
+  return entitlementsFor(state, new Date());
+}
