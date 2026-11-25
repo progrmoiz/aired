@@ -359,45 +359,49 @@
       catch (e) { return function (cc) { return cc; }; }
     })();
 
-    // Where pages are opened: one stacked bar for the top three countries and
-    // everyone else, with flags and shares underneath.
+    // Top countries by opens, with a bar for each one's share.
     function renderGeo(geo) {
-      var box = document.getElementById("geo");
-      if (!box) return;
+      var list = document.getElementById("geo");
+      if (!list) return;
       var rows = Object.keys(geo).filter(function (cc) { return cc !== "XX"; })
         .map(function (cc) { return [cc, geo[cc]]; })
         .sort(function (a, b) { return b[1] - a[1]; });
       if (!rows.length) return;
-      var total = Object.keys(geo).reduce(function (n, cc) { return n + geo[cc]; }, 0);
-      var top = rows.slice(0, 3), rest = total - top.reduce(function (n, r) { return n + r[1]; }, 0);
-      var stack = box.querySelector(".stack"), legend = box.querySelector(".legend");
-      var pct = function (n) { var p = n / total * 100; return p < 1 ? "<1%" : Math.round(p) + "%"; };
-      var labels = [];
-      top.concat(rest > 0 ? [["", rest]] : []).forEach(function (r) {
-        var seg = document.createElement("i");
-        seg.style.flex = String(r[1]);
-        stack.appendChild(seg);
+      var total = rows.reduce(function (n, r) { return n + r[1]; }, 0), top = rows.slice(0, 3);
+      list.innerHTML = "";
+      top.forEach(function (r) {
         var li = document.createElement("li");
-        if (r[0]) {
-          var img = document.createElement("img");
-          img.src = "https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/flags/4x3/" + r[0].toLowerCase() + ".svg";
-          img.alt = "";
-          img.width = 16;
-          img.height = 12;
-          img.loading = "lazy";
-          img.title = regionName(r[0]);
-          img.onerror = function () { img.replaceWith(document.createTextNode(r[0])); };
-          li.appendChild(img);
-        } else {
-          li.appendChild(document.createTextNode((rows.length - top.length) + " more"));
-        }
-        var b = document.createElement("b");
-        b.textContent = pct(r[1]);
-        li.appendChild(b);
-        legend.appendChild(li);
-        labels.push((r[0] ? regionName(r[0]) : "Other countries") + " " + pct(r[1]));
+        li.tabIndex = 0;
+        var share = r[1] / total;
+        li.style.setProperty("--w", Math.max(4, Math.round(100 * r[1] / top[0][1])) + "%");
+        li.title = r[1].toLocaleString("en-US") + " opens";
+        var name = document.createElement("span");
+        name.className = "flag";
+        var img = document.createElement("img");
+        img.src = "https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/flags/4x3/" + r[0].toLowerCase() + ".svg";
+        img.alt = "";
+        img.width = 16;
+        img.height = 12;
+        img.loading = "lazy";
+        img.onerror = function () { img.remove(); };
+        name.appendChild(img);
+        name.appendChild(document.createTextNode(regionName(r[0])));
+        var pct = document.createElement("b");
+        pct.textContent = (share < 0.01 ? "<1" : Math.round(share * 100)) + "%";
+        li.addEventListener("mouseenter", function () { pct.textContent = r[1].toLocaleString("en-US"); });
+        li.addEventListener("focus", function () { pct.textContent = r[1].toLocaleString("en-US"); });
+        li.addEventListener("mouseleave", function () { pct.textContent = (share < 0.01 ? "<1" : Math.round(share * 100)) + "%"; });
+        li.addEventListener("blur", function () { pct.textContent = (share < 0.01 ? "<1" : Math.round(share * 100)) + "%"; });
+        li.appendChild(name);
+        li.appendChild(pct);
+        list.appendChild(li);
       });
-      box.setAttribute("aria-label", "Where pages are opened: " + labels.join(", "));
+      if (rows.length > top.length) {
+        var more = document.createElement("li");
+        more.className = "more";
+        more.textContent = "+ " + (rows.length - top.length) + " more countries";
+        list.appendChild(more);
+      }
     }
 
     // ── Copy setup for my agent ──
