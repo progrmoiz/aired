@@ -7,7 +7,13 @@ import { rateLimit } from '../middleware/rate-limit.js';
 import { TIERS } from '../lib/rate-limit-tiers.js';
 import { billingEnabled, isEntitled } from '../lib/entitlements.js';
 import { verifyStripeSignature } from '../lib/billing/signature.js';
-import { HANDLED_EVENTS, subscriptionIdFromEvent, uidFromEvent } from '../lib/billing/stripe-shapes.js';
+import {
+  HANDLED_EVENTS,
+  isMissingCustomer,
+  subscriptionIdFromEvent,
+  uidFromEvent,
+  type NormalizedSubscription,
+} from '../lib/billing/stripe-shapes.js';
 import {
   createCheckout,
   createCustomer,
@@ -22,12 +28,14 @@ import {
   getSubscription,
   getCustomerId,
   saveCustomerId,
+  forgetCustomer,
   findUidByCustomer,
   syncSubscription,
 } from '../lib/billing/store.js';
 import {
   billingStatus,
   checkoutGate,
+  customerIdempotencyKey,
   isProPrice,
   parseInterval,
   parseWebhookEvent,
@@ -43,18 +51,26 @@ type User = NonNullable<AppBindings['Variables']['user']>;
 const BILLING_OFF = 'Billing is not available yet';
 const CHECKOUT_FAILED = 'Could not start checkout. Please try again.';
 const ALREADY_PRO = 'You already have Pro';
-const PROCESSING = 'Your payment is still processing. Check back in a minute.';
+const PROCESSING = 'Your payment is still processing. This can take a few minutes, or longer for bank payments.';
+const NO_ACCOUNT = 'No billing account yet';
+const PAYMENT_FAILED = 'Your last payment failed. Update your card in Manage billing.';
 
 const billing = new Hono<AppBindings>();
 const upgrade = new Hono<AppBindings>();
 
-type CheckoutResult = { kind: 'pro' } | { kind: 'processing' } | { kind: 'url'; url: string };
+type CheckoutResult =
+  | { kind: 'pro' }
+  | { kind: 'payment_failed' }
+  | { kind: 'processing' }
+  | { kind: 'url'; url: string };
 
 /**
- * Start a Stripe Checkout for this user, unless they already pay or a payment
- * is in progress. Every checkout runs on the user's one Stripe customer, and
- * Stripe is asked for that customer's live subscriptions first, so a second
- * checkout before the first webhook lands can't open a second subscription.
+ * Start a Stripe Checkout for this user, unless a live subscription already
+ * exists. Every checkout runs on the user's one Stripe customer, and Stripe is
+ * asked for that customer's live subscriptions first, so a second checkout
+ * before the first webhook lands can't open a second subscription.
+ * If Stripe no longer has the saved customer (deleted, or saved against another
+ * Stripe account), the stale rows are dropped and it retries once on a new one.
  */
 async function startCheckout(c: Context<AppBindings>, user: User, interval: Interval): Promise<CheckoutResult> {
   const db = c.env.DB;
@@ -64,16 +80,34 @@ async function startCheckout(c: Context<AppBindings>, user: User, interval: Inte
   // The users row first: billing_customers and subscriptions both reference it.
   await ensureUser(db, user);
   const customerId =
-    existing?.customerId ?? (await getCustomerId(db, user.id)) ?? (await newCustomer(c, user));
+    existing?.customerId ?? (await getCustomerId(db, user.id)) ?? (await newCustomer(c, user, null));
 
-  const live = (await listActiveSubscriptions(c.env, customerId)).filter((s) =>
-    isProPrice(s.priceId, c.env),
-  );
-  const gate = checkoutGate(live);
-  if (gate?.kind === 'pro') {
-    // The webhook hasn't landed yet (or was lost): store what Stripe says now.
-    await syncSubscription(c.env, user.id, gate.sub);
-    return { kind: 'pro' };
+  try {
+    return await checkoutOn(c, user, interval, customerId);
+  } catch (err) {
+    if (!isMissingCustomer(err)) throw err;
+    console.warn({ event: 'billing_customer_missing', uid: user.id, customerId });
+    await forgetCustomer(db, user.id, customerId);
+    const fresh = await newCustomer(c, user, customerId);
+    return await checkoutOn(c, user, interval, fresh);
+  }
+}
+
+/** The live-subscription check and the Checkout session, on one customer. */
+async function checkoutOn(
+  c: Context<AppBindings>,
+  user: User,
+  interval: Interval,
+  customerId: string,
+): Promise<CheckoutResult> {
+  const now = new Date();
+  // Any live subscription on the user's own customer blocks a new one, whatever its price.
+  const gate = checkoutGate(await listActiveSubscriptions(c.env, customerId), (s) => isEntitled(s, now));
+  if (gate?.kind === 'pro' || gate?.kind === 'payment_failed') {
+    // The webhook hasn't landed yet (or was lost): store what Stripe says now,
+    // so status and the portal see it. Only a Pro price is stored.
+    await storeIfProPrice(c, user.id, gate.sub);
+    return { kind: gate.kind };
   }
   if (gate?.kind === 'processing') return { kind: 'processing' };
 
@@ -87,9 +121,24 @@ async function startCheckout(c: Context<AppBindings>, user: User, interval: Inte
   return { kind: 'url', url };
 }
 
-/** Create and save the user's Stripe customer; if another request saved one first, use that. */
-async function newCustomer(c: Context<AppBindings>, user: User): Promise<string> {
-  const { id } = await createCustomer(c.env, { uid: user.id, email: user.email });
+async function storeIfProPrice(c: Context<AppBindings>, uid: number, sub: NormalizedSubscription): Promise<void> {
+  if (!isProPrice(sub.priceId, c.env)) {
+    console.warn({ event: 'billing_live_sub_not_pro_price', uid, subscriptionId: sub.id, priceId: sub.priceId });
+    return;
+  }
+  await syncSubscription(c.env, uid, sub);
+}
+
+/**
+ * Create and save the user's Stripe customer; if another request saved one
+ * first, use that. `replacing` is the id of a customer Stripe no longer has.
+ */
+async function newCustomer(c: Context<AppBindings>, user: User, replacing: string | null): Promise<string> {
+  const { id } = await createCustomer(c.env, {
+    uid: user.id,
+    email: user.email,
+    idempotencyKey: customerIdempotencyKey(siteOrigin(c.env), user.id, replacing),
+  });
   await saveCustomerId(c.env.DB, user.id, id);
   return (await getCustomerId(c.env.DB, user.id)) ?? id;
 }
@@ -131,6 +180,9 @@ billing.post('/checkout', requireAuth, requireCsrfHeader, rateLimit(TIERS.billin
   try {
     const result = await startCheckout(c, user, interval);
     if (result.kind === 'pro') return c.json({ error: ALREADY_PRO }, 409);
+    if (result.kind === 'payment_failed') {
+      return c.json({ error: PAYMENT_FAILED, code: 'payment_failed' }, 409);
+    }
     if (result.kind === 'processing') return c.json({ error: PROCESSING }, 409);
     return c.json({ url: result.url });
   } catch (err) {
@@ -144,12 +196,24 @@ billing.post('/portal', requireAuth, requireCsrfHeader, rateLimit(TIERS.billing)
   if (!billingEnabled(c.env)) return c.json({ error: BILLING_OFF }, 503);
   const user = c.get('user')!;
 
+  let customerId: string | null = null;
   try {
-    const row = await getSubscription(c.env.DB, user.id);
-    if (!row) return c.json({ error: 'No billing account yet' }, 404);
-    const { url } = await createPortal(c.env, row.customerId, `${siteOrigin(c.env)}/dashboard`);
+    customerId =
+      (await getSubscription(c.env.DB, user.id))?.customerId ?? (await getCustomerId(c.env.DB, user.id));
+    if (!customerId) return c.json({ error: NO_ACCOUNT }, 404);
+    const { url } = await createPortal(c.env, customerId, `${siteOrigin(c.env)}/dashboard`);
     return c.json({ url });
   } catch (err) {
+    if (customerId && isMissingCustomer(err)) {
+      // Stripe no longer has this customer: drop the stale rows; nothing to manage.
+      console.warn({ event: 'billing_customer_missing', uid: user.id, customerId });
+      try {
+        await forgetCustomer(c.env.DB, user.id, customerId);
+        return c.json({ error: NO_ACCOUNT }, 404);
+      } catch (forgetErr) {
+        err = forgetErr;
+      }
+    }
     logBillingError('billing_portal_failed', user.id, err);
     return c.json({ error: 'Could not open billing. Please try again.' }, 502);
   }
@@ -234,6 +298,7 @@ upgrade.get('/upgrade', rateLimit(TIERS.billing), async (c) => {
   try {
     const result = await startCheckout(c, user, interval);
     if (result.kind === 'pro') return c.redirect('/dashboard', 302);
+    if (result.kind === 'payment_failed') return c.redirect('/dashboard?billing=payment_failed', 302);
     if (result.kind === 'processing') return c.redirect('/pricing?checkout=processing', 302);
     return c.redirect(result.url, 303);
   } catch (err) {

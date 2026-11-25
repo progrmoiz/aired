@@ -78,16 +78,28 @@ export function billingStatus(input: {
   };
 }
 
+export type PriceEnv = {
+  STRIPE_PRICE_MONTHLY?: string;
+  STRIPE_PRICE_YEARLY?: string;
+  STRIPE_LEGACY_PRICE_IDS?: string;
+};
+
+/** `STRIPE_LEGACY_PRICE_IDS` as a list: comma-separated, trimmed, empty entries dropped. */
+export function legacyPriceIds(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw.split(',').map((p) => p.trim()).filter((p) => p !== '');
+}
+
 /**
- * Whether a subscription's price is one of ours. Only the configured Pro
- * prices grant Pro; any other subscription on the Stripe account is ignored.
+ * Whether a subscription's price grants Pro: one of the two current prices, or
+ * an older Pro price listed in STRIPE_LEGACY_PRICE_IDS (so changing the price
+ * doesn't drop people who subscribed at the old one). Any other price on the
+ * Stripe account doesn't.
  */
-export function isProPrice(
-  priceId: string | null,
-  env: { STRIPE_PRICE_MONTHLY?: string; STRIPE_PRICE_YEARLY?: string },
-): boolean {
+export function isProPrice(priceId: string | null, env: PriceEnv): boolean {
   if (!priceId) return false;
-  return priceId === env.STRIPE_PRICE_MONTHLY || priceId === env.STRIPE_PRICE_YEARLY;
+  if (priceId === env.STRIPE_PRICE_MONTHLY || priceId === env.STRIPE_PRICE_YEARLY) return true;
+  return legacyPriceIds(env.STRIPE_LEGACY_PRICE_IDS).includes(priceId);
 }
 
 /** Origin for the URLs Stripe sends the user back to. Never taken from the request. */
@@ -95,18 +107,41 @@ export function siteOrigin(env: { SITE_ORIGIN?: string }): string {
   return (env.SITE_ORIGIN || 'https://aired.sh').replace(/\/+$/, '');
 }
 
-const PAYING = new Set(['active', 'trialing', 'past_due']);
+/**
+ * Idempotency key for creating a user's Stripe customer. Scoped by site host so
+ * two environments sharing a Stripe test account never get each other's
+ * customer. `replacing` (the id of a customer Stripe no longer has) gives a
+ * fresh key, because replaying the old one would return the deleted customer.
+ */
+export function customerIdempotencyKey(origin: string, uid: number, replacing?: string | null): string {
+  const base = `aired-customer-${new URL(origin).host}-${uid}`;
+  return replacing ? `${base}-${replacing}` : base;
+}
+
+export type CheckoutGate<S> =
+  | { kind: 'pro'; sub: S }
+  | { kind: 'payment_failed'; sub: S }
+  | { kind: 'processing' }
+  | null;
 
 /**
  * Whether the customer's live subscriptions (see liveSubscriptions) rule out a
- * new Checkout: one that pays (store it and say Pro), or one whose first
- * payment is still in progress. null → go ahead.
+ * new Checkout. Any live subscription on the user's own customer blocks one,
+ * whatever its price; the caller decides separately whether to store it.
+ *  - 'pro': one is entitled now (paying, or past_due inside the grace period)
+ *  - 'payment_failed': one is past_due after the grace period, or unpaid;
+ *    the fix is a new card in the portal, not a second subscription
+ *  - 'processing': anything else live (an incomplete first payment)
+ *  - null: nothing live, go ahead
  */
 export function checkoutGate<S extends { status: string }>(
   subs: readonly S[],
-): { kind: 'pro'; sub: S } | { kind: 'processing' } | null {
-  const paying = subs.find((s) => PAYING.has(s.status));
+  entitled: (sub: S) => boolean,
+): CheckoutGate<S> {
+  const paying = subs.find(entitled);
   if (paying) return { kind: 'pro', sub: paying };
-  if (subs.some((s) => s.status === 'incomplete')) return { kind: 'processing' };
+  const failed = subs.find((s) => s.status === 'past_due' || s.status === 'unpaid');
+  if (failed) return { kind: 'payment_failed', sub: failed };
+  if (subs.length > 0) return { kind: 'processing' };
   return null;
 }

@@ -4,6 +4,7 @@ import {
   checkoutParams,
   liveSubscriptions,
   normalizeSubscription,
+  stripeErrorFrom,
   type NormalizedSubscription,
 } from './stripe-shapes.js';
 
@@ -51,18 +52,19 @@ export async function createPortal(env: StripeEnv, customerId: string, returnUrl
 }
 
 /**
- * Create the user's Stripe customer. The idempotency key makes a retry, or a
- * second checkout racing the first, get the same customer back within Stripe's
- * 24-hour key window; after that, the saved billing_customers row is used.
+ * Create the user's Stripe customer. The idempotency key (customerIdempotencyKey)
+ * makes a retry, or a second checkout racing the first, get the same customer
+ * back within Stripe's 24-hour key window; after that, the saved
+ * billing_customers row is used.
  */
 export async function createCustomer(
   env: StripeEnv,
-  input: { uid: number; email: string | null },
+  input: { uid: number; email: string | null; idempotencyKey: string },
 ): Promise<{ id: string }> {
   const body = new URLSearchParams({ 'metadata[uid]': String(input.uid) });
   if (input.email) body.set('email', input.email);
   const { data } = await stripeRequest(env, 'POST', '/v1/customers', body, [], {
-    'Idempotency-Key': `aired-customer-${input.uid}`,
+    'Idempotency-Key': input.idempotencyKey,
   });
   const id = (data as { id?: unknown } | null)?.id;
   if (typeof id !== 'string' || !id) throw new Error('Stripe customer has no id');
@@ -114,10 +116,8 @@ async function stripeRequest(
   const data: unknown = await res.json().catch(() => null);
   if (res.ok || allowStatuses.includes(res.status)) return { status: res.status, data };
 
-  // Only Stripe's machine-readable type/code: its `message` can echo part of the key.
-  const err = (data as { error?: { type?: unknown; code?: unknown } } | null)?.error;
-  const detail = [err?.type, err?.code].filter((v) => typeof v === 'string').join('/');
-  throw new Error(`Stripe ${method} ${path} failed: ${res.status}${detail ? ` ${detail}` : ''}`);
+  // Only Stripe's machine-readable type/code/param: its `message` can echo part of the key.
+  throw stripeErrorFrom(method, path, res.status, data);
 }
 
 function urlOf(data: unknown, what: string): string {

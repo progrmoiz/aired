@@ -12,6 +12,8 @@ STRIPE_SECRET_KEY=rk_test_your_restricted_key
 STRIPE_WEBHOOK_SECRET=whsec_from_stripe_listen
 STRIPE_PRICE_MONTHLY=price_monthly_test_id
 STRIPE_PRICE_YEARLY=price_yearly_test_id
+# Optional: older Pro price ids that still grant Pro, comma-separated.
+# STRIPE_LEGACY_PRICE_IDS=price_old_monthly,price_old_yearly
 # "1" turns on Stripe automatic tax in checkout; empty = off.
 STRIPE_AUTOMATIC_TAX=
 # Optional: point at a local Stripe mock. Default https://api.stripe.com.

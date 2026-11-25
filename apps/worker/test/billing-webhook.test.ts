@@ -3,13 +3,16 @@ import assert from "node:assert/strict";
 import {
   billingStatus,
   checkoutGate,
+  customerIdempotencyKey,
   isProPrice,
+  legacyPriceIds,
   siteOrigin,
   parseInterval,
   parseWebhookEvent,
   planWebhookEvent,
   upgradeInterval,
 } from "../src/lib/billing/webhook-plan.ts";
+import { isEntitled } from "../src/lib/entitlements.ts";
 
 const HANDLED = [
   "checkout.session.completed",
@@ -163,22 +166,98 @@ test("siteOrigin defaults to https://aired.sh and drops a trailing slash", () =>
   assert.equal(siteOrigin({ SITE_ORIGIN: "http://localhost:8787/" }), "http://localhost:8787");
 });
 
-test("checkoutGate: no live subscription → go ahead", () => {
-  assert.equal(checkoutGate([]), null);
+test("legacyPriceIds splits, trims and drops empty entries", () => {
+  assert.deepEqual(legacyPriceIds(undefined), []);
+  assert.deepEqual(legacyPriceIds(""), []);
+  assert.deepEqual(legacyPriceIds(" , ,"), []);
+  assert.deepEqual(legacyPriceIds("price_old"), ["price_old"]);
+  assert.deepEqual(legacyPriceIds(" price_old , ,price_older ,"), ["price_old", "price_older"]);
 });
 
-test("checkoutGate: a paying subscription → pro, with that subscription", () => {
-  for (const status of ["active", "trialing", "past_due"]) {
-    const sub = { id: "sub_1", status };
-    assert.deepEqual(checkoutGate([sub]), { kind: "pro", sub }, status);
+test("isProPrice accepts legacy Pro prices listed in STRIPE_LEGACY_PRICE_IDS", () => {
+  const env = { ...prices, STRIPE_LEGACY_PRICE_IDS: " price_old , ,price_older" };
+  assert.equal(isProPrice("price_old", env), true);
+  assert.equal(isProPrice("price_older", env), true);
+  assert.equal(isProPrice("price_m", env), true);
+  assert.equal(isProPrice("price_other", env), false);
+  assert.equal(isProPrice(" price_old ", env), false);
+  assert.equal(isProPrice("price_old", prices), false);
+  // empty entries never match an empty or missing price
+  assert.equal(isProPrice("", { STRIPE_LEGACY_PRICE_IDS: ",," }), false);
+  assert.equal(isProPrice(null, { STRIPE_LEGACY_PRICE_IDS: "price_old" }), false);
+});
+
+test("customerIdempotencyKey is scoped by site host and uid", () => {
+  assert.equal(customerIdempotencyKey("https://aired.sh", 4242), "aired-customer-aired.sh-4242");
+  assert.equal(customerIdempotencyKey("http://localhost:8787", 7), "aired-customer-localhost:8787-7");
+  assert.notEqual(
+    customerIdempotencyKey("https://staging.aired.sh", 7),
+    customerIdempotencyKey("https://aired.sh", 7),
+  );
+});
+
+test("customerIdempotencyKey gives a fresh key when replacing a missing customer", () => {
+  assert.equal(
+    customerIdempotencyKey("https://aired.sh", 4242, "cus_gone"),
+    "aired-customer-aired.sh-4242-cus_gone",
+  );
+  assert.equal(customerIdempotencyKey("https://aired.sh", 4242, null), "aired-customer-aired.sh-4242");
+});
+
+const NOW = new Date("2026-11-25T12:00:00Z");
+const DAY = 24 * 3600 * 1000;
+const at = (offsetDays: number) => new Date(NOW.getTime() + offsetDays * DAY).toISOString();
+const live = (id: string, status: string, periodEndDays: number | null) => ({
+  id,
+  status,
+  currentPeriodEnd: periodEndDays === null ? null : at(periodEndDays),
+});
+const entitledNow = (s: { status: string; currentPeriodEnd: string | null }) => isEntitled(s, NOW);
+
+test("checkoutGate: no live subscription → go ahead", () => {
+  assert.equal(checkoutGate([], entitledNow), null);
+});
+
+test("checkoutGate: active or trialing in period → pro, with that subscription", () => {
+  for (const status of ["active", "trialing"]) {
+    const sub = live("sub_1", status, 30);
+    assert.deepEqual(checkoutGate([sub], entitledNow), { kind: "pro", sub }, status);
   }
 });
 
-test("checkoutGate: only an incomplete one → processing", () => {
-  assert.deepEqual(checkoutGate([{ id: "sub_1", status: "incomplete" }]), { kind: "processing" });
+test("checkoutGate: past_due inside the grace period → pro", () => {
+  const sub = live("sub_1", "past_due", -1);
+  assert.deepEqual(checkoutGate([sub], entitledNow), { kind: "pro", sub });
 });
 
-test("checkoutGate: a paying one wins over an incomplete one", () => {
-  const paying = { id: "sub_2", status: "active" };
-  assert.deepEqual(checkoutGate([{ id: "sub_1", status: "incomplete" }, paying]), { kind: "pro", sub: paying });
+test("checkoutGate: past_due after the grace period → payment_failed", () => {
+  const sub = live("sub_1", "past_due", -5);
+  assert.deepEqual(checkoutGate([sub], entitledNow), { kind: "payment_failed", sub });
+});
+
+test("checkoutGate: unpaid → payment_failed, even inside the period", () => {
+  const sub = live("sub_1", "unpaid", 10);
+  assert.deepEqual(checkoutGate([sub], entitledNow), { kind: "payment_failed", sub });
+});
+
+test("checkoutGate: incomplete → processing", () => {
+  assert.deepEqual(checkoutGate([live("sub_1", "incomplete", null)], entitledNow), { kind: "processing" });
+});
+
+test("checkoutGate: any other live subscription still blocks (processing)", () => {
+  // active but its period ended long ago (stale data): not entitled, still live
+  assert.deepEqual(checkoutGate([live("sub_1", "active", -30)], entitledNow), { kind: "processing" });
+});
+
+test("checkoutGate: entitled wins over failed, failed over incomplete", () => {
+  const paying = live("sub_2", "active", 30);
+  const failed = live("sub_3", "unpaid", 10);
+  const pending = live("sub_1", "incomplete", null);
+  assert.deepEqual(checkoutGate([pending, failed, paying], entitledNow), { kind: "pro", sub: paying });
+  assert.deepEqual(checkoutGate([pending, failed], entitledNow), { kind: "payment_failed", sub: failed });
+});
+
+test("checkoutGate doesn't look at the price", () => {
+  const sub = { ...live("sub_1", "active", 30), priceId: "price_someone_else" };
+  assert.deepEqual(checkoutGate([sub], entitledNow), { kind: "pro", sub });
 });

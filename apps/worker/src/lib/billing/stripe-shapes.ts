@@ -89,8 +89,56 @@ export function normalizeSubscription(obj: unknown): NormalizedSubscription | nu
   };
 }
 
-/** Subscription statuses that block a new Checkout: paying now, or payment in progress. */
-export const LIVE_STATUSES: readonly string[] = ['active', 'trialing', 'past_due', 'incomplete'];
+/**
+ * Subscription statuses that block a new Checkout: paying now, a payment in
+ * progress, or a failed payment the user should fix in the portal.
+ */
+export const LIVE_STATUSES: readonly string[] = ['active', 'trialing', 'past_due', 'unpaid', 'incomplete'];
+
+/**
+ * A failed Stripe call. Carries Stripe's machine-readable `type`, `code` and
+ * `param` only: its `message` can echo part of the key, so it is never kept.
+ */
+export class StripeError extends Error {
+  readonly status: number;
+  readonly type: string | null;
+  readonly code: string | null;
+  readonly param: string | null;
+
+  constructor(
+    method: string,
+    path: string,
+    status: number,
+    detail: { type: string | null; code: string | null; param: string | null },
+  ) {
+    const tag = [detail.type, detail.code].filter((v) => v !== null).join('/');
+    super(`Stripe ${method} ${path} failed: ${status}${tag ? ` ${tag}` : ''}`);
+    this.name = 'StripeError';
+    this.status = status;
+    this.type = detail.type;
+    this.code = detail.code;
+    this.param = detail.param;
+  }
+}
+
+/** Build the StripeError for a non-2xx response body. */
+export function stripeErrorFrom(method: string, path: string, status: number, body: unknown): StripeError {
+  const err = record(record(body)?.error);
+  return new StripeError(method, path, status, {
+    type: str(err?.type),
+    code: str(err?.code),
+    param: str(err?.param),
+  });
+}
+
+/**
+ * Whether a Stripe call failed because the customer no longer exists (deleted
+ * in the dashboard, or saved from another Stripe account or mode).
+ */
+export function isMissingCustomer(err: unknown): boolean {
+  if (!(err instanceof StripeError) || err.code !== 'resource_missing') return false;
+  return err.param === null || err.param === 'customer';
+}
 
 /**
  * The live subscriptions in a `GET /v1/subscriptions` list response,

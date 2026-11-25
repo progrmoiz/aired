@@ -23,6 +23,11 @@ export type Env = {
   STRIPE_PRICE_MONTHLY?: string;
   /** Stripe price id for the yearly Pro plan (price_…). */
   STRIPE_PRICE_YEARLY?: string;
+  /**
+   * Older Pro price ids that still grant Pro, comma-separated (e.g. after a price
+   * change). New checkouts always use the two prices above. Unset: none.
+   */
+  STRIPE_LEGACY_PRICE_IDS?: string;
   /** "1" turns on Stripe automatic tax in checkout. Unset: off. */
   STRIPE_AUTOMATIC_TAX?: string;
   /** Stripe API origin. Default https://api.stripe.com; override only for local mocks. */

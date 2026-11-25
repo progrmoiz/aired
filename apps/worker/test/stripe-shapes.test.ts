@@ -5,6 +5,9 @@ import {
   STRIPE_API_VERSION,
   checkoutParams,
   LIVE_STATUSES,
+  StripeError,
+  isMissingCustomer,
+  stripeErrorFrom,
   liveSubscriptions,
   normalizeSubscription,
   shouldStoreSubscription,
@@ -427,8 +430,8 @@ test("normalize carries the first item's price id, null when absent or not a str
   );
 });
 
-test("live statuses are the paying ones plus incomplete", () => {
-  assert.deepEqual([...LIVE_STATUSES].sort(), ["active", "incomplete", "past_due", "trialing"]);
+test("live statuses are the paying ones plus unpaid and incomplete", () => {
+  assert.deepEqual([...LIVE_STATUSES].sort(), ["active", "incomplete", "past_due", "trialing", "unpaid"]);
 });
 
 test("liveSubscriptions keeps live, normalizable entries of a list response", () => {
@@ -451,4 +454,45 @@ test("liveSubscriptions keeps live, normalizable entries of a list response", ()
   for (const bad of [null, undefined, {}, { data: "x" }, [], "list"]) {
     assert.deepEqual(liveSubscriptions(bad), [], JSON.stringify(bad));
   }
+});
+
+test("stripeErrorFrom keeps type, code and param, never the message", () => {
+  const body = {
+    error: {
+      type: "invalid_request_error",
+      code: "resource_missing",
+      param: "customer",
+      message: "No such customer: 'cus_gone'; a similar object exists in live mode, but a test mode key (rk_test_***abcd) was used",
+    },
+  };
+  const err = stripeErrorFrom("POST", "/v1/checkout/sessions", 400, body);
+  assert.ok(err instanceof StripeError);
+  assert.ok(err instanceof Error);
+  assert.equal(err.status, 400);
+  assert.equal(err.type, "invalid_request_error");
+  assert.equal(err.code, "resource_missing");
+  assert.equal(err.param, "customer");
+  assert.equal(err.message, "Stripe POST /v1/checkout/sessions failed: 400 invalid_request_error/resource_missing");
+  assert.ok(!err.message.includes("rk_test") && !err.message.includes("No such"));
+});
+
+test("stripeErrorFrom handles bodies without a usable error", () => {
+  for (const body of [null, "oops", {}, { error: "x" }, { error: { code: 3 } }]) {
+    const err = stripeErrorFrom("GET", "/v1/subscriptions/sub_1", 500, body);
+    assert.equal(err.code, null, JSON.stringify(body));
+    assert.equal(err.type, null);
+    assert.equal(err.message, "Stripe GET /v1/subscriptions/sub_1 failed: 500");
+  }
+});
+
+test("isMissingCustomer: resource_missing on the customer, or with no param", () => {
+  const e = (code: unknown, param?: unknown) =>
+    stripeErrorFrom("POST", "/v1/checkout/sessions", 400, { error: { type: "invalid_request_error", code, param } });
+  assert.equal(isMissingCustomer(e("resource_missing", "customer")), true);
+  assert.equal(isMissingCustomer(e("resource_missing")), true);
+  assert.equal(isMissingCustomer(e("resource_missing", "line_items[0][price]")), false);
+  assert.equal(isMissingCustomer(e("card_declined")), false);
+  assert.equal(isMissingCustomer(e(undefined)), false);
+  assert.equal(isMissingCustomer(new Error("resource_missing")), false);
+  assert.equal(isMissingCustomer(null), false);
 });

@@ -98,6 +98,25 @@ export async function getSubscription(db: D1Database, uid: number): Promise<Stor
   return row ? fromRow(row) : null;
 }
 
+/**
+ * Drop a Stripe customer that Stripe no longer has: the billing_customers row,
+ * and the subscriptions row too when it points at that customer and no longer
+ * grants Pro (an entitled row is left alone; the webhook owns it).
+ */
+export async function forgetCustomer(db: D1Database, uid: number, customerId: string): Promise<void> {
+  await db
+    .prepare('DELETE FROM billing_customers WHERE user_id = ? AND customer_id = ?')
+    .bind(uid, customerId)
+    .run();
+  const row = await getSubscription(db, uid);
+  if (row && row.customerId === customerId && !isEntitled(row, new Date())) {
+    await db
+      .prepare('DELETE FROM subscriptions WHERE user_id = ? AND customer_id = ?')
+      .bind(uid, customerId)
+      .run();
+  }
+}
+
 export async function findUidByCustomer(db: D1Database, customerId: string): Promise<number | null> {
   const row = await db
     .prepare(
