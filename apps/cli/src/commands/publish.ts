@@ -164,6 +164,9 @@ export function makePublishCommand(globalOpts: () => GlobalOpts): Command {
           process.stdout.write('\n')
           const asLogin = jwt !== undefined && session !== null ? ` as @${session.user.login}` : ''
           process.stdout.write(pc.green('Published!') + ' ' + pc.bold(result.url) + asLogin + '\n')
+          if (result.upgrade?.url !== undefined) {
+            process.stdout.write(pc.dim(`Remove the badge with Pro: ${result.upgrade.url}`) + '\n')
+          }
           process.stdout.write(pc.dim('Token:   ') + result.update_token + '\n')
           process.stdout.write(pc.dim('Expires: ') + formatExpiry(result.expiresAt) + '\n')
           if (resolvedProject !== null) {

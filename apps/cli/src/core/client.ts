@@ -14,6 +14,14 @@ export interface PublishOptions {
   id?: string
 }
 
+/** Offer the server attaches to a publish/update response for free-plan accounts. */
+export interface UpgradeHint {
+  reason: string
+  url: string
+}
+
+export type PublishResponse = PublishResult & { upgrade?: UpgradeHint }
+
 export interface MeResult {
   id: number
   login: string
@@ -77,7 +85,7 @@ export async function publishHTML(
   html: string,
   options: PublishOptions = {},
   jwt?: string,
-): Promise<PublishResult> {
+): Promise<PublishResponse> {
   const body: Record<string, unknown> = { html }
 
   if (options.title !== undefined) body['title'] = options.title
@@ -105,7 +113,7 @@ export async function publishHTML(
     body: JSON.stringify(body),
   })
 
-  return handleResponse<PublishResult>(resp, 'Publish')
+  return handleResponse<PublishResponse>(resp, 'Publish')
 }
 
 export async function updatePage(

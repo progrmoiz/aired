@@ -6,7 +6,8 @@ import { requireCsrfHeader } from "../middleware/csrf.js";
 import { readUpdateToken } from "../lib/page-token.js";
 import { TIERS } from "../lib/rate-limit-tiers.js";
 import { detectSpam, SPAM_REJECTION } from "../lib/spam.js";
-import { billingEnabled, getEntitlements, planLimitError } from "../lib/entitlements.js";
+import { billingEnabled, getEntitlements, planLimitError, UPGRADE_URL } from "../lib/entitlements.js";
+import type { Entitlements } from "../lib/entitlements.js";
 import {
   generateId,
   generateToken,
@@ -33,24 +34,40 @@ import {
 const api = new Hono<AppBindings>();
 
 /**
- * Validate HTML against the caller's plan size limit. Returns the error
+ * Validate HTML against the caller's plan size limit. `response` is the error
  * response, or null when the HTML is fine. A signed-in free user whose page
  * would fit on Pro gets a 402 upgrade prompt when billing is on; everyone else
- * gets the validateHtml 400 as before.
+ * gets the validateHtml 400 as before. `ent` is the caller's entitlements
+ * (null when anonymous), returned so the success path doesn't read KV again.
  */
-async function rejectInvalidHtml(c: Context<AppBindings>, html: string): Promise<Response | null> {
+async function rejectInvalidHtml(
+  c: Context<AppBindings>,
+  html: string,
+): Promise<{ response: Response | null; ent: Entitlements | null }> {
   const user = c.get("user");
   const ent = user !== null ? await getEntitlements(c.env, user.id) : null;
   const maxBytes = ent !== null ? ent.maxBytes : MAX_SIZE;
   const validation = validateHtml(html, maxBytes);
-  if (validation.ok) return null;
+  if (validation.ok) return { response: null, ent };
   if (ent !== null && ent.plan === "free" && billingEnabled(c.env)) {
     const size = new TextEncoder().encode(html).byteLength;
     if (size > maxBytes && size <= PRO_MAX_SIZE) {
-      return c.json(planLimitError("page_size"), 402);
+      return { response: c.json(planLimitError("page_size"), 402), ent };
     }
   }
-  return c.json({ error: validation.error }, 400);
+  return { response: c.json({ error: validation.error }, 400), ent };
+}
+
+/**
+ * The `upgrade` key for a successful publish/update response: only a signed-in
+ * free-plan caller with billing on sees the offer to remove the badge.
+ */
+function upgradeHint(
+  c: Context<AppBindings>,
+  ent: Entitlements | null,
+): { upgrade: { reason: "badge"; url: string } } | Record<string, never> {
+  if (ent === null || ent.plan !== "free" || !billingEnabled(c.env)) return {};
+  return { upgrade: { reason: "badge", url: `${UPGRADE_URL}?ref=publish` } };
 }
 
 // POST /api/publish — create a new page or update an existing one via update_token
@@ -73,7 +90,7 @@ api.post("/publish", publishRateLimit, async (c) => {
     return c.json({ error: "html is required and must be a string" }, 400);
   }
 
-  const invalid = await rejectInvalidHtml(c, html);
+  const { response: invalid, ent } = await rejectInvalidHtml(c, html);
   if (invalid !== null) return invalid;
 
   const resolvedTitle =
@@ -138,6 +155,7 @@ api.post("/publish", publishRateLimit, async (c) => {
       url: `${origin}/p/${existingId}`,
       update_token,
       expiresAt,
+      ...upgradeHint(c, ent),
     });
   }
 
@@ -251,6 +269,7 @@ api.post("/publish", publishRateLimit, async (c) => {
     url: `${origin}/p/${id}`,
     update_token: token,
     expiresAt,
+    ...upgradeHint(c, ent),
   });
 });
 
@@ -279,7 +298,7 @@ api.put("/pages/:id", requireCsrfHeader, async (c) => {
     return c.json({ error: "html is required and must be a string" }, 400);
   }
 
-  const invalid = await rejectInvalidHtml(c, html);
+  const { response: invalid, ent } = await rejectInvalidHtml(c, html);
   if (invalid !== null) return invalid;
 
   const resolvedTitle =
@@ -362,6 +381,7 @@ api.put("/pages/:id", requireCsrfHeader, async (c) => {
     url: `${origin}/p/${id}`,
     ...(returnToken !== undefined ? { update_token: returnToken } : {}),
     expiresAt,
+    ...upgradeHint(c, ent),
   });
 });
 
