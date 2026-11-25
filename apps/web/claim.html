@@ -2,170 +2,111 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>aired — keep a page</title>
   <meta name="robots" content="noindex" />
   <meta name="referrer" content="no-referrer" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="/style.css" />
   <link rel="preload" href="/fonts/inter-latin-v20.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/fonts/fonts.css" />
-  <style>
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background-color: #0a0a0b;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
-
-    @keyframes skeleton-pulse {
-      from { opacity: 1; }
-      to { opacity: 0.4; }
-    }
-    .skeleton-row { animation: skeleton-pulse 1.2s linear infinite alternate; }
-
-    /* Buttons: light primary (DESIGN.md §1.3, §8.1) and secondary (§8.2) */
-    .claim-btn {
-      display: inline-flex;
-      align-items: center;
-      transition: background-color 120ms cubic-bezier(0.16, 1, 0.3, 1),
-                  border-color 120ms cubic-bezier(0.16, 1, 0.3, 1),
-                  color 120ms cubic-bezier(0.16, 1, 0.3, 1),
-                  opacity 120ms cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .claim-btn-primary:hover:not(:disabled) { opacity: 0.9; }
-    .claim-btn-primary:active:not(:disabled) { opacity: 0.8; }
-    .claim-btn-secondary:active:not(:disabled) { opacity: 0.8; }
-    .claim-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    @media (pointer: coarse) {
-      .claim-btn { min-height: 44px; }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .skeleton-row { animation: none; opacity: 0.7; }
-      .claim-btn { transition: none; }
-    }
-    .claim-url { word-break: break-all; transition: color 120ms cubic-bezier(0.16, 1, 0.3, 1); }
-    .claim-url:hover {
-      text-decoration: underline;
-      text-decoration-color: #3b3b40;
-      text-underline-offset: 3px;
-    }
-    /* text-lg (tailwind.config.js) isn't in the committed style.css yet; same values until build:css regenerates it */
-    .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
-  </style>
+  <link rel="stylesheet" href="/site.css" />
 </head>
-<body class="min-h-screen flex flex-col text-aired-text-primary">
+<body>
+<header><div class="wrap">
+  <a class="logo" href="/" aria-label="aired home"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>aired</a>
+  <nav aria-label="Main"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link">Guides</a></nav>
+  <div class="right"><a class="login" id="nav-auth" href="/auth/github?return=/dashboard">Log in</a><a class="start" href="/#publish">Start free</a></div>
+</div></header>
 
-  <header class="w-full px-6 h-14 flex items-center justify-between max-w-2xl mx-auto">
-    <a href="/" class="text-base font-semibold tracking-tight text-aired-text-primary hover:text-white transition-colors duration-150">aired</a>
-    <nav class="flex items-center gap-5 text-sm text-aired-text-secondary">
-      <a href="/docs" class="hover:text-aired-text-primary transition-colors duration-150">Docs</a>
-    </nav>
-  </header>
+<main class="wrap">
+  <div class="duo">
+    <section>
+      <p class="eyebrow">Keep a page</p>
+      <h1>Keep this page in your account</h1>
+      <p class="lede">Pages published without an account expire. Add this one to your aired account and manage it from your dashboard, where you can see its views, copy the link or delete it.</p>
 
-  <main class="flex-1 w-full max-w-2xl mx-auto px-6 py-10">
-    <h1 class="text-xl font-medium tracking-tight">Keep a page</h1>
-    <p class="mt-2 text-sm text-aired-text-secondary">
-      Pages published without an account expire. Add this one to your aired account to manage it from the dashboard.
-    </p>
+      <p id="status" class="sr-only" role="status" aria-live="polite"></p>
 
-    <p id="status" class="sr-only" role="status" aria-live="polite"></p>
+      <div class="panel box-pad claim-box">
+        <!-- Loading: checking sign-in -->
+        <section id="state-loading" aria-hidden="true">
+          <span class="skel" style="width:14rem;height:16px"></span>
+          <span class="skel" style="width:8rem;margin-top:12px"></span>
+        </section>
 
-    <!-- Loading: checking sign-in -->
-    <section id="state-loading" class="mt-8" aria-hidden="true">
-      <div class="skeleton-row h-4 w-56 rounded-sm bg-aired-border"></div>
-      <div class="skeleton-row mt-3 h-3 w-32 rounded-sm bg-aired-border"></div>
-    </section>
+        <!-- Signed out -->
+        <section id="state-signed-out" class="hidden">
+          <p class="box-title">Sign in to keep this page</p>
+          <p class="box-sub">After you sign in, you come back here to confirm before anything is added.</p>
+          <div class="btns"><a id="sign-in" class="btn solid" href="/auth/github?return=/claim">Sign in with GitHub</a></div>
+        </section>
 
-    <!-- Signed out -->
-    <section id="state-signed-out" class="hidden mt-8">
-      <h2 class="text-lg font-medium">Sign in to keep this page</h2>
-      <p class="mt-2 text-sm text-aired-text-secondary">After you sign in, you come back here to confirm before anything is added.</p>
-      <div class="mt-6">
-        <a id="sign-in" href="/auth/github?return=/claim"
-           class="claim-btn claim-btn-primary focus-ring px-4 py-2.5 rounded bg-aired-text-primary text-aired-bg text-sm font-medium">
-          Sign in with GitHub
-        </a>
+        <!-- Confirm: signed in, nothing is added until the button is pressed -->
+        <section id="state-confirm" class="hidden">
+          <p class="box-title">Add this page to your account?</p>
+          <div class="claim-page">
+            <span class="thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></span>
+            <div style="min-width:0"><p id="confirm-title" class="claim-title"></p><a id="confirm-link" href="/" target="_blank" rel="noopener" class="claim-url mono"></a></div>
+          </div>
+          <p class="box-sub" style="margin-top:14px">Only add a page you published. Anyone can send you a link to this screen.</p>
+          <div class="btns">
+            <button id="confirm-add" type="button" class="btn solid">Add to your account</button>
+            <button id="confirm-cancel" type="button" class="btn">Cancel</button>
+          </div>
+        </section>
+
+        <!-- Claiming -->
+        <section id="state-claiming" class="hidden">
+          <p class="status-line">Adding the page to your account…</p>
+          <span class="skel" style="width:12rem;margin-top:12px" aria-hidden="true"></span>
+        </section>
+
+        <!-- Success -->
+        <section id="state-success" class="hidden">
+          <p class="box-title" style="color:var(--ok)">Added to your account</p>
+          <p id="success-title" class="box-sub" style="font-size:14px;color:var(--text-2);margin-top:6px"></p>
+          <a id="success-link" href="/" class="claim-url mono" style="margin-top:10px"></a>
+          <div class="btns"><a href="/dashboard" class="btn solid">Open dashboard</a></div>
+        </section>
+
+        <!-- Cancelled -->
+        <section id="state-cancelled" class="hidden">
+          <p class="box-title">Nothing was added</p>
+          <div class="btns"><a href="/dashboard" class="btn">Go to dashboard</a></div>
+        </section>
+
+        <!-- Error -->
+        <section id="state-error" class="hidden">
+          <p id="error-message" class="status-line" style="color:#f87171"></p>
+          <div class="btns">
+            <span id="error-actions" class="hidden"><button id="retry" type="button" class="btn">Try again</button></span>
+            <a href="/dashboard" class="btn ghost">Go to dashboard</a>
+          </div>
+        </section>
       </div>
     </section>
 
-    <!-- Confirm: signed in, nothing is added until the button is pressed -->
-    <section id="state-confirm" class="hidden mt-8">
-      <h2 class="text-lg font-medium">Add this page to your account?</h2>
-      <p id="confirm-title" class="mt-2 text-sm text-aired-text-primary"></p>
-      <a id="confirm-link" href="/" target="_blank" rel="noopener" class="claim-url mt-1 block font-mono text-sm text-aired-accent focus-ring rounded-sm"></a>
-      <p class="mt-3 text-xs text-aired-text-tertiary">Only add a page you published. Anyone can send you a link to this screen.</p>
-      <div class="mt-6 flex flex-wrap items-center gap-3">
-        <button id="confirm-add" type="button" class="claim-btn claim-btn-primary focus-ring px-4 py-2.5 rounded bg-aired-text-primary text-aired-bg text-sm font-medium">Add to your account</button>
-        <button id="confirm-cancel" type="button" class="claim-btn claim-btn-secondary focus-ring px-4 py-2 rounded bg-aired-surface border border-aired-border text-aired-text-secondary text-sm hover:bg-aired-surface-hover hover:border-aired-border-focus hover:text-aired-text-primary">Cancel</button>
+    <aside class="side-vis">
+      <div class="seen-cap"><span>Where it goes</span><span>aired.sh/dashboard</span></div>
+      <div class="dash" role="img" aria-label="Example of a page in the dashboard">
+        <div class="dash-top"><span><b style="color:var(--text-1)">Your pages</b></span><span class="new">Publish</span></div>
+        <div class="row"><div class="t"><b>Q3 performance report</b><span>aired.sh/p/q3-northwind</span></div><span class="v">14 views</span><span class="e perm">Never expires</span></div>
+        <div class="row"><div class="t"><b>Website refresh proposal</b><span>aired.sh/p/proposal-refresh</span></div><span class="v">6 views</span><span class="e">30 Nov</span></div>
       </div>
-    </section>
+      <ul class="ticklist side-ticks">
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span><b>Same link.</b> Nothing changes for the people you sent it to.</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span><b>Yours to manage.</b> Delete it or let it expire from the dashboard.</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span><b>Free.</b> Keeping pages doesn't need a paid plan.</span></li>
+      </ul>
+    </aside>
+  </div>
+</main>
 
-    <!-- Claiming -->
-    <section id="state-claiming" class="hidden mt-8">
-      <p class="text-sm text-aired-text-secondary">Adding the page to your account…</p>
-      <div class="skeleton-row mt-3 h-3 w-48 rounded-sm bg-aired-border" aria-hidden="true"></div>
-    </section>
-
-    <!-- Success -->
-    <section id="state-success" class="hidden mt-8">
-      <h2 class="text-lg font-medium">Added to your account</h2>
-      <p id="success-title" class="mt-2 text-sm text-aired-text-secondary"></p>
-      <a id="success-link" href="/" class="claim-url mt-3 block font-mono text-sm text-aired-accent focus-ring rounded-sm"></a>
-      <div class="mt-6 flex flex-wrap items-center gap-3">
-        <a href="/dashboard"
-           class="claim-btn claim-btn-secondary focus-ring px-4 py-2 rounded bg-aired-surface border border-aired-border text-aired-text-secondary text-sm hover:bg-aired-surface-hover hover:border-aired-border-focus hover:text-aired-text-primary">
-          Open dashboard
-        </a>
-      </div>
-    </section>
-
-    <!-- Cancelled -->
-    <section id="state-cancelled" class="hidden mt-8">
-      <p class="text-sm text-aired-text-secondary">Nothing was added.</p>
-      <p class="mt-6 text-sm text-aired-text-secondary">
-        <a href="/dashboard" class="hover:text-aired-text-primary underline transition-colors duration-150 focus-ring rounded-sm">Go to dashboard</a>
-      </p>
-    </section>
-
-    <!-- Error -->
-    <section id="state-error" class="hidden mt-8">
-      <p id="error-message" class="text-sm text-red-400"></p>
-      <div id="error-actions" class="hidden mt-6 flex flex-wrap items-center gap-3">
-        <button id="retry" type="button"
-                class="claim-btn claim-btn-secondary focus-ring px-4 py-2 rounded bg-aired-surface border border-aired-border text-aired-text-secondary text-sm hover:bg-aired-surface-hover hover:border-aired-border-focus hover:text-aired-text-primary">
-          Try again
-        </button>
-      </div>
-      <p class="mt-6 text-sm text-aired-text-secondary">
-        <a href="/dashboard" class="hover:text-aired-text-primary underline transition-colors duration-150 focus-ring rounded-sm">Go to dashboard</a>
-      </p>
-    </section>
-  </main>
-
-  <footer class="w-full max-w-2xl mx-auto px-6 py-8">
-    <nav aria-label="Guides" class="mb-4 flex flex-wrap justify-center sm:justify-start gap-x-4 gap-y-1 text-2xs">
-      <a href="/html-to-link" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">HTML to link</a>
-      <a href="/share-claude-artifacts" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Share Claude artifacts</a>
-      <a href="/share-chatgpt-html" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Share ChatGPT HTML</a>
-      <a href="/password-protect-html" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Password-protect HTML</a>
-      <a href="/share-html-privately" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Share HTML privately</a>
-      <a href="/share-html-with-client" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Send HTML to a client</a>
-      <a href="/tiiny-host-alternative" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Tiiny Host alternative</a>
-      <a href="/docs" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Docs</a>
-    </nav>
-    <div class="flex flex-col sm:flex-row items-center justify-between gap-2 text-2xs text-aired-text-tertiary">
-      <p>Built by <a href="https://x.com/iammoizfarooq" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">@iammoizfarooq</a></p>
-      <div class="flex items-center gap-4">
-        <a href="/terms" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Terms</a>
-        <a href="/privacy" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Privacy</a>
-        <a href="/refunds" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Refunds</a>
-        <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">GitHub</a>
-      </div>
-    </div>
-  </footer>
-
+<footer><div class="wrap">
+  <span>aired</span>
+  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
+</div></footer>
   <script>
     (function () {
       var STORAGE_KEY = 'aired.claim';
@@ -374,5 +315,6 @@
       init();
     })();
   </script>
+<script src="/app.js"></script>
 </body>
 </html>

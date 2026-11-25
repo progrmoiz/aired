@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>aired docs — publish HTML from the CLI, MCP or HTTP API</title>
   <meta name="description" content="Publish HTML to a link from Claude Code, Cursor, Codex, CI or any script. Install aired as a skill, CLI, MCP server or HTTP API." />
   <link rel="canonical" href="https://aired.sh/docs" />
@@ -18,183 +18,38 @@
   <meta name="twitter:image" content="https://aired.sh/og.png" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="/style.css" />
   <link rel="preload" href="/fonts/inter-latin-v20.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/fonts/fonts.css" />
-  <style>
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background-color: #0a0a0b;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
-    .copy-btn { transition: all 120ms cubic-bezier(0.16, 1, 0.3, 1); }
-    .copy-btn:hover { background-color: #18181b; border-color: #3b3b40; }
-    .copy-btn.copied { color: #34d399; border-color: rgba(52, 211, 153, 0.3); }
-    .focus-ring:focus-visible {
-      outline: none;
-      box-shadow: 0 0 0 2px #0a0a0b, 0 0 0 4px rgba(124, 106, 239, 0.4);
-    }
-    .toc a {
-      display: block;
-      padding: 4px 8px;
-      border-radius: 6px;
-      color: #8a8a8e;
-      text-decoration: none;
-      font-size: 0.8125rem;
-      transition: all 120ms ease;
-    }
-    .toc a:hover { color: #ededef; background: #111113; }
-    .toc a.active { color: #ededef; background: #18181b; }
-    section[id] { scroll-margin-top: 80px; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
-    th, td {
-      text-align: left;
-      padding: 8px 12px;
-      border-bottom: 1px solid #222225;
-    }
-    th { color: #8a8a8e; font-weight: 500; }
-    td { color: #ededef; }
-    td code, th code, p code, li code {
-      font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
-      font-size: 0.875em;
-      color: #ededef;
-      background: #111113;
-      padding: 1px 5px;
-      border-radius: 4px;
-      border: 1px solid #222225;
-    }
-    pre {
-      margin-top: 0.5rem;
-      padding: 32px 14px 14px;
-      background: #0a0a0b;
-      border: 1px solid #222225;
-      border-radius: 8px;
-      overflow-x: auto;
-      position: relative;
-    }
-    pre code {
-      font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
-      font-size: 0.8125rem;
-      line-height: 1.55;
-      color: #ededef;
-      background: transparent;
-      padding: 0;
-      border: 0;
-    }
-    pre[data-lang]::before {
-      content: attr(data-lang);
-      position: absolute;
-      top: 8px;
-      left: 14px;
-      font-family: 'Inter', -apple-system, sans-serif;
-      font-size: 0.625rem;
-      color: #56565a;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      font-weight: 500;
-      pointer-events: none;
-    }
-    pre .code-copy {
-      position: absolute;
-      top: 6px;
-      right: 6px;
-      padding: 2px 8px;
-      font-family: 'Inter', -apple-system, sans-serif;
-      font-size: 0.6875rem;
-      font-weight: 500;
-      color: #8a8a8e;
-      background: #111113;
-      border: 1px solid #222225;
-      border-radius: 4px;
-      cursor: pointer;
-      opacity: 0;
-      transition: opacity 150ms ease, color 120ms ease, border-color 120ms ease, background-color 120ms ease;
-    }
-    pre:hover .code-copy,
-    pre .code-copy:focus-visible { opacity: 1; }
-    pre .code-copy:hover { color: #ededef; border-color: #3b3b40; background: #18181b; }
-    pre .code-copy.copied { color: #34d399; border-color: rgba(52, 211, 153, 0.3); opacity: 1; }
-
-    /* Code separator stripe under the language label */
-    pre[data-lang]::after {
-      content: '';
-      position: absolute;
-      top: 28px;
-      left: 14px;
-      right: 14px;
-      height: 1px;
-      background: linear-gradient(to right, #222225, transparent);
-      pointer-events: none;
-    }
-
-    /* Syntax tokens — restrained palette */
-    .hl-c { color: #56565a; font-style: italic; }   /* comments */
-    .hl-k { color: #ededef; }                       /* JSON keys */
-    .hl-s { color: #8a8a8e; }                       /* strings */
-    .hl-n { color: #b5b1ee; }                       /* numbers, true/false/null — soft purple */
-    .hl-p { color: #56565a; }                       /* punctuation */
-    .hl-f { color: #b5b1ee; }                       /* CLI flags */
-    .hl-cmd { color: #ededef; font-weight: 500; }   /* CLI command head */
-    .doc-prose p { color: #8a8a8e; line-height: 1.625; margin-top: 0.5rem; }
-    .doc-prose h2 {
-      color: #ededef;
-      font-size: 1.5rem;
-      font-weight: 500;
-      letter-spacing: -0.025em;
-      margin-top: 3rem;
-      margin-bottom: 0.75rem;
-    }
-    .doc-prose h3 {
-      color: #ededef;
-      font-size: 1.125rem;
-      font-weight: 500;
-      margin-top: 2rem;
-      margin-bottom: 0.5rem;
-    }
-    .doc-prose ul {
-      margin-top: 0.5rem;
-      padding-left: 1.25rem;
-      list-style: disc;
-      color: #8a8a8e;
-    }
-    .doc-prose ul li { margin-top: 0.25rem; line-height: 1.625; }
-    .doc-prose a {
-      color: #ededef;
-      text-decoration: underline;
-      text-decoration-color: #222225;
-      transition: text-decoration-color 150ms ease;
-    }
-    .doc-prose a:hover { text-decoration-color: #8a8a8e; }
-  </style>
+  <link rel="stylesheet" href="/site.css" />
 </head>
-<body class="min-h-screen flex flex-col text-aired-text-primary">
+<body>
+<header><div class="wrap">
+  <a class="logo" href="/" aria-label="aired home"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>aired</a>
+  <nav aria-label="Main"><a href="/pricing">Pricing</a><a href="/docs" aria-current="page" class="on">Docs</a><a href="/html-to-link">Guides</a></nav>
+  <div class="right"><a class="login" id="nav-auth" href="/auth/github?return=/dashboard">Log in</a><a class="start" href="/#publish">Start free</a></div>
+</div></header>
 
-  <!-- ─── Header ─── -->
-  <header class="w-full px-6 h-14 flex items-center justify-between max-w-5xl mx-auto">
-    <a href="/" class="text-base font-semibold tracking-tight text-aired-text-primary hover:text-white transition-colors duration-150">aired</a>
-    <nav class="flex items-center gap-5 text-sm text-aired-text-secondary">
-      <a href="/docs" class="text-aired-text-primary transition-colors duration-150">Docs</a>
-      <a href="/llms.txt" class="hover:text-aired-text-primary transition-colors duration-150 font-mono">llms.txt</a>
-      <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener"
-         class="flex items-center gap-1.5 hover:text-aired-text-primary transition-colors duration-150">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-        GitHub
-      </a>
-    </nav>
-  </header>
+<main class="wrap">
+  <section class="ptop">
+    <p class="eyebrow">Docs</p>
+    <h1>Publish from your agent, terminal or code</h1>
+    <p class="lede">Most people never need this page: <a href="/#publish">paste or drop the HTML on the homepage</a> and send the link. These docs are for publishing from Claude Code, Cursor, scripts and CI. Every path is free and needs no account. Source is on <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a>.</p>
+    <div class="gcards docs-paths">
+      <a class="gcard" href="#skill"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.3L12 16.8l-6.2 4.4 2.4-7.3L2 9.4h7.6z"/></svg></span><b>Skill</b><span>For Claude Code, Cursor, Windsurf and Codex. Your agent learns to publish.</span><em class="mono">npx skills add progrmoiz/aired -g</em></a>
+      <a class="gcard" href="#cli"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 17 6-5-6-5M12 19h8"/></svg></span><b>CLI</b><span>Publish a file or a whole folder from your terminal.</span><em class="mono">npx aired page.html</em></a>
+      <a class="gcard" href="#mcp"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 9h8M8 13h5"/></svg></span><b>MCP server</b><span>Give any MCP client a publish_html tool.</span><em class="mono">aired.sh/mcp</em></a>
+      <a class="gcard" href="#api"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-4 3 4 3M16 9l4 3-4 3M14 5l-4 14"/></svg></span><b>HTTP API</b><span>POST the HTML, get a link back. No key needed.</span><em class="mono">POST /api/publish</em></a>
+    </div>
+  </section>
 
-  <!-- ─── Layout: TOC + content ─── -->
-  <div class="flex-1 w-full max-w-5xl mx-auto px-6 mt-8 mb-20 grid grid-cols-1 md:grid-cols-[200px_1fr] gap-10">
-
-    <!-- TOC -->
-    <aside class="toc md:sticky md:top-6 md:self-start hidden md:block">
-      <div class="text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider mb-2 px-2">Install</div>
+  <div class="doc-grid">
+    <aside class="toc" aria-label="On this page">
+      <p>Install</p>
       <a href="#skill">Skill</a>
       <a href="#cli">CLI</a>
       <a href="#mcp">MCP server</a>
       <a href="#api">HTTP API</a>
-      <div class="text-2xs font-medium text-aired-text-tertiary uppercase tracking-wider mt-5 mb-2 px-2">Reference</div>
+      <p>Reference</p>
       <a href="#endpoints">Endpoints</a>
       <a href="#auth">Auth</a>
       <a href="#errors">Errors</a>
@@ -203,20 +58,13 @@
       <a href="#agents">Agent surfaces</a>
       <a href="#self-host">Self-hosting</a>
     </aside>
-
-    <!-- Content -->
-    <main class="doc-prose">
-      <h1 class="text-xl font-medium tracking-tight text-aired-text-primary">Docs</h1>
-      <p>Install aired four ways. All paths are no-auth and free. Source on <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a>.</p>
+    <article class="prose">
 
       <!-- ─── Skill ─── -->
       <section id="skill">
         <h2>Skill</h2>
         <p>Adds a <code>SKILL.md</code> to your project so any AI agent (Claude Code, Cursor, Windsurf, Codex) discovers and uses aired automatically. This is the recommended path.</p>
-        <div class="flex items-center justify-between bg-aired-surface border border-aired-border rounded-sm px-3 py-2.5 mt-3">
-          <code class="font-mono text-sm text-aired-accent select-all">npx skills add progrmoiz/aired -g</code>
-          <button type="button" class="copy-snippet copy-btn flex-shrink-0 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy="npx skills add progrmoiz/aired -g">Copy</button>
-        </div>
+        <div class="snip"><code>npx skills add progrmoiz/aired -g</code><button type="button" class="btn sm copy-snippet" data-copy="npx skills add progrmoiz/aired -g">Copy</button></div>
         <ul>
           <li><code>-g</code> installs the skill user-globally (under <code>~/&lt;agent&gt;/skills/</code>) so it works across all projects.</li>
           <li>The skills CLI auto-detects which agent is running it and targets that agent.</li>
@@ -228,12 +76,9 @@
       <section id="cli">
         <h2>CLI</h2>
         <p>Publishes a file or directory and prints the URL. Inlines CSS, JS, and images automatically. Pipe-friendly.</p>
-        <div class="flex items-center justify-between bg-aired-surface border border-aired-border rounded-sm px-3 py-2.5 mt-3">
-          <code class="font-mono text-sm text-aired-accent select-all">npx aired dashboard.html</code>
-          <button type="button" class="copy-snippet copy-btn flex-shrink-0 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy="npx aired dashboard.html">Copy</button>
-        </div>
+        <div class="snip"><code>npx aired dashboard.html</code><button type="button" class="btn sm copy-snippet" data-copy="npx aired dashboard.html">Copy</button></div>
         <h3>Common flags</h3>
-        <table>
+        <div class="table-wrap"><table>
           <thead><tr><th>Flag</th><th>Effect</th></tr></thead>
           <tbody>
             <tr><td><code>--ttl &lt;dur&gt;</code></td><td>Expiry: <code>1h</code>, <code>24h</code>, <code>7d</code>, <code>30d</code></td></tr>
@@ -243,9 +88,9 @@
             <tr><td><code>--reads &lt;n&gt;</code></td><td>Stop opening after N views</td></tr>
             <tr><td><code>--json</code></td><td>Print <code>{ url, update_token, expiresAt }</code></td></tr>
           </tbody>
-        </table>
+        </table></div>
         <h3>Other commands</h3>
-        <table>
+        <div class="table-wrap"><table>
           <thead><tr><th>Command</th><th>Description</th></tr></thead>
           <tbody>
             <tr><td><code>aired ./dir/</code></td><td>Bundle a directory into one HTML</td></tr>
@@ -256,7 +101,7 @@
             <tr><td><code>aired tokens prune</code></td><td>Drop tokens for expired pages</td></tr>
             <tr><td><code>aired doctor</code></td><td>Diagnostics (Node.js, API reachability, token store)</td></tr>
           </tbody>
-        </table>
+        </table></div>
         <p>The CLI persists update tokens locally via <a href="https://www.npmjs.com/package/conf" target="_blank" rel="noopener">conf</a>. On macOS that lands in <code>~/Library/Preferences/aired-nodejs/</code>; on Linux <code>~/.config/aired-nodejs/</code>.</p>
       </section>
 
@@ -266,10 +111,7 @@
         <p>Streamable HTTP at <code>https://aired.sh/mcp</code>. Exposes a <code>publish_html</code> tool — your AI publishes artifacts directly through the MCP transport.</p>
 
         <h3>Claude Code</h3>
-        <div class="flex items-center justify-between bg-aired-surface border border-aired-border rounded-sm px-3 py-2.5 mt-2">
-          <code class="font-mono text-sm text-aired-accent select-all truncate">claude mcp add aired --transport http https://aired.sh/mcp</code>
-          <button type="button" class="copy-snippet copy-btn flex-shrink-0 ml-2 px-2 py-0.5 text-2xs text-aired-text-tertiary border border-aired-border rounded-sm focus-ring" data-copy="claude mcp add aired --transport http https://aired.sh/mcp">Copy</button>
-        </div>
+        <div class="snip"><code>claude mcp add aired --transport http https://aired.sh/mcp</code><button type="button" class="btn sm copy-snippet" data-copy="claude mcp add aired --transport http https://aired.sh/mcp">Copy</button></div>
 
         <h3>Cursor &middot; <code>.cursor/mcp.json</code></h3>
 <pre><code>{
@@ -337,7 +179,7 @@ url = "https://aired.sh/mcp"</code></pre>
       <!-- ─── Endpoints ─── -->
       <section id="endpoints">
         <h2>Endpoints</h2>
-        <table>
+        <div class="table-wrap"><table>
           <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
           <tbody>
             <tr><td><code>POST</code></td><td><code>/api/publish</code></td><td>Create a page. Returns <code>{ id, url, update_token, expiresAt }</code>. Also updates if <code>id</code> + <code>update_token</code> are in the body.</td></tr>
@@ -345,12 +187,12 @@ url = "https://aired.sh/mcp"</code></pre>
             <tr><td><code>DELETE</code></td><td><code>/api/pages/:id</code></td><td>Delete by <code>Authorization: Bearer &lt;token&gt;</code> header.</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/pages/:id</code></td><td>Public metadata: <code>{ id, title, size, readCount, expiresAt }</code>. No auth.</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/stats</code></td><td>Aggregate counts: publishes, views and views per country. No page titles.</td></tr>
-            <tr><td><code>POST</code></td><td><code>/api/report</code></td><td>Body <code>{ id, category?, reason, contact? }</code>. <code>id</code> is a page ID or URL; <code>category</code> is one of <code>spam</code>, <code>phishing</code>, <code>malware</code>, <code>illegal</code>, <code>other</code>. Flags a page for abuse review. Or use the <a href="/abuse" class="underline">report form</a>.</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/report</code></td><td>Body <code>{ id, category?, reason, contact? }</code>. <code>id</code> is a page ID or URL; <code>category</code> is one of <code>spam</code>, <code>phishing</code>, <code>malware</code>, <code>illegal</code>, <code>other</code>. Flags a page for abuse review. Or use the <a href="/abuse">report form</a>.</td></tr>
             <tr><td><code>GET</code></td><td><code>/og/:id</code></td><td>Generated Open Graph image for the page.</td></tr>
             <tr><td><code>GET</code></td><td><code>/p/:id</code></td><td>Public viewer for a published page.</td></tr>
             <tr><td><code>POST</code></td><td><code>/p/:id/verify-pin</code></td><td>Submit a PIN to view a protected page.</td></tr>
           </tbody>
-        </table>
+        </table></div>
 
         <h3>Request body — <code>POST /api/publish</code></h3>
 <pre><code>{
@@ -401,7 +243,7 @@ url = "https://aired.sh/mcp"</code></pre>
       <section id="errors">
         <h2>Errors</h2>
         <p>All errors are JSON: <code>{ "error": "&lt;message&gt;" }</code>.</p>
-        <table>
+        <div class="table-wrap"><table>
           <thead><tr><th>Status</th><th>When</th></tr></thead>
           <tbody>
             <tr><td><code>400</code></td><td>Invalid JSON body, missing <code>html</code>, validation failed.</td></tr>
@@ -412,7 +254,7 @@ url = "https://aired.sh/mcp"</code></pre>
             <tr><td><code>429</code></td><td>Rate limit: 5 publishes an hour per IP, or 30 an hour when signed in.</td></tr>
             <tr><td><code>503</code></td><td>Storage write limit reached. Retry shortly.</td></tr>
           </tbody>
-        </table>
+        </table></div>
       </section>
 
       <!-- ─── PIN flow ─── -->
@@ -429,14 +271,14 @@ url = "https://aired.sh/mcp"</code></pre>
       <!-- ─── Limits ─── -->
       <section id="limits">
         <h2>Limits</h2>
-        <table>
+        <div class="table-wrap"><table>
           <tbody>
             <tr><td>Max artifact size</td><td>2 MB</td></tr>
             <tr><td>Publishes per hour per IP</td><td>5</td></tr>
             <tr><td>Default TTL</td><td>7 days</td></tr>
             <tr><td>Max TTL</td><td>permanent</td></tr>
           </tbody>
-        </table>
+        </table></div>
         <p>Need more? aired is open source — run your own.</p>
       </section>
 
@@ -457,44 +299,23 @@ url = "https://aired.sh/mcp"</code></pre>
         <h2>Agent surfaces</h2>
         <p>For agents that want context before acting:</p>
         <ul>
-          <li><a href="/llms.txt" class="font-mono">/llms.txt</a> — concise agent context</li>
-          <li><a href="/llms-full.txt" class="font-mono">/llms-full.txt</a> — expanded reference with examples</li>
-          <li><a href="/index.md" class="font-mono">/index.md</a> — markdown homepage</li>
-          <li><a href="/.well-known/agent.json" class="font-mono">/.well-known/agent.json</a> — agent discovery manifest</li>
-          <li><a href="/.well-known/ai-plugin.json" class="font-mono">/.well-known/ai-plugin.json</a> — OpenAI plugin manifest</li>
-          <li><a href="/mcp" class="font-mono">/mcp</a> — MCP streamable HTTP endpoint</li>
+          <li><a href="/llms.txt" class="mono">/llms.txt</a> — concise agent context</li>
+          <li><a href="/llms-full.txt" class="mono">/llms-full.txt</a> — expanded reference with examples</li>
+          <li><a href="/index.md" class="mono">/index.md</a> — markdown homepage</li>
+          <li><a href="/.well-known/agent.json" class="mono">/.well-known/agent.json</a> — agent discovery manifest</li>
+          <li><a href="/.well-known/ai-plugin.json" class="mono">/.well-known/ai-plugin.json</a> — OpenAI plugin manifest</li>
+          <li><a href="/mcp" class="mono">/mcp</a> — MCP streamable HTTP endpoint</li>
         </ul>
       </section>
 
-    </main>
+    </article>
   </div>
+</main>
 
-  <!-- ─── Footer ─── -->
-  <footer class="w-full max-w-5xl mx-auto px-6 py-8 border-t border-aired-border">
-    <nav aria-label="Guides" class="mb-4 flex flex-wrap justify-center sm:justify-start gap-x-4 gap-y-1 text-2xs">
-      <a href="/html-to-link" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">HTML to link</a>
-      <a href="/share-claude-artifacts" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Share Claude artifacts</a>
-      <a href="/share-chatgpt-html" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Share ChatGPT HTML</a>
-      <a href="/password-protect-html" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Password-protect HTML</a>
-      <a href="/share-html-privately" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Share HTML privately</a>
-      <a href="/share-html-with-client" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Send HTML to a client</a>
-      <a href="/tiiny-host-alternative" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Tiiny Host alternative</a>
-      <a href="/docs" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Docs</a>
-    </nav>
-    <div class="flex flex-col sm:flex-row items-center justify-between gap-2 text-2xs text-aired-text-tertiary">
-      <p>Built by <a href="https://x.com/iammoizfarooq" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">@iammoizfarooq</a></p>
-      <div class="flex items-center gap-4">
-        <a href="/abuse" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Report abuse</a>
-        <a href="/terms" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Terms</a>
-        <a href="/privacy" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Privacy</a>
-        <a href="/refunds" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Refunds</a>
-        <a href="/llms.txt" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150 font-mono">llms.txt</a>
-        <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">GitHub</a>
-        <a href="https://workers.cloudflare.com" target="_blank" rel="noopener" class="text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150">Cloudflare</a>
-      </div>
-    </div>
-  </footer>
-
+<footer><div class="wrap">
+  <span>aired</span>
+  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
+</div></footer>
   <script>
     // ── Code-block enhancements: detect language, highlight, add copy button ──
     (function () {
@@ -648,7 +469,7 @@ url = "https://aired.sh/mcp"</code></pre>
         var text = btn.getAttribute("data-copy");
         if (!text) return;
         navigator.clipboard.writeText(text).then(function () {
-          btn.textContent = "Copied!";
+          btn.textContent = "Copied";
           btn.classList.add("copied");
           setTimeout(function () {
             btn.textContent = "Copy";
@@ -657,26 +478,7 @@ url = "https://aired.sh/mcp"</code></pre>
         });
       });
     });
-
-    // TOC active-section highlight
-    (function () {
-      var links = document.querySelectorAll(".toc a");
-      var sections = Array.from(links).map(function (a) {
-        var id = a.getAttribute("href").slice(1);
-        return { id: id, el: document.getElementById(id), link: a };
-      }).filter(function (s) { return s.el; });
-
-      function update() {
-        var top = window.scrollY + 100;
-        var current = sections[0];
-        for (var i = 0; i < sections.length; i++) {
-          if (sections[i].el.offsetTop <= top) current = sections[i];
-        }
-        sections.forEach(function (s) { s.link.classList.toggle("active", s === current); });
-      }
-      window.addEventListener("scroll", update, { passive: true });
-      update();
-    })();
   </script>
+<script src="/app.js"></script>
 </body>
 </html>

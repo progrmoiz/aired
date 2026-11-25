@@ -1,17 +1,17 @@
 # aired Design System
 
-*Version 2.0 — 2026-11-25*
+*Version 2.1 — 2026-11-25*
 
 The single reference for building any UI in aired. Read before writing any component, page, or layout. Updated when patterns evolve.
 
-**Stack:** pnpm monorepo. Web app is vanilla HTML + JS (`apps/web/`). Tool pages (dashboard, docs, guides, abuse) use Tailwind 3 utilities against the tokens in `tailwind.config.js`. Marketing pages (homepage, `/pricing`) use plain CSS in `apps/web/site.css` with the same tokens as CSS variables. No React, no shadcn.
+**Stack:** pnpm monorepo. Web app is vanilla HTML + JS (`apps/web/`). Every page (homepage, pricing, guides, docs, dashboard, claim, abuse, legal, 404) uses plain CSS in `apps/web/site.css`, with the tokens from `tailwind.config.js` as CSS variables. No page loads the Tailwind build (`style.css`) any more. No React, no shadcn.
 **Icons:** Inline SVG, hand-picked. No library.
 **Fonts:** Inter (400, 500, 600), JetBrains Mono (400, 500). Both self-hosted from `apps/web/fonts/` (latin variable woff2, OFL).
 **Voice:** see §10 below
 **Audience:** Anyone who made a page with an AI tool and needs to send it: agency people sending client reports, makers sharing a game, developers whose agent publishes. Also developer mid-task. Pasted HTML from Claude, ran a script, generated an artifact — they want a shareable URL right now, then leaving in 30 seconds. Indie hackers shipping prototypes are a superset of the same need.
 **Brand keywords:** Instant. Trustworthy. Quiet.
 
-**Two surfaces:** *tool pages* follow the dense rules below (14px body, 24px max heading). *Marketing pages* (homepage, `/pricing`) are allowed larger type and standard landing-page blocks so aired reads as a product people pay for. See §9.2.
+**One surface:** every page uses the wide marketing layout (1120px `.wrap`, shared header and footer) so the site reads as one product people pay for. Reading pages (guides, docs) use 15px body in a 720px column. The dense 14px rules below still apply inside controls: form options, chips, captions. See §9.2 and §9.3.
 
 ---
 
@@ -240,6 +240,8 @@ Appears after successful publish.
 
 ### 8.7 Empty / error inline messaging
 
+One exception: the dashboard with no pages shows a panel with three steps and an example of two page rows (dashed border, labelled "Example"), because the people who pay are not developers and need to see what the list will hold. Everywhere else:
+
 No decorative empty-state cards — no illustrations, no big "Get started" panels, no celebratory copy. A single inline factual line is allowed (and required) when the user lands somewhere with no data and no obvious path forward. Treat it like a CLI: an empty list prints nothing if the next step is implied, or one line if it isn't.
 
 **Empty state (when shown at all):**
@@ -270,7 +272,19 @@ Wide layout, max-width 1120px, built from standard landing-page blocks in `apps/
 - Cards: 16px radius, `1px solid rgba(255,255,255,.08)`, inset top glow `0 -20px 80px -20px rgba(255,255,255,.07)`
 - Features that don't exist yet are labelled "soon"; plans that aren't open show "Coming soon" instead of a buy button
 
-### 9.1 Single-page tool layout
+### 9.3 Inner pages (guides, docs, dashboard, claim, abuse, 404)
+
+Built from the shared kit at the end of `site.css`. Same header, footer, cards and buttons as the homepage.
+
+- **Guides:** hero with breadcrumb, H1, lede and the homepage publish form on the left; on the right "What they open" (an example page, a PIN screen or a comparison) and three ticks. Below: sticky "On this page" contents (hidden under 900px), the article in `.prose`, the first how-to list as numbered step cards (`ol.steps`), the FAQ as the homepage accordion (same text as the FAQPage JSON-LD), and cards for the other guides.
+- **Docs:** eyebrow + H1 + four path cards (Skill, CLI, MCP, API), then contents + `.prose` with code blocks and `.snip` copy rows. Developer detail lives here, one click from every page.
+- **Dashboard:** "Your pages" heading with a light Publish button; claim banner and plan strip as `.panel.strip` cards (icon, two lines, buttons); one card per project. Each page row says its facts in words as chips: views, "Expires in 5 days" / "Never expires", "Needs a PIN" / "Anyone with the link", "Stops after 20 views · 14 left" / "No view limit", size.
+- **Claim, abuse, 404:** `.duo` two columns: the task on the left in a `.panel`, context on the right (where the page goes, what happens next, popular guides).
+- Buttons are `.btn` (secondary), `.btn.solid` (the one primary action), `.btn.ghost`, `.btn.sm`. Fields are `.field` inside `.fl` labels.
+
+### 9.1 Single-page tool layout (retired)
+
+No page uses this any more; kept for history.
 
 Vertical stack, max-width 640px, centered. Sections separated by 40-48px.
 
@@ -352,5 +366,6 @@ Append-only record of design decisions. One line per entry. Append on every nota
 2026-05-10 — Empty-state rule softened: one inline factual line allowed (required) when user has no breadcrumb to the next action; decorative cards still forbidden. Dashboard 0-pages state is the canonical example.
 2026-11-25 — Live numbers: count up on view, static charts on the totals, the top three countries from /api/stats with SVG flags from flag-icons (images, not emoji, so they render on Windows).
 2026-11-25 — Homepage and /pricing rebuilt as marketing pages (site.css): wide layout, bento and feature grids, plan cards, logo-wall CTA. Primary button is now light; purple limited to the mark, focus and eyebrows. Text tokens raised for contrast (secondary #a1a1a6, tertiary #84848a). Globe and live title ticker removed.
+2026-11-25 — Remaining narrow pages moved to the wide layout: 7 guides, docs, dashboard, claim, abuse, 404. Shared kit in site.css (.btn, .panel, .field, .prose, .toc, ol.steps, .gcard, .strip, .chip, .duo). Dashboard v2: plain-language chips per page, project cards, empty state with an example (exception to §8.7). Tailwind build no longer loaded. Homepage `.v` timeline rules scoped to `.vers` so they stop hitting `.row .v`.
 2026-11-21 — Guide pages added (/html-to-link, /share-claude-artifacts, /tiiny-host-alternative). They reuse the homepage form and tokens, keep 14px body and 18px h2, and exist for search traffic from non-technical visitors. Homepage H1 and button now use font-medium and "Publish" per §3 and §8.1.
 ```

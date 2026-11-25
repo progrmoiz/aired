@@ -4,18 +4,80 @@
   'use strict';
 
   var UNSORTED_KEY = '__unsorted__';
-  var UNSORTED_LABEL = 'Unsorted';
+  var UNSORTED_LABEL = 'Not in a project';
 
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  var ICONS = {
+    doc: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
+    lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+    eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+    size: '<path d="M4 7h16M4 12h16M4 17h10"/>',
+    stop: '<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>',
+    folder: '<path d="M3 7h6l2 2h10v10H3z"/>',
+    chev: '<path d="m9 6 6 6-6 6"/>',
+  };
+
+  // Icons are fixed strings from ICONS, never page data.
+  function icon(name) {
+    var svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '1.8');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.innerHTML = ICONS[name];
+    return svg;
+  }
+
+  function plural(n, word) {
+    return n + ' ' + word + (n === 1 ? '' : 's');
+  }
+
+  // "Published 3 days ago"
   function relativeAge(isoString) {
     if (!isoString) return '';
-    var now = Date.now();
-    var then = new Date(isoString).getTime();
-    var diff = Math.floor((now - then) / 1000);
-    if (diff < 60) return diff + 's ago';
-    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-    if (diff < 86400 * 30) return Math.floor(diff / 86400) + 'd ago';
-    return Math.floor(diff / (86400 * 30)) + 'mo ago';
+    var diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
+    if (isNaN(diff)) return '';
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return plural(Math.floor(diff / 60), 'minute') + ' ago';
+    if (diff < 86400) return plural(Math.floor(diff / 3600), 'hour') + ' ago';
+    if (diff < 86400 * 30) return plural(Math.floor(diff / 86400), 'day') + ' ago';
+    if (diff < 86400 * 365) return plural(Math.floor(diff / (86400 * 30)), 'month') + ' ago';
+    return plural(Math.floor(diff / (86400 * 365)), 'year') + ' ago';
+  }
+
+  // How long the page stays up, in words. Returns { text, tone, title }.
+  function expiryWords(page) {
+    if (page.permanent || !page.expiresAt) return { text: 'Never expires', tone: 'good', title: '' };
+    var at = new Date(page.expiresAt);
+    var left = Math.floor((at.getTime() - Date.now()) / 1000);
+    var title = isNaN(at.getTime()) ? '' : 'Expires ' + at.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    if (isNaN(left)) return { text: 'Expires soon', tone: '', title: '' };
+    if (left <= 0) return { text: 'Expired', tone: 'soon', title: title };
+    if (left < 3600) return { text: 'Expires in ' + plural(Math.max(1, Math.floor(left / 60)), 'minute'), tone: 'soon', title: title };
+    if (left < 86400) return { text: 'Expires in ' + plural(Math.floor(left / 3600), 'hour'), tone: 'soon', title: title };
+    if (left < 86400 * 14) return { text: 'Expires in ' + plural(Math.round(left / 86400), 'day'), tone: '', title: title };
+    return { text: 'Expires ' + at.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }), tone: '', title: title };
+  }
+
+  function sizeWords(bytes) {
+    if (typeof bytes !== 'number' || bytes < 0) return '';
+    if (bytes < 1024) return 'Under 1 KB';
+    if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, '') + ' MB';
+  }
+
+  function chip(iconName, text, tone, title) {
+    var el = document.createElement('span');
+    el.className = 'chip' + (tone ? ' ' + tone : '');
+    el.appendChild(icon(iconName));
+    el.appendChild(document.createTextNode(text));
+    if (title) el.title = title;
+    return el;
   }
 
   function announce(message) {
@@ -29,64 +91,74 @@
   // successful delete so the enclosing group can update its count / prune itself.
   function renderRow(page, onRemoved) {
     var li = document.createElement('li');
-    li.className = 'flex items-center gap-3 min-h-[44px] py-3';
+    li.className = 'prow';
     li.setAttribute('data-page-id', page.id);
 
+    var thumb = document.createElement('span');
+    thumb.className = 'thumb';
+    thumb.appendChild(icon(page.hasPin ? 'lock' : 'doc'));
+
     var info = document.createElement('div');
-    info.className = 'flex-1 min-w-0';
+    info.style.minWidth = '0';
 
     var titleLink = document.createElement('a');
-    titleLink.className = 'row-link block text-sm text-aired-text-primary truncate focus-ring rounded-sm';
+    titleLink.className = 'ttl focus-ring';
     titleLink.href = '/p/' + page.id;
     titleLink.target = '_blank';
     titleLink.rel = 'noopener noreferrer';
-    titleLink.textContent = page.title || page.id;
+    titleLink.textContent = page.title || 'Untitled page';
 
-    var metaEl = document.createElement('div');
-    metaEl.className = 'flex items-center gap-2 mt-0.5';
-
-    var idSpan = document.createElement('span');
-    idSpan.className = 'font-mono text-xs text-aired-text-tertiary';
-    idSpan.textContent = page.id;
-    metaEl.appendChild(idSpan);
-
+    var metaEl = document.createElement('p');
+    metaEl.className = 'sub';
+    var urlSpan = document.createElement('span');
+    urlSpan.className = 'mono';
+    urlSpan.textContent = window.location.host + '/p/' + page.id;
+    metaEl.appendChild(urlSpan);
     if (page.createdAt) {
-      var dot = document.createElement('span');
-      dot.className = 'text-aired-text-tertiary';
-      dot.textContent = '·';
-      dot.setAttribute('aria-hidden', 'true');
-      metaEl.appendChild(dot);
-
-      var ageSpan = document.createElement('span');
-      ageSpan.className = 'text-xs text-aired-text-tertiary';
-      ageSpan.textContent = relativeAge(page.createdAt);
-      metaEl.appendChild(ageSpan);
+      var age = relativeAge(page.createdAt);
+      if (age) metaEl.appendChild(document.createTextNode(' · Published ' + age));
     }
+
+    // Plain-language facts: views, expiry, who can open it, view limit, size.
+    var chips = document.createElement('div');
+    chips.className = 'chips';
+    var viewCount = typeof page.readCount === 'number' ? page.readCount : 0;
+    chips.appendChild(chip('eye', plural(viewCount, 'view')));
+    var exp = expiryWords(page);
+    chips.appendChild(chip('clock', exp.text, exp.tone, exp.title));
+    chips.appendChild(page.hasPin ? chip('lock', 'Needs a PIN') : chip('globe', 'Anyone with the link'));
+    if (typeof page.reads === 'number' && page.reads > 0) {
+      var left = Math.max(0, page.reads - viewCount);
+      chips.appendChild(chip('stop', 'Stops after ' + plural(page.reads, 'view') + ' · ' + left + ' left', left <= Math.max(1, Math.ceil(page.reads * 0.1)) ? 'soon' : ''));
+    } else {
+      chips.appendChild(chip('stop', 'No view limit'));
+    }
+    var size = sizeWords(page.size);
+    if (size) chips.appendChild(chip('size', size));
 
     info.appendChild(titleLink);
     info.appendChild(metaEl);
+    info.appendChild(chips);
 
-    var viewsEl = document.createElement('span');
-    viewsEl.className = 'text-xs text-aired-text-tertiary tabular-nums flex-shrink-0';
-    var viewCount = typeof page.readCount === 'number' ? page.readCount : 0;
-    viewsEl.textContent = viewCount + (viewCount === 1 ? ' view' : ' views');
+    var acts = document.createElement('div');
+    acts.className = 'acts';
 
     var copyBtn = document.createElement('button');
     copyBtn.type = 'button';
-    var copyBaseClass = 'row-action-btn flex-shrink-0 text-xs text-aired-text-tertiary hover:text-aired-text-primary focus-ring rounded-sm border border-transparent px-1.5 py-1';
+    var copyBaseClass = 'btn sm';
     copyBtn.className = copyBaseClass;
-    copyBtn.setAttribute('aria-label', 'Copy page URL');
-    copyBtn.textContent = 'Copy';
+    copyBtn.setAttribute('aria-label', 'Copy link to ' + (page.title || page.id));
+    copyBtn.textContent = 'Copy link';
 
     var copyTimer = null;
     function setCopied() {
-      copyBtn.className = copyBaseClass + ' row-action-copied';
+      copyBtn.className = copyBaseClass + ' copied';
       copyBtn.textContent = 'Copied';
       announce('Copied');
       if (copyTimer) clearTimeout(copyTimer);
       copyTimer = setTimeout(function () {
         copyBtn.className = copyBaseClass;
-        copyBtn.textContent = 'Copy';
+        copyBtn.textContent = 'Copy link';
       }, 1800);
     }
 
@@ -112,9 +184,9 @@
 
     var deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
-    var deleteBaseClass = 'row-action-btn flex-shrink-0 text-xs text-aired-text-tertiary hover:text-aired-text-primary focus-ring rounded-sm border border-transparent px-1.5 py-1';
+    var deleteBaseClass = 'btn sm ghost';
     deleteBtn.className = deleteBaseClass;
-    deleteBtn.setAttribute('aria-label', 'Delete page');
+    deleteBtn.setAttribute('aria-label', 'Delete ' + (page.title || page.id));
     deleteBtn.textContent = 'Delete';
 
     var deleteTimer = null;
@@ -131,15 +203,15 @@
     deleteBtn.addEventListener('click', function () {
       if (deleteState === 'idle') {
         deleteState = 'confirm';
-        deleteBtn.textContent = 'Confirm delete';
-        deleteBtn.className = deleteBaseClass + ' row-action-confirm';
+        deleteBtn.textContent = 'Click to confirm';
+        deleteBtn.className = 'btn sm confirm';
         deleteTimer = setTimeout(revertDelete, 3000);
       } else if (deleteState === 'confirm') {
         if (deleteTimer) { clearTimeout(deleteTimer); deleteTimer = null; }
         deleteState = 'deleting';
         deleteBtn.disabled = true;
         deleteBtn.textContent = 'Deleting…';
-        deleteBtn.className = deleteBaseClass + ' opacity-50 cursor-not-allowed';
+        deleteBtn.className = 'btn sm confirm';
 
         fetch('/api/pages/' + page.id, {
           method: 'DELETE',
@@ -158,10 +230,12 @@
       }
     });
 
+    acts.appendChild(copyBtn);
+    acts.appendChild(deleteBtn);
+
+    li.appendChild(thumb);
     li.appendChild(info);
-    li.appendChild(viewsEl);
-    li.appendChild(copyBtn);
-    li.appendChild(deleteBtn);
+    li.appendChild(acts);
 
     return li;
   }
@@ -185,11 +259,11 @@
     var countEl = document.getElementById('page-count');
     if (countEl) {
       if (currentPageCount === null) {
-        countEl.innerHTML = '&nbsp;';
+        countEl.textContent = '';
       } else {
-        var pageLabel = currentPageCount + ' page' + (currentPageCount === 1 ? '' : 's');
+        var pageLabel = ' · ' + plural(currentPageCount, 'page');
         if (projectCount > 0) {
-          pageLabel += ' · ' + projectCount + ' project' + (projectCount === 1 ? '' : 's');
+          pageLabel += ' in ' + plural(projectCount, 'project');
         }
         countEl.textContent = pageLabel;
       }
@@ -197,7 +271,7 @@
 
     var heroPublish = document.getElementById('hero-publish');
     if (heroPublish && currentPageCount !== null) {
-      heroPublish.textContent = currentPageCount === 0 ? 'Publish your first →' : 'Publish another →';
+      heroPublish.textContent = currentPageCount === 0 ? 'Publish a page' : 'Publish another';
     }
 
     var emptyState = document.getElementById('empty-state');
@@ -228,7 +302,7 @@
     var labelId = ulId + '-label';
 
     var section = document.createElement('section');
-    section.className = 'project-group border-b border-aired-border';
+    section.className = 'project-group panel pgroup';
     section.setAttribute('data-project', group.key);
     // Give the section an accessible name so it's a meaningful landmark, not a
     // generic unlabeled region.
@@ -236,31 +310,34 @@
 
     var header = document.createElement('button');
     header.type = 'button';
-    header.className = 'group-header w-full flex items-center gap-2 min-h-[44px] py-3 px-2 -mx-2 text-left rounded-sm focus-ring text-sm text-aired-text-primary hover:bg-aired-surface-hover active:bg-aired-border transition-colors duration-150';
+    header.className = 'group-header ghead';
     header.setAttribute('aria-expanded', 'false');
     header.setAttribute('aria-controls', ulId);
 
-    var chevron = document.createElement('span');
-    chevron.className = 'group-chevron text-aired-text-tertiary flex-shrink-0';
-    chevron.setAttribute('aria-hidden', 'true');
-    chevron.textContent = '›';
+    var chevron = icon('chev');
+    chevron.setAttribute('class', 'chev');
+
+    var gic = document.createElement('span');
+    gic.className = 'gic';
+    gic.appendChild(icon(group.key === UNSORTED_KEY ? 'doc' : 'folder'));
 
     var nameEl = document.createElement('span');
     nameEl.id = labelId;
-    nameEl.className = 'font-medium truncate';
+    nameEl.className = 'gname';
     nameEl.textContent = group.label;
 
     var countEl = document.createElement('span');
-    countEl.className = 'group-count ml-auto flex-shrink-0 text-xs text-aired-text-tertiary tabular-nums';
+    countEl.className = 'group-count gcount';
     countEl.textContent = String(group.count);
 
     header.appendChild(chevron);
+    header.appendChild(gic);
     header.appendChild(nameEl);
     header.appendChild(countEl);
 
     var ul = document.createElement('ul');
     ul.id = ulId;
-    ul.className = 'divide-y divide-aired-border pb-1';
+    ul.className = 'prows';
     ul.hidden = true;
 
     section.appendChild(header);
@@ -312,8 +389,8 @@
       var btn = document.createElement('button');
       btn.type = 'button';
       btn.setAttribute('data-load-more', ulId);
-      btn.className = 'mb-3 w-full text-xs text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150 focus-ring rounded-sm py-2';
-      btn.textContent = 'Load more';
+      btn.className = 'loadmore';
+      btn.textContent = 'Show more pages';
       btn.addEventListener('click', function () {
         btn.textContent = 'Loading…';
         btn.disabled = true;
@@ -321,7 +398,7 @@
           btn.remove();
           renderLoadMore();
         }).catch(function () {
-          btn.textContent = 'Load more';
+          btn.textContent = 'Show more pages';
           btn.disabled = false;
         });
       });
@@ -381,9 +458,9 @@
       // more pages remain) or from the first page (named groups, prefetched null).
       return loadPage(group.prefetched ? true : false).catch(function () {
         // Surface a minimal inline failure inside the group.
-        var p = document.createElement('p');
-        p.className = 'text-sm text-aired-text-secondary py-2';
-        p.textContent = 'Could not load.';
+        var p = document.createElement('li');
+        p.className = 'gnote';
+        p.textContent = 'Could not load these pages. Refresh to try again.';
         ul.appendChild(p);
       });
     }
@@ -417,15 +494,14 @@
 
     var wrap = document.createElement('div');
     wrap.id = 'load-error';
-    wrap.className = 'flex items-center justify-between py-3';
+    wrap.className = 'panel load-err';
 
     var msg = document.createElement('p');
-    msg.className = 'text-sm text-aired-text-secondary';
-    msg.textContent = 'Could not load.';
+    msg.textContent = 'Could not load your pages.';
 
     var retry = document.createElement('button');
     retry.type = 'button';
-    retry.className = 'text-xs text-aired-text-secondary hover:text-aired-text-primary transition-colors duration-150 focus-ring rounded-sm px-1.5 py-1';
+    retry.className = 'btn sm';
     retry.textContent = 'Retry';
     retry.addEventListener('click', function () {
       retry.disabled = true;
@@ -491,7 +567,7 @@
       if (unsortedRows.length > 0 || unsortedData.cursor) {
         renderGroup(container, {
           key: UNSORTED_KEY,
-          label: UNSORTED_LABEL,
+          label: projects.length ? UNSORTED_LABEL : 'All pages',
           count: unsortedRows.length,
           prefetched: unsortedRows,
           cursor: unsortedData.cursor || null,
@@ -506,8 +582,8 @@
   // ── Plan strip (shown only when billing is on) ──
   // Free → "Get Pro" (yearly checkout); Pro → renewal date + "Manage billing".
   // Plan state comes from /api/billing/status; only the webhook changes it.
-  var PRIMARY_BTN_CLASS = 'plan-btn plan-btn-primary flex-shrink-0 rounded px-3 py-2 text-sm font-medium bg-aired-text-primary text-aired-bg focus-ring';
-  var SECONDARY_BTN_CLASS = 'plan-btn flex-shrink-0 rounded px-3 py-2 text-sm border border-aired-border bg-aired-bg text-aired-text-secondary hover:text-aired-text-primary hover:border-aired-border-focus hover:bg-aired-surface-hover active:bg-aired-border focus-ring';
+  var PRIMARY_BTN_CLASS = 'btn solid sm';
+  var SECONDARY_BTN_CLASS = 'btn sm';
   var UPGRADE_POLL_MS = 2000;
   var UPGRADE_POLL_LIMIT_MS = 30000;
 
@@ -587,23 +663,24 @@
     var helper = '';
     if (status.plan === 'pro') {
       var date = formatDate(status.renewsAt);
-      label = 'Pro';
+      label = 'Pro plan';
       if (date) label += status.cancelAtPeriodEnd ? ' · ends ' + date : ' · renews ' + date;
       if (status.status === 'past_due') helper = 'Last payment failed. Update your card in billing';
       plan.mode = 'portal';
     } else if (status.status === 'past_due' || status.status === 'unpaid') {
       // Pro lapsed because a payment failed: the fix is the card, not a new checkout.
-      label = 'Free';
+      label = 'Free plan';
       helper = 'Your last payment failed. Update your card to get Pro back.';
       plan.mode = 'portal';
     } else {
-      label = 'Free';
-      helper = 'Pro: no aired badge, 10 MB pages, $108/year';
+      label = 'Free plan';
+      helper = 'Pro takes the aired badge off your pages and lets them be up to 10 MB. $108 a year.';
       plan.mode = 'checkout';
     }
 
     setText('plan-label', label);
     setText('plan-detail', detail !== undefined ? detail : helper);
+    strip.classList.toggle('is-pro', status.plan === 'pro');
     setPlanState('idle');
     strip.classList.remove('hidden');
   }
@@ -1058,8 +1135,10 @@
       return;
     }
 
-    var h1 = document.getElementById('user-handle');
-    if (h1) h1.textContent = '@' + user.login;
+    var handle = document.getElementById('user-handle');
+    if (handle) handle.textContent = 'Signed in as @' + user.login;
+    var who = document.getElementById('nav-who');
+    if (who) who.textContent = '@' + user.login;
 
     initPlan();
     initClaim();
