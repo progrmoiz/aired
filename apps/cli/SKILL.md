@@ -101,6 +101,7 @@ The MCP tool accepts `html` (string), `file_path` (STDIO only), `title`, `pin`, 
 - **Max file size is 2 MB.** The API rejects anything larger. For bigger artifacts, host them elsewhere.
 - **Directory bundling inlines images as base64.** This adds ~33% to image size. A directory with large images may exceed the 2 MB limit. The CLI warns if bundled size exceeds 2 MB.
 - **Directory requires index.html.** `npx aired ./dir/` looks for `index.html` in the directory root. No other entry point is supported.
+- **Vite and React builds load code later with `import()`, and directory bundling doesn't inline those chunks.** `npx aired ./dist` gives a blank page. Build one file with `vite-plugin-singlefile` (`build.assetsInlineLimit` high, output to `dist-single/`), switch any router to hash routing (the page lives at `/p/<id>`, not `/`), import large `public/` files so they get inlined, then publish `dist-single/index.html`. Toolcraft apps also need their lazy `import("./app-bootstrap")` made static. Full recipe: https://aired.sh/share-vite-app
 - **PIN is not encryption.** Content is stored in plaintext on R2. PIN just gates browser access. Don't use aired for sensitive data.
 - **Default expiry is 7 days.** Pages auto-delete unless `--permanent` is set. The TTL resets on update.
 

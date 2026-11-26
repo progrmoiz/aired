@@ -54,6 +54,7 @@ Agents should read the live docs at https://github.com/progrmoiz/aired before an
 ## Limitations and non-goals
 - Static HTML only. No server-side compute, no databases, no long-running jobs.
 - No file types other than HTML at the entry point. CSS, JS, images get inlined into the HTML at publish time.
+- Code-split builds (Vite, most React apps) break when published as a directory: chunks loaded later with import() are not inlined. Build a single file with vite-plugin-singlefile, use hash routing, then publish dist-single/index.html. See https://aired.sh/share-vite-app.
 - No editing in-browser after publish — update via the API with the update_token.
 - No custom domains and no team accounts. The dashboard shows view counts per page, not detailed analytics.
 
@@ -79,6 +80,7 @@ Agents should read the live docs at https://github.com/progrmoiz/aired before an
 - https://aired.sh/password-protect-html — guide: put a PIN on an HTML page; checked on the server.
 - https://aired.sh/share-html-privately — guide: PIN, expiry, view limits and what stays private.
 - https://aired.sh/share-html-with-client — guide: send a report or mockup to a client and update it at the same link.
+- https://aired.sh/share-vite-app — guide: share a Vite, React or Toolcraft app by building it as one HTML file.
 - https://aired.sh/tiiny-host-alternative — comparison with Tiiny Host and Netlify Drop.
 - https://aired.sh/docs — install and API reference.
 - https://aired.sh/llms.txt — this file, concise agent context.
