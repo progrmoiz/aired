@@ -21,3 +21,6 @@ docs/tmp/
 # [build] step on dev and deploy; never committed.
 apps/web/dashboard.html
 apps/web/dashboard-assets/
+
+# MCP registry publisher login tokens
+.mcpregistry_*

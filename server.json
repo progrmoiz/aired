@@ -1,0 +1,30 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.progrmoiz/aired",
+  "title": "aired",
+  "description": "Publish HTML to a shareable link. Reports, dashboards and pages from your AI tool, one URL.",
+  "version": "1.2.0",
+  "websiteUrl": "https://aired.sh",
+  "repository": {
+    "url": "https://github.com/progrmoiz/aired",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://aired.sh/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Optional: Bearer aired_sk_... API key, so pages belong to your account",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    },
+    {
+      "type": "streamable-http",
+      "url": "https://aired.sh/mcp/account"
+    }
+  ]
+}
