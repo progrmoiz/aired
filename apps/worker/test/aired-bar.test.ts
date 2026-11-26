@@ -61,9 +61,9 @@ test("badge shows by default and with badge: true", () => {
 });
 
 test("the badge, report link and OG image follow the deploy's origin", () => {
-  const out = injectAiredBar("<head></head><body></body>", { ...opts, origin: "https://staging.aired.sh" });
-  assert.ok(out.includes('href="https://staging.aired.sh/?ref=badge"'));
-  assert.ok(out.includes("https://staging.aired.sh/abuse?id=abc123"));
-  assert.ok(out.includes('content="https://staging.aired.sh/og/abc123"'));
+  const out = injectAiredBar("<head></head><body></body>", { ...opts, origin: "http://localhost:8787" });
+  assert.ok(out.includes('href="http://localhost:8787/?ref=badge"'));
+  assert.ok(out.includes("http://localhost:8787/abuse?id=abc123"));
+  assert.ok(out.includes('content="http://localhost:8787/og/abc123"'));
   assert.ok(!out.includes("https://aired.sh"));
 });

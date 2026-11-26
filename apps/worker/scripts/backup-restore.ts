@@ -4,15 +4,15 @@
  *
  *   node --experimental-strip-types scripts/backup-restore.ts <command> ...
  *
- *   status   --env staging|production
+ *   status
  *            Print state.json: the latest snapshot and how far it got.
- *   download --env staging|production --date YYYY-MM-DD --out <dir>
+ *   download --date YYYY-MM-DD --out <dir>
  *            Fetch that snapshot's manifest and every file in it.
  *   prepare  --dir <dir>
  *            Turn a downloaded snapshot into kv-bulk-<n>.json files (for
  *            `wrangler kv bulk put`) and d1-restore.sql (for `wrangler d1
  *            execute --file`), and print the commands to apply them.
- *   untrash  --env staging|production --id <pageId>
+ *   untrash  --id <pageId>
  *            Copy a page's files back from trash/ into the pages bucket.
  *
  * Nothing here writes to KV or D1: `prepare` prints the commands and you run
@@ -24,10 +24,8 @@ import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { d1RestoreSql, kvRestoreEntries, manifestKey, STATE_KEY, trashKey, type BackupFile, type KvEntry } from "../src/lib/backup.ts";
 
-const BUCKETS = {
-  production: { backup: "aired-backups", pages: "aired-pages", d1: "aired", wranglerEnv: [] as string[] },
-  staging: { backup: "aired-backups-staging", pages: "aired-pages-staging", d1: "aired-staging", wranglerEnv: ["--env", "staging"] },
-};
+/** Production is the only deploy (docs/deploy.md). */
+const BUCKETS = { backup: "aired-backups", pages: "aired-pages", d1: "aired" };
 
 /** `wrangler kv bulk put` takes up to 10,000 entries per file. */
 const KV_BULK_MAX = 10_000;
@@ -49,10 +47,6 @@ function die(msg: string): never {
   process.exit(1);
 }
 
-function env(name: string | undefined) {
-  if (name !== "staging" && name !== "production") die("--env must be staging or production");
-  return BUCKETS[name];
-}
 
 function wrangler(argv: string[]): void {
   execFileSync("npx", ["wrangler", ...argv], { stdio: ["ignore", "ignore", "inherit"] });
@@ -72,13 +66,13 @@ const command = process.argv[2];
 const a = args();
 
 if (command === "status") {
-  const e = env(a.env);
+  const e = BUCKETS;
   const file = join(mkdtempSync(join(tmpdir(), "aired-backup-")), STATE_KEY);
   if (!r2Get(e.backup, STATE_KEY, file)) die("no state.json yet: no snapshot has started");
   const s = JSON.parse(readFileSync(file, "utf8"));
   console.log(JSON.stringify({ id: s.id, startedAt: new Date(s.startedAt).toISOString(), finishedAt: s.finishedAt ? new Date(s.finishedAt).toISOString() : null, step: `${s.step}/${s.plan.length}`, files: s.files.length }, null, 2));
 } else if (command === "download") {
-  const e = env(a.env);
+  const e = BUCKETS;
   if (!a.date || !/^\d{4}-\d{2}-\d{2}$/.test(a.date)) die("--date YYYY-MM-DD is required");
   if (!a.out) die("--out <dir> is required");
   const manifestFile = join(a.out, "manifest.json");
@@ -106,11 +100,11 @@ if (command === "status") {
   const sqlFile = join(a.dir, "d1-restore.sql");
   writeFileSync(sqlFile, d1RestoreSql(d1Files));
   console.log(`Snapshot ${manifest.id}: ${entries.length} KV entries in ${bulk.length} file(s), ${d1Files.reduce((n, c) => n + c.rows.length, 0)} D1 rows.`);
-  console.log("\nTo apply (production shown; add --env staging for staging). Read docs/backups.md first:");
+  console.log("\nTo apply, after reading docs/backups.md (add --local instead of --remote to rehearse on a local copy):");
   for (const f of bulk) console.log(`  npx wrangler kv bulk put ${f} --binding PAGES_KV --remote`);
   console.log(`  npx wrangler d1 execute aired --remote --file ${sqlFile}`);
 } else if (command === "untrash") {
-  const e = env(a.env);
+  const e = BUCKETS;
   if (!a.id || !/^[A-Za-z0-9_-]{1,64}$/.test(a.id)) die("--id <pageId> is required");
   const dir = mkdtempSync(join(tmpdir(), "aired-untrash-"));
   let restored = 0;

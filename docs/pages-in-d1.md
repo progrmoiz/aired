@@ -42,6 +42,22 @@ The KV indexes and `page_claims` are still written, best-effort, so rolling
 back the code loses nothing. Nothing reads them for decisions. Retire them
 after a release with no rollback (see the end).
 
+## Rehearsal
+
+Done on staging on 2026-11-26, before staging was removed:
+- Pages were seeded through the old code: owned pages, anonymous pages,
+  claims, deletes, and a claimed page whose KV record was written back
+  stale.
+- The dry run counted them exactly. Applying it inserted every page, and a
+  second run inserted 0.
+- Dashboard lists and project counts were identical before and after.
+- 28 end-to-end checks passed: token, owner, claim, MCP, delete and
+  tombstone paths.
+
+To rehearse again without staging, run `pnpm dev` (local KV and D1), seed
+pages through the API, and use `--origin http://localhost:8787`. Set
+`ADMIN_TOKEN` in `.dev.vars` first.
+
 ## Rollout (production)
 
 Each step is safe to stop after.

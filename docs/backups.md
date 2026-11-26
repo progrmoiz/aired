@@ -28,10 +28,9 @@ the `stats:live` counter.
 
 ## Buckets
 
-| Env | Pages bucket | Backup bucket | D1 |
-|---|---|---|---|
-| production | `aired-pages` | `aired-backups` | `aired` |
-| staging | `aired-pages-staging` | `aired-backups-staging` | `aired-staging` |
+| Pages bucket | Backup bucket | D1 |
+|---|---|---|
+| `aired-pages` | `aired-backups` | `aired` |
 
 The Worker binds the backup bucket as `BACKUP_BUCKET`. Layout:
 
@@ -67,8 +66,8 @@ windows. Change both together.
 
 ## How the nightly snapshot runs
 
-- There's no separate trigger. Every cron run (every 5 minutes in
-  production, hourly on staging) does the expired-page sweep, then
+- There's no separate trigger. Every cron run (every 5 minutes) does the
+  expired-page sweep, then
   `runBackup`.
 - A new snapshot starts once per UTC day, on the first run at or after
   03:00 UTC.
@@ -84,7 +83,7 @@ windows. Change both together.
 Check the latest one:
 
 ```bash
-cd apps/worker && node --experimental-strip-types scripts/backup-restore.ts status --env production
+cd apps/worker && node --experimental-strip-types scripts/backup-restore.ts status
 ```
 
 ## The expired-page sweep can't lose a page
@@ -120,17 +119,19 @@ lost. It prints a bookmark you can restore to undo the restore:
 npx wrangler d1 time-travel restore aired --bookmark=<bookmark>
 ```
 
-Try it on staging first (`aired-staging`, `--env staging`).
+There is no staging copy to try it on. If in doubt, export the database
+first (`npx wrangler d1 export aired --remote --output aired.sql`).
 
 ## Restore steps
 
-Rehearse on staging before touching production. Every command below runs
-from `apps/worker`. Add `--env staging` to wrangler commands for staging.
+Every command below runs from `apps/worker`. Rehearse against local
+storage first: the same wrangler commands with `--local` instead of
+`--remote` write to `wrangler dev`'s local KV and D1.
 
 ### One page the sweep removed
 
 ```bash
-node --experimental-strip-types scripts/backup-restore.ts untrash --env production --id <pageId>
+node --experimental-strip-types scripts/backup-restore.ts untrash --id <pageId>
 ```
 
 That copies `index.html`, `shot.jpg` and `tile.jpg` back from `trash/`.
@@ -149,7 +150,7 @@ The page also needs to be live again in the record that decides it:
    you if you can't.
 2. Download the newest finished snapshot and prepare it:
    ```bash
-   node --experimental-strip-types scripts/backup-restore.ts download --env production --date 2026-11-27 --out ../../restore
+   node --experimental-strip-types scripts/backup-restore.ts download --date 2026-11-27 --out ../../restore
    ```
    ```bash
    node --experimental-strip-types scripts/backup-restore.ts prepare --dir ../../restore
@@ -185,8 +186,11 @@ Delete the restore folder when you're done. It holds account emails.
 
 ## Restore drill
 
-Once a month, on staging:
-1. `status --env staging`, to check a snapshot finished last night.
+Once a month, locally:
+1. `status`, to check a snapshot finished last night.
 2. `download` and `prepare` it.
-3. `wrangler d1 execute aired-staging --env staging --remote --file .../d1-restore.sql`.
-4. Check that the dashboard still lists the same pages.
+3. Load it into a local database:
+   `npx wrangler d1 migrations apply aired --local`, then
+   `npx wrangler d1 execute aired --local --file ../../restore/d1-restore.sql`.
+4. Run `pnpm dev` and check a restored account's pages list.
+5. Delete the restore folder.

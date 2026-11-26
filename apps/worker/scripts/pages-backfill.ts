@@ -3,10 +3,11 @@
  * batch by batch, and write the combined report. Run from apps/worker:
  *
  *   ADMIN_TOKEN=... node --experimental-strip-types scripts/pages-backfill.ts \
- *     --origin https://staging.aired.sh [--apply] [--limit 200] [--out report.json]
+ *     --origin https://aired.sh [--apply] [--limit 200] [--out report.json]
  *
  * Without --apply it's a dry run: nothing is written. The worker needs the
- * same ADMIN_TOKEN as a secret (`wrangler secret put ADMIN_TOKEN [--env staging]`).
+ * same ADMIN_TOKEN as a secret (`wrangler secret put ADMIN_TOKEN`). Against
+ * `pnpm dev` (local KV and D1), use --origin http://localhost:8787.
  * Safe to stop and run again: rows are only ever inserted when missing.
  * docs/pages-in-d1.md has the full rollout.
  */
@@ -22,7 +23,7 @@ const opt = (name: string) => {
 
 const origin = opt("origin");
 const token = process.env.ADMIN_TOKEN;
-if (!origin || !/^https:\/\//.test(origin)) throw new Error("--origin https://... is required");
+if (!origin || !/^(https:\/\/|http:\/\/localhost[:/])/.test(origin)) throw new Error("--origin https://... (or http://localhost:8787) is required");
 if (!token) throw new Error("set ADMIN_TOKEN");
 const apply = flag("apply");
 const limit = Number(opt("limit") ?? 200);
