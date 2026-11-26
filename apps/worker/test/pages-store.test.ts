@@ -143,7 +143,10 @@ test("releaseOwnerPages makes every page anonymous and returns the live ones", a
   await insertPageRow(db, row("d", { ownerId: 1 }));
   await markPageDeleted(db, "d", NOW);
   const released = await releaseOwnerPages(db, 1, NOW);
-  assert.deepEqual(released.sort((x, y) => x.id.localeCompare(y.id)), [{ id: "a", tokenHash: "h_a" }, { id: "b", tokenHash: "h_b2" }]);
+  assert.deepEqual(
+    released.map((r) => [r.id, r.ownerId, r.tokenHash]).sort(),
+    [["a", null, "h_a"], ["b", null, "h_b2"]],
+  );
   assert.equal((await getPageRow(db, "d"))!.ownerId, null, "deleted pages are unlinked too");
   assert.equal((await getPageRow(db, "c"))!.ownerId, 2);
 });

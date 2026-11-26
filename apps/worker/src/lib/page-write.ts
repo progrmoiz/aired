@@ -180,19 +180,18 @@ export async function deletePage(env: PageEnv, page: LoadedPage, now = Date.now(
 }
 
 /**
- * Write the owner and token of a row into its KV record (after a claim or a
- * release), keeping the expiry. The viewer reads the owner from it for the
- * badge and indexing. Missing records are left missing. Never throws.
+ * Rebuild a live page's KV record from its row (after a claim or a
+ * release), keeping the view count and PIN the record has now. Built from
+ * the row, not from a KV read, so a stale read can't put an old title or
+ * token back. Never throws.
  */
-export async function mirrorOwnerToKv(kv: KVNamespace, id: string, ownerId: number | null, tokenHash: string, now = Date.now()): Promise<void> {
+export async function refreshCache(kv: KVNamespace, row: PageRow, now = Date.now()): Promise<void> {
   try {
-    const raw = await kv.get(kvKeys.page(id));
-    const metadata = raw === null ? null : parseMetadata(raw);
-    if (metadata === null) return;
-    const exp = metadata.expiresAt === null ? null : Date.parse(metadata.expiresAt);
-    if (exp !== null && (!Number.isFinite(exp) || exp - now < 60_000)) return;
-    await kv.put(kvKeys.page(id), serializeMetadata({ ...metadata, ownerId, tokenHash }), kvOptions(exp, now));
+    if (!isLive(row, now) || (row.expiresAt !== null && row.expiresAt - now < 60_000)) return;
+    const raw = await kv.get(kvKeys.page(row.id));
+    const current = raw === null ? null : parseMetadata(raw);
+    await kv.put(kvKeys.page(row.id), serializeMetadata(cacheRecord(row, current)), kvOptions(row.expiresAt, now));
   } catch (err) {
-    console.error("page record mirror failed", { id, err });
+    console.error("page record refresh failed", { id: row.id, err });
   }
 }

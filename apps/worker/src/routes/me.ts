@@ -47,7 +47,7 @@ import {
   type PageRow,
   type ProjectFilter,
 } from '../lib/pages-store.ts';
-import { indexForOwner, loadPage, mirrorOwnerToKv, type LoadedPage } from '../lib/page-write.ts';
+import { indexForOwner, loadPage, refreshCache, type LoadedPage } from '../lib/page-write.ts';
 
 const me = new Hono<AppBindings>();
 
@@ -501,7 +501,7 @@ me.delete('/', requireWebSession, requireCsrfHeader, async (c) => {
   // The account's pages become anonymous pages, in D1 (the source of truth)
   // in one statement, before the account rows go: a failure here leaves the
   // account intact to retry. Their KV records follow after the response.
-  let releasedPages: Array<{ id: string; tokenHash: string }>;
+  let releasedPages: PageRow[];
   try {
     releasedPages = await releaseOwnerPages(c.env.DB, userId, Date.now());
   } catch (err) {
@@ -624,9 +624,9 @@ me.delete('/', requireWebSession, requireCsrfHeader, async (c) => {
       const kv = c.env.PAGES_KV;
       const now = Date.now();
       const done = new Set<string>();
-      for (const page of releasedPages) {
-        done.add(page.id);
-        await mirrorOwnerToKv(kv, page.id, null, page.tokenHash, now);
+      for (const row of releasedPages) {
+        done.add(row.id);
+        await refreshCache(kv, row, now);
       }
 
       // Pages from before D1 `pages` that have no row yet are found the old
@@ -647,7 +647,7 @@ me.delete('/', requireWebSession, requireCsrfHeader, async (c) => {
           const row = await resolvePage(c.env.DB, pageId, raw === null ? null : parseMetadata(raw), now);
           if (row === null) return;
           if (row.ownerId === userId) await releaseOwnerPage(c.env.DB, pageId, userId, now);
-          if (row.deletedAt === null) await mirrorOwnerToKv(kv, pageId, null, row.tokenHash, now);
+          await refreshCache(kv, { ...row, ownerId: row.ownerId === userId ? null : row.ownerId }, now);
         } catch (err) {
           console.error('Failed to release a page during account deletion:', { pageId, err });
         }
@@ -735,13 +735,19 @@ async function claimPage(
       hash: hashToken,
       matches: (hash) => verifyToken(updateToken, hash),
       // D1 already holds the claim, so failures here can't revive the old token.
-      mirrorToKv: async (ownerId, tokenHash) => {
-        await mirrorOwnerToKv(env.PAGES_KV, pageId, ownerId, tokenHash);
+      mirrorToKv: async (ownerId) => {
         try {
-          const claimed = await currentClaim();
-          await mirrorClaim(env.DB, pageId, { ...claimed, ownerId });
+          const claimed = await getPageRow(env.DB, pageId);
+          if (claimed === null) return;
+          await refreshCache(env.PAGES_KV, claimed);
+          await mirrorClaim(env.DB, pageId, {
+            ownerId,
+            tokenHash: claimed.tokenHash,
+            prevTokenHash: claimed.prevTokenHash ?? DELETED_TOKEN_HASH,
+            claimedAt: claimed.claimedAt ?? 0,
+          });
         } catch (err) {
-          console.error('page_claims mirror failed during claim', { pageId, userId, err });
+          console.error('cache and page_claims mirror failed during claim', { pageId, userId, err });
         }
       },
       indexPage: () => indexForOwner(env.PAGES_KV, userId, metadataFromRow(row, 0)),

@@ -257,18 +257,15 @@ export async function replacePageToken(db: D1Database, id: string, ownerId: numb
 
 /**
  * Account deletion: every page of this owner becomes anonymous, keeping its
- * token. Returns the live ones, for refreshing their KV cache records.
+ * token. Returns the live ones as they are now, for refreshing their KV
+ * cache records.
  */
-export async function releaseOwnerPages(
-  db: D1Database,
-  ownerId: number,
-  now: number,
-): Promise<Array<{ id: string; tokenHash: string }>> {
+export async function releaseOwnerPages(db: D1Database, ownerId: number, now: number): Promise<PageRow[]> {
   const { results } = await db
-    .prepare('UPDATE pages SET owner_id = NULL, updated_at = ? WHERE owner_id = ? RETURNING id, token_hash, deleted_at')
+    .prepare(`UPDATE pages SET owner_id = NULL, updated_at = ? WHERE owner_id = ? RETURNING ${COLUMNS}`)
     .bind(now, ownerId)
-    .all<{ id: string; token_hash: string; deleted_at: number | null }>();
-  return results.filter((r) => r.deleted_at === null).map((r) => ({ id: r.id, tokenHash: r.token_hash }));
+    .all<DbRow>();
+  return results.map(fromDb).filter((r) => isLive(r, now));
 }
 
 /** Release one page of this owner (pages found only through the old KV index). */
