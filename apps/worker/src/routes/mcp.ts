@@ -97,6 +97,7 @@ function createAiredMcpServer(
         .optional()
         .describe("Page ID — required when update_token is provided"),
     },
+    { title: "Publish HTML", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     async ({ html, title, pin, ttl_seconds, permanent, update_token, id: existingId }) => {
       if (signedIn !== null) {
         if (typeof update_token === "string" && typeof existingId !== "string") {
@@ -309,6 +310,7 @@ function createAiredMcpServer(
       cursor: z.string().optional().describe("From a previous list_pages answer, for the next page of results"),
       project: z.string().optional().describe("Only pages in this project"),
     },
+    { title: "List your pages", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async ({ cursor, project }) => {
       if (signedIn === null) return signInRequired(origin);
       const q = new URLSearchParams();
@@ -327,6 +329,7 @@ function createAiredMcpServer(
       html: z.string().describe("The new HTML"),
       title: z.string().optional().describe("New title"),
     },
+    { title: "Update a page", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
     async ({ id, html, title }) => {
       if (signedIn === null) return signInRequired(origin);
       if (!PAGE_ID.test(id)) return badId();
@@ -339,6 +342,7 @@ function createAiredMcpServer(
     "delete_page",
     "Delete one of your pages for good (needs an API key). The link stops working.",
     { id: z.string().describe("Page id, from publish_html or list_pages") },
+    { title: "Delete a page", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     async ({ id }) => {
       if (signedIn === null) return signInRequired(origin);
       if (!PAGE_ID.test(id)) return badId();
@@ -351,6 +355,7 @@ function createAiredMcpServer(
     "get_account",
     "Your aired account (needs an API key): plan, limits, renewal, and an upgrade link for a person to open.",
     {},
+    { title: "Get your account", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async () => {
       if (signedIn === null) return signInRequired(origin);
       const res = await signedIn.callApi("GET", "/api/me");
