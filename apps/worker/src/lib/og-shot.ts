@@ -2,11 +2,19 @@
  * Link-preview screenshots: the rules, with no runtime imports so tests load
  * them directly. The browser work is in og-render.ts.
  *
- * After a publish or update, a 1200×630 JPEG of the page is stored next to
- * its HTML (`pages/<id>/shot.jpg`) and GET /og/:id serves it instead of the
- * title card. Pages with a PIN or a view limit never get one (the image would
- * show what the PIN hides, or a crawler would spend views), nor do pages over
- * SHOT_MAX_BYTES. They keep the card.
+ * After a publish or update, the page is drawn in a browser and stored next
+ * to its HTML:
+ *   - `pages/<id>/shot.jpg`, 1200×630: the link preview GET /og/:id serves
+ *     instead of the title card. Only for pages anyone may see: a page with a
+ *     PIN or a view limit never gets one (it would show what the PIN hides, or
+ *     a crawler would spend views) and keeps the card.
+ *   - `pages/<id>/tile.jpg`, 1200×800: the owner's dashboard tile, served
+ *     only by the owner-only GET /api/me/pages/:id/tile. PIN and view-limited
+ *     pages get one too, since only their owner can fetch it.
+ *   - a tiny blurred placeholder (a JPEG data URI of about 1 KB) kept in D1
+ *     `page_shots` with the HTML etag the images were taken from. The page
+ *     list sends both, so tiles blur up at once and cache the image by version.
+ * Pages over SHOT_MAX_BYTES get neither.
  *
  * Browser Rendering is metered: Workers Free allows 10 minutes a day, 3
  * browsers at once and 1 new browser every 20 seconds; Workers Paid includes
@@ -17,6 +25,16 @@
 
 export const SHOT_WIDTH = 1200;
 export const SHOT_HEIGHT = 630;
+/** Dashboard tiles are 3:2, drawn at the width pages are previewed at. */
+export const TILE_HEIGHT = 800;
+export const TILE_QUALITY = 75;
+/** The placeholder is the tile at this scale: 24×16 pixels. */
+export const PLACEHOLDER_SCALE = 0.02;
+export const PLACEHOLDER_QUALITY = 50;
+/** A failed or skipped render isn't tried again from the dashboard for a day. */
+export const RETRY_AFTER_MS = 24 * 60 * 60 * 1000;
+/** Pages the dashboard may ask to backfill in one request (one browser, in turn). */
+export const BACKFILL_MAX = 3;
 export const SHOT_CONTENT_TYPE = "image/jpeg";
 export const SHOT_QUALITY = 80;
 
@@ -38,6 +56,10 @@ export function shotKey(id: string): string {
   return `pages/${id}/shot.jpg`;
 }
 
+export function tileKey(id: string): string {
+  return `pages/${id}/tile.jpg`;
+}
+
 export type ShotPage = {
   pin: string | null;
   reads: number | null;
@@ -46,15 +68,39 @@ export type ShotPage = {
   expiresAt: string | null;
 };
 
-/** Whether this page may have a screenshot, both when taking and serving it. */
-export function shotAllowed(page: ShotPage, nowMs: number): boolean {
-  if (page.pin !== null || page.reads !== null) return false;
+/** Whether this page is drawn at all (its owner's tile): live and not too big. */
+export function renderAllowed(page: ShotPage, nowMs: number): boolean {
   if (page.size > SHOT_MAX_BYTES) return false;
   if (!page.permanent && page.expiresAt !== null) {
     const exp = Date.parse(page.expiresAt);
     if (Number.isFinite(exp) && exp <= nowMs) return false;
   }
   return true;
+}
+
+/**
+ * Whether this page may have a public link-preview screenshot, both when
+ * taking and when serving it: never with a PIN or a view limit.
+ */
+export function shotAllowed(page: ShotPage, nowMs: number): boolean {
+  if (page.pin !== null || page.reads !== null) return false;
+  return renderAllowed(page, nowMs);
+}
+
+/** A page's D1 page_shots row. lqip null: tried (or being tried), no images yet. */
+export type ShotRow = { htmlEtag: string | null; lqip: string | null; triedAt: number };
+
+/** What the page list tells the dashboard: the tile's version and placeholder, or null. */
+export function tileInfo(row: ShotRow | undefined): { v: string; lqip: string } | null {
+  if (row === undefined || row.lqip === null || row.htmlEtag === null) return null;
+  return { v: versionFromEtag(row.htmlEtag), lqip: row.lqip };
+}
+
+/** Whether the dashboard may ask for this page to be drawn now. */
+export function needsBackfill(row: ShotRow | undefined, nowMs: number): boolean {
+  if (row === undefined) return true;
+  if (row.lqip !== null) return false;
+  return nowMs - row.triedAt >= RETRY_AFTER_MS;
 }
 
 /** OG_SHOT_DAILY_SECONDS as milliseconds. "0" turns screenshots off; junk means the default. */
@@ -113,4 +159,13 @@ export function ogCacheControl(kind: "shot" | "card", versionMatches: boolean): 
   return kind === "shot" && versionMatches
     ? "public, max-age=3600"
     : "public, max-age=300";
+}
+
+/**
+ * Cache-Control for the owner's tile. Asked for by its own version, the image
+ * never changes (an update gives it a new version), so tab switches and
+ * reloads never fetch it again. It's private: never kept by a shared cache.
+ */
+export function tileCacheControl(versionMatches: boolean): string {
+  return versionMatches ? "private, max-age=31536000, immutable" : "private, max-age=60";
 }
