@@ -42,6 +42,14 @@ not_found_handling = "404-page"
 binding = "PAGES_BUCKET"
 bucket_name = "aired-pages"
 
+# Backups (src/lib/backup.ts, docs/backups.md): nightly KV + D1 snapshots
+# under snapshots/ (kept 30 days) and the expired-page sweep's copies of the
+# files it deletes under trash/ (kept 14 days). Retention is the bucket's
+# lifecycle rules. The cron below drives it: no extra trigger needed.
+[[r2_buckets]]
+binding = "BACKUP_BUCKET"
+bucket_name = "aired-backups"
+
 [[kv_namespaces]]
 binding = "PAGES_KV"
 id = "6388d6b3b6c04fe5ad8529ae029e723e"
@@ -156,6 +164,10 @@ OG_SHOT_DAILY_SECONDS = "0"
 [[env.staging.r2_buckets]]
 binding = "PAGES_BUCKET"
 bucket_name = "aired-pages-staging"
+
+[[env.staging.r2_buckets]]
+binding = "BACKUP_BUCKET"
+bucket_name = "aired-backups-staging"
 
 # Owner: `wrangler kv namespace create aired-staging`, paste the id in both.
 [[env.staging.kv_namespaces]]

@@ -42,13 +42,18 @@ stops being logged or goes missing from this page.
 |---|---|---|
 | `billing_webhook_failed` | A Stripe webhook threw. Stripe retries for up to 3 days, but a subscription change may be stuck. | Check the log's `eventId` in Stripe and the error. Once fixed, resend it from the Stripe dashboard. |
 | `unhandled_error` | Some route returned a 500. | Read the stack, then find the request by `requestId`. |
-| `scheduled_failed` | The cron run (expired-page sweep) threw. | Check D1 and R2. The sweep picks up from its saved cursor next run. |
+| `scheduled_failed` | A cron job threw: `job` is `expired_sweep` or `backup`. One failing doesn't stop the other. | Check D1 and R2. The sweep picks up from its saved cursor next run; the backup from `state.json`. |
+| `backup_stale` | Tonight's backup snapshot started over 36 hours ago and hasn't finished. | Look for `scheduled_failed` with `job: "backup"`. See `docs/backups.md`. |
 | `health_check_failed` | KV, D1 or R2 failed a probe. | Check the Cloudflare status page and the failing binding. |
 
 These are worth a daily look but shouldn't page anyone:
 - `billing_webhook_uid_mismatch`, `billing_webhook_no_uid` and
   `billing_misconfigured`
 - `expired_sweep_kv_error`
+- `expired_sweep_copy_failed`, `expired_sweep_kept_uncopied` and
+  `expired_sweep_preserve_failed` (the sweep kept a file it couldn't back up)
+- `backup_unconfigured` (no `BACKUP_BUCKET` binding: no backups, and the
+  sweep deletes nothing)
 - `burst_limit_error`
 - `og_shot_failed`
 

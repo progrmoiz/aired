@@ -10,7 +10,13 @@
  * (same etag). An update needs the KV record to exist, so once it has been
  * gone that long nothing can rewrite the file under us, and KV's ~60s lag
  * can't make a live page look expired twice a day apart. A KV error keeps
- * the file. No runtime imports, so tests run it with fakes.
+ * the file.
+ *
+ * Before a file is deleted it is copied to the backup bucket (`trash/`, kept
+ * 14 days; docs/backups.md), and only files whose copy succeeded are
+ * deleted. So even a KV record lost by mistake, which the rule above would
+ * read as an expiry, leaves the page recoverable. No runtime imports, so
+ * tests run it with fakes.
  */
 
 /** Objects looked at per run: one KV read each, plus a handful of D1/R2 calls. */
@@ -39,6 +45,11 @@ export type SweepDeps = {
   }>;
   /** True if the page's KV record exists. Throws on a KV error. */
   pageExists: (id: string) => Promise<boolean>;
+  /**
+   * Copy these files to the backup bucket, each only if it still has this
+   * etag. Returns the keys that are safely copied (or already gone).
+   */
+  preserve: (files: Array<{ key: string; etag: string }>) => Promise<string[]>;
   deleteKeys: (keys: string[]) => Promise<void>;
   loadCursor: () => Promise<string | null>;
   /** `passDone` when the walk reached the end of the bucket. */
@@ -59,7 +70,7 @@ export async function sweepExpiredPages(
   );
   const known = await deps.loadCandidates(files.map((f) => f.key));
 
-  const doomed: string[] = [];
+  const doomed: Array<{ key: string; etag: string }> = [];
   const put = new Map<string, Candidate>();
   const drop: string[] = [];
   for (const file of files) {
@@ -76,16 +87,32 @@ export async function sweepExpiredPages(
       continue;
     }
     if (seen && seen.etag === file.etag) {
-      if (now - seen.firstSeen >= CONFIRM_AFTER_MS) doomed.push(file.key);
+      if (now - seen.firstSeen >= CONFIRM_AFTER_MS) doomed.push({ key: file.key, etag: file.etag });
       continue; // still waiting: keep the original first sighting
     }
     put.set(file.key, { etag: file.etag, firstSeen: now }); // new, or the file changed
   }
 
-  if (doomed.length > 0) await deps.deleteKeys(doomed);
-  if (put.size > 0 || doomed.length > 0 || drop.length > 0) {
-    await deps.saveCandidates(put, [...drop, ...doomed]);
+  // Only what made it into the backup bucket is deleted; the rest keep
+  // their mark and are tried again next pass.
+  let deleted: string[] = [];
+  if (doomed.length > 0) {
+    let copied: Set<string>;
+    try {
+      copied = new Set(await deps.preserve(doomed));
+    } catch (err) {
+      deps.log?.({ event: 'expired_sweep_preserve_failed', count: doomed.length, err: String(err) });
+      copied = new Set();
+    }
+    deleted = doomed.filter((d) => copied.has(d.key)).map((d) => d.key);
+    if (deleted.length < doomed.length) {
+      deps.log?.({ event: 'expired_sweep_kept_uncopied', count: doomed.length - deleted.length });
+    }
+    if (deleted.length > 0) await deps.deleteKeys(deleted);
+  }
+  if (put.size > 0 || deleted.length > 0 || drop.length > 0) {
+    await deps.saveCandidates(put, [...drop, ...deleted]);
   }
   await deps.saveCursor(page.truncated ? page.cursor : null, !page.truncated);
-  return { scanned: page.objects.length, deleted: doomed, marked: put.size };
+  return { scanned: page.objects.length, deleted, marked: put.size };
 }

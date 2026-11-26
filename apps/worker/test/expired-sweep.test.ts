@@ -17,18 +17,24 @@ const old = new Date(NOW - 10 * DAY);
 const file = (id: string, etag = `e_${id}`, uploaded = old) => ({ key: `pages/${id}/index.html`, uploaded, etag });
 
 function fake(objects: Array<{ key: string; uploaded: Date; etag: string }>, live: Set<string>, opts: {
-  kvThrows?: Set<string>; truncated?: boolean; cursor?: string | null; candidates?: Map<string, Candidate>;
+  kvThrows?: Set<string>; truncated?: boolean; cursor?: string | null; candidates?: Map<string, Candidate>; copyFails?: Set<string>;
 } = {}) {
   const state = {
     cursor: opts.cursor ?? (null as string | null),
     passDone: null as boolean | null,
     deleted: [] as string[],
+    preserved: [] as Array<{ key: string; etag: string }>,
     candidates: new Map(opts.candidates ?? []),
     listedWith: [] as Array<[string | null, number]>,
   };
   const deps: SweepDeps = {
     list: async (cursor, limit) => { state.listedWith.push([cursor, limit]); return { objects, truncated: opts.truncated ?? false, cursor: opts.truncated ? "next" : null }; },
     pageExists: async (id) => { if (opts.kvThrows?.has(id)) throw new Error("kv down"); return live.has(id); },
+    preserve: async (files) => {
+      const ok = files.filter((f) => !opts.copyFails?.has(f.key));
+      state.preserved.push(...ok);
+      return ok.map((f) => f.key);
+    },
     deleteKeys: async (keys) => { state.deleted.push(...keys); },
     loadCursor: async () => state.cursor,
     saveCursor: async (c, done) => { state.cursor = c; state.passDone = done; },
@@ -60,6 +66,40 @@ test("a file goes only when seen missing again a day later, unchanged", async ()
   assert.deepEqual((await sweepExpiredPages(f.deps, NOW)).deleted, ["pages/gone/index.html"]);
   assert.deepEqual(f.state.deleted, ["pages/gone/index.html"]);
   assert.equal(f.state.candidates.size, 0);
+});
+
+test("a file is copied to the backup bucket before it is deleted", async () => {
+  const candidates = new Map([["pages/gone/index.html", { etag: "e_gone", firstSeen: NOW - CONFIRM_AFTER_MS }]]);
+  const f = fake([file("gone")], new Set(), { candidates });
+  f.deps.deleteKeys = async (keys) => {
+    assert.deepEqual(f.state.preserved, [{ key: "pages/gone/index.html", etag: "e_gone" }], "copied first");
+    f.state.deleted.push(...keys);
+  };
+  await sweepExpiredPages(f.deps, NOW);
+  assert.deepEqual(f.state.deleted, ["pages/gone/index.html"]);
+});
+
+test("a file whose copy fails is kept, with its mark, for the next run", async () => {
+  const mark = { etag: "e_a", firstSeen: NOW - CONFIRM_AFTER_MS };
+  const candidates = new Map([["pages/a/index.html", mark], ["pages/b/index.html", { etag: "e_b", firstSeen: NOW - CONFIRM_AFTER_MS }]]);
+  const f = fake([file("a"), file("b")], new Set(), { candidates, copyFails: new Set(["pages/a/index.html"]) });
+  const out = await sweepExpiredPages(f.deps, NOW);
+  assert.deepEqual(out.deleted, ["pages/b/index.html"]);
+  assert.deepEqual(f.state.deleted, ["pages/b/index.html"]);
+  assert.deepEqual(f.state.candidates.get("pages/a/index.html"), mark);
+  assert.equal(f.state.candidates.has("pages/b/index.html"), false);
+});
+
+test("nothing is deleted when no copy could be made", async () => {
+  const candidates = new Map([["pages/a/index.html", { etag: "e_a", firstSeen: NOW - CONFIRM_AFTER_MS }]]);
+  const f = fake([file("a")], new Set(), { candidates });
+  f.deps.preserve = async () => { throw new Error("backup bucket down"); };
+  let deleteCalled = false;
+  f.deps.deleteKeys = async () => { deleteCalled = true; };
+  const out = await sweepExpiredPages(f.deps, NOW);
+  assert.deepEqual(out.deleted, []);
+  assert.equal(deleteCalled, false);
+  assert.equal(f.state.candidates.size, 1);
 });
 
 test("seen again too soon: kept, and the first sighting isn't reset", async () => {
@@ -119,7 +159,8 @@ test("a failing delete leaves the cursor and marks unsaved, so the batch is retr
 test("index.ts wires the cron to the sweep through kvKeys.page and the pages/ prefix", () => {
   const code = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
   assert.match(code, /scheduled\(controller: ScheduledController, env: Env, ctx: ExecutionContext\) \{\s*ctx\.waitUntil\(runScheduled\(controller\.cron, env\)\)/);
-  assert.match(code, /async function runScheduled\(cron: string, env: Env\): Promise<void> \{\s*try \{\s*await runExpiredSweep\(env\);/);
+  assert.match(code, /\["expired_sweep", runExpiredSweep\],\s*\["backup", runBackup\],/);
+  assert.match(code, /preserve: \(files\) => preserveSweptFiles\(env, files\)/);
   assert.match(code, /PAGES_KV\.get\(kvKeys\.page\(id\)\)\) !== null/);
   assert.match(code, /PAGES_BUCKET\.list\(\{ prefix: "pages\/"/);
   assert.match(code, /etag: o\.etag/);

@@ -25,6 +25,7 @@ import { rateLimit } from "./middleware/rate-limit.js";
 import { TIERS } from "./lib/rate-limit-tiers.js";
 import { pageIdFromKey, sweepExpiredPages } from "./lib/expired-sweep.js";
 import { withAssetCache } from "./lib/asset-cache.js";
+import { preserveSweptFiles, runBackup } from "./lib/backup-bindings.ts";
 import { API_KEY_PREFIX, kvKeys } from "@aired/core";
 import { loadUserRecord, signedInUser } from "./lib/user-record.js";
 import { bearerToken } from "./lib/page-token.js";
@@ -215,6 +216,9 @@ async function runExpiredSweep(env: Env): Promise<void> {
         };
       },
       pageExists: async (id) => (await env.PAGES_KV.get(kvKeys.page(id))) !== null,
+      // Copied to the backup bucket first (trash/, 14 days): a KV record lost
+      // by mistake must not take the only copy of a page with it.
+      preserve: (files) => preserveSweptFiles(env, files),
       deleteKeys: async (keys) => {
         await env.PAGES_BUCKET.delete(keys);
         // The page is gone: its tile placeholder in D1 goes with its HTML.
@@ -271,17 +275,27 @@ async function runExpiredSweep(env: Env): Promise<void> {
 }
 
 /**
- * Every cron job runs through here: a throw is logged as scheduled_failed
- * (an alert event, lib/log.ts) with the cron expression, then rethrown so
- * Cloudflare still records the run as failed.
+ * Every cron run does each job in turn: the expired-page sweep, then the
+ * nightly backup's next few chunks (lib/backup.ts; it does nothing until a
+ * snapshot is due). One job failing doesn't stop the other. A throw is logged
+ * as scheduled_failed (an alert event, lib/log.ts) with the cron expression
+ * and job, then rethrown so Cloudflare still records the run as failed.
  */
 async function runScheduled(cron: string, env: Env): Promise<void> {
-  try {
-    await runExpiredSweep(env);
-  } catch (err) {
-    logError("scheduled_failed", err, { cron, job: "expired_sweep" });
-    throw err;
+  const jobs: Array<[string, (env: Env) => Promise<void>]> = [
+    ["expired_sweep", runExpiredSweep],
+    ["backup", runBackup],
+  ];
+  let failure: unknown = null;
+  for (const [job, run] of jobs) {
+    try {
+      await run(env);
+    } catch (err) {
+      logError("scheduled_failed", err, { cron, job });
+      failure ??= err;
+    }
   }
+  if (failure !== null) throw failure;
 }
 
 export default {
