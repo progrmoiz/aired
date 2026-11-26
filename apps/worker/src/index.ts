@@ -17,7 +17,6 @@ import { publishRateLimit } from "./middleware/rate-limit.js";
 import { corsMiddleware } from "./middleware/cors.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { requestIdMiddleware } from "./middleware/request-id.js";
-import { stagingNoIndex } from "./middleware/staging.js";
 import { log, logError } from "./lib/log.js";
 import { cachedHealth, checkHealth, publicReport, storageProbes } from "./lib/health.js";
 import { countMcpToolCalls, isMcpToolCall } from "./lib/mcp-rpc.js";
@@ -55,7 +54,6 @@ app.onError((err, c) => {
 // Global middleware: request id first (so every later log line has it),
 // then CORS, then auth
 app.use("*", requestIdMiddleware);
-app.use("*", stagingNoIndex);
 app.use("*", corsMiddleware);
 app.use("*", authMiddleware);
 

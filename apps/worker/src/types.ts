@@ -51,7 +51,7 @@ export type Env = {
   /**
    * This deploy's own origin, for every absolute link the Worker writes
    * (lib/origin.ts siteOrigin). Unset in production (https://aired.sh);
-   * staging sets it in wrangler.toml, local dev in .dev.vars.
+   * local dev and self-hosted deploys set it.
    */
   SITE_ORIGIN?: string;
   /** WorkOS AuthKit sign-in: on only when both are set (lib/workos.ts). */
@@ -63,8 +63,6 @@ export type Env = {
   BROWSER?: Fetcher;
   /** Daily browser time for screenshots, in seconds (lib/og-shot.ts). Default 480; "0" turns them off. */
   OG_SHOT_DAILY_SECONDS?: string;
-  /** "staging" on the staging deploy (wrangler.toml [env.staging.vars]): pages get noindex. Unset in production. */
-  AIRED_ENV?: string;
 };
 
 export type AppBindings = {
