@@ -3,13 +3,13 @@
  * the call to the HTTP API with the caller's API key, so the API's own rules
  * (ownership, plan limits, rate limits, claims) apply unchanged; this file
  * turns the API's JSON answers into what an agent reads. No imports, so tests
- * load it directly.
+ * load it directly. `origin` arguments are siteOrigin(env).
  */
 
 export type ToolResult = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
 
-export const SIGN_IN_REQUIRED =
-  'Sign in required: add aired as a connector at https://aired.sh/mcp/account (you sign in with your aired account), ' +
+export const signInRequiredText = (origin: string): string =>
+  `Sign in required: add aired as a connector at ${origin}/mcp/account (you sign in with your aired account), ` +
   'or connect with an aired API key (Authorization: Bearer aired_sk_...) from API keys in the dashboard. ' +
   'Without either, only publish_html works, anonymously.';
 
@@ -21,7 +21,7 @@ type Obj = Record<string, unknown>;
 const str = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
 
 /** An API error as a tool error. Plan limits say a person must open the upgrade link. */
-export function apiErrorResult(status: number, body: unknown): ToolResult {
+export function apiErrorResult(status: number, body: unknown, origin: string): ToolResult {
   const b = (body ?? {}) as Obj;
   const message = str(b.error) ?? `The aired API answered ${status}.`;
   if (b.code === 'plan_limit' && str(b.upgrade_url)) {
@@ -34,7 +34,7 @@ export function apiErrorResult(status: number, body: unknown): ToolResult {
       true,
     );
   }
-  if (status === 401) return text([message, SIGN_IN_REQUIRED], true);
+  if (status === 401) return text([message, signInRequiredText(origin)], true);
   if (status === 429) return text([message, 'Wait a while before publishing again.'], true);
   return text([message], true);
 }

@@ -10,7 +10,8 @@ import { claimUrl } from "../lib/claim-url.js";
 import { hashPin } from "../lib/pin-hash.js";
 import { authoritativeCredentials, authorizePageWrite } from "../lib/claim-decision.js";
 import { getClaim, tombstoneClaim } from "../lib/page-claims.js";
-import { billingEnabled, getEntitlements, planLimitError, UPGRADE_URL } from "../lib/entitlements.js";
+import { billingEnabled, getEntitlements, planLimitError, upgradeUrl } from "../lib/entitlements.js";
+import { siteOrigin } from "../lib/origin.ts";
 import { forgetShots, refreshShot } from "../lib/og-render.js";
 import type { Entitlements } from "../lib/entitlements.js";
 import {
@@ -68,7 +69,7 @@ async function rejectInvalidHtml(
   if (ent !== null && ent.plan === "free" && billingEnabled(c.env)) {
     const size = new TextEncoder().encode(html).byteLength;
     if (size > maxBytes && size <= PRO_MAX_SIZE) {
-      return { response: c.json(planLimitError("page_size"), 402), ent };
+      return { response: c.json(planLimitError("page_size", siteOrigin(c.env)), 402), ent };
     }
   }
   return { response: c.json({ error: validation.error }, 400), ent };
@@ -83,7 +84,7 @@ function upgradeHint(
   ent: Entitlements | null,
 ): { upgrade: { reason: "badge"; url: string } } | Record<string, never> {
   if (ent === null || ent.plan !== "free" || !billingEnabled(c.env)) return {};
-  return { upgrade: { reason: "badge", url: `${UPGRADE_URL}?ref=publish` } };
+  return { upgrade: { reason: "badge", url: upgradeUrl(siteOrigin(c.env), "publish") } };
 }
 
 // POST /api/publish — create a new page or update an existing one via update_token
@@ -314,7 +315,7 @@ api.post("/publish", publishRateLimit, async (c) => {
     update_token: token,
     expiresAt,
     // Anonymous creates get a link to attach the page to an account later.
-    ...(user === null ? { claim_url: claimUrl(c.env.SITE_ORIGIN, id, token) } : {}),
+    ...(user === null ? { claim_url: claimUrl(siteOrigin(c.env), id, token) } : {}),
     ...upgradeHint(c, ent),
   });
 });

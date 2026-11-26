@@ -6,6 +6,7 @@ import { applyPageHeaders } from "../middleware/security.js";
 import { loadStats, recordView, saveStats } from "../lib/stats.js";
 import { SANDBOX_SHIM, injectEarlyScript } from "../lib/sandbox-shim.js";
 import { injectAiredBar } from "../lib/aired-bar.js";
+import { siteOrigin } from "../lib/origin.ts";
 import { versionFromEtag } from "../lib/og-shot.js";
 import { getEntitlements } from "../lib/entitlements.js";
 import { notFoundPage } from "../lib/not-found.js";
@@ -132,6 +133,7 @@ viewer.get("/p/:id", async (c) => {
   // own <head> injection.
   const wrappedHtml = injectEarlyScript(
     injectAiredBar(html, {
+      origin: siteOrigin(c.env),
       id,
       title: pageTitle,
       readCount: newReadCount,

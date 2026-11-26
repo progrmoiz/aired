@@ -4,6 +4,7 @@ import { hashToHex } from "@aired/core";
 import { TIERS, publishTier, type RateLimitTier } from "../lib/rate-limit-tiers.js";
 import { underBurstLimit } from "../lib/burst-limit.js";
 import { billingEnabled, getEntitlements, planLimitError } from "../lib/entitlements.js";
+import { siteOrigin } from "../lib/origin.ts";
 
 type RateLimitOptions = {
   /**
@@ -131,7 +132,7 @@ const publishLimits = {
   authenticated: rateLimit(TIERS.authenticated, {
     onLimited: (c) =>
       c.get("user") && billingEnabled(c.env)
-        ? c.json(planLimitError("publish_rate"), 402)
+        ? c.json(planLimitError("publish_rate", siteOrigin(c.env)), 402)
         : undefined,
   }),
   pro: rateLimit(TIERS.pro),

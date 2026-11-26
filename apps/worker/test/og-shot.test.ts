@@ -93,9 +93,9 @@ test("the daily-limit 429 blocks until the next UTC day; other 429s for a minute
 
 test("og:image carries a version from the HTML etag, so an update busts preview caches", () => {
   assert.equal(versionFromEtag('"a1b2c3d4e5f6a7b8c9d0"'), "a1b2c3d4e5f6");
-  const out = injectAiredBar("<head></head><body></body>", { id: "abc", title: "t", readCount: 0, imageVersion: "a1b2c3d4e5f6" });
+  const out = injectAiredBar("<head></head><body></body>", { origin: "https://aired.sh", id: "abc", title: "t", readCount: 0, imageVersion: "a1b2c3d4e5f6" });
   assert.ok(out.includes('content="https://aired.sh/og/abc?v=a1b2c3d4e5f6"'));
-  const plain = injectAiredBar("<head></head><body></body>", { id: "abc", title: "t", readCount: 0 });
+  const plain = injectAiredBar("<head></head><body></body>", { origin: "https://aired.sh", id: "abc", title: "t", readCount: 0 });
   assert.ok(plain.includes('content="https://aired.sh/og/abc"'));
 });
 
@@ -162,7 +162,7 @@ test("og-render.ts: renders the stored HTML in the sandbox, never through /p/:id
   // A page updated or deleted mid-render doesn't get the old image.
   assert.match(code, /current === null \|\| current\.etag !== job\.htmlEtag/);
   // The public preview is only taken for pages allowed one; the tile always.
-  assert.match(code, /capture\(browser, job\.id, job\.html, shotAllowed\(job\.page, Date\.now\(\)\)\)/);
+  assert.match(code, /capture\(browser, siteOrigin\(env\), job\.id, job\.html, shotAllowed\(job\.page, Date\.now\(\)\)\)/);
   assert.match(code, /const og = withOg \?/);
 });
 

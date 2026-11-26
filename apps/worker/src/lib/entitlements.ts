@@ -24,7 +24,10 @@ export const PRO_MAX_BYTES = 10 * 1024 * 1024;
  */
 export const GRACE_MS = 3 * 24 * 3600 * 1000;
 
-export const UPGRADE_URL = 'https://aired.sh/pricing';
+/** The pricing page, tagged with where the person came from. `origin` is siteOrigin(env). */
+export function upgradeUrl(origin: string, ref: string): string {
+  return `${origin}/pricing?ref=${ref}`;
+}
 
 const PAID_STATUSES = new Set(['active', 'trialing', 'past_due']);
 
@@ -45,13 +48,14 @@ export function entitlementsFor(state: SubscriptionState | null, now: Date): Ent
 /** Body of the 402 a signed-in user gets when a free-plan limit blocks the request. */
 export function planLimitError(
   limit: 'page_size' | 'publish_rate',
+  origin: string,
   ref?: string,
 ): { error: string; code: 'plan_limit'; limit: string; upgrade_url: string } {
   return {
     error: 'This needs Pro',
     code: 'plan_limit',
     limit,
-    upgrade_url: `${UPGRADE_URL}?ref=${ref ?? 'api'}`,
+    upgrade_url: upgradeUrl(origin, ref ?? 'api'),
   };
 }
 

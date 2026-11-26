@@ -2,8 +2,11 @@
  * WorkOS AuthKit over plain fetch (no SDK). WorkOS only proves who someone
  * is; aired keeps its own session cookie and account ids (lib/resolve-user.ts).
  * Off until both WORKOS_CLIENT_ID and WORKOS_API_KEY are set: until then every
- * sign-in uses GitHub as before. No imports, so tests load it directly.
+ * sign-in uses GitHub as before. Imports only lib/origin.ts, so tests load
+ * it directly.
  */
+
+import { siteOrigin } from './origin.ts';
 
 export type WorkosEnv = {
   WORKOS_CLIENT_ID?: string;
@@ -23,7 +26,7 @@ function base(env: WorkosEnv): string {
 
 /** Where WorkOS sends people back: <SITE_ORIGIN>/auth/workos/callback. */
 export function workosRedirectUri(env: WorkosEnv): string {
-  return `${(env.SITE_ORIGIN ?? 'https://aired.sh').replace(/\/+$/, '')}/auth/workos/callback`;
+  return `${siteOrigin(env)}/auth/workos/callback`;
 }
 
 /** The AuthKit hosted sign-in page for this state. */
@@ -69,7 +72,7 @@ export function sessionIdFromAccessToken(token: unknown): string | null {
 export function workosLogoutUrl(env: WorkosEnv, sessionId: string): string {
   const url = new URL(`${base(env)}/user_management/sessions/logout`);
   url.searchParams.set('session_id', sessionId);
-  url.searchParams.set('return_to', `${(env.SITE_ORIGIN ?? 'https://aired.sh').replace(/\/+$/, '')}/`);
+  url.searchParams.set('return_to', `${siteOrigin(env)}/`);
   return url.toString();
 }
 

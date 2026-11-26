@@ -2,6 +2,7 @@ import puppeteer from "@cloudflare/puppeteer";
 import type { Browser } from "@cloudflare/puppeteer";
 import { PAGE_CSP } from "../middleware/security.js";
 import { SANDBOX_SHIM, injectEarlyScript } from "./sandbox-shim.js";
+import { siteOrigin } from "./origin.ts";
 import {
   LOAD_TIMEOUT_MS,
   PLACEHOLDER_QUALITY,
@@ -44,6 +45,8 @@ export type ShotEnv = {
   PAGES_BUCKET: R2Bucket;
   DB: D1Database;
   OG_SHOT_DAILY_SECONDS?: string;
+  /** The page URL the browser is shown (lib/origin.ts siteOrigin). */
+  SITE_ORIGIN?: string;
 };
 
 export type ShotJob = {
@@ -55,7 +58,6 @@ export type ShotJob = {
 };
 
 const BUDGET_ROW = "browser";
-const PAGE_ORIGIN = "https://aired.sh";
 /** Don't start another page in a batch after this long (waitUntil has ~30 s). */
 const BATCH_START_BEFORE_MS = 12_000;
 
@@ -123,7 +125,7 @@ export async function renderShots(env: ShotEnv, jobs: ShotJob[]): Promise<string
         const t0 = Date.now();
         let images: Images;
         try {
-          images = await withTimeout(capture(browser, job.id, job.html, shotAllowed(job.page, Date.now())), RENDER_TIMEOUT_MS);
+          images = await withTimeout(capture(browser, siteOrigin(env), job.id, job.html, shotAllowed(job.page, Date.now())), RENDER_TIMEOUT_MS);
         } catch (err) {
           console.log({ event: "og_shot_failed", id: job.id, err: String(err) });
           continue;
@@ -166,7 +168,7 @@ async function store(env: ShotEnv, job: ShotJob, images: Images): Promise<boolea
   return true;
 }
 
-async function capture(browser: Browser, id: string, html: string, withOg: boolean): Promise<Images> {
+async function capture(browser: Browser, origin: string, id: string, html: string, withOg: boolean): Promise<Images> {
   const page = await browser.newPage();
   try {
     await page.setViewport({ width: SHOT_WIDTH, height: SHOT_HEIGHT, deviceScaleFactor: 1 });
@@ -174,7 +176,7 @@ async function capture(browser: Browser, id: string, html: string, withOg: boole
       d.dismiss().catch(() => {});
     });
 
-    const url = `${PAGE_ORIGIN}/p/${encodeURIComponent(id)}`;
+    const url = `${origin}/p/${encodeURIComponent(id)}`;
     const body = injectEarlyScript(html, SANDBOX_SHIM);
     let served = false;
     await page.setRequestInterception(true);

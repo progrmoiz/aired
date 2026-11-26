@@ -1,7 +1,7 @@
 import type { Context, Next } from 'hono';
 import type { AppBindings } from '../types.js';
+import { siteOrigin } from '../lib/origin.ts';
 
-const ALLOWED_ORIGIN = 'https://aired.sh';
 const ALLOWED_METHODS = 'GET, POST, PUT, DELETE, OPTIONS';
 const ALLOWED_HEADERS = 'Content-Type, Authorization, aired-Session, X-Aired-Request';
 const PUBLIC_ALLOWED_HEADERS = 'Authorization, Content-Type, Mcp-Session-Id, Mcp-Protocol-Version, Last-Event-ID';
@@ -30,13 +30,14 @@ function allowsCredentials(path: string): boolean {
  * Paths starting with /auth/* (excluding /auth/logout) still get CORS headers
  * but WITHOUT Allow-Credentials.
  */
-function originAllowed(origin: string, path: string): boolean {
-  if (origin !== ALLOWED_ORIGIN) return false;
+function originAllowed(origin: string, path: string, allowed: string): boolean {
+  if (origin !== allowed) return false;
   return path.startsWith('/api/') || path.startsWith('/auth/');
 }
 
 /**
  * CORS middleware.
+ * The allowed origin is siteOrigin(env): https://aired.sh in production.
  * - OPTIONS preflight from https://aired.sh on /api/* or /auth/logout → full CORS with credentials.
  * - OPTIONS preflight from https://aired.sh on other /auth/* → CORS without credentials.
  * - Other origins → 200 with no CORS headers.
@@ -48,6 +49,7 @@ export async function corsMiddleware(
 ): Promise<Response | void> {
   const origin = c.req.header('Origin') ?? '';
   const path = new URL(c.req.url).pathname;
+  const allowed = siteOrigin(c.env);
 
   // MCP and its OAuth protocol endpoints are called by clients on any origin
   // (MCP Inspector runs in a browser) with a bearer token, never cookies: open
@@ -72,7 +74,7 @@ export async function corsMiddleware(
   }
 
   if (c.req.method === 'OPTIONS') {
-    if (originAllowed(origin, path)) {
+    if (originAllowed(origin, path, allowed)) {
       const withCreds = allowsCredentials(path);
       c.header('Access-Control-Allow-Origin', origin);
       c.header('Access-Control-Allow-Methods', ALLOWED_METHODS);
@@ -89,7 +91,7 @@ export async function corsMiddleware(
   await next();
 
   // Post-request: add CORS headers for matching origins
-  if (originAllowed(origin, path)) {
+  if (originAllowed(origin, path, allowed)) {
     c.header('Access-Control-Allow-Origin', origin);
     c.header('Access-Control-Allow-Methods', ALLOWED_METHODS);
     c.header('Access-Control-Allow-Headers', ALLOWED_HEADERS);

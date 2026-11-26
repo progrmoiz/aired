@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { injectAiredBar, BADGE_HREF, OG_DESCRIPTION } from "../src/lib/aired-bar.ts";
+import { injectAiredBar, badgeHref, OG_DESCRIPTION } from "../src/lib/aired-bar.ts";
 
-const opts = { id: "abc123", title: "Q3 report", readCount: 1284 };
+const opts = { origin: "https://aired.sh", id: "abc123", title: "Q3 report", readCount: 1284 };
+const BADGE_HREF = badgeHref(opts.origin);
 
 test("badge says Shared with aired and links home with a ref tag", () => {
   const out = injectAiredBar("<html><head></head><body><p>hi</p></body></html>", opts);
@@ -28,7 +29,7 @@ test("works on fragments with no head or body", () => {
 });
 
 test("title and id are escaped", () => {
-  const out = injectAiredBar("<head></head><body></body>", { id: 'a"b', title: '"><script>x</script>', readCount: 1 });
+  const out = injectAiredBar("<head></head><body></body>", { origin: "https://aired.sh", id: 'a"b', title: '"><script>x</script>', readCount: 1 });
   assert.ok(!out.includes('"><script>x</script>'));
   assert.ok(out.includes("1 view<"));
   assert.ok(out.includes("og/a%22b"));
@@ -57,4 +58,12 @@ test("badge shows by default and with badge: true", () => {
   const html = "<html><head></head><body></body></html>";
   assert.ok(injectAiredBar(html, opts).includes('id="__aired-bar"'));
   assert.ok(injectAiredBar(html, { ...opts, badge: true }).includes('id="__aired-bar"'));
+});
+
+test("the badge, report link and OG image follow the deploy's origin", () => {
+  const out = injectAiredBar("<head></head><body></body>", { ...opts, origin: "https://staging.aired.sh" });
+  assert.ok(out.includes('href="https://staging.aired.sh/?ref=badge"'));
+  assert.ok(out.includes("https://staging.aired.sh/abuse?id=abc123"));
+  assert.ok(out.includes('content="https://staging.aired.sh/og/abc123"'));
+  assert.ok(!out.includes("https://aired.sh"));
 });
