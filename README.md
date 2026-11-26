@@ -289,7 +289,6 @@ npm run deploy
 
 - The `[[ratelimits]]` bindings in `wrangler.toml` (`PUBLISH_BURST`, `REPORT_BURST`, `PIN_GUESS`, `PIN_GUESS_PAGE`, `DEVICE_BURST`, `OAUTH_BURST`) need no setup; give them your own `namespace_id`s if you run more than one deployment in an account.
 - Set `SITE_ORIGIN` if you're not serving from aired.sh, and change the `[[routes]]` to your domain. Every link the Worker writes follows it (`src/lib/origin.ts`); the static pages in `apps/web/` still say aired.sh.
-- `[env.staging]` in `wrangler.toml` is aired's own staging deploy; delete it or point it at your own resources. See `docs/deploy.md`.
 - Optional, off until set: billing (`BILLING_ENABLED`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_MONTHLY`, `STRIPE_PRICE_YEARLY`, `STRIPE_MANAGED_PAYMENTS`) and WorkOS sign-in (`WORKOS_CLIENT_ID`, `WORKOS_API_KEY`).
 - The `[browser]` binding (`BROWSER`, Cloudflare Browser Rendering) takes each page's link-preview screenshot, which `/og/:id` serves; it needs no setup. Screenshots stop for the day after 8 minutes of browser time (Workers Free allows 10); set `OG_SHOT_DAILY_SECONDS` to change that, or `0` to keep the generated card for every page.
 - The `[assets]` directive serves the site from `apps/web/`, and a Cron Trigger every 5 minutes removes expired pages' files from R2.

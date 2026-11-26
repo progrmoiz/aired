@@ -3,8 +3,8 @@
  * redirect URIs, Stripe return URLs, claim and upgrade links, the badge,
  * OG tags, MCP replies and the CORS allow-list.
  *
- * Production leaves SITE_ORIGIN unset and gets https://aired.sh. Staging sets
- * it in wrangler.toml [env.staging.vars]; local dev sets it in .dev.vars.
+ * Production leaves SITE_ORIGIN unset and gets https://aired.sh. Local dev
+ * sets it in .dev.vars; a self-hosted deploy sets it to its own domain.
  * Never taken from the request, so a forged Host header can't redirect
  * anyone.
  *
@@ -16,9 +16,4 @@ export const PRODUCTION_ORIGIN = "https://aired.sh";
 
 export function siteOrigin(env: { SITE_ORIGIN?: string | undefined }): string {
   return (env.SITE_ORIGIN || PRODUCTION_ORIGIN).replace(/\/+$/, "");
-}
-
-/** True for any deploy that isn't production (staging, local dev). */
-export function isProductionOrigin(env: { SITE_ORIGIN?: string | undefined }): boolean {
-  return siteOrigin(env) === PRODUCTION_ORIGIN;
 }
