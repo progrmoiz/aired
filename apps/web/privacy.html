@@ -50,7 +50,7 @@
 
 <main class="wrap">
   <article class="legal">
-    <p class="updated">Last updated: November 25, 2026</p>
+    <p class="updated">Last updated: November 26, 2026</p>
 
     <p class="eyebrow">Legal</p>
     <h1>Privacy policy</h1>
@@ -82,17 +82,16 @@
     <p>The web form keeps your page links and update tokens in your browser's local storage, so you can manage those pages later. The CLI keeps them in a file on your computer. They stay on your device until you use them.</p>
 
     <h3>When you sign in</h3>
-    <p>Today you sign in with GitHub. We ask GitHub only for <code>read:user</code> and <code>user:email</code>. We never get access to your repositories, organizations or gists, and we never see your GitHub password. We keep:</p>
+    <p>You sign in through WorkOS, with an email code, Google or GitHub. WorkOS checks who you are and gives us your email address, whether it's verified, and your name. If you use GitHub, we ask it only for your public profile and email, and use GitHub's answer once to find your existing account. We never get access to your repositories, organizations or gists, we never store your GitHub access, and we never see any password. We keep:</p>
     <ul>
-      <li>Your GitHub numeric id, so your account survives a username change.</li>
-      <li>Your GitHub username and display name, to show in your dashboard.</li>
+      <li>If you use GitHub: your GitHub numeric id, so your account survives a username change.</li>
+      <li>Your name (and GitHub username, if you use GitHub), to show in your dashboard.</li>
       <li>Your primary email, only if it's verified and not a GitHub "noreply" address. Otherwise we store nothing. We use it to recognize your account. <strong>We don't send marketing email.</strong> If we ever send product news, you'll have to opt in. Link sends your receipts and billing emails.</li>
       <li>Your projects and the list of pages you own.</li>
-      <li>Which sign-in you used (GitHub today), with its verified email if it gave one (same rule as above), so a later sign-in reaches the same account.</li>
+      <li>Which sign-in you used (email code, Google or GitHub), with its verified email if it gave one (same rule as above), so a later sign-in reaches the same account.</li>
       <li>If you create API keys: a one-way hash of each key (never the key itself), its first few characters so you can tell keys apart, its name, when it was created and last used, and when you revoked it.</li>
       <li>If you connect an app to aired over MCP (for example a chat assistant): which app, where it receives access, and when you approved it. Its access is stored as hashes.</li>
     </ul>
-    <p>We plan to move sign-in to WorkOS, which adds Google, Microsoft, Apple and email codes. Once that's switched on, WorkOS checks who you are and gives us your email address, whether it's verified and your name, and we keep the same things as above. This page will say when it's on.</p>
 
     <h3>When you pay for Pro</h3>
     <p>Link, Stripe's checkout, collects your card details, name, email and billing address on its own checkout page. <strong>We never see or store your card number.</strong> Stripe sends us back, and we keep:</p>
@@ -137,8 +136,8 @@
         <tbody>
           <tr><td>Cloudflare</td><td>Hosting, storage and delivery of every page, and cookieless visit counts on aired.sh's own pages (Cloudflare Web Analytics). Like any host, it sees visitors' IP addresses to deliver pages and block attacks.</td><td><a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener">cloudflare.com/privacypolicy</a></td></tr>
           <tr><td>Link (Stripe)</td><td>Sells Pro to you as the merchant of record: checkout, payment, tax, receipts, refunds and disputes. Link decides how it uses that data, under its own privacy policy.</td><td><a href="https://link.com/privacy" target="_blank" rel="noopener">Link's privacy policy</a>, also linked at checkout</td></tr>
-          <tr><td>GitHub</td><td>Sign-in (current)</td><td><a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener">GitHub privacy statement</a></td></tr>
-          <tr><td>WorkOS</td><td>Sign-in with Google, GitHub, Microsoft, Apple or an email code. <strong>Not used yet</strong>: only once aired switches sign-in to it. Receives your email address and name.</td><td><a href="https://workos.com/privacy" target="_blank" rel="noopener">workos.com/privacy</a></td></tr>
+          <tr><td>GitHub</td><td>Sign-in, if you choose GitHub</td><td><a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener">GitHub privacy statement</a></td></tr>
+          <tr><td>WorkOS</td><td>Runs sign-in: email codes, Google and GitHub. Receives your email address and name.</td><td><a href="https://workos.com/privacy" target="_blank" rel="noopener">workos.com/privacy</a></td></tr>
         </tbody>
       </table>
     </div>
@@ -151,8 +150,8 @@
         <thead><tr><th>Cookie</th><th>What it does</th><th>How long</th></tr></thead>
         <tbody>
           <tr><td><code>aired_session</code></td><td>Keeps you signed in. Your browser's scripts can't read it.</td><td>30 days, renewed as you use aired</td></tr>
-          <tr><td><code>aired_oauth_state</code></td><td>Protects the GitHub sign-in step from forgery.</td><td>10 minutes</td></tr>
-          <tr><td><code>aired_workos_sid</code></td><td>Only once sign-in goes through WorkOS: lets signing out of aired sign you out of WorkOS too.</td><td>30 days</td></tr>
+          <tr><td><code>aired_oauth_state</code></td><td>Protects the sign-in step from forgery.</td><td>10 minutes</td></tr>
+          <tr><td><code>aired_workos_sid</code></td><td>Lets signing out of aired sign you out of WorkOS too.</td><td>30 days</td></tr>
           <tr><td><code>__Host-oauth-consent-…</code></td><td>Only while you connect an app over MCP: ties the Allow button to your browser so another site can't press it for you.</td><td>10 minutes</td></tr>
           <tr><td><code>pin_&lt;page id&gt;</code></td><td>Shows you entered that page's PIN, so you don't have to type it again. It doesn't contain the PIN. Only sent to that page.</td><td>1 hour</td></tr>
         </tbody>
@@ -187,7 +186,7 @@
     <p>aired isn't meant for anyone under 16. If you think someone under 16 has given us personal data, email <a href="mailto:support@aired.sh">support@aired.sh</a> and we'll delete it.</p>
 
     <h2>Security</h2>
-    <p>Every connection to aired uses HTTPS. Session cookies are HttpOnly and Secure. Update tokens are stored only as hashes. Page PINs are stored as salted hashes (older ones once they're next used), and PIN guesses are rate-limited. GitHub sign-in asks for the smallest set of permissions. The code is open source, so anyone can check how it handles data. If we ever have a breach that puts your data at risk, we'll tell affected users and the authorities as the law requires.</p>
+    <p>Every connection to aired uses HTTPS. Session cookies are HttpOnly and Secure. Update tokens are stored only as hashes. Page PINs are stored as salted hashes (older ones once they're next used), and PIN guesses are rate-limited. Sign-in asks for the smallest set of permissions. The code is open source, so anyone can check how it handles data. If we ever have a breach that puts your data at risk, we'll tell affected users and the authorities as the law requires.</p>
 
     <h2>Changes and questions</h2>
     <p>When we change this policy, we update this page and the date at the top. The full history is in the <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">public repository</a>. If a change affects how we use data you already gave us, we tell signed-in users before it takes effect. Questions? Email <a href="mailto:support@aired.sh">support@aired.sh</a>. See also our <a href="/terms">terms</a> and <a href="/refunds">refund policy</a>.</p>

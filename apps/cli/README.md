@@ -144,7 +144,7 @@ Every command outputs structured JSON. Exit codes are consistent:
 
 ## Accounts (optional)
 
-Sign in with GitHub to manage all your pages in one place.
+Sign in to manage all your pages in one place.
 Anonymous publish still works without an account.
 
 ```bash
