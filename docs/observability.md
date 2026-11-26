@@ -72,8 +72,8 @@ These are worth a daily look but shouldn't page anyone:
 3. **Cloudflare Issues (open beta, free, no new account).**
    - Issues groups uncaught exceptions, 5xx responses and `console.error`
      lines that carry a stack trace. That covers every `logError` call.
-   - It needs **wrangler 4.134.0 or later**, and the repo pins 4.78.
-   - Upgrade wrangler first, then add this to `wrangler.toml`:
+   - It needs **wrangler 4.134.0 or later**, and the repo pins 4.161.0.
+   - It is on in `wrangler.toml`:
      ```toml
      [observability.issues]
      enabled = true

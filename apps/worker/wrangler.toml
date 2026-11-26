@@ -16,6 +16,11 @@ workers_dev = true
 enabled = true
 head_sampling_rate = 1
 
+# Cloudflare Issues groups uncaught errors, 5xx and console.error with a
+# stack. It must stay in the config: a deploy without it turns Issues off.
+[observability.issues]
+enabled = true
+
 # Build the signed-in dashboard (apps/dashboard, React + shadcn/ui) into
 # ../web/dashboard.html and ../web/dashboard-assets/ before every `wrangler dev`
 # and `wrangler deploy`, so a deploy can never ship a stale or missing dashboard.
