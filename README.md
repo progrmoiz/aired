@@ -237,7 +237,7 @@ Serves the raw HTML. If PIN-protected, serves a PIN entry page first.
 
 ## Accounts (optional)
 
-Sign in with GitHub at aired.sh to manage all your pages in one place.
+Sign in at aired.sh to manage all your pages in one place.
 Anonymous publish still works without an account.
 
 CLI:
