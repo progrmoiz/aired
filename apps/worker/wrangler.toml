@@ -155,17 +155,17 @@ bucket_name = "aired-pages-staging"
 # Owner: `wrangler kv namespace create aired-staging`, paste the id in both.
 [[env.staging.kv_namespaces]]
 binding = "PAGES_KV"
-id = "REPLACE_WITH_STAGING_KV_ID"
+id = "20b26dfbd9dc49e1ace1f1071c56b7e2"
 
 [[env.staging.kv_namespaces]]
 binding = "OAUTH_KV"
-id = "REPLACE_WITH_STAGING_KV_ID"
+id = "20b26dfbd9dc49e1ace1f1071c56b7e2"
 
 # Owner: `wrangler d1 create aired-staging`, paste the id.
 [[env.staging.d1_databases]]
 binding = "DB"
 database_name = "aired-staging"
-database_id = "REPLACE_WITH_STAGING_D1_ID"
+database_id = "d1735d1e-1f73-4613-acb4-40d4b5925d1e"
 migrations_dir = "migrations"
 
 [env.staging.browser]
