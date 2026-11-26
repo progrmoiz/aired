@@ -124,7 +124,7 @@ test("api.ts: every page HTML write queues a screenshot after the response", () 
 test("api.ts: deleting a page deletes its screenshots and placeholder", () => {
   const api = src("../src/routes/api.ts");
   const del = api.slice(api.indexOf('api.delete("/pages/:id"'));
-  assert.match(del.slice(0, del.indexOf("\n});")), /await deletePage\(c\.env, page\)/);
+  assert.match(del.slice(0, del.indexOf("\n});")), /await deletePage\(c\.env, page, /);
   const write = src("../src/lib/page-write.ts");
   const fn = write.slice(write.indexOf("export async function deletePage"));
   assert.match(fn.slice(0, fn.indexOf("\n}\n")), /await forgetShots\(env, row\.id\)/);

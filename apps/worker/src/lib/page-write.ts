@@ -8,6 +8,7 @@ import {
   removePageFromOwnerProject,
 } from "./owner-index.js";
 import {
+  getPageRow,
   insertPageRow,
   isLive,
   markPageDeleted,
@@ -71,25 +72,28 @@ export class StorageUnavailable extends Error {}
 const limitHit = (err: unknown) => (err instanceof Error ? err.message : String(err)).includes("limit exceeded");
 
 /**
- * Create a page: R2, then its D1 row, then the KV cache record, then the
- * old KV indexes (best-effort). A failure after the HTML is stored undoes
- * what was written and throws, so no half-made page is left behind; a
- * storage "limit exceeded" becomes StorageUnavailable (503).
+ * Create a page: its D1 row, then R2, then the KV cache record, then the old
+ * KV indexes (best-effort). A failure undoes what was written and throws, so
+ * no half-made page is left behind; a storage failure or "limit exceeded"
+ * becomes StorageUnavailable (503). The row goes first so an id that is
+ * somehow taken fails before anything of the other page is overwritten.
  */
 export async function createPage(env: PageEnv, page: PageMetadata, html: string, now = Date.now()): Promise<R2Object | null> {
+  const row = rowFromMetadata(page, null, now);
+  let inserted: boolean;
+  try {
+    inserted = await insertPageRow(env.DB, row);
+  } catch (err) {
+    throw new StorageUnavailable(`pages insert failed: ${String(err)}`);
+  }
+  if (!inserted) throw new Error(`page id ${page.id} is already taken`);
   let htmlObj: R2Object | null;
   try {
     htmlObj = await env.PAGES_BUCKET.put(`pages/${page.id}/index.html`, html, HTML_TYPE);
   } catch (err) {
+    await removePageRow(env.DB, page.id).catch(() => {});
     if (limitHit(err)) throw new StorageUnavailable(String(err));
     throw err;
-  }
-  const row = rowFromMetadata(page, null, now);
-  try {
-    await insertPageRow(env.DB, row);
-  } catch (err) {
-    await env.PAGES_BUCKET.delete(`pages/${page.id}/index.html`).catch(() => {});
-    throw new StorageUnavailable(`pages insert failed: ${String(err)}`);
   }
   try {
     await env.PAGES_KV.put(kvKeys.page(page.id), serializeMetadata(page), kvOptions(row.expiresAt, now));
@@ -123,6 +127,11 @@ export async function indexForOwner(kv: KVNamespace, ownerId: number, page: Page
  * permanent), then R2, then the KV record rebuilt from the row (so even a
  * missing or stale cache entry comes back right). Returns the new record
  * and the HTML's etag, for the screenshot.
+ *
+ * The row is read again after the writes. If a delete marked it in the
+ * meantime, what this update wrote is removed again, so a deleted page
+ * can't come back. If a claim changed its owner or token, the KV record is
+ * rebuilt from the row as it is now.
  */
 export async function updatePage(
   env: PageEnv,
@@ -140,19 +149,51 @@ export async function updatePage(
   const htmlObj = await env.PAGES_BUCKET.put(`pages/${row.id}/index.html`, html, HTML_TYPE);
   const metadata = cacheRecord(updated, kv);
   await env.PAGES_KV.put(kvKeys.page(row.id), serializeMetadata(metadata), kvOptions(expiresAt, now));
+
+  const after = await getPageRow(env.DB, row.id);
+  if (after === null || after.deletedAt !== null) {
+    await removeContent(env, row.id);
+    throw new Error("page was deleted during the update");
+  }
+  if (after.ownerId !== updated.ownerId || after.tokenHash !== updated.tokenHash) await refreshCache(env.PAGES_KV, after, now);
   return { metadata, expiresAt: metadata.expiresAt, htmlEtag: htmlObj?.etag ?? null };
 }
 
+/** A page's HTML and KV record, a few tries before giving up. */
+async function removeContent(env: PageEnv, id: string): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await Promise.all([env.PAGES_BUCKET.delete(`pages/${id}/index.html`), env.PAGES_KV.delete(kvKeys.page(id))]);
+      return;
+    } catch (err) {
+      if (attempt >= 3) throw err;
+      await new Promise((r) => setTimeout(r, 200 * attempt));
+    }
+  }
+}
+
 /**
- * Delete a page: its HTML and KV record first, then the row is marked
- * deleted. If marking fails this throws, and a retry (the row is still
- * live, so the same token works) finishes the job. Screenshots, the
- * `page_claims` tombstone and the old indexes follow, best-effort.
+ * Delete a page. The row is marked deleted first, so from then on no token
+ * works and no update can bring it back (updatePage re-checks). Then its
+ * HTML and KV record go; if that keeps failing, it's handed to `later`
+ * (waitUntil) and logged, since the page is already deleted for every API.
+ * Screenshots, the `page_claims` tombstone and the old indexes follow,
+ * best-effort. Throws only if the row can't be marked: nothing has changed
+ * then, and a retry works.
  */
-export async function deletePage(env: PageEnv, page: LoadedPage, now = Date.now()): Promise<void> {
+export async function deletePage(env: PageEnv, page: LoadedPage, later: (work: Promise<unknown>) => void, now = Date.now()): Promise<void> {
   const { row } = page;
-  await Promise.all([env.PAGES_BUCKET.delete(`pages/${row.id}/index.html`), env.PAGES_KV.delete(kvKeys.page(row.id))]);
   await markPageDeleted(env.DB, row.id, now);
+  try {
+    await removeContent(env, row.id);
+  } catch (err) {
+    console.error({ event: "page_delete_cleanup_retry", id: row.id, error: String(err) });
+    later(
+      new Promise((r) => setTimeout(r, 5_000))
+        .then(() => removeContent(env, row.id))
+        .catch((e) => console.error({ event: "page_delete_cleanup_failed", id: row.id, error: String(e) })),
+    );
+  }
   try {
     await forgetShots(env, row.id);
   } catch (err) {

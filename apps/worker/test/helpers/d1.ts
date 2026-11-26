@@ -34,14 +34,13 @@ export function fakeD1(sql = migrationsSql()) {
       async first<T>() { check(q); return ((raw.prepare(q).get(...(args as never[])) as T | undefined) ?? null); },
       async run() { check(q); const r = raw.prepare(q).run(...(args as never[])); return { meta: { changes: Number(r.changes) } }; },
       async all<T>() { check(q); return { results: raw.prepare(q).all(...(args as never[])) as T[] }; },
-      _run() { check(q); raw.prepare(q).run(...(args as never[])); },
+      _all() { check(q); return { results: raw.prepare(q).all(...(args as never[])), meta: {} }; },
     };
     return stmt;
   };
-  const batch = async (stmts: Array<{ _run: () => void }>) => {
+  const batch = async (stmts: Array<{ _all: () => unknown }>) => {
     raw.exec("BEGIN");
-    try { for (const s of stmts) s._run(); raw.exec("COMMIT"); } catch (e) { raw.exec("ROLLBACK"); throw e; }
-    return [];
+    try { const out = stmts.map((s) => s._all()); raw.exec("COMMIT"); return out; } catch (e) { raw.exec("ROLLBACK"); throw e; }
   };
   return {
     raw,

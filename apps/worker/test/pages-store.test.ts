@@ -198,3 +198,22 @@ test("batch helpers take any number of ids in one query", async () => {
   const claims = await claimsFor(db, ["id3", "id4", "id5"]);
   assert.deepEqual([...claims.keys()].sort(), ["id3", "id4"]);
 });
+
+test("account deletion releases pages in the same batch as the account rows: both or neither", async () => {
+  const { deleteAccountRows } = await import("../src/lib/billing/forget.ts");
+  const { releaseOwnerPagesStatement, releasedRows } = await import("../src/lib/pages-store.ts");
+  const f = fakeD1();
+  f.raw.prepare("INSERT INTO users (id, email, name, login, created_at) VALUES (1, 'a@example.com', 'A', 'a', 'x')").run();
+  await insertPageRow(f.db, row("a", { ownerId: 1 }));
+  await insertPageRow(f.db, row("b", { ownerId: 1 }));
+
+  f.fail(/DELETE FROM users/);
+  await assert.rejects(deleteAccountRows(f.db, 1, [releaseOwnerPagesStatement(f.db, 1, NOW)]));
+  assert.equal((await getPageRow(f.db, "a"))!.ownerId, 1, "a failed account delete leaves the pages owned");
+
+  f.fail(null);
+  const [released] = await deleteAccountRows(f.db, 1, [releaseOwnerPagesStatement(f.db, 1, NOW)]);
+  assert.deepEqual(releasedRows(released, NOW).map((r) => r.id).sort(), ["a", "b"]);
+  assert.equal((await getPageRow(f.db, "a"))!.ownerId, null);
+  assert.equal(f.raw.prepare("SELECT count(*) AS n FROM users").get()!.n, 0);
+});

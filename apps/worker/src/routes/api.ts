@@ -361,10 +361,11 @@ api.delete("/pages/:id", requireCsrfHeader, async (c) => {
     return c.json({ error: "Authorization: Bearer <update_token> is required" }, 401);
   }
 
-  // HTML and cache record, then the D1 row (lib/page-write.ts). If the row
-  // can't be marked, the page is still live there and a retry finishes.
+  // The D1 row is marked first, then the HTML and cache record go
+  // (lib/page-write.ts). If the row can't be marked, nothing has changed and
+  // a retry works.
   try {
-    await deletePage(c.env, page);
+    await deletePage(c.env, page, (work) => c.executionCtx.waitUntil(work));
   } catch (err) {
     console.error("page delete failed", { id, err });
     return c.json({ error: "Could not delete this page. Please try again." }, 503);

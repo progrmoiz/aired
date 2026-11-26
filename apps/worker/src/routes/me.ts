@@ -41,7 +41,8 @@ import {
   listOwnerProjects,
   metadataFromRow,
   releaseOwnerPage,
-  releaseOwnerPages,
+  releaseOwnerPagesStatement,
+  releasedRows,
   replacePageToken,
   resolvePage,
   type PageRow,
@@ -498,19 +499,15 @@ me.delete('/', requireWebSession, requireCsrfHeader, async (c) => {
     console.error('Failed to set the revocation marker during account deletion:', err);
     return c.json({ error: 'Could not delete your account. Please try again.' }, 503);
   }
-  // The account's pages become anonymous pages, in D1 (the source of truth)
-  // in one statement, before the account rows go: a failure here leaves the
-  // account intact to retry. Their KV records follow after the response.
+  // The account's pages become anonymous pages in D1 (the source of truth)
+  // in the same batch as the account rows: both commit or neither, so a
+  // failure leaves the account and its pages as they were, to retry. Their
+  // KV records follow after the response.
   let releasedPages: PageRow[];
   try {
-    releasedPages = await releaseOwnerPages(c.env.DB, userId, Date.now());
-  } catch (err) {
-    console.error('Failed to release pages during account deletion:', err);
-    clearSessionCookie(c);
-    return c.json({ error: 'Could not delete your account records. Sign in again and retry.' }, 503);
-  }
-  try {
-    await deleteAccountRows(c.env.DB, userId);
+    const now = Date.now();
+    const [released] = await deleteAccountRows(c.env.DB, userId, [releaseOwnerPagesStatement(c.env.DB, userId, now)]);
+    releasedPages = releasedRows(released, now);
   } catch (err) {
     console.error('Failed to delete account rows during account deletion:', err);
     // The marker above already ended every session, this one included.

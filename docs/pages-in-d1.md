@@ -16,20 +16,25 @@ create, update, delete and lookup every route uses) and
 | View count | KV `page:<id>` | — (WP9 moves it) |
 | HTML | R2 `pages/<id>/index.html` | — |
 
-- **Writes.** Create writes R2, then the row, then the KV record; a failure
-  undoes the others. Update writes the row first, then R2, then the KV
-  record rebuilt from the row. Delete removes R2 and KV, then marks the row
-  deleted; if marking fails, a retry with the same token finishes it.
+- **Writes.**
+  - Create writes the row, then R2, then the KV record. A failure undoes
+    the others.
+  - Update writes the row first, then R2, then the KV record rebuilt from
+    the row. It then reads the row again: if a delete marked it meanwhile,
+    the update removes what it wrote; if a claim changed it, the KV record
+    is rebuilt.
+  - Delete marks the row deleted first, so no token works from then on,
+    then removes R2 and KV, retrying in the background if needed. If the
+    mark fails, nothing has changed, and a retry works.
 - **Reads.** Publish-update, PUT, DELETE, the anonymous MCP tool, claims,
   previews and tiles all go through `loadPage`. It reads the row, makes it
   from the KV record (and any `page_claims` row) if the page has none yet,
   and treats deleted or expired rows as not found. A D1 error answers 503.
   It never falls back to KV.
 - **Viewer.** It still reads only KV `page:<id>`, as its cache.
-- **Account deletion.** It releases the account's pages in D1 in one
-  statement, before the account rows are deleted. A failure there leaves
-  the account intact to retry. KV records and the old indexes follow in
-  the background.
+- **Account deletion.** It releases the account's pages in D1 in the
+  same batch that deletes the account rows, so both happen or neither
+  does. KV records and the old indexes follow in the background.
 - **Sweep.** The expired-page sweep keeps a file whose page D1 has as live,
   even if KV doesn't.
 
@@ -94,13 +99,27 @@ Each step is safe to stop after.
   overwrites a row that exists, so changes the old code made in between to
   pages that already had rows need copying across:
   - Title, size and expiry are rewritten by the page's next update.
-  - Deletions and claims are not. Run this once after the redeploy:
+  - Deletions, claims, claim retries and account deletions are not. Run
+    this once after the redeploy, in this order:
     ```sql
+    -- Claims made under the old code.
     UPDATE pages SET owner_id = c.owner_id, token_hash = c.token_hash, prev_token_hash = c.prev_token_hash, claimed_at = c.claimed_at
     FROM page_claims c WHERE c.page_id = pages.id AND c.claimed_at > coalesce(pages.claimed_at, 0) AND c.token_hash <> 'deleted';
+    -- Token reissues (same owner, new token).
+    UPDATE pages SET token_hash = c.token_hash
+    FROM page_claims c WHERE c.page_id = pages.id AND c.owner_id = pages.owner_id AND c.token_hash <> pages.token_hash AND c.token_hash <> 'deleted';
+    -- Account deletions (claims released).
+    UPDATE pages SET owner_id = NULL
+    FROM page_claims c WHERE c.page_id = pages.id AND c.owner_id IS NULL AND pages.owner_id IS NOT NULL AND c.token_hash <> 'deleted';
+    -- Deletions.
     UPDATE pages SET deleted_at = c.claimed_at, token_hash = 'deleted'
     FROM page_claims c WHERE c.page_id = pages.id AND c.token_hash = 'deleted' AND pages.deleted_at IS NULL;
+    -- Pages that were never claimed but whose account was deleted under the old code.
+    UPDATE pages SET owner_id = NULL WHERE owner_id IS NOT NULL AND owner_id NOT IN (SELECT id FROM users);
     ```
+    The last statement relies on D1 `users` holding every account. Check
+    that first: `SELECT count(*) FROM users` against the number of
+    `user:` keys in KV. If D1 is short, skip that statement.
 
 ## Retiring the old copies (a later change)
 

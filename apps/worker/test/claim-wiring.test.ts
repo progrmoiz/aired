@@ -33,7 +33,11 @@ test("page-write.ts: loadPage reads the row (made from KV only if missing) and d
 
 test("page-write.ts: DELETE marks the row and tombstones page_claims for a rollback", () => {
   const code = src("lib/page-write.ts");
-  assert.match(code, /await markPageDeleted\(env\.DB, row\.id, now\);/);
+  // Marked first, so no update can bring the page back once a delete starts.
+  const fn = code.slice(code.indexOf("export async function deletePage"));
+  assert.match(fn, /^[^]*?\{\s*const \{ row \} = page;\s*await markPageDeleted\(env\.DB, row\.id, now\);\s*try \{\s*await removeContent\(env, row\.id\);/);
+  // An update that raced a delete removes what it wrote.
+  assert.match(code, /if \(after === null \|\| after\.deletedAt !== null\) \{\s*await removeContent\(env, row\.id\);/);
   assert.match(code, /tombstoneClaim\(env\.DB, row\.id, now\)/);
   assert.doesNotMatch(code, /DELETE FROM page_claims/);
 });
@@ -50,8 +54,8 @@ test("me.ts: claims go through runClaim on the row; account deletion releases pa
   assert.match(code, /runClaim\(/);
   assert.match(code, /upsertClaim: \(record, checkedHash\) => claimPageRow\(env\.DB, pageId, record, checkedHash\)/);
   assert.match(code, /replaceClaimToken: \(hash\) => replacePageToken\(env\.DB, pageId, userId, hash, Date\.now\(\)\)/);
-  const release = code.indexOf("releasedPages = await releaseOwnerPages(c.env.DB, userId, Date.now());");
-  assert.ok(release > 0 && release < code.indexOf("await deleteAccountRows(c.env.DB, userId);"), "pages are released before the account rows go");
+  // Pages are released in the same batch as the account rows.
+  assert.match(code, /await deleteAccountRows\(c\.env\.DB, userId, \[releaseOwnerPagesStatement\(c\.env\.DB, userId, now\)\]\)/);
   assert.match(code, /releaseClaimsForOwner\(c\.env\.DB, userId\)/);
   // Lists and project counts come from D1, not the KV indexes.
   assert.match(code, /listOwnerPages\(c\.env\.DB, ownerId, filter, cursor, limit, Date\.now\(\)\)/);

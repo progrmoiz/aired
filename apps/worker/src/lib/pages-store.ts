@@ -257,15 +257,22 @@ export async function replacePageToken(db: D1Database, id: string, ownerId: numb
 
 /**
  * Account deletion: every page of this owner becomes anonymous, keeping its
- * token. Returns the live ones as they are now, for refreshing their KV
- * cache records.
+ * token. A statement, so it can run in the same batch as the account's own
+ * rows (lib/billing/forget.ts deleteAccountRows): both commit or neither.
+ * Read its result with releasedRows.
  */
+export function releaseOwnerPagesStatement(db: D1Database, ownerId: number, now: number): D1PreparedStatement {
+  return db.prepare(`UPDATE pages SET owner_id = NULL, updated_at = ? WHERE owner_id = ? RETURNING ${COLUMNS}`).bind(now, ownerId);
+}
+
+/** The live pages a release statement returned, as they are now, for refreshing their KV records. */
+export function releasedRows(result: D1Result | undefined, now: number): PageRow[] {
+  return ((result?.results ?? []) as DbRow[]).map(fromDb).filter((r) => isLive(r, now));
+}
+
+/** releaseOwnerPagesStatement on its own. */
 export async function releaseOwnerPages(db: D1Database, ownerId: number, now: number): Promise<PageRow[]> {
-  const { results } = await db
-    .prepare(`UPDATE pages SET owner_id = NULL, updated_at = ? WHERE owner_id = ? RETURNING ${COLUMNS}`)
-    .bind(now, ownerId)
-    .all<DbRow>();
-  return results.map(fromDb).filter((r) => isLive(r, now));
+  return releasedRows(await releaseOwnerPagesStatement(db, ownerId, now).all(), now);
 }
 
 /** Release one page of this owner (pages found only through the old KV index). */

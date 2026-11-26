@@ -77,7 +77,7 @@ test("only a subscription that will renew blocks account deletion", () => {
 
 test("me.ts deletes the D1 rows before responding, refusing on failure, and asks Stripe when D1 has no subscription", () => {
   const code = readFileSync(new URL("../src/routes/me.ts", import.meta.url), "utf8");
-  const del = code.indexOf("await deleteAccountRows(c.env.DB, userId)");
+  const del = code.indexOf("await deleteAccountRows(c.env.DB, userId, ");
   assert.ok(del > 0);
   assert.ok(del < code.indexOf("const response = c.json("), "D1 delete must run before the response");
   assert.ok(del < code.indexOf("c.executionCtx.waitUntil("), "D1 delete must not be in the background sweep");
