@@ -27,7 +27,23 @@ Numbered, ordered by priority. When unsure, run the decision through these.
 
 ---
 
-## 2. Color Tokens
+## 2. Design tokens: one source of truth
+
+**`packages/ui-tokens/tokens.css` is the only place colour, type, radius, spacing, shadow and motion values are defined.** Everything else reads from it:
+
+| Consumer | How it reads the tokens |
+|---|---|
+| Marketing site (`apps/web/site.css`) | `@import url("/tokens.css")`. `apps/web/tokens.css` is a synced copy made by `pnpm --filter @aired/ui-tokens sync`, which the Worker's `[build]` runs. Short aliases (`--bg`, `--text-1`, `--btn`…) point at `--aired-*`. |
+| Dashboard (`apps/dashboard/src/index.css`) | `@import "@aired/ui-tokens/tokens.css"`. shadcn's variables (`--background`, `--primary`, `--ring`, `--radius-*`…) and Tailwind theme sizes (`text-body`, `text-heading`, `text-title`, `text-display`) point at `--aired-*`. |
+| Guard | `apps/worker/test/tokens-sync.test.ts` fails if the copy drifts, or if either side stops mapping onto the tokens or puts a raw hex value in the dashboard theme. |
+
+Token groups: surfaces (`--aired-bg`, `-surface`, `-surface-2`, `-popover`, `-sidebar`, `-code-bg`), lines and overlays (`-border`, `-border-strong`, `-hairline`, `-hairline-strong`, `-glow`, `-tint`), text (`-text-1/2/3`), actions and states (`-primary`, `-on-primary`, `-mark`, `-ring`, `-ok`, `-warn`, `-warn-bg`, `-danger`, `-chip-bg`, `-chip-text`, `-avatar-*`), type (`-font-sans`, `-font-mono`, `-text-xs` … `-text-display`), radius (`-radius-sm` 6 → `-radius-full`), spacing (`-space` 4px, `-page-max`, `-gutter`), shadow (`-shadow-glow`, `-shadow-pop`) and motion (`-ease`, `-dur-fast`, `-dur`).
+
+**Two themes, one set of names.** Midnight (dark) is the default (`:root`). Daylight (`:root[data-theme="daylight"]`, neutral light, tighter corners) uses the same names with new values; every text colour passes WCAG AA on bg, surface and surface-2. Setting it on `<html>` (and dropping the `dark` class) re-skins anything that reads the tokens. The dashboard lets people pick; the marketing site stays Midnight.
+
+Illustration colours inside example artwork (the sample report, the code card) stay fixed on purpose: they depict a person's page, not aired.
+
+## 2.1 Color Tokens (dark set)
 
 Dark only. No light mode. All values come from `apps/web/tailwind.config.js` under `theme.extend.colors.aired`. Never hardcode hex in markup — use the token classes (`bg-aired-bg`, `text-aired-text-primary`, etc.).
 
@@ -287,36 +303,37 @@ Built from the shared kit at the end of `site.css`. Same header, footer, cards a
 The signed-in dashboard is the one page not built from `site.css`. It's a Vite + React + TypeScript app using shadcn/ui components on Base UI and Tailwind v4, scoped to `apps/dashboard`, so the marketing site's Tailwind 3 setup and `site.css` are untouched.
 
 - **Build:** `pnpm --filter @aired/dashboard build` writes `apps/web/dashboard.html` and `apps/web/dashboard-assets/`. Both are gitignored. `apps/worker/wrangler.toml` runs that build as its `[build]` command, so every `wrangler dev` and `wrangler deploy` builds a fresh dashboard. The Worker's `/dashboard` route (sign-in check, then the static file) is unchanged.
-- **Tokens:** DESIGN.md's palette under shadcn's variable names, in `apps/dashboard/src/index.css`:
-  - `--background` #0a0a0b, `--card` #111113, `--muted`/`--accent` #18181b, `--border` #222225, `--input` #34343a;
-  - `--foreground` #ededef, `--muted-foreground` #a1a1a6, plus an extra `--subtle` #84848a for the third text tier;
-  - `--primary` is the light button (#ededef on #0a0a0b);
-  - `--ring` and `--mark` are #7c6aef: focus rings, the logo mark and eyebrows only;
-  - `--destructive` is red-400, for destructive actions and errors only;
-  - `--radius` is 12px. Dark only (`<html class="dark">`).
+- **Tokens:** the shared tokens (§2) under shadcn's variable names, in `apps/dashboard/src/index.css`. `--primary` is the main button, `--ring`/`--mark` are focus rings, the logo mark and eyebrows only, and `--destructive` is for destructive actions and errors only.
+- **Themes:** Midnight (dark) and Daylight (light). The avatar menu offers System / Midnight / Daylight; System follows the device. The choice is stored in `localStorage` (`aired-theme`) and an inline script in `dashboard.html` applies it before first paint (`src/lib/theme.ts` holds the same rule).
 - **Fonts:** Inter and JetBrains Mono from `/fonts/fonts.css`, the same self-hosted files as the site. No Geist, no Google.
-- **Shell:** shadcn `Sidebar`, which becomes a drawer on phones, opened from a hamburger in the header.
-  - Sidebar: logo, **Publish a page**, Pages / Connect your AI tools / Plan & billing / Account, then Guides/Docs/Pricing and an account card showing the plan.
-  - The header and footer copy the site's: nav links, `@login`, a light **Publish** button, and the same footer links.
+- **Shell (Direction A, "Gallery"):** no sidebar. `TopBar` with the logo, Pages / AI tools / Plan (a scrolling row under 768px), a "Free plan · Go Pro" pill for free accounts, and the avatar menu (Account, Plan & billing, AI tools, Developer keys, theme, Sign out). The site's footer underneath.
   - Views live on `#pages`, `#connect`, `#billing` and `#account`. `?upgraded=1` and `?billing=…` open `#billing`.
-- **Components used:**
-  - Sidebar;
-  - Data Table (TanStack Table v8), with project group rows, sortable Page/Expires/Views columns, and cards under 768px;
-  - Card for the summary tiles;
-  - Input Group for search;
-  - Toggle Group for filters (chips with counts);
-  - Badge for status (Live / Expiring / Expired / PIN);
-  - Dropdown Menu for the row "…" menu;
-  - Alert Dialog for deleting a page, revoking a key and deleting the account;
-  - Dialog for a new key, with the key shown once;
-  - Tabs for the four tool setups;
-  - Collapsible for Developer keys;
-  - Empty for the first-page state;
-  - Sonner for toasts ("Copied", "Deleted …", "You're on Pro").
+  - **Pages:** a publish area at the top (`PublishZone`: drop or choose an `.html` file, or paste code; then how long it lasts and an optional PIN; it calls the same `POST /api/publish` as the homepage, so the page lands in the account). Below it: filter chips with counts, search, sort (Newest / Most viewed / Expiring first), a grid/list switch (remembered), and project chips when there are projects.
+  - **Grid tiles** show the real page, drawn small (`LivePreview`): once a tile scrolls into view, the dashboard fetches `GET /api/me/pages/:id/preview` (owner only, sent as text/plain with a sandbox CSP; no view counted, no PIN, view limit ignored, 404 for anyone else, 204 over 1 MB) and renders it in an `allow-scripts` iframe with an opaque origin, so the page's scripts run but can't reach the account. Until then, or when there's no preview, the `PageCover` (kind icon, title and link) shows. Tiles show views and age, PIN and expiry badges, Copy link and a "…" menu (Open, Report a problem, Delete). Expired pages are dimmed.
+  - **List** is the Data Table (TanStack Table v8) with project group rows and sortable Page/Expires/Views columns, cards under 768px.
+  - **Empty:** the publish area full size, with three example tiles underneath.
+- **Components used:** Input Group (search), Toggle Group (filters, layout, segmented choices), Badge, Dropdown Menu (sort, row menu, avatar menu with theme radio items), Dialog (publish, new key), Alert Dialog (delete page, revoke key, delete account), Tabs (tool setups), Collapsible (Developer keys), Skeleton (loading), Sonner (toasts, including "Published" with Copy link).
 - **Copy:** plain words. The jargon (MCP, header, `AIRED_API_KEY`) appears only inside Developer keys. Connector setup steps don't name menu paths, because those change between app versions.
-- **Accessibility:** one `<main>` (our `SidebarInset` renders a div), and focus moves to the view's H1 on navigation. Dialogs trap focus and start on Cancel. Every icon button has an `aria-label`, and touch targets are at least 24px. Lighthouse accessibility is 100 on Pages, Connect, Account and the empty state (desktop), and on Pages and Plan & billing (mobile).
-- **Generated files:** `src/components/ui/*` is shadcn's generated source and can be edited (see `sidebar.tsx`). `src/styles/shadcn-base.css` is vendored from `shadcn@4.23.0`, so the CLI isn't a runtime dependency.
+- **Accessibility:** one `<main>`, a skip link, and focus moves to the view's H1 on navigation. Dialogs trap focus and start on Cancel. Every icon button has an `aria-label`, and touch targets are at least 24px. Lighthouse accessibility is 100 on Pages, Connect, Account and the empty state (desktop), and on Pages and Plan & billing (mobile).
+- **Generated files:** `src/components/ui/*` is shadcn's generated source and can be edited. `src/styles/shadcn-base.css` is vendored from `shadcn@4.23.0`, so the CLI isn't a runtime dependency.
 - **Dependencies:** every direct dependency is an exact version published at least two weeks before it was added. Base UI's `@babel/runtime` is overridden to 8.1.0 for the same reason.
+
+### 9.5 Dashboard components (one library)
+
+Everything in the dashboard is built from shadcn/ui on Base UI, restyled through tokens and variants, never hand-rolled widgets:
+
+- **aired variants on shadcn primitives:**
+  - `Button`: `size="xl"`, `shape="pill"`;
+  - `Badge`: `chip`, `warn`, `overlay`;
+  - `Card`: `variant="panel" | "hero" | "bare"`;
+  - `Toggle`/`ToggleGroup`: `pill` (filter chips), `segment` (segmented controls).
+- **Reusable components (`apps/dashboard/src/components/`), each on those primitives:**
+  - pages: `PagePreview` (sandboxed render; `scripts` to let page JavaScript run), `LivePreview` (lazy owner preview with cover fallback), `PageCover`, `QrPlaceholder`, `PageTile` (`cover` or live preview; optional `meta`/`actions`);
+  - publishing: `DropZone` (+ `AiToolLinks`), `PublishZone` (DropZone wired to files, paste and `POST /api/publish`);
+  - chrome: `AccountMenu` (DropdownMenu, theme radio items), `UserBadge`, `TopBar` (optional `switcher`; section links become a scrolling row under 768px), `WorkspaceSwitcher` (DropdownMenu);
+  - people and sharing: `PersonAvatar`/`AvatarStack`, `ShareDialog` (Dialog: invite, who has access, link access, PIN, end date, view limit), `ChoicePicker` (DropdownMenu radio);
+  - controls: `IconAction`/`CopyLinkAction` (Button + Tooltip + Sonner), `Segmented`.
+- **tailwind-merge** is told that `text-body`, `text-md`, `text-heading`, `text-subheading`, `text-title` and `text-display` are font sizes (`lib/utils.ts`), so they never knock out a text colour.
 
 ### 9.1 Single-page tool layout (retired)
 
@@ -402,8 +419,12 @@ Append-only record of design decisions. One line per entry. Append on every nota
 2026-05-10 — Empty-state rule softened: one inline factual line allowed (required) when user has no breadcrumb to the next action; decorative cards still forbidden. Dashboard 0-pages state is the canonical example.
 2026-11-25 — Live numbers: count up on view, static charts on the totals, the top three countries from /api/stats with SVG flags from flag-icons (images, not emoji, so they render on Windows).
 2026-11-25 — Homepage and /pricing rebuilt as marketing pages (site.css): wide layout, bento and feature grids, plan cards, logo-wall CTA. Primary button is now light; purple limited to the mark, focus and eyebrows. Text tokens raised for contrast (secondary #a1a1a6, tertiary #84848a). Globe and live title ticker removed.
+2026-11-26 — One token source: packages/ui-tokens/tokens.css feeds site.css (via /tokens.css) and the dashboard theme; a dark default and a proposed warm light set ([data-theme="warm"]). Dashboard directions A/B/C rebuilt only from shadcn primitives + aired variants + shared components (§9.5). Test guards the copy and the mappings.
 2026-11-25 — Dashboard moved to React + shadcn/ui (Base UI) + Tailwind v4 in apps/dashboard, built by wrangler into apps/web. Same sections and flows as the vanilla app shell below; page list is now a shadcn Data Table, confirmations are Alert Dialogs, new keys use a Dialog. See §9.4.
 2026-11-25 — Dashboard rebuilt as an app: sidebar shell (tabs on mobile), hash views for Pages / Connect your AI tools / Plan & billing / Account, summary tiles, search and filter chips over all pages loaded at once (cap 1,000), "…" row menu, tool setup cards with developer keys collapsed, account card with typed-DELETE account deletion. Exceptions: the row menu has a drop shadow (popovers need separation), and destructive actions (Delete page, Delete my account) use red-400.
 2026-11-25 — Remaining narrow pages moved to the wide layout: 7 guides, docs, dashboard, claim, abuse, 404. Shared kit in site.css (.btn, .panel, .field, .prose, .toc, ol.steps, .gcard, .strip, .chip, .duo). Dashboard v2: plain-language chips per page, project cards, empty state with an example (exception to §8.7). Tailwind build no longer loaded. Homepage `.v` timeline rules scoped to `.vers` so they stop hitting `.row .v`.
 2026-11-21 — Guide pages added (/html-to-link, /share-claude-artifacts, /tiiny-host-alternative). They reuse the homepage form and tokens, keep 14px body and 18px h2, and exist for search traffic from non-technical visitors. Homepage H1 and button now use font-medium and "Publish" per §3 and §8.1.
+2026-11-26 — Direction C (Studio) dropped. Direction A gained a team mockup: workspace switcher next to the logo, folders, owner and access on each tile, a list view, a share dialog (people, groups, guests, link rules) and a settings area with a left menu (members, groups, domains, plan and seats, security, audit log, AI keys). Four more proposed token sets (ink, daylight, warm, violet) behind a floating style bar.
+2026-11-26 — Owner picked Direction A (Gallery) with Midnight and Daylight. The real dashboard now uses it: top bar instead of the sidebar, a working publish area, gallery tiles with kind covers (no live render, so views aren't counted) or the list table, project chips, sort, and a System / Midnight / Daylight theme setting. Direction B and the ink, warm and violet sets are gone; `?direction=a` stays as the team-features mockup.
+2026-11-27 — Dashboard tiles show the real page: an owner-only preview route (text/plain, no view counted) feeds a lazy, script-sandboxed iframe, with the kind cover as the fallback.
 ```

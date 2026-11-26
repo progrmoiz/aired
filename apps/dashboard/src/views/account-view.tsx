@@ -7,21 +7,16 @@ import { Label } from '@/components/ui/label'
 import {
   AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Avatar } from '@/components/app-sidebar'
+import { UserBadge } from '@/components/account-menu'
 import { ViewHeader } from '@/components/common'
-import { type User, SIGN_IN, afterSignOut, mutate, readJson } from '@/lib/api'
+import { type User, SIGN_IN, afterSignOut, initialOf, mutate, readJson, signOut as signOutNow } from '@/lib/api'
 import { formatDate } from '@/lib/format'
 
 export function AccountView({ user }: { user: User | null }) {
   const [signingOut, setSigningOut] = useState(false)
   const signOut = async () => {
     setSigningOut(true)
-    try {
-      const res = await fetch('/auth/logout', { method: 'POST', headers: { 'X-Aired-Request': '1' }, credentials: 'same-origin' })
-      afterSignOut(await readJson(res))
-    } catch {
-      window.location.href = '/'
-    }
+    await signOutNow()
   }
   const since = formatDate(user?.createdAt, { year: 'numeric', month: 'long', day: 'numeric' })
 
@@ -31,7 +26,7 @@ export function AccountView({ user }: { user: User | null }) {
 
       <Card className="gap-4 px-5 py-5">
         <div className="flex flex-wrap items-center gap-4">
-          <Avatar user={user} className="size-14 text-[22px]" />
+          <UserBadge initial={initialOf(user)} className="size-14 text-[22px]" />
           <div className="grid min-w-0 flex-1">
             <span className="truncate text-[17px] font-medium">{user?.name || (user ? '@' + user.login : 'Signed in')}</span>
             {user && <span className="text-sm text-subtle">@{user.login}</span>}

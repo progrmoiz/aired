@@ -1,0 +1,11 @@
+{
+  "name": "@aired/ui-tokens",
+  "version": "0.0.1",
+  "private": true,
+  "description": "aired design tokens (CSS variables) shared by the marketing site and the dashboard.",
+  "exports": { "./tokens.css": "./tokens.css" },
+  "files": ["tokens.css"],
+  "scripts": {
+    "sync": "node sync.mjs"
+  }
+}

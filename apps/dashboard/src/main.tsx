@@ -1,14 +1,18 @@
-import { StrictMode } from 'react'
+import { StrictMode, Suspense, lazy } from 'react'
 import { createRoot } from 'react-dom/client'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Toaster } from '@/components/ui/sonner'
 import App from './App'
+
+// Design directions (mock data, no API): /dashboard?direction=a (team mockup)
+const Directions = lazy(() => import('./directions'))
+const direction = new URLSearchParams(window.location.search).has('direction')
 import './index.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <TooltipProvider>
-      <App />
+      {direction ? <Suspense fallback={null}><Directions /></Suspense> : <App />}
       <Toaster position="bottom-right" />
     </TooltipProvider>
   </StrictMode>,

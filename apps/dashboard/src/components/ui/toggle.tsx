@@ -9,6 +9,10 @@ const toggleVariants = cva(
       variant: {
         default: "bg-transparent",
         outline: "border border-input bg-transparent hover:bg-muted",
+        // aired: filter chips ("All", "Live", "Expiring soon")
+        pill: "h-8 rounded-full border border-hairline-strong px-3.5 text-muted-foreground hover:bg-tint hover:text-foreground aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground data-[pressed]:border-primary data-[pressed]:bg-primary data-[pressed]:text-primary-foreground",
+        // aired: one option in a segmented control (see components/segmented.tsx)
+        segment: "h-8 flex-1 rounded-lg px-2 text-xs text-muted-foreground hover:bg-tint hover:text-foreground data-[pressed]:bg-primary data-[pressed]:text-primary-foreground",
       },
       size: {
         default:

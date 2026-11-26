@@ -39,6 +39,7 @@ import type { StoredSubscription } from '../lib/billing/store.js';
 import { AUTH_HEADER } from '@aired/core';
 import { addClaimResult, runClaim } from '../lib/claim-decision.js';
 import type { ClaimBatchResult } from '../lib/claim-decision.js';
+import { PREVIEW_HEADERS, previewDecision } from '../lib/page-preview.js';
 import { claimedIds, getClaim, releaseClaimsForOwner, replaceClaimToken, upsertClaim } from '../lib/page-claims.js';
 
 const me = new Hono<AppBindings>();
@@ -206,6 +207,31 @@ me.get('/pages', async (c) => {
 });
 
 // GET /api/me/projects — distinct projects for the authenticated user, with counts.
+// GET /api/me/pages/:id/preview — the owner's page HTML for a dashboard
+// preview, as text/plain (lib/page-preview.ts). Doesn't count a view, ask for
+// the PIN or apply the view limit. 404 for anyone else; 204 when too big.
+me.get('/pages/:id/preview', async (c) => {
+  const user = c.get('user')!;
+  const id = c.req.param('id');
+  const raw = await c.env.PAGES_KV.get(kvKeys.page(id));
+  const metadata = raw === null ? null : parseMetadata(raw);
+  let claimed = false;
+  if (metadata !== null && metadata.ownerId === null) {
+    try {
+      claimed = (await claimedIds(c.env.DB, user.id, [id])).has(id);
+    } catch (err) {
+      console.error('page_claims lookup failed for a preview', { id, err });
+    }
+  }
+  const decision = previewDecision(metadata, user.id, claimed, Date.now());
+  if (!decision.ok) {
+    return decision.status === 204 ? new Response(null, { status: 204, headers: PREVIEW_HEADERS }) : c.json({ error: 'Page not found' }, 404);
+  }
+  const obj = await c.env.PAGES_BUCKET.get(`pages/${id}/index.html`);
+  if (obj === null) return c.json({ error: 'Page not found' }, 404);
+  return new Response(await obj.text(), { status: 200, headers: PREVIEW_HEADERS });
+});
+
 me.get('/projects', async (c) => {
   const user = c.get('user')!;
   const projects = await listProjectsForOwner(c.env.PAGES_KV, user.id);

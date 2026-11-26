@@ -103,6 +103,19 @@ export function afterSignOut(data: Record<string, unknown>) {
   window.location.href = next
 }
 
+/** Sign out of this browser, then follow the logout redirect (or go home). */
+export async function signOut(): Promise<void> {
+  try {
+    const res = await fetch('/auth/logout', { method: 'POST', headers: { 'X-Aired-Request': '1' }, credentials: 'same-origin' })
+    afterSignOut(await readJson(res))
+  } catch {
+    window.location.href = '/'
+  }
+}
+
+/** The person's initial for their avatar. */
+export const initialOf = (user: User | null) => ((user?.name || user?.login || '').trim().charAt(0) || '·').toUpperCase()
+
 export function isNavigableUrl(url: unknown): url is string {
   if (typeof url !== 'string') return false
   try {

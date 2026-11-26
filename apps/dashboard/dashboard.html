@@ -9,6 +9,14 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="preload" href="/fonts/inter-latin-v20.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/fonts/fonts.css" />
+  <script>
+    // Theme before first paint (same rule as src/lib/theme.ts).
+    try {
+      var t = localStorage.getItem('aired-theme');
+      if (t !== 'midnight' && t !== 'daylight') t = matchMedia('(prefers-color-scheme: light)').matches ? 'daylight' : 'midnight';
+      if (t === 'daylight') { document.documentElement.dataset.theme = 'daylight'; document.documentElement.classList.remove('dark'); }
+    } catch (e) {}
+  </script>
 </head>
 <body>
   <div id="root"></div>
