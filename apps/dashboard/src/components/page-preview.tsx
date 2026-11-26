@@ -5,7 +5,8 @@ import { cn } from '@/lib/utils'
 export type PreviewSource = { title: string; html: string }
 
 /** A live, sandboxed render of the page, scaled to fit (pages are drawn at 1200×800). */
-export function PagePreview({ page, className, interactive = false }: { page: PreviewSource; className?: string; interactive?: boolean }) {
+/** `scripts` lets the page's JavaScript run (still an opaque origin: no cookies, no access to the dashboard). */
+export function PagePreview({ page, className, interactive = false, scripts = false, onLoad }: { page: PreviewSource; className?: string; interactive?: boolean; scripts?: boolean; onLoad?: () => void }) {
   const box = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(0.25)
   useEffect(() => {
@@ -20,7 +21,8 @@ export function PagePreview({ page, className, interactive = false }: { page: Pr
       <iframe
         title={`Preview of ${page.title}`}
         srcDoc={page.html}
-        sandbox=""
+        sandbox={scripts ? 'allow-scripts' : ''}
+        onLoad={onLoad}
         tabIndex={interactive ? 0 : -1}
         aria-hidden={interactive ? undefined : true}
         className="pointer-events-none absolute top-0 left-0 origin-top-left border-0"
