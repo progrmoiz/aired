@@ -20,7 +20,9 @@ STRIPE_AUTOMATIC_TAX=
 # STRIPE_MANAGED_PAYMENTS=1
 # Optional: point at a local Stripe mock. Default https://api.stripe.com.
 # STRIPE_API_BASE=http://localhost:12111
-# Optional, local dev only: where Stripe sends the user back. Default https://aired.sh.
+# Optional: this deploy's origin for every absolute link (OAuth redirects, Stripe
+# return URLs, claim links, CORS). Default https://aired.sh; staging sets it in
+# wrangler.toml [env.staging.vars].
 # SITE_ORIGIN=http://localhost:8787
 
 # WorkOS AuthKit sign-in (Phase 3). Off unless BOTH are set; then /auth/login

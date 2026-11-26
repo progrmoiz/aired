@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  # Production deploys are manual: Actions > CI > Run workflow on main.
+  workflow_dispatch:
+    inputs:
+      deploy_production:
+        description: "Deploy this commit of main to production (aired.sh)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}-${{ github.event_name }}
+  # Never cancel a run that may be deploying.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: Typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Actions are pinned to commit SHAs (tag in the comment) because the
+      # repo is public and a moved tag would run someone else's code here.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Version comes from "packageManager" in the root package.json.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Builds @aired/core first (the other packages import its dist), then
+      # typechecks every workspace package.
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Worker tests
+        run: pnpm test
+
+      - name: CLI build
+        run: pnpm --filter aired build
+
+      # Runs the [build] step (dashboard) and bundles the Worker exactly as
+      # `wrangler deploy` would, without uploading anything or needing a token.
+      - name: Worker bundle (dry run)
+        working-directory: apps/worker
+        run: |
+          pnpm exec wrangler deploy --dry-run --outdir "$RUNNER_TEMP/worker-dist"
+          pnpm exec wrangler deploy --dry-run --env staging --outdir "$RUNNER_TEMP/worker-dist-staging"
+
+  # Every push to main goes to https://staging.aired.sh once CI is green.
+  # Off until the owner sets the repo variable DEPLOY_STAGING=on and the
+  # staging environment's secrets (docs/deploy.md), so main doesn't go red
+  # before staging exists.
+  deploy-staging:
+    name: Deploy to staging
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_STAGING == 'on'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: staging
+      url: https://staging.aired.sh
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Deploy
+        working-directory: apps/worker
+        run: bash scripts/deploy.sh staging
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  # Manual only, from main, after CI passes on that commit. Give the
+  # production environment a required reviewer (docs/deploy.md) so a run
+  # waits for a click before it touches aired.sh.
+  deploy-production:
+    name: Deploy to production
+    needs: check
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy_production && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://aired.sh
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Deploy
+        working-directory: apps/worker
+        run: bash scripts/deploy.sh production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

@@ -16,6 +16,10 @@ import { authDevice, devicePage } from "./routes/auth-device.js";
 import { publishRateLimit } from "./middleware/rate-limit.js";
 import { corsMiddleware } from "./middleware/cors.js";
 import { authMiddleware } from "./middleware/auth.js";
+import { requestIdMiddleware } from "./middleware/request-id.js";
+import { stagingNoIndex } from "./middleware/staging.js";
+import { log, logError } from "./lib/log.js";
+import { cachedHealth, checkHealth, publicReport, storageProbes } from "./lib/health.js";
 import { countMcpToolCalls, isMcpToolCall } from "./lib/mcp-rpc.js";
 import { rateLimit } from "./middleware/rate-limit.js";
 import { TIERS } from "./lib/rate-limit-tiers.js";
@@ -37,28 +41,38 @@ import type { Env } from "./types.js";
 
 const app = new Hono<AppBindings>();
 
-// Error handler
+// Error handler. HTTPExceptions are deliberate answers; anything else is a
+// bug, logged with the request id and path (not the query string, which can
+// carry tokens) and answered with a generic 500.
 app.onError((err, c) => {
   if (err instanceof HTTPException) {
     return c.json({ error: err.message }, err.status);
   }
-  console.error({
-    event: "unhandled_error",
-    timestamp: new Date().toISOString(),
-    method: c.req.method,
-    url: c.req.url,
-    error: err.message,
-    stack: err.stack,
-  });
+  logError("unhandled_error", err, { method: c.req.method, path: new URL(c.req.url).pathname }, c.get("requestId"));
   return c.json({ error: "Internal Server Error" }, 500);
 });
 
-// Global middleware: CORS first, then auth
+// Global middleware: request id first (so every later log line has it),
+// then CORS, then auth
+app.use("*", requestIdMiddleware);
+app.use("*", stagingNoIndex);
 app.use("*", corsMiddleware);
 app.use("*", authMiddleware);
 
-// Health check
-app.get("/health", (c) => c.json({ status: "ok" }));
+// Health check: probes KV, D1 and R2 (lib/health.ts). 503 when any fails.
+const health = cachedHealth();
+app.get("/health", async (c) => {
+  const { report: pending, fresh } = health(() => checkHealth(storageProbes(c.env)));
+  const report = await pending;
+  if (fresh && report.status !== "ok") {
+    const failed = Object.fromEntries(
+      Object.entries(report.checks).filter(([, r]) => !r.ok).map(([name, r]) => [name, r.error ?? "failed"]),
+    );
+    log("error", "health_check_failed", { failed }, c.get("requestId"));
+  }
+  c.header("Cache-Control", "no-store");
+  return c.json(publicReport(report), report.status === "ok" ? 200 : 503);
+});
 
 // MCP Streamable HTTP endpoints (/mcp and /mcp/account).
 // OAuth for the remote MCP: metadata, /oauth/* (token, registration) and
@@ -81,7 +95,7 @@ function mcpCaller(which: "open" | "account") {
       try {
         found = await validateMcpToken(c.env, resource, bearer);
       } catch (err) {
-        console.error("MCP token check failed", err);
+        logError("mcp_token_check_failed", err, {}, c.get("requestId"));
         return c.json({ error: "Could not check the access token. Please try again." }, 503);
       }
       if (found === null) return mcpChallenge(c, resource, "invalid_token");
@@ -219,7 +233,7 @@ async function runExpiredSweep(env: Env): Promise<void> {
           .first<{ pass_started_at: number | null }>();
         const started = prev?.pass_started_at ?? now;
         if (passDone) {
-          console.log({ event: "expired_sweep_pass_done", hours: Math.round((now - started) / 3_600_000) });
+          log("info", "expired_sweep_pass_done", { hours: Math.round((now - started) / 3_600_000) });
         }
         await env.DB
           .prepare(
@@ -249,16 +263,30 @@ async function runExpiredSweep(env: Env): Promise<void> {
         ];
         if (stmts.length > 0) await env.DB.batch(stmts);
       },
-      log: (entry) => console.warn(entry),
+      log: ({ event, ...fields }) => log("warn", String(event), fields),
     },
     Date.now(),
   );
-  console.log({ event: "expired_sweep", scanned: result.scanned, marked: result.marked, deleted: result.deleted.length });
+  log("info", "expired_sweep", { scanned: result.scanned, marked: result.marked, deleted: result.deleted.length });
+}
+
+/**
+ * Every cron job runs through here: a throw is logged as scheduled_failed
+ * (an alert event, lib/log.ts) with the cron expression, then rethrown so
+ * Cloudflare still records the run as failed.
+ */
+async function runScheduled(cron: string, env: Env): Promise<void> {
+  try {
+    await runExpiredSweep(env);
+  } catch (err) {
+    logError("scheduled_failed", err, { cron, job: "expired_sweep" });
+    throw err;
+  }
 }
 
 export default {
   fetch: app.fetch,
-  scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(runExpiredSweep(env));
+  scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(runScheduled(controller.cron, env));
   },
 };

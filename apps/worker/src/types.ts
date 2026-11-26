@@ -48,7 +48,11 @@ export type Env = {
   STRIPE_MANAGED_PAYMENTS?: string;
   /** Stripe API origin. Default https://api.stripe.com; override only for local mocks. */
   STRIPE_API_BASE?: string;
-  /** Site origin for Stripe success/cancel/portal return URLs. Default https://aired.sh; set only for local dev. */
+  /**
+   * This deploy's own origin, for every absolute link the Worker writes
+   * (lib/origin.ts siteOrigin). Unset in production (https://aired.sh);
+   * staging sets it in wrangler.toml, local dev in .dev.vars.
+   */
   SITE_ORIGIN?: string;
   /** WorkOS AuthKit sign-in: on only when both are set (lib/workos.ts). */
   WORKOS_CLIENT_ID?: string;
@@ -59,6 +63,8 @@ export type Env = {
   BROWSER?: Fetcher;
   /** Daily browser time for screenshots, in seconds (lib/og-shot.ts). Default 480; "0" turns them off. */
   OG_SHOT_DAILY_SECONDS?: string;
+  /** "staging" on the staging deploy (wrangler.toml [env.staging.vars]): pages get noindex. Unset in production. */
+  AIRED_ENV?: string;
 };
 
 export type AppBindings = {
@@ -77,6 +83,8 @@ export type AppBindings = {
     authTime: number | null;
     /** The API key's id when via is 'key'. */
     apiKeyId: string | null;
+    /** This request's id for log lines (middleware/request-id.ts). */
+    requestId: string;
   };
 };
 

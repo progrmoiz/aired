@@ -103,9 +103,7 @@ export function isProPrice(priceId: string | null, env: PriceEnv): boolean {
 }
 
 /** Origin for the URLs Stripe sends the user back to. Never taken from the request. */
-export function siteOrigin(env: { SITE_ORIGIN?: string }): string {
-  return (env.SITE_ORIGIN || 'https://aired.sh').replace(/\/+$/, '');
-}
+export { siteOrigin } from '../origin.ts';
 
 /**
  * Idempotency key for creating a user's Stripe customer. Scoped by site host so

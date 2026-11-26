@@ -4,12 +4,12 @@ import {
   FREE_MAX_BYTES,
   PRO_MAX_BYTES,
   GRACE_MS,
-  UPGRADE_URL,
   billingEnabled,
   entitlementsFor,
   getEntitlements,
   isEntitled,
   planLimitError,
+  upgradeUrl,
 } from "../src/lib/entitlements.ts";
 
 const now = new Date("2026-06-15T12:00:00Z");
@@ -66,14 +66,16 @@ test("Pro lasts three days past the period end, then stops", () => {
 });
 
 test("plan limit errors carry the upgrade link", () => {
-  assert.deepEqual(planLimitError("page_size"), {
+  assert.deepEqual(planLimitError("page_size", "https://aired.sh"), {
     error: "This needs Pro",
     code: "plan_limit",
     limit: "page_size",
     upgrade_url: "https://aired.sh/pricing?ref=api",
   });
-  assert.equal(planLimitError("publish_rate", "mcp").upgrade_url, `${UPGRADE_URL}?ref=mcp`);
-  assert.equal(planLimitError("publish_rate", "mcp").limit, "publish_rate");
+  assert.equal(planLimitError("publish_rate", "https://aired.sh", "mcp").upgrade_url, "https://aired.sh/pricing?ref=mcp");
+  assert.equal(planLimitError("publish_rate", "https://aired.sh", "mcp").limit, "publish_rate");
+  assert.equal(planLimitError("page_size", "https://staging.aired.sh").upgrade_url, "https://staging.aired.sh/pricing?ref=api");
+  assert.equal(upgradeUrl("https://aired.sh", "publish"), "https://aired.sh/pricing?ref=publish");
 });
 
 test("billing is on only when BILLING_ENABLED is exactly 1", () => {

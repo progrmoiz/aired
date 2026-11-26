@@ -7,6 +7,15 @@ compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 workers_dev = true
 
+# Workers Logs: every console.* call and one invocation log per request are
+# kept and queryable in the dashboard (Workers > aired > Logs). Objects from
+# lib/log.ts are indexed by field, so filter on event or requestId. All
+# requests are kept (head_sampling_rate = 1); lower it if volume gets
+# expensive. Alerts and limits: docs/observability.md.
+[observability]
+enabled = true
+head_sampling_rate = 1
+
 # Build the signed-in dashboard (apps/dashboard, React + shadcn/ui) into
 # ../web/dashboard.html and ../web/dashboard-assets/ before every `wrangler dev`
 # and `wrangler deploy`, so a deploy can never ship a stale or missing dashboard.
@@ -113,3 +122,87 @@ zone_name = "aired.sh"
 # (expired_sweep_pass_done) to check against the privacy policy's 30 days.
 [triggers]
 crons = ["*/5 * * * *"]
+
+# ---------------------------------------------------------------------------
+# Staging: https://staging.aired.sh, deployed with `pnpm deploy:staging`
+# (scripts/deploy.sh) or by CI on every push to main. Its own KV namespace,
+# R2 bucket, D1 database and rate-limit counters, so nothing it does can touch
+# production data. Secrets are set per environment
+# (`wrangler secret put NAME --env staging`); see docs/deploy.md.
+#
+# Wrangler does not copy bindings, vars, routes or triggers into an
+# environment, so every one is listed again here. [build], [assets],
+# [observability] and the compatibility settings are inherited.
+# ---------------------------------------------------------------------------
+[env.staging]
+name = "aired-staging"
+workers_dev = false
+# A Custom Domain: `wrangler deploy --env staging` creates the DNS record.
+routes = [{ pattern = "staging.aired.sh", custom_domain = true }]
+
+[env.staging.vars]
+SITE_ORIGIN = "https://staging.aired.sh"
+# Adds X-Robots-Tag: noindex to every response (middleware/staging.ts).
+AIRED_ENV = "staging"
+# Screenshots share the account's Browser Rendering minutes with production;
+# off on staging. Set to e.g. "60" to try them.
+OG_SHOT_DAILY_SECONDS = "0"
+
+[[env.staging.r2_buckets]]
+binding = "PAGES_BUCKET"
+bucket_name = "aired-pages-staging"
+
+# Owner: `wrangler kv namespace create aired-staging`, paste the id in both.
+[[env.staging.kv_namespaces]]
+binding = "PAGES_KV"
+id = "REPLACE_WITH_STAGING_KV_ID"
+
+[[env.staging.kv_namespaces]]
+binding = "OAUTH_KV"
+id = "REPLACE_WITH_STAGING_KV_ID"
+
+# Owner: `wrangler d1 create aired-staging`, paste the id.
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "aired-staging"
+database_id = "REPLACE_WITH_STAGING_D1_ID"
+migrations_dir = "migrations"
+
+[env.staging.browser]
+binding = "BROWSER"
+
+# Same limits as production, separate counters (namespace ids are per
+# account, so reusing 1001-1006 would share production's buckets).
+[[env.staging.ratelimits]]
+name = "PUBLISH_BURST"
+namespace_id = "2001"
+simple = { limit = 6, period = 60 }
+
+[[env.staging.ratelimits]]
+name = "REPORT_BURST"
+namespace_id = "2002"
+simple = { limit = 3, period = 60 }
+
+[[env.staging.ratelimits]]
+name = "PIN_GUESS"
+namespace_id = "2003"
+simple = { limit = 10, period = 60 }
+
+[[env.staging.ratelimits]]
+name = "PIN_GUESS_PAGE"
+namespace_id = "2004"
+simple = { limit = 60, period = 60 }
+
+[[env.staging.ratelimits]]
+name = "DEVICE_BURST"
+namespace_id = "2005"
+simple = { limit = 5, period = 60 }
+
+[[env.staging.ratelimits]]
+name = "OAUTH_BURST"
+namespace_id = "2006"
+simple = { limit = 5, period = 60 }
+
+# Staging keeps the sweep so expiry is tested end to end, hourly to stay cheap.
+[env.staging.triggers]
+crons = ["0 * * * *"]

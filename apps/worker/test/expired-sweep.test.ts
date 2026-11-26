@@ -118,7 +118,8 @@ test("a failing delete leaves the cursor and marks unsaved, so the batch is retr
 
 test("index.ts wires the cron to the sweep through kvKeys.page and the pages/ prefix", () => {
   const code = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
-  assert.match(code, /scheduled\(_controller: ScheduledController, env: Env, ctx: ExecutionContext\) \{\s*ctx\.waitUntil\(runExpiredSweep\(env\)\)/);
+  assert.match(code, /scheduled\(controller: ScheduledController, env: Env, ctx: ExecutionContext\) \{\s*ctx\.waitUntil\(runScheduled\(controller\.cron, env\)\)/);
+  assert.match(code, /async function runScheduled\(cron: string, env: Env\): Promise<void> \{\s*try \{\s*await runExpiredSweep\(env\);/);
   assert.match(code, /PAGES_KV\.get\(kvKeys\.page\(id\)\)\) !== null/);
   assert.match(code, /PAGES_BUCKET\.list\(\{ prefix: "pages\/"/);
   assert.match(code, /etag: o\.etag/);

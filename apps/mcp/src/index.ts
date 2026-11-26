@@ -9,6 +9,16 @@ import { readCliSession } from "./session.js";
 
 const DEFAULT_API_URL = "https://aired.sh";
 
+type PackToString = (
+  baseDir: string,
+  inputHtml: string,
+  fs: {
+    exists(path: string): Promise<boolean>;
+    readFileText(path: string): Promise<string>;
+    readFileDataUri(path: string): Promise<string>;
+  },
+) => Promise<string>;
+
 interface PublishResult {
   id: string;
   url: string;
@@ -129,7 +139,12 @@ server.tool(
               isError: true,
             };
           }
-          const { default: packToString } = await import("@joplin/htmlpack/packToString");
+          // Loaded with require so tsc does not typecheck the package's raw
+          // .ts sources (its "types" field points at them); same as apps/cli.
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const { default: packToString } = require("@joplin/htmlpack/packToString") as {
+            default: PackToString;
+          };
           const baseDir = dirname(indexPath);
           const inputHtml = readFileSync(indexPath, "utf-8");
           content = await packToString(baseDir, inputHtml, {
@@ -141,7 +156,8 @@ server.tool(
             },
             async readFileDataUri(p: string) {
               const { default: Datauri } = await import("datauri/sync");
-              return Datauri(p).content;
+              // Empty string is how htmlpack already treats an unreadable file.
+              return Datauri(p).content ?? "";
             },
           });
         } else {

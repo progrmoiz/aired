@@ -8,7 +8,7 @@
  * the two in step.
  */
 
-const DEFAULT_ORIGIN = "https://aired.sh";
+import { siteOrigin } from "./origin.ts";
 
 // Page ids are 10 chars from [0-9a-zA-Z] (@aired/core generateId); allow a
 // little range so a future id length doesn't break old links.
@@ -16,10 +16,9 @@ const ID_RE = /^[0-9A-Za-z]{6,32}$/;
 // Update tokens are "at_" + base64url of 32 bytes (@aired/core generateToken).
 const TOKEN_RE = /^at_[A-Za-z0-9_-]{16,128}$/;
 
-/** The claim link for a page. `origin` falls back to https://aired.sh. */
+/** The claim link for a page. `origin` is siteOrigin(env); empty falls back to production. */
 export function claimUrl(origin: string | undefined, id: string, token: string): string {
-  const base = (origin || DEFAULT_ORIGIN).replace(/\/+$/, "");
-  return `${base}/claim#${id}.${token}`;
+  return `${siteOrigin({ SITE_ORIGIN: origin })}/claim#${id}.${token}`;
 }
 
 /**

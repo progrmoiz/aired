@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler d1 migrations apply aired --remote && wrangler deploy",
+    "deploy": "bash scripts/deploy.sh production",
+    "deploy:production": "bash scripts/deploy.sh production",
+    "deploy:staging": "bash scripts/deploy.sh staging",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit",
     "test": "node --experimental-strip-types --no-warnings --test 'test/*.test.ts'"

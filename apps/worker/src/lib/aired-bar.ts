@@ -10,6 +10,8 @@
  */
 
 export interface AiredBarOptions {
+  /** siteOrigin(env): where the badge, report link and OG image point. */
+  origin: string;
   id: string;
   title: string;
   readCount: number;
@@ -19,7 +21,7 @@ export interface AiredBarOptions {
   imageVersion?: string;
 }
 
-export const BADGE_HREF = "https://aired.sh/?ref=badge";
+export const badgeHref = (origin: string): string => `${origin}/?ref=badge`;
 export const OG_DESCRIPTION = "Shared with aired. Turn HTML into a link anyone can open.";
 
 export function injectAiredBar(html: string, opts: AiredBarOptions): string {
@@ -33,9 +35,9 @@ export function injectAiredBar(html: string, opts: AiredBarOptions): string {
   return barOut === out ? out + bar : barOut;
 }
 
-export function renderOgTags({ id, title, imageVersion }: AiredBarOptions): string {
+export function renderOgTags({ origin, id, title, imageVersion }: AiredBarOptions): string {
   const ogImageUrl =
-    `https://aired.sh/og/${encodeURIComponent(id)}` +
+    `${origin}/og/${encodeURIComponent(id)}` +
     (imageVersion ? `?v=${encodeURIComponent(imageVersion)}` : "");
   return `
   <!-- aired OG tags -->
@@ -49,7 +51,7 @@ export function renderOgTags({ id, title, imageVersion }: AiredBarOptions): stri
   <meta name="twitter:image" content="${ogImageUrl}" />`;
 }
 
-export function renderAiredBar({ id, readCount }: AiredBarOptions): string {
+export function renderAiredBar({ origin, id, readCount }: AiredBarOptions): string {
   const views = `${readCount.toLocaleString("en-US")} view${readCount !== 1 ? "s" : ""}`;
   return `
 <!-- aired badge -->
@@ -105,12 +107,12 @@ export function renderAiredBar({ id, readCount }: AiredBarOptions): string {
   @media print { #__aired-bar { display: none; } }
 </style>
 <div id="__aired-bar" role="complementary" aria-label="Shared with aired">
-  <a href="${BADGE_HREF}" target="_blank" rel="noopener" class="__aired-brand"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span>Shared with <b>aired</b></span></a>
+  <a href="${badgeHref(origin)}" target="_blank" rel="noopener" class="__aired-brand"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span>Shared with <b>aired</b></span></a>
   <span class="__aired-meta">
     <span class="__aired-sep"></span>
     <span class="__aired-views">${views}</span>
     <span class="__aired-sep"></span>
-    <a href="https://aired.sh/abuse?id=${encodeURIComponent(id)}" target="_blank" rel="noopener" class="__aired-report">Report</a>
+    <a href="${origin}/abuse?id=${encodeURIComponent(id)}" target="_blank" rel="noopener" class="__aired-report">Report</a>
   </span>
 </div>
 <script>

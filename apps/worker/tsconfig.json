@@ -13,6 +13,7 @@
     "skipLibCheck": true,
     "isolatedModules": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "paths": {
       "@aired/core": ["../../packages/core/src/index.ts"]
     }
