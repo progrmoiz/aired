@@ -6,6 +6,7 @@ import { applyPageHeaders } from "../middleware/security.js";
 import { loadStats, recordView, saveStats } from "../lib/stats.js";
 import { SANDBOX_SHIM, injectEarlyScript } from "../lib/sandbox-shim.js";
 import { injectAiredBar } from "../lib/aired-bar.js";
+import { versionFromEtag } from "../lib/og-shot.js";
 import { getEntitlements } from "../lib/entitlements.js";
 import { notFoundPage } from "../lib/not-found.js";
 import { viewWrite } from "../lib/view-write.js";
@@ -135,6 +136,8 @@ viewer.get("/p/:id", async (c) => {
       title: pageTitle,
       readCount: newReadCount,
       badge,
+      // Changes with every update, so previews fetch the new screenshot.
+      imageVersion: versionFromEtag(obj.etag),
     }),
     SANDBOX_SHIM,
   );

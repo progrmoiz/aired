@@ -1,7 +1,8 @@
 /**
  * Deletes the R2 files of expired pages. A page's KV record expires with the
- * page, but nothing removed its file in R2 (`pages/<id>/index.html`). A Cron
- * Trigger (index.ts) walks the bucket a batch at a time.
+ * page, but nothing removed its files in R2 (`pages/<id>/index.html` and its
+ * link-preview screenshot `pages/<id>/shot.jpg`). A Cron Trigger (index.ts)
+ * walks the bucket a batch at a time; each file is judged on its own.
  *
  * A file is deleted only when its KV page record has been seen missing on two
  * runs at least CONFIRM_AFTER_MS apart, with the file unchanged in between
@@ -20,9 +21,9 @@ export const SWEEP_MIN_AGE_MS = 24 * 60 * 60 * 1000;
 /** How long a file's KV record must stay missing before the file goes. */
 export const CONFIRM_AFTER_MS = 24 * 60 * 60 * 1000;
 
-const PAGE_FILE = /^pages\/([A-Za-z0-9_-]{1,64})\/index\.html$/;
+const PAGE_FILE = /^pages\/([A-Za-z0-9_-]{1,64})\/(?:index\.html|shot\.jpg)$/;
 
-/** The page id of a page file key, or null for anything else in the bucket. */
+/** The page id of a page file key (HTML or screenshot), or null for anything else. */
 export function pageIdFromKey(key: string): string | null {
   return PAGE_FILE.exec(key)?.[1] ?? null;
 }

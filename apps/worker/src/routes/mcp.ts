@@ -21,6 +21,7 @@ import type { PageMetadata } from "@aired/core";
 import { authoritativeCredentials } from "../lib/claim-decision.js";
 import { getClaim } from "../lib/page-claims.js";
 import { hashPin } from "../lib/pin-hash.js";
+import { refreshShot } from "../lib/og-render.js";
 import { UPGRADE_URL, billingEnabled } from "../lib/entitlements.js";
 import { TIERS } from "../lib/rate-limit-tiers.js";
 import {
@@ -58,8 +59,12 @@ function createAiredMcpServer(
     DB: D1Database;
     SITE_ORIGIN?: string;
     BILLING_ENABLED?: string;
+    BROWSER?: Fetcher;
+    OG_SHOT_DAILY_SECONDS?: string;
   },
   signedIn: SignedIn | null,
+  /** Runs work after the response (the request's waitUntil). */
+  background: (work: Promise<unknown>) => void,
 ) {
   const server = new McpServer({
     name: "aired",
@@ -185,11 +190,14 @@ function createAiredMcpServer(
           };
         }
 
-        await env.PAGES_BUCKET.put(
+        const htmlObj = await env.PAGES_BUCKET.put(
           `pages/${existingId}/index.html`,
           html,
           { httpMetadata: { contentType: "text/html; charset=utf-8" } },
         );
+        // Link-preview screenshot, after the response (lib/og-render.ts).
+        const size = new TextEncoder().encode(html).byteLength;
+        background(refreshShot(env, existingId, { ...metadata, size }, html, htmlObj?.etag ?? null, { replacing: true }));
 
         return {
           content: [
@@ -247,7 +255,7 @@ function createAiredMcpServer(
         project: null,
       };
 
-      await env.PAGES_BUCKET.put(`pages/${pageId}/index.html`, html, {
+      const htmlObj = await env.PAGES_BUCKET.put(`pages/${pageId}/index.html`, html, {
         httpMetadata: { contentType: "text/html; charset=utf-8" },
       });
 
@@ -260,6 +268,9 @@ function createAiredMcpServer(
         serializeMetadata(metadata),
         kvOptions,
       );
+
+      // Link-preview screenshot, after the response (lib/og-render.ts).
+      background(refreshShot(env, pageId, metadata, html, htmlObj?.etag ?? null, { replacing: false }));
 
       // Increment publish counter (best effort)
       try {
@@ -395,7 +406,7 @@ export async function handleMcp(c: Context<AppBindings>, appFetch: AppFetch, rou
           },
         }
       : null;
-  const server = createAiredMcpServer(c.env, signedIn);
+  const server = createAiredMcpServer(c.env, signedIn, (work) => c.executionCtx.waitUntil(work));
   const handler = createMcpHandler(server, { route });
   return handler(c.req.raw, c.env, c.executionCtx);
 }

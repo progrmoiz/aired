@@ -11,6 +11,8 @@ import { hashPin } from "../lib/pin-hash.js";
 import { authoritativeCredentials, authorizePageWrite } from "../lib/claim-decision.js";
 import { getClaim, tombstoneClaim } from "../lib/page-claims.js";
 import { billingEnabled, getEntitlements, planLimitError, UPGRADE_URL } from "../lib/entitlements.js";
+import { refreshShot } from "../lib/og-render.js";
+import { shotKey } from "../lib/og-shot.js";
 import type { Entitlements } from "../lib/entitlements.js";
 import {
   generateId,
@@ -159,7 +161,7 @@ api.post("/publish", publishRateLimit, async (c) => {
       }
     }
 
-    await c.env.PAGES_BUCKET.put(`pages/${existingId}/index.html`, html, {
+    const htmlObj = await c.env.PAGES_BUCKET.put(`pages/${existingId}/index.html`, html, {
       httpMetadata: { contentType: "text/html; charset=utf-8" },
     });
 
@@ -184,6 +186,9 @@ api.post("/publish", publishRateLimit, async (c) => {
       kvOptions.expirationTtl = ttlSeconds;
     }
     await c.env.PAGES_KV.put(`page:${existingId}`, serializeMetadata(updated), kvOptions);
+
+    // Link-preview screenshot, after the response (lib/og-render.ts).
+    c.executionCtx.waitUntil(refreshShot(c.env, existingId, updated, html, htmlObj?.etag ?? null, { replacing: true }));
 
     return c.json({
       id: existingId,
@@ -230,8 +235,9 @@ api.post("/publish", publishRateLimit, async (c) => {
     project: normalizeProject(project),
   };
 
+  let htmlObj: R2Object | null;
   try {
-    await c.env.PAGES_BUCKET.put(`pages/${id}/index.html`, html, {
+    htmlObj = await c.env.PAGES_BUCKET.put(`pages/${id}/index.html`, html, {
       httpMetadata: { contentType: "text/html; charset=utf-8" },
     });
   } catch (err: unknown) {
@@ -299,6 +305,9 @@ api.post("/publish", publishRateLimit, async (c) => {
       await saveStats(c.env.PAGES_KV, stats);
     })().catch(() => {}),
   );
+
+  // Link-preview screenshot, after the response (lib/og-render.ts).
+  c.executionCtx.waitUntil(refreshShot(c.env, id, metadata, html, htmlObj?.etag ?? null, { replacing: false }));
 
   return c.json({
     id,
@@ -388,7 +397,7 @@ api.put("/pages/:id", requireCsrfHeader, async (c) => {
     }
   }
 
-  await c.env.PAGES_BUCKET.put(`pages/${id}/index.html`, html, {
+  const htmlObj = await c.env.PAGES_BUCKET.put(`pages/${id}/index.html`, html, {
     httpMetadata: { contentType: "text/html; charset=utf-8" },
   });
 
@@ -413,6 +422,9 @@ api.put("/pages/:id", requireCsrfHeader, async (c) => {
     kvOptions.expirationTtl = ttlSeconds;
   }
   await c.env.PAGES_KV.put(`page:${id}`, serializeMetadata(updated), kvOptions);
+
+  // Link-preview screenshot, after the response (lib/og-render.ts).
+  c.executionCtx.waitUntil(refreshShot(c.env, id, updated, html, htmlObj?.etag ?? null, { replacing: true }));
 
   const origin = new URL(c.req.url).origin;
   // Return the token string back (prefer the body token; if owner-JWT path used, no token in response)
@@ -488,7 +500,7 @@ api.delete("/pages/:id", requireCsrfHeader, async (c) => {
   }
 
   await Promise.all([
-    c.env.PAGES_BUCKET.delete(`pages/${id}/index.html`),
+    c.env.PAGES_BUCKET.delete([`pages/${id}/index.html`, shotKey(id)]),
     c.env.PAGES_KV.delete(`page:${id}`),
   ]);
   // Keep a tombstone row: a stale KV copy of the page, still readable in

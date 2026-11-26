@@ -1,36 +1,53 @@
 import { Hono } from "hono";
 import type { AppBindings } from "../types.js";
 import { parseMetadata } from "@aired/core";
+import { SHOT_CONTENT_TYPE, ogCacheControl, shotAllowed, shotKey, versionFromEtag } from "../lib/og-shot.js";
 
 const og = new Hono<AppBindings>();
 
-// GET /og/:id — dynamic OG image as SVG (served as PNG via resvg or as SVG directly)
+// GET /og/:id — the page's link-preview image: its screenshot when there is
+// one (lib/og-shot.ts), else a title card drawn as SVG.
 og.get("/og/:id", async (c) => {
   const id = c.req.param("id");
 
   const raw = await c.env.PAGES_KV.get(`page:${id}`);
+  const metadata = raw === null ? null : parseMetadata(raw);
+
+  // Only a live page that may have one gets its screenshot: a deleted or
+  // expired page's file can outlive it in R2 until the sweep.
+  if (metadata !== null && shotAllowed(metadata, Date.now())) {
+    const shot = await c.env.PAGES_BUCKET.get(shotKey(id));
+    if (shot !== null) {
+      const shotVersion = shot.customMetadata?.html ? versionFromEtag(shot.customMetadata.html) : null;
+      const asked = c.req.query("v");
+      return new Response(shot.body, {
+        headers: {
+          "Content-Type": SHOT_CONTENT_TYPE,
+          "Cache-Control": ogCacheControl("shot", asked !== undefined && asked === shotVersion),
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    }
+  }
 
   let title = "Untitled";
   let views = 0;
   let expiryText = "";
 
-  if (raw !== null) {
-    const metadata = parseMetadata(raw);
-    if (metadata) {
-      title = metadata.title ?? "Untitled";
-      views = metadata.readCount;
-      if (metadata.permanent) {
-        expiryText = "Permanent";
-      } else if (metadata.expiresAt) {
-        const remaining = Math.max(
-          0,
-          Math.floor(
-            (new Date(metadata.expiresAt).getTime() - Date.now()) / 86400000,
-          ),
-        );
-        expiryText =
-          remaining > 0 ? `Expires in ${remaining}d` : "Expired";
-      }
+  if (metadata) {
+    title = metadata.title ?? "Untitled";
+    views = metadata.readCount;
+    if (metadata.permanent) {
+      expiryText = "Permanent";
+    } else if (metadata.expiresAt) {
+      const remaining = Math.max(
+        0,
+        Math.floor(
+          (new Date(metadata.expiresAt).getTime() - Date.now()) / 86400000,
+        ),
+      );
+      expiryText =
+        remaining > 0 ? `Expires in ${remaining}d` : "Expired";
     }
   }
 
@@ -49,7 +66,7 @@ og.get("/og/:id", async (c) => {
   return new Response(svg, {
     headers: {
       "Content-Type": "image/svg+xml",
-      "Cache-Control": "public, max-age=300, s-maxage=300",
+      "Cache-Control": ogCacheControl("card", false),
     },
   });
 });
