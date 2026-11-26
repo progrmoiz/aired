@@ -5,7 +5,8 @@
  * (index.ts) walks the bucket a batch at a time; each file is judged on its
  * own. When the HTML goes, index.ts also drops the page's page_shots row.
  *
- * A file is deleted only when its KV page record has been seen missing on two
+ * A file is deleted only when its page is live neither in D1 `pages` nor in
+ * KV, and its KV page record has been seen missing on two
  * runs at least CONFIRM_AFTER_MS apart, with the file unchanged in between
  * (same etag). An update needs the KV record to exist, so once it has been
  * gone that long nothing can rewrite the file under us, and KV's ~60s lag
@@ -46,6 +47,12 @@ export type SweepDeps = {
   /** True if the page's KV record exists. Throws on a KV error. */
   pageExists: (id: string) => Promise<boolean>;
   /**
+   * Which of these pages D1 `pages` has as live (lib/pages-store.ts). A
+   * file of one of them is kept without asking KV. Throws on a D1 error,
+   * and the sweep then goes by KV alone.
+   */
+  livePages?: (ids: string[]) => Promise<Set<string>>;
+  /**
    * Copy these files to the backup bucket, each only if it still has this
    * etag. Returns the keys that are safely copied (or already gone).
    */
@@ -69,6 +76,15 @@ export async function sweepExpiredPages(
     (o) => pageIdFromKey(o.key) !== null && now - o.uploaded.getTime() >= SWEEP_MIN_AGE_MS,
   );
   const known = await deps.loadCandidates(files.map((f) => f.key));
+  // A file goes only if neither D1 nor KV has its page as live.
+  let liveInD1 = new Set<string>();
+  if (deps.livePages && files.length > 0) {
+    try {
+      liveInD1 = await deps.livePages([...new Set(files.map((f) => pageIdFromKey(f.key)!))]);
+    } catch (err) {
+      deps.log?.({ event: 'expired_sweep_d1_error', err: String(err) });
+    }
+  }
 
   const doomed: Array<{ key: string; etag: string }> = [];
   const put = new Map<string, Candidate>();
@@ -76,7 +92,7 @@ export async function sweepExpiredPages(
   for (const file of files) {
     let exists: boolean;
     try {
-      exists = await deps.pageExists(pageIdFromKey(file.key)!);
+      exists = liveInD1.has(pageIdFromKey(file.key)!) || (await deps.pageExists(pageIdFromKey(file.key)!));
     } catch (err) {
       deps.log?.({ event: 'expired_sweep_kv_error', key: file.key, err: String(err) });
       continue;

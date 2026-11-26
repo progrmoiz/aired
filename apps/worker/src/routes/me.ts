@@ -6,7 +6,6 @@ import {
   generateToken,
   hashToken,
   parseMetadata,
-  serializeMetadata,
   redactNoreplyEmail,
   normalizeProject,
   UNSORTED_PROJECT,
@@ -17,15 +16,6 @@ import { revokeAllSessions } from '../lib/revocation.js';
 import { requireCsrfHeader } from '../middleware/csrf.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { TIERS } from '../lib/rate-limit-tiers.js';
-import {
-  addPageToOwner,
-  listPagesForOwner,
-  removePageFromOwner,
-  addPageToOwnerProject,
-  listPagesForOwnerProject,
-  listProjectsForOwner,
-  bumpProjectCount,
-} from '../lib/owner-index.js';
 import { clearSessionCookie, readSessionCookie, readWorkosSessionCookie, clearWorkosSessionCookie } from '../lib/cookies.js';
 import { billingEnabled, getEntitlements, isEntitled } from '../lib/entitlements.js';
 import { getCustomerId, getSubscription } from '../lib/billing/store.js';
@@ -42,7 +32,22 @@ import type { ClaimBatchResult } from '../lib/claim-decision.js';
 import { PREVIEW_HEADERS, previewDecision } from '../lib/page-preview.js';
 import { readShotRows, renderShots, type ShotJob } from '../lib/og-render.js';
 import { BACKFILL_MAX, SHOT_CONTENT_TYPE, needsBackfill, renderAllowed, tileCacheControl, tileInfo, tileKey, versionFromEtag } from '../lib/og-shot.js';
-import { claimedIds, getClaim, releaseClaimsForOwner, replaceClaimToken, upsertClaim } from '../lib/page-claims.js';
+import { DELETED_TOKEN_HASH, mirrorClaim, releaseClaimsForOwner } from '../lib/page-claims.ts';
+import type { ClaimRecord } from '../lib/claim-decision.js';
+import {
+  claimPageRow,
+  getPageRow,
+  listOwnerPages,
+  listOwnerProjects,
+  metadataFromRow,
+  releaseOwnerPage,
+  releaseOwnerPages,
+  replacePageToken,
+  resolvePage,
+  type PageRow,
+  type ProjectFilter,
+} from '../lib/pages-store.ts';
+import { indexForOwner, loadPage, mirrorOwnerToKv, type LoadedPage } from '../lib/page-write.ts';
 
 const me = new Hono<AppBindings>();
 
@@ -108,7 +113,8 @@ async function readSubscription(db: D1Database, uid: number): Promise<StoredSubs
   }
 }
 
-// GET /api/me/pages — list pages owned by the authenticated user.
+// GET /api/me/pages — list pages owned by the authenticated user, from D1
+// `pages` (lib/pages-store.ts), newest first.
 // Optional ?project=<name> filters to one project; ?project=__unsorted__ lists
 // pages with no project (including old records published before tagging existed).
 me.get('/pages', async (c) => {
@@ -120,14 +126,7 @@ me.get('/pages', async (c) => {
   const cursor = c.req.query('cursor') || undefined;
   const projectFilter = c.req.query('project') || undefined;
 
-  // Decide the id source + an optional metadata predicate.
-  // - named project: query the project index, double-check metadata.project matches.
-  // - __unsorted__: walk the flat index, keep only project === null.
-  // - default: the flat index, no project predicate.
-  let ids: string[];
-  let nextCursor: string | null;
-  let predicate: ((m: PageMetadata) => boolean) | null = null;
-
+  let filter: ProjectFilter = { kind: 'all' };
   if (projectFilter !== undefined && projectFilter !== UNSORTED_PROJECT) {
     // Match the read filter to the write-time normalization. A query that can't
     // normalize to a stored value (empty, whitespace, >64 chars) matches nothing.
@@ -135,23 +134,34 @@ me.get('/pages', async (c) => {
     if (normalized === null) {
       return c.json({ pages: [], cursor: null });
     }
-    const res = await listPagesForOwnerProject(c.env.PAGES_KV, ownerId, normalized, cursor, limit);
-    ids = res.ids;
-    nextCursor = res.cursor;
-    predicate = (m) => m.project === normalized;
-  } else {
-    const res = await listPagesForOwner(c.env.PAGES_KV, ownerId, cursor, limit);
-    ids = res.ids;
-    nextCursor = res.cursor;
-    if (projectFilter === UNSORTED_PROJECT) {
-      predicate = (m) => m.project === null;
-    }
+    filter = { kind: 'project', name: normalized };
+  } else if (projectFilter === UNSORTED_PROJECT) {
+    filter = { kind: 'unsorted' };
   }
 
-  // Fetch all page metadata in parallel
-  const rawPages = await Promise.all(
-    ids.map((id) => c.env.PAGES_KV.get(kvKeys.page(id))),
-  );
+  let listed: { rows: PageRow[]; cursor: string | null };
+  try {
+    listed = await listOwnerPages(c.env.DB, ownerId, filter, cursor, limit, Date.now());
+  } catch (err) {
+    console.error('pages list failed', { ownerId, err });
+    return c.json({ error: 'Could not load your pages. Please try again.' }, 503);
+  }
+
+  // View counts still live in the KV records (one bulk read). Best-effort:
+  // a page whose record can't be read shows 0.
+  const readCounts = new Map<string, number>();
+  if (listed.rows.length > 0) {
+    try {
+      const raws = await c.env.PAGES_KV.get(listed.rows.map((r) => kvKeys.page(r.id)));
+      for (const r of listed.rows) {
+        const raw = raws.get(kvKeys.page(r.id));
+        const m = raw === null || raw === undefined ? null : parseMetadata(raw);
+        if (m !== null) readCounts.set(r.id, m.readCount);
+      }
+    } catch (err) {
+      console.error('view counts lookup failed while listing pages', { ownerId, err });
+    }
+  }
 
   // Project only safe public fields — never leak tokenHash or pin to clients.
   const pages: Array<{
@@ -168,45 +178,23 @@ me.get('/pages', async (c) => {
     project: string | null;
     /** The dashboard tile's version and blurred placeholder (lib/og-shot.ts), or null. */
     tile: { v: string; lqip: string } | null;
-  }> = [];
-
-  const parsed = rawPages.map((raw) => (raw === null ? null : parseMetadata(raw)));
-
-  // A claimed page whose KV record was written back stale (ownerId null) is
-  // still this owner's: D1 page_claims says so. Best-effort; on a D1 error
-  // those pages are left out, as before.
-  let claimedHere = new Set<string>();
-  const unownedIds = parsed.flatMap((m) => (m !== null && m.ownerId === null ? [m.id] : []));
-  if (unownedIds.length > 0) {
-    try {
-      claimedHere = await claimedIds(c.env.DB, ownerId, unownedIds);
-    } catch (err) {
-      console.error('page_claims lookup failed while listing pages', { ownerId, err });
-    }
-  }
-
-  for (const found of parsed) {
-    if (found === null) continue;
-    const metadata = found.ownerId === null && claimedHere.has(found.id) ? { ...found, ownerId } : found;
-    // Self-heal: filter stale index entries where ownerId doesn't match
-    if (metadata.ownerId !== ownerId) continue;
-    // Apply the project predicate (self-heals stale project-index entries too)
-    if (predicate !== null && !predicate(metadata)) continue;
-    pages.push({
-      id: metadata.id,
-      title: metadata.title,
-      size: metadata.size,
-      readCount: metadata.readCount,
-      reads: metadata.reads,
-      permanent: metadata.permanent,
-      createdAt: metadata.createdAt,
-      expiresAt: metadata.expiresAt,
-      hasPin: metadata.pin !== null,
-      ownerId: metadata.ownerId,
-      project: metadata.project,
+  }> = listed.rows.map((r) => {
+    const m = metadataFromRow(r, readCounts.get(r.id) ?? 0);
+    return {
+      id: m.id,
+      title: m.title,
+      size: m.size,
+      readCount: m.readCount,
+      reads: m.reads,
+      permanent: m.permanent,
+      createdAt: m.createdAt,
+      expiresAt: m.expiresAt,
+      hasPin: m.pin !== null,
+      ownerId: m.ownerId,
+      project: m.project,
       tile: null,
-    });
-  }
+    };
+  });
 
   // Tiles: one D1 read for the whole list. Best-effort: on an error the
   // dashboard falls back to live previews.
@@ -219,7 +207,7 @@ me.get('/pages', async (c) => {
     }
   }
 
-  return c.json({ pages, cursor: nextCursor });
+  return c.json({ pages, cursor: listed.cursor });
 });
 
 // GET /api/me/projects — distinct projects for the authenticated user, with counts.
@@ -229,17 +217,8 @@ me.get('/pages', async (c) => {
 me.get('/pages/:id/preview', async (c) => {
   const user = c.get('user')!;
   const id = c.req.param('id');
-  const raw = await c.env.PAGES_KV.get(kvKeys.page(id));
-  const metadata = raw === null ? null : parseMetadata(raw);
-  let claimed = false;
-  if (metadata !== null && metadata.ownerId === null) {
-    try {
-      claimed = (await claimedIds(c.env.DB, user.id, [id])).has(id);
-    } catch (err) {
-      console.error('page_claims lookup failed for a preview', { id, err });
-    }
-  }
-  const decision = previewDecision(metadata, user.id, claimed, Date.now());
+  const page = await livePage(c.env, id);
+  const decision = previewDecision(page === null ? null : pageFacts(page), user.id, false, Date.now());
   if (!decision.ok) {
     return decision.status === 204 ? new Response(null, { status: 204, headers: PREVIEW_HEADERS }) : c.json({ error: 'Page not found' }, 404);
   }
@@ -248,25 +227,31 @@ me.get('/pages/:id/preview', async (c) => {
   return new Response(await obj.text(), { status: 200, headers: PREVIEW_HEADERS });
 });
 
+/** A live page, or null: missing, expired, deleted, or D1 unreadable (logged). */
+async function livePage(env: AppBindings['Bindings'], id: string): Promise<LoadedPage | null> {
+  try {
+    return await loadPage(env, id);
+  } catch (err) {
+    console.error('pages lookup failed for an owner route', { id, err });
+    return null;
+  }
+}
+
+/** The page's facts for preview and screenshot rules: the D1 row's owner, the KV record's PIN. */
+function pageFacts(page: LoadedPage): PageMetadata {
+  return { ...metadataFromRow(page.row, page.kv?.readCount ?? 0), pin: page.kv?.pin ?? page.row.pin };
+}
+
 /**
  * The owner's live page record, or null: missing, someone else's, or expired
  * (the same rule as the preview route, via previewDecision).
  */
-async function ownedPage(c: { env: AppBindings['Bindings'] }, userId: number, id: string, claimed: Set<string> | null): Promise<PageMetadata | null> {
-  const raw = await c.env.PAGES_KV.get(kvKeys.page(id));
-  const metadata = raw === null ? null : parseMetadata(raw);
-  if (metadata === null) return null;
-  let isClaimed = claimed?.has(id) ?? false;
-  if (claimed === null && metadata.ownerId === null) {
-    try {
-      isClaimed = (await claimedIds(c.env.DB, userId, [id])).has(id);
-    } catch (err) {
-      console.error('page_claims lookup failed for a tile', { id, err });
-    }
-  }
-  const decision = previewDecision(metadata, userId, isClaimed, Date.now());
+async function ownedPage(c: { env: AppBindings['Bindings'] }, userId: number, id: string): Promise<PageMetadata | null> {
+  const page = await livePage(c.env, id);
+  if (page === null) return null;
+  const facts = pageFacts(page);
   // A page too big to preview (204) has no tile either.
-  return decision.ok ? metadata : null;
+  return previewDecision(facts, userId, false, Date.now()).ok ? facts : null;
 }
 
 // GET /api/me/pages/:id/tile — the owner's dashboard tile, a 1200×800 JPEG
@@ -276,7 +261,7 @@ async function ownedPage(c: { env: AppBindings['Bindings'] }, userId: number, id
 me.get('/pages/:id/tile', async (c) => {
   const user = c.get('user')!;
   const id = c.req.param('id');
-  if ((await ownedPage(c, user.id, id, null)) === null) return c.json({ error: 'Page not found' }, 404);
+  if ((await ownedPage(c, user.id, id)) === null) return c.json({ error: 'Page not found' }, 404);
   const obj = await c.env.PAGES_BUCKET.get(tileKey(id));
   if (obj === null) return c.json({ error: 'Page not found' }, 404);
   const version = obj.customMetadata?.html ? versionFromEtag(obj.customMetadata.html) : null;
@@ -312,16 +297,10 @@ me.post('/pages/shots', requireCsrfHeader, async (c) => {
   const now = Date.now();
   const rows = await readShotRows(c.env.DB, ids);
   const wanted = ids.filter((id) => needsBackfill(rows.get(id), now));
-  let claimed = new Set<string>();
-  try {
-    claimed = await claimedIds(c.env.DB, user.id, wanted);
-  } catch (err) {
-    console.error('page_claims lookup failed for a tile backfill', { err });
-  }
   const jobs: ShotJob[] = [];
   for (const id of wanted) {
     if (jobs.length >= BACKFILL_MAX) break;
-    const metadata = await ownedPage(c, user.id, id, claimed);
+    const metadata = await ownedPage(c, user.id, id);
     if (metadata === null || !renderAllowed(metadata, now)) continue;
     const obj = await c.env.PAGES_BUCKET.get(`pages/${id}/index.html`);
     if (obj === null) continue;
@@ -336,8 +315,12 @@ me.post('/pages/shots', requireCsrfHeader, async (c) => {
 
 me.get('/projects', async (c) => {
   const user = c.get('user')!;
-  const projects = await listProjectsForOwner(c.env.PAGES_KV, user.id);
-  return c.json({ projects });
+  try {
+    return c.json({ projects: await listOwnerProjects(c.env.DB, user.id, Date.now()) });
+  } catch (err) {
+    console.error('projects list failed', { ownerId: user.id, err });
+    return c.json({ error: 'Could not load your projects. Please try again.' }, 503);
+  }
 });
 
 // POST /api/me/claim — claim a single page by id + update_token.
@@ -515,6 +498,17 @@ me.delete('/', requireWebSession, requireCsrfHeader, async (c) => {
     console.error('Failed to set the revocation marker during account deletion:', err);
     return c.json({ error: 'Could not delete your account. Please try again.' }, 503);
   }
+  // The account's pages become anonymous pages, in D1 (the source of truth)
+  // in one statement, before the account rows go: a failure here leaves the
+  // account intact to retry. Their KV records follow after the response.
+  let releasedPages: Array<{ id: string; tokenHash: string }>;
+  try {
+    releasedPages = await releaseOwnerPages(c.env.DB, userId, Date.now());
+  } catch (err) {
+    console.error('Failed to release pages during account deletion:', err);
+    clearSessionCookie(c);
+    return c.json({ error: 'Could not delete your account records. Sign in again and retry.' }, 503);
+  }
   try {
     await deleteAccountRows(c.env.DB, userId);
   } catch (err) {
@@ -623,129 +617,70 @@ me.delete('/', requireWebSession, requireCsrfHeader, async (c) => {
       : { ok: true },
   );
 
-  // Step 5: waitUntil — paginated sweep to null out ownerId on all pages
+  // Step 5: waitUntil — bring the released pages' KV records in line, and
+  // clear the old KV owner and project indexes.
   c.executionCtx.waitUntil(
     (async () => {
-      // Claimed pages become anonymous pages again, like every other page.
-      // Their D1 rows are released, not deleted, and keep the rotated hash:
-      // the KV record may hold a stale pre-claim hash, which must not become
-      // the authority again. `released` mirrors the right hash into KV below.
-      let released = new Map<string, string>();
+      const kv = c.env.PAGES_KV;
+      const now = Date.now();
+      const done = new Set<string>();
+      for (const page of releasedPages) {
+        done.add(page.id);
+        await mirrorOwnerToKv(kv, page.id, null, page.tokenHash, now);
+      }
+
+      // Pages from before D1 `pages` that have no row yet are found the old
+      // way: page_claims and the KV owner index. Each gets its row (from KV
+      // and its claim), is released there, and its KV record follows.
+      // page_claims is released too, for a rollback to the code before pages.
+      let claimIds: string[] = [];
       try {
-        released = await releaseClaimsForOwner(c.env.DB, userId);
+        claimIds = [...(await releaseClaimsForOwner(c.env.DB, userId)).keys()];
       } catch (err) {
         console.error('Failed to release page claims during account deletion:', err);
       }
-      const mirrorAnonymous = async (pageId: string) => {
-        const raw = await c.env.PAGES_KV.get(kvKeys.page(pageId));
-        if (raw === null) return;
-        const metadata = parseMetadata(raw);
-        if (metadata === null) return;
-        const updated: PageMetadata = {
-          ...metadata,
-          ownerId: null,
-          tokenHash: released.get(pageId) ?? metadata.tokenHash,
-        };
-        const kvOptions: KVNamespacePutOptions = {};
-        if (metadata.expiresAt !== null) {
-          kvOptions.expiration = Math.floor(Date.parse(metadata.expiresAt) / 1000);
+      const releaseLegacy = async (pageId: string) => {
+        if (done.has(pageId)) return;
+        done.add(pageId);
+        try {
+          const raw = await kv.get(kvKeys.page(pageId));
+          const row = await resolvePage(c.env.DB, pageId, raw === null ? null : parseMetadata(raw), now);
+          if (row === null) return;
+          if (row.ownerId === userId) await releaseOwnerPage(c.env.DB, pageId, userId, now);
+          if (row.deletedAt === null) await mirrorOwnerToKv(kv, pageId, null, row.tokenHash, now);
+        } catch (err) {
+          console.error('Failed to release a page during account deletion:', { pageId, err });
         }
-        await c.env.PAGES_KV.put(kvKeys.page(pageId), serializeMetadata(updated), kvOptions);
       };
-      const swept = new Set<string>();
+      for (const pageId of claimIds) await releaseLegacy(pageId);
 
-      let sweepCursor: string | undefined = undefined;
-
-      while (true) {
-        const listOptions: KVNamespaceListOptions = {
-          prefix: kvKeys.pagesByOwnerPrefix(userId),
-          limit: 50,
-        };
-        if (sweepCursor) {
-          listOptions.cursor = sweepCursor;
-        }
-
-        let list: KVNamespaceListResult<unknown, string>;
-        try {
-          list = await c.env.PAGES_KV.list(listOptions);
-        } catch (err) {
-          console.error('Failed to list owner index during account deletion sweep:', err);
-          break;
-        }
-
-        for (const entry of list.keys) {
-          const segments = entry.name.split(':');
-          const pageId = segments[segments.length - 1];
-          if (pageId === undefined) continue;
-
+      for (const prefix of [kvKeys.pagesByOwnerPrefix(userId), kvKeys.pagesByOwnerProjectOwnerPrefix(userId)]) {
+        let cursor: string | undefined = undefined;
+        while (true) {
+          let list: KVNamespaceListResult<unknown, string>;
           try {
-            swept.add(pageId);
-            await mirrorAnonymous(pageId);
+            list = await kv.list({ prefix, limit: 50, ...(cursor ? { cursor } : {}) });
           } catch (err) {
-            console.error('Failed to null ownerId on page during deletion sweep:', { pageId, err });
+            console.error('Failed to list an owner index during account deletion sweep:', err);
+            break;
           }
-
-          // Delete the index entry
-          try {
-            await c.env.PAGES_KV.delete(entry.name);
-          } catch (err) {
-            console.error('Failed to delete owner index entry during deletion sweep:', { key: entry.name, err });
+          for (const entry of list.keys) {
+            const pageId = entry.name.split(':').pop();
+            if (pageId !== undefined && prefix === kvKeys.pagesByOwnerPrefix(userId)) await releaseLegacy(pageId);
+            try {
+              await kv.delete(entry.name);
+            } catch (err) {
+              console.error('Failed to delete an owner index entry during deletion sweep:', { key: entry.name, err });
+            }
           }
+          if (list.list_complete) break;
+          cursor = list.cursor ?? undefined;
         }
-
-        if (list.list_complete) {
-          break;
-        }
-        sweepCursor = list.cursor ?? undefined;
-      }
-
-      // Claimed pages missing from the owner index (a failed index write).
-      for (const pageId of released.keys()) {
-        if (swept.has(pageId)) continue;
-        try {
-          await mirrorAnonymous(pageId);
-        } catch (err) {
-          console.error('Failed to null ownerId on claimed page during deletion sweep:', { pageId, err });
-        }
-      }
-
-      // Second sweep: delete the owner's project-index entries (page records were
-      // already handled above — here we only clear the secondary index keys).
-      let projectSweepCursor: string | undefined = undefined;
-      while (true) {
-        const listOptions: KVNamespaceListOptions = {
-          prefix: kvKeys.pagesByOwnerProjectOwnerPrefix(userId),
-          limit: 50,
-        };
-        if (projectSweepCursor) {
-          listOptions.cursor = projectSweepCursor;
-        }
-
-        let list: KVNamespaceListResult<unknown, string>;
-        try {
-          list = await c.env.PAGES_KV.list(listOptions);
-        } catch (err) {
-          console.error('Failed to list project index during account deletion sweep:', err);
-          break;
-        }
-
-        for (const entry of list.keys) {
-          try {
-            await c.env.PAGES_KV.delete(entry.name);
-          } catch (err) {
-            console.error('Failed to delete project index entry during deletion sweep:', { key: entry.name, err });
-          }
-        }
-
-        if (list.list_complete) {
-          break;
-        }
-        projectSweepCursor = list.cursor ?? undefined;
       }
 
       // Finally, drop the project manifest.
       try {
-        await c.env.PAGES_KV.delete(kvKeys.projectsByOwner(userId));
+        await kv.delete(kvKeys.projectsByOwner(userId));
       } catch (err) {
         console.error('Failed to delete project manifest during deletion sweep:', err);
       }
@@ -759,61 +694,57 @@ me.delete('/', requireWebSession, requireCsrfHeader, async (c) => {
  * Internal helper: claim a single page for a user.
  * Returns a Hono Response. Both claim and claim-batch call this.
  *
- * D1 `page_claims` decides who owns a claimed page and which token works
- * (lib/claim-decision.ts). The KV record is updated after it, best-effort.
+ * The page's D1 row decides who owns it and which token works
+ * (lib/claim-decision.ts, lib/pages-store.ts). The KV record, the old
+ * indexes and page_claims (for a rollback) are updated after it, best-effort.
  */
 async function claimPage(
-  env: { PAGES_KV: KVNamespace; DB: D1Database },
+  env: { PAGES_KV: KVNamespace; PAGES_BUCKET: R2Bucket; DB: D1Database },
   userId: number,
   pageId: string,
   updateToken: string,
 ): Promise<Response> {
-  const kv = env.PAGES_KV;
   const denied = () => Response.json({ error: 'claim failed' }, { status: 403 });
 
-  const raw = await kv.get(kvKeys.page(pageId));
-  if (raw === null) return denied();
-  const metadata = parseMetadata(raw);
-  if (metadata === null) return denied();
+  let page: LoadedPage | null;
+  try {
+    page = await loadPage(env, pageId);
+  } catch (err) {
+    console.error('pages lookup failed during claim', { pageId, err });
+    return Response.json({ error: 'Could not claim this page. Please try again.' }, { status: 503 });
+  }
+  if (page === null) return denied();
+  const { row } = page;
+
+  // The row as a claim record; a deleted or vanished row matches nothing.
+  const currentClaim = async (): Promise<ClaimRecord> => {
+    const r = await getPageRow(env.DB, pageId);
+    if (r === null || r.deletedAt !== null) {
+      return { ownerId: r?.ownerId ?? null, tokenHash: DELETED_TOKEN_HASH, prevTokenHash: DELETED_TOKEN_HASH, claimedAt: 0 };
+    }
+    return { ownerId: r.ownerId, tokenHash: r.tokenHash, prevTokenHash: r.prevTokenHash ?? DELETED_TOKEN_HASH, claimedAt: r.claimedAt ?? 0 };
+  };
 
   const outcome = await runClaim(
-    { kvOwnerId: metadata.ownerId, kvTokenHash: metadata.tokenHash, userId, now: Date.now() },
+    { kvOwnerId: row.ownerId, kvTokenHash: row.tokenHash, userId, now: Date.now() },
     {
-      getClaim: () => getClaim(env.DB, pageId),
-      upsertClaim: (record, checkedHash) => upsertClaim(env.DB, pageId, record, checkedHash),
-      replaceClaimToken: (hash) => replaceClaimToken(env.DB, pageId, userId, hash),
+      getClaim: currentClaim,
+      upsertClaim: (record, checkedHash) => claimPageRow(env.DB, pageId, record, checkedHash),
+      replaceClaimToken: (hash) => replacePageToken(env.DB, pageId, userId, hash, Date.now()),
       newToken: generateToken,
       hash: hashToken,
       matches: (hash) => verifyToken(updateToken, hash),
-      // KV is a cache for the viewer and dashboard; D1 already holds the
-      // claim, so a failure here can't revive the old token.
+      // D1 already holds the claim, so failures here can't revive the old token.
       mirrorToKv: async (ownerId, tokenHash) => {
+        await mirrorOwnerToKv(env.PAGES_KV, pageId, ownerId, tokenHash);
         try {
-          const updated: PageMetadata = { ...metadata, ownerId, tokenHash };
-          const kvOptions: KVNamespacePutOptions = {};
-          if (metadata.expiresAt !== null) {
-            kvOptions.expiration = Math.floor(Date.parse(metadata.expiresAt) / 1000);
-          }
-          await kv.put(kvKeys.page(pageId), serializeMetadata(updated), kvOptions);
+          const claimed = await currentClaim();
+          await mirrorClaim(env.DB, pageId, { ...claimed, ownerId });
         } catch (err) {
-          console.error('page metadata write failed during claim', { pageId, userId, err });
+          console.error('page_claims mirror failed during claim', { pageId, userId, err });
         }
       },
-      indexPage: async () => {
-        try {
-          await addPageToOwner(kv, userId, pageId, metadata.createdAt, metadata.expiresAt);
-        } catch (err) {
-          console.error('owner-index write failed during claim', { pageId, userId, err });
-        }
-        if (metadata.project !== null) {
-          try {
-            await addPageToOwnerProject(kv, userId, metadata.project, pageId, metadata.createdAt, metadata.expiresAt);
-            await bumpProjectCount(kv, userId, metadata.project, 1);
-          } catch (err) {
-            console.error('owner-project-index write failed during claim', { pageId, userId, project: metadata.project, err });
-          }
-        }
-      },
+      indexPage: () => indexForOwner(env.PAGES_KV, userId, metadataFromRow(row, 0)),
     },
   );
 
@@ -821,10 +752,10 @@ async function claimPage(
   return Response.json({
     ok: true,
     page: {
-      id: metadata.id,
-      title: metadata.title,
-      createdAt: metadata.createdAt,
-      expiresAt: metadata.expiresAt,
+      id: row.id,
+      title: row.title,
+      createdAt: new Date(row.createdAt).toISOString(),
+      expiresAt: row.expiresAt === null ? null : new Date(row.expiresAt).toISOString(),
     },
     ...(outcome.token !== null ? { update_token: outcome.token } : {}),
   });

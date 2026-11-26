@@ -3,41 +3,58 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 // Tripwire: route handlers can't be imported by these tests, so check their
-// source. Every token check must go through the D1 claim row (getClaim via
-// authoritativeCredentials), never straight against the KV record's hash,
-// which a stale write-back can reset to the pre-claim token.
-const src = (f: string) => readFileSync(new URL(`../src/routes/${f}`, import.meta.url), "utf8");
+// source. Every token and owner check must go through the page's D1 row
+// (loadPage in lib/page-write.ts), never straight against the KV record's
+// hash, which a stale write-back can reset to the pre-claim token.
+const src = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8");
 const count = (code: string, re: RegExp) => (code.match(new RegExp(re.source, "g")) ?? []).length;
 
-test("api.ts: publish-update, PUT and DELETE all read credentials from the claim row", () => {
-  const code = src("api.ts");
+test("api.ts: publish-update, PUT and DELETE all read credentials from the D1 row", () => {
+  const code = src("routes/api.ts");
   assert.doesNotMatch(code, /verifyToken\([^)]*metadata\.tokenHash/);
-  assert.match(code, /authoritativeCredentials\(\s*\(\) => getClaim\(db, id\)/);
-  assert.equal(count(code, /await credentialsFor\(c\.env\.DB, /), 3);
+  assert.doesNotMatch(code, /getClaim|page_claims|PAGES_KV\.get\(`page:\$\{(existingId|id)\}`\)[\s\S]{0,200}verifyToken/);
+  assert.match(code, /return \(await loadPage\(c\.env, id\)\) \?\? c\.json\(\{ error: "Page not found" \}, 404\)/);
+  assert.equal(count(code, /await pageFor\(c, /), 3);
+  assert.equal(count(code, /const creds = \{ ownerId: page\.row\.ownerId, tokenHash: page\.row\.tokenHash \};/), 3);
 });
 
-test("api.ts: PUT accepts the owner's session, writes back the row's owner and hash, and DELETE checks the row's owner", () => {
-  const code = src("api.ts");
+test("api.ts: PUT accepts the owner's session, and DELETE checks the row's owner", () => {
+  const code = src("routes/api.ts");
   assert.match(code, /allowSession: true/);
-  assert.equal(count(code, /\.\.\.metadata,\s*\n\s*\/\/ Write the authoritative owner and hash[^\n]*\n\s*ownerId: creds\.ownerId,\s*\n\s*tokenHash: creds\.tokenHash,/), 2);
   assert.match(code, /creds\.ownerId === deleteUser\.id/);
 });
 
-test("api.ts: DELETE tombstones the page's claim row", () => {
-  const code = src("api.ts");
-  assert.match(code, /tombstoneClaim\(c\.env\.DB, id, /);
+test("page-write.ts: loadPage reads the row (made from KV only if missing) and drops dead pages", () => {
+  const code = src("lib/page-write.ts");
+  assert.match(code, /const row = await resolvePage\(env\.DB, id, kv, now\);\s*if \(row === null \|\| !isLive\(row, now\)\) return null;/);
+  // KV cache records are rebuilt from the row on update, so a stale one can't win.
+  assert.match(code, /const metadata = cacheRecord\(updated, kv\);/);
+});
+
+test("page-write.ts: DELETE marks the row and tombstones page_claims for a rollback", () => {
+  const code = src("lib/page-write.ts");
+  assert.match(code, /await markPageDeleted\(env\.DB, row\.id, now\);/);
+  assert.match(code, /tombstoneClaim\(env\.DB, row\.id, now\)/);
   assert.doesNotMatch(code, /DELETE FROM page_claims/);
 });
 
-test("mcp.ts: MCP updates read credentials from the claim row", () => {
-  const code = src("mcp.ts");
+test("mcp.ts: MCP updates read credentials from the D1 row", () => {
+  const code = src("routes/mcp.ts");
   assert.doesNotMatch(code, /verifyToken\([^)]*metadata\.tokenHash/);
-  assert.match(code, /authoritativeCredentials\(\s*\(\) => getClaim\(env\.DB, existingId\)/);
+  assert.match(code, /page = await loadPage\(env, existingId\);/);
+  assert.match(code, /verifyToken\(update_token, page\.row\.tokenHash\)/);
 });
 
-test("me.ts: claims go through runClaim; account deletion releases rows and mirrors their hash", () => {
-  const code = src("me.ts");
+test("me.ts: claims go through runClaim on the row; account deletion releases pages in D1 first", () => {
+  const code = src("routes/me.ts");
   assert.match(code, /runClaim\(/);
+  assert.match(code, /upsertClaim: \(record, checkedHash\) => claimPageRow\(env\.DB, pageId, record, checkedHash\)/);
+  assert.match(code, /replaceClaimToken: \(hash\) => replacePageToken\(env\.DB, pageId, userId, hash, Date\.now\(\)\)/);
+  const release = code.indexOf("releasedPages = await releaseOwnerPages(c.env.DB, userId, Date.now());");
+  assert.ok(release > 0 && release < code.indexOf("await deleteAccountRows(c.env.DB, userId);"), "pages are released before the account rows go");
   assert.match(code, /releaseClaimsForOwner\(c\.env\.DB, userId\)/);
-  assert.match(code, /tokenHash: released\.get\(pageId\) \?\? metadata\.tokenHash/);
+  // Lists and project counts come from D1, not the KV indexes.
+  assert.match(code, /listOwnerPages\(c\.env\.DB, ownerId, filter, cursor, limit, Date\.now\(\)\)/);
+  assert.match(code, /listOwnerProjects\(c\.env\.DB, user\.id, Date\.now\(\)\)/);
+  assert.doesNotMatch(code, /listPagesForOwner|listProjectsForOwner|claimedIds/);
 });

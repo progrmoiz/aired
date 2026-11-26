@@ -75,7 +75,7 @@ test("publish, MCP and the viewer store hashes and check cookie tokens", () => {
   assert.doesNotMatch(viewer, /pinCookie !== metadata\.pin|if \(pin !== metadata\.pin\)|=\$\{metadata\.pin\}/);
   // Nothing returns the stored PIN.
   assert.doesNotMatch(src("api.ts"), /pin: metadata\.pin/);
-  assert.match(src("me.ts"), /hasPin: metadata\.pin !== null/);
+  assert.match(src("me.ts"), /hasPin: m\.pin !== null/);
 });
 
 test("verify-pin limits guesses, and the rehash and view-count writes don't undo each other", () => {

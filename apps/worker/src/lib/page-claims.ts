@@ -108,6 +108,25 @@ export async function releaseClaimsForOwner(
   return new Map(results.map((r) => [r.page_id, r.token_hash]));
 }
 
+/**
+ * Copy a claim made on D1 `pages` into page_claims, so code from before the
+ * pages table reads the same owner and token after a rollback.
+ */
+export async function mirrorClaim(db: D1Database, pageId: string, record: ClaimRecord): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO page_claims (page_id, owner_id, token_hash, prev_token_hash, claimed_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT (page_id) DO UPDATE SET
+         owner_id = excluded.owner_id,
+         token_hash = excluded.token_hash,
+         prev_token_hash = excluded.prev_token_hash,
+         claimed_at = excluded.claimed_at`,
+    )
+    .bind(pageId, record.ownerId, record.tokenHash, record.prevTokenHash, record.claimedAt)
+    .run();
+}
+
 /** D1 allows 100 bound parameters per query; one goes to the owner id. */
 const IDS_PER_QUERY = 90;
 

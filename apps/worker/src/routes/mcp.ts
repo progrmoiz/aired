@@ -13,13 +13,10 @@ import {
   verifyToken,
   validateHtml,
   extractTitle,
-  parseMetadata,
-  serializeMetadata,
   DEFAULT_TTL,
 } from "@aired/core";
 import type { PageMetadata } from "@aired/core";
-import { authoritativeCredentials } from "../lib/claim-decision.js";
-import { getClaim } from "../lib/page-claims.js";
+import { createPage, loadPage, StorageUnavailable, updatePage, type LoadedPage } from "../lib/page-write.ts";
 import { hashPin } from "../lib/pin-hash.js";
 import { refreshShot } from "../lib/og-render.js";
 import { billingEnabled, upgradeUrl } from "../lib/entitlements.js";
@@ -151,41 +148,26 @@ function createAiredMcpServer(
         typeof update_token === "string" &&
         typeof existingId === "string"
       ) {
-        const raw = await env.PAGES_KV.get(`page:${existingId}`);
-        if (raw === null) {
-          return {
-            content: [{ type: "text" as const, text: "Page not found" }],
-            isError: true,
-          };
-        }
-
-        const metadata = parseMetadata(raw);
-        if (metadata === null) {
-          return {
-            content: [{ type: "text" as const, text: "Page metadata is corrupted" }],
-            isError: true,
-          };
-        }
-
-        // A claimed page's D1 row wins over its KV record, which can be
-        // written back stale. Fail closed if D1 can't be read.
-        let tokenHash: string;
+        // The page's D1 row decides its token (lib/page-write.ts loadPage),
+        // never the KV record, which can be written back stale. Fail closed
+        // if D1 can't be read.
+        let page: LoadedPage | null;
         try {
-          tokenHash = (
-            await authoritativeCredentials(
-              () => getClaim(env.DB, existingId),
-              metadata.ownerId,
-              metadata.tokenHash,
-            )
-          ).tokenHash;
+          page = await loadPage(env, existingId);
         } catch (err) {
-          console.error("page_claims lookup failed on MCP update", { id: existingId, err });
+          console.error("pages lookup failed on MCP update", { id: existingId, err });
           return {
             content: [{ type: "text" as const, text: "Could not check this page's credentials. Please try again." }],
             isError: true,
           };
         }
-        const valid = await verifyToken(update_token, tokenHash);
+        if (page === null) {
+          return {
+            content: [{ type: "text" as const, text: "Page not found" }],
+            isError: true,
+          };
+        }
+        const valid = await verifyToken(update_token, page.row.tokenHash);
         if (!valid) {
           return {
             content: [{ type: "text" as const, text: "Invalid update token" }],
@@ -193,14 +175,10 @@ function createAiredMcpServer(
           };
         }
 
-        const htmlObj = await env.PAGES_BUCKET.put(
-          `pages/${existingId}/index.html`,
-          html,
-          { httpMetadata: { contentType: "text/html; charset=utf-8" } },
-        );
+        // Same update as the API: title, size and expiry move with the HTML.
+        const { metadata: updated, htmlEtag } = await updatePage(env, page, html, resolvedTitle);
         // Link-preview screenshot, after the response (lib/og-render.ts).
-        const size = new TextEncoder().encode(html).byteLength;
-        background(refreshShot(env, existingId, { ...metadata, size }, html, htmlObj?.etag ?? null, { replacing: true }));
+        background(refreshShot(env, existingId, updated, html, htmlEtag, { replacing: true }));
 
         return {
           content: [
@@ -258,19 +236,18 @@ function createAiredMcpServer(
         project: null,
       };
 
-      const htmlObj = await env.PAGES_BUCKET.put(`pages/${pageId}/index.html`, html, {
-        httpMetadata: { contentType: "text/html; charset=utf-8" },
-      });
-
-      const kvOptions: KVNamespacePutOptions = {};
-      if (ttlSeconds !== null) {
-        kvOptions.expirationTtl = ttlSeconds;
+      // D1 row, R2 HTML and KV cache record, or nothing (lib/page-write.ts).
+      let htmlObj: R2Object | null;
+      try {
+        htmlObj = await createPage(env, metadata, html, now.getTime());
+      } catch (err) {
+        if (!(err instanceof StorageUnavailable)) throw err;
+        console.error("MCP publish storage write failed", { id: pageId, err: err.message });
+        return {
+          content: [{ type: "text" as const, text: "Service temporarily unavailable. Try again later." }],
+          isError: true,
+        };
       }
-      await env.PAGES_KV.put(
-        `page:${pageId}`,
-        serializeMetadata(metadata),
-        kvOptions,
-      );
 
       // Link-preview screenshot, after the response (lib/og-render.ts).
       background(refreshShot(env, pageId, metadata, html, htmlObj?.etag ?? null, { replacing: false }));

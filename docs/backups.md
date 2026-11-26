@@ -8,7 +8,7 @@ and `scripts/backup-restore.ts`.
 
 | Data | Copy | Kept | Restore with |
 |---|---|---|---|
-| D1 (`aired`): accounts, identities, billing, API keys, page claims, page shots | D1 Time Travel, built in | 30 days on Workers Paid, 7 on Free | `wrangler d1 time-travel restore` (below) |
+| D1 (`aired`): pages, accounts, identities, billing, API keys, page claims, page shots | D1 Time Travel, built in | 30 days on Workers Paid, 7 on Free | `wrangler d1 time-travel restore` (below) |
 | D1, again | Nightly snapshot in the backup bucket | 30 days | `backup-restore.ts prepare`, then `wrangler d1 execute` |
 | KV page records, accounts and indexes | Nightly snapshot in the backup bucket | 30 days | `backup-restore.ts prepare`, then `wrangler kv bulk put` |
 | R2 page files removed by the expired-page sweep | Copied to `trash/` just before the sweep deletes them | 14 days | `backup-restore.ts untrash` |
@@ -133,11 +133,14 @@ from `apps/worker`. Add `--env staging` to wrangler commands for staging.
 node --experimental-strip-types scripts/backup-restore.ts untrash --env production --id <pageId>
 ```
 
-That copies `index.html`, `shot.jpg` and `tile.jpg` back from `trash/`. The
-page also needs its KV `page:<id>` record. Take it from the last snapshot
-that has it, in `kv/page/*.json`, and put it back with
-`wrangler kv key put`. Leave out `expiration` (or set it in the future),
-or KV drops the page again.
+That copies `index.html`, `shot.jpg` and `tile.jpg` back from `trash/`.
+The page also needs to be live again in the record that decides it:
+- **D1 `pages`** (docs/pages-in-d1.md): set its `expires_at` to NULL
+  (permanent) or a future time in ms, and `deleted_at` to NULL.
+- **KV `page:<id>`**, the viewer's copy: take it from the last snapshot
+  that has it (`kv/page/*.json`) and put it back with `wrangler kv key put`.
+  Leave out `expiration` (or set it in the future), or KV drops the page
+  again.
 
 ### KV lost or corrupted
 
