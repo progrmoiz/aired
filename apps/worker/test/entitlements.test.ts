@@ -74,7 +74,7 @@ test("plan limit errors carry the upgrade link", () => {
   });
   assert.equal(planLimitError("publish_rate", "https://aired.sh", "mcp").upgrade_url, "https://aired.sh/pricing?ref=mcp");
   assert.equal(planLimitError("publish_rate", "https://aired.sh", "mcp").limit, "publish_rate");
-  assert.equal(planLimitError("page_size", "https://staging.aired.sh").upgrade_url, "https://staging.aired.sh/pricing?ref=api");
+  assert.equal(planLimitError("page_size", "http://localhost:8787").upgrade_url, "http://localhost:8787/pricing?ref=api");
   assert.equal(upgradeUrl("https://aired.sh", "publish"), "https://aired.sh/pricing?ref=publish");
 });
 
