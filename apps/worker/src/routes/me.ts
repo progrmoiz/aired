@@ -40,6 +40,8 @@ import { AUTH_HEADER } from '@aired/core';
 import { addClaimResult, runClaim } from '../lib/claim-decision.js';
 import type { ClaimBatchResult } from '../lib/claim-decision.js';
 import { PREVIEW_HEADERS, previewDecision } from '../lib/page-preview.js';
+import { readShotRows, renderShots, type ShotJob } from '../lib/og-render.js';
+import { BACKFILL_MAX, SHOT_CONTENT_TYPE, needsBackfill, renderAllowed, tileCacheControl, tileInfo, tileKey, versionFromEtag } from '../lib/og-shot.js';
 import { claimedIds, getClaim, releaseClaimsForOwner, replaceClaimToken, upsertClaim } from '../lib/page-claims.js';
 
 const me = new Hono<AppBindings>();
@@ -164,6 +166,8 @@ me.get('/pages', async (c) => {
     hasPin: boolean;
     ownerId: number | null;
     project: string | null;
+    /** The dashboard tile's version and blurred placeholder (lib/og-shot.ts), or null. */
+    tile: { v: string; lqip: string } | null;
   }> = [];
 
   const parsed = rawPages.map((raw) => (raw === null ? null : parseMetadata(raw)));
@@ -200,7 +204,19 @@ me.get('/pages', async (c) => {
       hasPin: metadata.pin !== null,
       ownerId: metadata.ownerId,
       project: metadata.project,
+      tile: null,
     });
+  }
+
+  // Tiles: one D1 read for the whole list. Best-effort: on an error the
+  // dashboard falls back to live previews.
+  if (pages.length > 0) {
+    try {
+      const rows = await readShotRows(c.env.DB, pages.map((p) => p.id));
+      for (const p of pages) p.tile = tileInfo(rows.get(p.id));
+    } catch (err) {
+      console.error('page_shots lookup failed while listing pages', { ownerId, err });
+    }
   }
 
   return c.json({ pages, cursor: nextCursor });
@@ -230,6 +246,92 @@ me.get('/pages/:id/preview', async (c) => {
   const obj = await c.env.PAGES_BUCKET.get(`pages/${id}/index.html`);
   if (obj === null) return c.json({ error: 'Page not found' }, 404);
   return new Response(await obj.text(), { status: 200, headers: PREVIEW_HEADERS });
+});
+
+/**
+ * The owner's live page record, or null: missing, someone else's, or expired
+ * (the same rule as the preview route, via previewDecision).
+ */
+async function ownedPage(c: { env: AppBindings['Bindings'] }, userId: number, id: string, claimed: Set<string> | null): Promise<PageMetadata | null> {
+  const raw = await c.env.PAGES_KV.get(kvKeys.page(id));
+  const metadata = raw === null ? null : parseMetadata(raw);
+  if (metadata === null) return null;
+  let isClaimed = claimed?.has(id) ?? false;
+  if (claimed === null && metadata.ownerId === null) {
+    try {
+      isClaimed = (await claimedIds(c.env.DB, userId, [id])).has(id);
+    } catch (err) {
+      console.error('page_claims lookup failed for a tile', { id, err });
+    }
+  }
+  const decision = previewDecision(metadata, userId, isClaimed, Date.now());
+  // A page too big to preview (204) has no tile either.
+  return decision.ok ? metadata : null;
+}
+
+// GET /api/me/pages/:id/tile — the owner's dashboard tile, a 1200×800 JPEG
+// of the page (lib/og-shot.ts). PIN and view-limited pages have one too:
+// only their owner can fetch it, and it's never served at /og/:id. 404 for
+// anyone else. Asked for by its version (?v=), it's cached for good.
+me.get('/pages/:id/tile', async (c) => {
+  const user = c.get('user')!;
+  const id = c.req.param('id');
+  if ((await ownedPage(c, user.id, id, null)) === null) return c.json({ error: 'Page not found' }, 404);
+  const obj = await c.env.PAGES_BUCKET.get(tileKey(id));
+  if (obj === null) return c.json({ error: 'Page not found' }, 404);
+  const version = obj.customMetadata?.html ? versionFromEtag(obj.customMetadata.html) : null;
+  const asked = c.req.query('v');
+  return new Response(obj.body, {
+    headers: {
+      'Content-Type': SHOT_CONTENT_TYPE,
+      'Cache-Control': tileCacheControl(asked !== undefined && asked === version),
+      'X-Content-Type-Options': 'nosniff',
+      'Cross-Origin-Resource-Policy': 'same-origin',
+    },
+  });
+});
+
+// POST /api/me/pages/shots — draw tiles for the owner's pages that have none
+// yet (pages from before screenshots, or that missed the budget). The
+// dashboard sends the ids it's showing; up to BACKFILL_MAX are drawn in one
+// browser, inside the daily budget, and a page that was tried in the last
+// day is skipped. Answers with the new tiles, for the dashboard to swap in.
+me.post('/pages/shots', requireCsrfHeader, async (c) => {
+  const user = c.get('user')!;
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+  const rawIds = (body as { ids?: unknown } | null)?.ids;
+  if (!Array.isArray(rawIds)) return c.json({ error: 'ids must be an array' }, 400);
+  const ids = [...new Set(rawIds.filter((x): x is string => typeof x === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(x)))].slice(0, 20);
+  if (ids.length === 0) return c.json({ tiles: {} });
+
+  const now = Date.now();
+  const rows = await readShotRows(c.env.DB, ids);
+  const wanted = ids.filter((id) => needsBackfill(rows.get(id), now));
+  let claimed = new Set<string>();
+  try {
+    claimed = await claimedIds(c.env.DB, user.id, wanted);
+  } catch (err) {
+    console.error('page_claims lookup failed for a tile backfill', { err });
+  }
+  const jobs: ShotJob[] = [];
+  for (const id of wanted) {
+    if (jobs.length >= BACKFILL_MAX) break;
+    const metadata = await ownedPage(c, user.id, id, claimed);
+    if (metadata === null || !renderAllowed(metadata, now)) continue;
+    const obj = await c.env.PAGES_BUCKET.get(`pages/${id}/index.html`);
+    if (obj === null) continue;
+    jobs.push({ id, page: metadata, html: await obj.text(), htmlEtag: obj.etag });
+  }
+  const done = await renderShots(c.env, jobs);
+  const after = done.length > 0 ? await readShotRows(c.env.DB, done) : new Map();
+  const tiles: Record<string, { v: string; lqip: string } | null> = {};
+  for (const id of done) tiles[id] = tileInfo(after.get(id));
+  return c.json({ tiles });
 });
 
 me.get('/projects', async (c) => {

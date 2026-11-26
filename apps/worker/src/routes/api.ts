@@ -11,8 +11,7 @@ import { hashPin } from "../lib/pin-hash.js";
 import { authoritativeCredentials, authorizePageWrite } from "../lib/claim-decision.js";
 import { getClaim, tombstoneClaim } from "../lib/page-claims.js";
 import { billingEnabled, getEntitlements, planLimitError, UPGRADE_URL } from "../lib/entitlements.js";
-import { refreshShot } from "../lib/og-render.js";
-import { shotKey } from "../lib/og-shot.js";
+import { forgetShots, refreshShot } from "../lib/og-render.js";
 import type { Entitlements } from "../lib/entitlements.js";
 import {
   generateId,
@@ -500,9 +499,15 @@ api.delete("/pages/:id", requireCsrfHeader, async (c) => {
   }
 
   await Promise.all([
-    c.env.PAGES_BUCKET.delete([`pages/${id}/index.html`, shotKey(id)]),
+    c.env.PAGES_BUCKET.delete(`pages/${id}/index.html`),
     c.env.PAGES_KV.delete(`page:${id}`),
   ]);
+  // Its link-preview screenshot, dashboard tile and placeholder go too.
+  try {
+    await forgetShots(c.env, id);
+  } catch (err) {
+    console.error("screenshot cleanup failed on delete", { id, err });
+  }
   // Keep a tombstone row: a stale KV copy of the page, still readable in
   // other regions for a while, must not let its old token bring it back.
   try {

@@ -19,7 +19,7 @@ import { authMiddleware } from "./middleware/auth.js";
 import { countMcpToolCalls, isMcpToolCall } from "./lib/mcp-rpc.js";
 import { rateLimit } from "./middleware/rate-limit.js";
 import { TIERS } from "./lib/rate-limit-tiers.js";
-import { sweepExpiredPages } from "./lib/expired-sweep.js";
+import { pageIdFromKey, sweepExpiredPages } from "./lib/expired-sweep.js";
 import { withAssetCache } from "./lib/asset-cache.js";
 import { API_KEY_PREFIX, kvKeys } from "@aired/core";
 import { loadUserRecord, signedInUser } from "./lib/user-record.js";
@@ -201,7 +201,14 @@ async function runExpiredSweep(env: Env): Promise<void> {
         };
       },
       pageExists: async (id) => (await env.PAGES_KV.get(kvKeys.page(id))) !== null,
-      deleteKeys: (keys) => env.PAGES_BUCKET.delete(keys),
+      deleteKeys: async (keys) => {
+        await env.PAGES_BUCKET.delete(keys);
+        // The page is gone: its tile placeholder in D1 goes with its HTML.
+        const ids = keys.filter((k) => k.endsWith("/index.html")).map((k) => pageIdFromKey(k)!);
+        if (ids.length > 0) {
+          await env.DB.batch(ids.map((id) => env.DB.prepare("DELETE FROM page_shots WHERE id = ?").bind(id)));
+        }
+      },
       loadCursor: async () =>
         (await env.DB.prepare("SELECT cursor FROM sweep_state WHERE name = ?").bind(name).first<{ cursor: string | null }>())?.cursor ?? null,
       saveCursor: async (cursor, passDone) => {

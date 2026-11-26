@@ -21,9 +21,14 @@ export type Page = {
   expiresAt: string | null
   hasPin: boolean
   project: string | null
+  /** The dashboard tile's version and blurred placeholder, once the page has been drawn. */
+  tile?: TileInfo | null
   /** Which list it came from: a project name or UNSORTED. Set by loadAllPages. */
   group: string
 }
+
+/** A page's stored screenshot: `v` keys the image URL (it changes on update), `lqip` is a tiny blurred JPEG data URI. */
+export type TileInfo = { v: string; lqip: string }
 
 export type BillingStatus = {
   enabled: boolean

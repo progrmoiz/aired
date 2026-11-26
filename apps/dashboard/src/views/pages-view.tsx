@@ -23,7 +23,8 @@ import {
 } from '@/components/ui/alert-dialog'
 import { CopyButton, KindIcon } from '@/components/common'
 import { CopyLinkAction } from '@/components/icon-action'
-import { LivePreview, forgetPreview } from '@/components/live-preview'
+import { forgetPreview } from '@/components/live-preview'
+import { PageThumb, forgetTile } from '@/components/page-thumb'
 import { PageCover } from '@/components/page-cover'
 import { PageTile } from '@/components/page-tile'
 import { PublishZone } from '@/components/publish-zone'
@@ -161,7 +162,7 @@ export function PagesView({ pages, reload, removePage }: {
         </>
       )}
 
-      <DeleteDialog page={deleting} onClose={() => setDeleting(null)} onDeleted={(p) => { forgetPreview(p.id); removePage(p.id); setDeleting(null) }} />
+      <DeleteDialog page={deleting} onClose={() => setDeleting(null)} onDeleted={(p) => { forgetPreview(p.id); forgetTile(p.id); removePage(p.id); setDeleting(null) }} />
     </div>
   )
 }
@@ -192,7 +193,7 @@ function RealTile({ page: p, onDelete }: { page: Page; onDelete: (p: Page) => vo
       origin={origin}
       href={`/p/${p.id}`}
       page={{ id: p.id, title, expires: e.text, soon: isExpiringSoon(p), pin: p.hasPin, views: viewsOf(p), published: relativeAge(p.createdAt), dim: expired }}
-      cover={<LivePreview id={p.id} title={title} enabled={!expired || limitReached(p)} fallback={<PageCover kind={kindOf(p)} title={title} link={`${host}/p/${p.id}`} />} />}
+      cover={<PageThumb id={p.id} title={title} tile={p.tile} enabled={!expired || limitReached(p)} fallback={<PageCover kind={kindOf(p)} title={title} link={`${host}/p/${p.id}`} />} />}
       meta={
         <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-sm text-subtle">
           <EyeIcon className="size-3.5 shrink-0" /><span className="truncate">{viewsWords(p)} {viewsOf(p) === 1 && !p.reads ? 'view' : 'views'} · {relativeAge(p.createdAt)}{p.project ? ` · ${p.project}` : ''}</span>

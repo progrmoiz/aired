@@ -2,7 +2,14 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  BACKFILL_MAX,
   DEFAULT_DAILY_BUDGET_MS,
+  RETRY_AFTER_MS,
+  needsBackfill,
+  renderAllowed,
+  tileCacheControl,
+  tileInfo,
+  tileKey,
   RATE_LIMIT_BACKOFF_MS,
   SHOT_MAX_BYTES,
   blockAfterError,
@@ -112,9 +119,13 @@ test("api.ts: every page HTML write queues a screenshot after the response", () 
   assert.equal((code.match(/refreshShot\([^)]*\{ replacing: false \}\)/g) ?? []).length, 1);
 });
 
-test("api.ts: deleting a page deletes its screenshot", () => {
-  const code = src("../src/routes/api.ts");
-  assert.match(code, /PAGES_BUCKET\.delete\(\[`pages\/\$\{id\}\/index\.html`, shotKey\(id\)\]\)/);
+test("api.ts: deleting a page deletes its screenshots and placeholder", () => {
+  const api = src("../src/routes/api.ts");
+  const del = api.slice(api.indexOf('api.delete("/pages/:id"'));
+  assert.match(del.slice(0, del.indexOf("\n});")), /await forgetShots\(c\.env, id\)/);
+  const render = src("../src/lib/og-render.ts");
+  assert.match(render, /PAGES_BUCKET\.delete\(\[shotKey\(id\), tileKey\(id\)\]\)/);
+  assert.match(render, /DELETE FROM page_shots WHERE id = \?/);
 });
 
 test("mcp.ts: the anonymous publish tool queues screenshots too", () => {
@@ -149,7 +160,10 @@ test("og-render.ts: renders the stored HTML in the sandbox, never through /p/:id
   assert.match(code, /blockAfterError\(/);
   assert.doesNotMatch(code, /retry/i);
   // A page updated or deleted mid-render doesn't get the old image.
-  assert.match(code, /current === null \|\| current\.etag !== htmlEtag/);
+  assert.match(code, /current === null \|\| current\.etag !== job\.htmlEtag/);
+  // The public preview is only taken for pages allowed one; the tile always.
+  assert.match(code, /capture\(browser, job\.id, job\.html, shotAllowed\(job\.page, Date\.now\(\)\)\)/);
+  assert.match(code, /const og = withOg \?/);
 });
 
 test("viewer.ts passes the HTML etag as the og:image version", () => {
@@ -159,4 +173,73 @@ test("viewer.ts passes the HTML etag as the og:image version", () => {
 test("wrangler.toml binds Browser Rendering and the budget table has a migration", () => {
   assert.match(src("../wrangler.toml"), /\[browser\]\s*\nbinding = "BROWSER"/);
   assert.match(src("../migrations/0008_og_shot_budget.sql"), /CREATE TABLE og_shot_budget/);
+});
+
+// --- Dashboard tiles ------------------------------------------------------------
+
+test("PIN and view-limited pages are drawn for their owner's tile, but get no public preview", () => {
+  assert.equal(renderAllowed(page({ pin: "pbkdf2$..." }), NOW), true);
+  assert.equal(renderAllowed(page({ reads: 3 }), NOW), true);
+  assert.equal(shotAllowed(page({ pin: "pbkdf2$..." }), NOW), false);
+  assert.equal(renderAllowed(page({ size: SHOT_MAX_BYTES + 1 }), NOW), false);
+  assert.equal(renderAllowed(page({ permanent: false, expiresAt: new Date(NOW - 1).toISOString() }), NOW), false);
+});
+
+test("the tile sits next to the HTML, where the expired sweep finds it", () => {
+  assert.equal(tileKey("abc"), "pages/abc/tile.jpg");
+  assert.equal(pageIdFromKey(tileKey("abc")), "abc");
+});
+
+test("the page list gets a tile only once its images exist", () => {
+  assert.equal(tileInfo(undefined), null);
+  assert.equal(tileInfo({ htmlEtag: '"abc"', lqip: null, triedAt: NOW }), null);
+  assert.deepEqual(tileInfo({ htmlEtag: '"a1b2c3d4e5f6a7"', lqip: "data:image/jpeg;base64,xx", triedAt: NOW }), { v: "a1b2c3d4e5f6", lqip: "data:image/jpeg;base64,xx" });
+});
+
+test("backfill draws pages with no row, and retries a failed one only after a day", () => {
+  assert.equal(needsBackfill(undefined, NOW), true);
+  assert.equal(needsBackfill({ htmlEtag: "e", lqip: "data:x", triedAt: 0 }, NOW), false);
+  assert.equal(needsBackfill({ htmlEtag: "e", lqip: null, triedAt: NOW - 1000 }, NOW), false);
+  assert.equal(needsBackfill({ htmlEtag: "e", lqip: null, triedAt: NOW - RETRY_AFTER_MS }, NOW), true);
+  assert.ok(BACKFILL_MAX <= 3, "one browser draws them in turn inside a request");
+});
+
+test("a tile asked for by its version is cached for good, privately", () => {
+  assert.equal(tileCacheControl(true), "private, max-age=31536000, immutable");
+  assert.equal(tileCacheControl(false), "private, max-age=60");
+});
+
+test("me.ts: the tile route is owner-only and the list carries tiles", () => {
+  const code = src("../src/routes/me.ts");
+  const start = code.indexOf("me.get('/pages/:id/tile'");
+  assert.ok(start > 0);
+  const route = code.slice(start, code.indexOf("\n});", start));
+  assert.match(route, /ownedPage\(c, user\.id, id, null\)\) === null\) return c\.json\(\{ error: 'Page not found' \}, 404\)/);
+  assert.match(route, /PAGES_BUCKET\.get\(tileKey\(id\)\)/);
+  assert.doesNotMatch(route, /shotKey|PAGES_KV\.put|readCount/);
+  // ownedPage uses the preview route's owner/expiry rule.
+  const helper = code.slice(code.indexOf("async function ownedPage"), code.indexOf("me.get('/pages/:id/tile'"));
+  assert.match(helper, /previewDecision\(metadata, userId, isClaimed, Date\.now\(\)\)/);
+  assert.match(code, /p\.tile = tileInfo\(rows\.get\(p\.id\)\)/);
+});
+
+test("me.ts: the backfill checks ownership, skips recent tries and caps the batch", () => {
+  const code = src("../src/routes/me.ts");
+  const start = code.indexOf("me.post('/pages/shots', requireCsrfHeader");
+  assert.ok(start > 0, "route exists behind the CSRF header");
+  const route = code.slice(start, code.indexOf("\n});", start));
+  assert.match(route, /needsBackfill\(rows\.get\(id\), now\)/);
+  assert.match(route, /jobs\.length >= BACKFILL_MAX/);
+  assert.match(route, /ownedPage\(c, user\.id, id, claimed\)/);
+  assert.match(route, /renderShots\(c\.env, jobs\)/);
+});
+
+test("og.ts never serves the tile", () => {
+  assert.doesNotMatch(src("../src/routes/og.ts"), /tileKey|tile\.jpg/);
+});
+
+test("the expired sweep drops a page's page_shots row with its HTML", () => {
+  const code = src("../src/index.ts");
+  assert.match(code, /DELETE FROM page_shots WHERE id = \?/);
+  assert.match(src("../migrations/0009_page_shots.sql"), /CREATE TABLE page_shots/);
 });
