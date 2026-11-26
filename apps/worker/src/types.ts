@@ -77,6 +77,8 @@ export type AppBindings = {
     authTime: number | null;
     /** The API key's id when via is 'key'. */
     apiKeyId: string | null;
+    /** This request's id for log lines (middleware/request-id.ts). */
+    requestId: string;
   };
 };
 

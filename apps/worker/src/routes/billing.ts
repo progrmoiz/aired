@@ -55,6 +55,7 @@ import { userRowExists,
   findUidByCustomer,
   syncSubscription,
 } from '../lib/billing/store.js';
+import { logError } from '../lib/log.js';
 import {
   billingStatus,
   checkoutGate,
@@ -286,12 +287,7 @@ billing.post('/webhook', async (c) => {
     await recordEvent(c.env.DB, evt.id, evt.type);
     return c.json({ received: true });
   } catch (err) {
-    console.error({
-      event: 'billing_webhook_failed',
-      eventId: evt.id,
-      type: evt.type,
-      error: err instanceof Error ? err.message : String(err),
-    });
+    logError('billing_webhook_failed', err, { eventId: evt.id, type: evt.type }, c.get('requestId'));
     return c.json({ error: 'Webhook processing failed' }, 500);
   }
 });

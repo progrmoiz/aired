@@ -7,6 +7,15 @@ compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 workers_dev = true
 
+# Workers Logs: every console.* call and one invocation log per request are
+# kept and queryable in the dashboard (Workers > aired > Logs). Objects from
+# lib/log.ts are indexed by field, so filter on event or requestId. All
+# requests are kept (head_sampling_rate = 1); lower it if volume gets
+# expensive. Alerts and limits: docs/observability.md.
+[observability]
+enabled = true
+head_sampling_rate = 1
+
 # Build the signed-in dashboard (apps/dashboard, React + shadcn/ui) into
 # ../web/dashboard.html and ../web/dashboard-assets/ before every `wrangler dev`
 # and `wrangler deploy`, so a deploy can never ship a stale or missing dashboard.
