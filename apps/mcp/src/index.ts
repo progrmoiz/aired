@@ -119,6 +119,7 @@ server.tool(
     update_token: z.string().optional().describe("Pass a previously returned token to update the same URL instead of creating a new one"),
     id: z.string().optional().describe("Page ID — required when update_token is provided to update the same URL"),
   },
+  { title: "Publish HTML", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   async ({ html, file_path, title, pin, ttl_seconds, permanent, project, update_token, id }) => {
     // Resolve HTML content
     let content: string;
