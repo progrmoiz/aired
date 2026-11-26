@@ -119,7 +119,18 @@ export async function authenticateWithCode(
     return { ok: false, reason: 'unavailable' };
   }
   if (res.status >= 500) return { ok: false, reason: 'unavailable' };
-  if (!res.ok) return { ok: false, reason: 'rejected' };
+  if (!res.ok) {
+    // WorkOS's error code and description only; never the request body.
+    const body = (await res.json().catch(() => null)) as { error?: unknown; error_description?: unknown; code?: unknown; message?: unknown } | null;
+    console.error(JSON.stringify({
+      event: 'workos_authenticate_rejected',
+      status: res.status,
+      error: typeof body?.error === 'string' ? body.error : typeof body?.code === 'string' ? body.code : null,
+      description: typeof body?.error_description === 'string' ? body.error_description.slice(0, 200) : typeof body?.message === 'string' ? body.message.slice(0, 200) : null,
+    }));
+    return { ok: false, reason: 'rejected' };
+  }
   const result = parseAuthenticateResponse(await res.json().catch(() => null));
+  if (!result) console.error(JSON.stringify({ event: 'workos_authenticate_unparsed' }));
   return result ? { ok: true, result } : { ok: false, reason: 'rejected' };
 }
