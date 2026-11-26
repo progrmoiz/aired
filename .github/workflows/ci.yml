@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Actions are pinned to commit SHAs (tag in the comment) because the
+      # repo is public and a moved tag would run someone else's code here.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Version comes from "packageManager" in the root package.json.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Builds @aired/core first (the other packages import its dist), then
+      # typechecks every workspace package.
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Worker tests
+        run: pnpm test
+
+      - name: CLI build
+        run: pnpm --filter aired build
+
+      # Runs the [build] step (dashboard) and bundles the Worker exactly as
+      # `wrangler deploy` would, without uploading anything or needing a token.
+      - name: Worker bundle (dry run)
+        working-directory: apps/worker
+        run: pnpm exec wrangler deploy --dry-run --outdir "$RUNNER_TEMP/worker-dist"

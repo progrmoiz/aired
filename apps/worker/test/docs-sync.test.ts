@@ -48,7 +48,9 @@ test("self-hosting docs name D1, the rate-limit bindings and the required secret
 test("the privacy policy covers D1 sign-in records, API keys, connected apps and WorkOS", () => {
   const p = web("privacy.html");
   assert.match(p, /Account and sign-in records \(including the email you signed in with\), API key hashes and billing records live in Cloudflare D1\./);
-  assert.match(p, /<tr><td>WorkOS<\/td><td>[^<]*<strong>Not used yet<\/strong>/);
+  // Sign-in runs on WorkOS now, so the row names it as live.
+  assert.match(p, /<tr><td>WorkOS<\/td><td>Runs sign-in[^<]*Receives your email address and name\./);
+  assert.ok(!p.includes("Not used yet"), "privacy policy still says WorkOS is not used");
   assert.match(p, /<code>aired_workos_sid<\/code>/);
   assert.match(p, /disconnects every app you connected, deletes your API keys/);
 });
