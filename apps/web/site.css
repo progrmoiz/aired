@@ -124,6 +124,8 @@ h2 { font-size: clamp(26px, 3.4vw, 36px); font-weight: 500; letter-spacing: -0.0
 .card-text { padding: 22px 22px 0; }
 .card h3 { font-size: 16px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
 .card p { font-size: 14px; color: var(--text-2); margin-top: 4px; max-width: 30em; }
+.news { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 18px; padding: 4px 12px; font-size: 13px; color: var(--text-2); border: 1px solid var(--border-2); border-radius: 999px; text-decoration: none; }
+.news:hover { color: var(--text-1); border-color: var(--text-3); }
 .pro-tag { font-size: 11px; font-weight: 500; color: var(--text-2); border: 1px solid var(--border-2); border-radius: 4px; padding: 0 6px; }
 .vis { flex: 1; position: relative; margin-top: 18px; min-height: 140px; -webkit-mask-image: linear-gradient(to bottom, #000 60%, transparent); mask-image: linear-gradient(to bottom, #000 60%, transparent); }
 .vis.nofade { -webkit-mask-image: none; mask-image: none; }
