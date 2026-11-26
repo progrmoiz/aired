@@ -147,6 +147,8 @@ Every command outputs structured JSON. Exit codes are consistent:
 Sign in to manage all your pages in one place.
 Anonymous publish still works without an account.
 
+**Pro** ($9/month billed yearly, or $12 monthly) removes the aired badge and raises the limits to 10 MB pages and 500 publishes a day. Free stays free. See [aired.sh/pricing](https://aired.sh/pricing).
+
 ```bash
 npx aired login              # browser flow
 npx aired login --device     # SSH-friendly fallback

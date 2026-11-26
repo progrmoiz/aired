@@ -240,6 +240,8 @@ Serves the raw HTML. If PIN-protected, serves a PIN entry page first.
 Sign in at aired.sh to manage all your pages in one place.
 Anonymous publish still works without an account.
 
+**Pro** ($9/month billed yearly, or $12 monthly) removes the aired badge and raises the limits to 10 MB pages and 500 publishes a day. Free stays free. See [aired.sh/pricing](https://aired.sh/pricing).
+
 CLI:
 ```bash
 npx aired login              # browser flow
