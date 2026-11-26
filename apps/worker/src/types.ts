@@ -55,6 +55,10 @@ export type Env = {
   WORKOS_API_KEY?: string;
   /** Local tests point this at a mock. */
   WORKOS_API_BASE?: string;
+  /** Browser Rendering (wrangler.toml [browser]), for link-preview screenshots. Unset: cards only. */
+  BROWSER?: Fetcher;
+  /** Daily browser time for screenshots, in seconds (lib/og-shot.ts). Default 480; "0" turns them off. */
+  OG_SHOT_DAILY_SECONDS?: string;
 };
 
 export type AppBindings = {

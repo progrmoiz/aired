@@ -15,6 +15,8 @@ export interface AiredBarOptions {
   readCount: number;
   /** Show the badge. Defaults to true; false for pages owned by a Pro account. */
   badge?: boolean;
+  /** Added to the og:image URL as ?v= (og-shot.ts versionFromEtag). */
+  imageVersion?: string;
 }
 
 export const BADGE_HREF = "https://aired.sh/?ref=badge";
@@ -31,8 +33,10 @@ export function injectAiredBar(html: string, opts: AiredBarOptions): string {
   return barOut === out ? out + bar : barOut;
 }
 
-export function renderOgTags({ id, title }: AiredBarOptions): string {
-  const ogImageUrl = `https://aired.sh/og/${encodeURIComponent(id)}`;
+export function renderOgTags({ id, title, imageVersion }: AiredBarOptions): string {
+  const ogImageUrl =
+    `https://aired.sh/og/${encodeURIComponent(id)}` +
+    (imageVersion ? `?v=${encodeURIComponent(imageVersion)}` : "");
   return `
   <!-- aired OG tags -->
   <meta property="og:title" content="${escapeAttr(title)}" />
