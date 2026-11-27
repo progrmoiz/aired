@@ -18,6 +18,7 @@ import {
   budgetAllows,
   dailyBudgetMs,
   renderAllowed,
+  renderOrigin,
   shotAllowed,
   shotKey,
   tileKey,
@@ -141,7 +142,7 @@ export async function renderShots(env: ShotEnv, jobs: ShotJob[]): Promise<string
         const t0 = Date.now();
         let images: Images;
         try {
-          images = await withTimeout(capture(browser, siteOrigin(env), job.id, job.html, shotAllowed(job.page, Date.now())), RENDER_TIMEOUT_MS);
+          images = await withTimeout(capture(browser, renderOrigin(siteOrigin(env)), job.id, job.html, shotAllowed(job.page, Date.now())), RENDER_TIMEOUT_MS);
         } catch (err) {
           console.log({ event: "og_shot_failed", id: job.id, err: String(err) });
           continue;
@@ -242,7 +243,8 @@ async function serveStoredPage(
   await page.setRequestInterception(true);
   page.on("request", (req) => {
     const target = req.url();
-    if (!served && target === url && req.isNavigationRequest()) {
+    // By host and path: Chrome may upgrade an http:// SITE_ORIGIN (local dev) to https.
+    if (!served && sameDocument(target, url) && req.isNavigationRequest()) {
       served = true;
       req
         .respond({
@@ -293,7 +295,7 @@ export async function checkPage(
     throw new CheckUnavailable("busy", until !== null ? Math.max(1, Math.ceil((until - Date.now()) / 1000)) : 60);
   }
   try {
-    return await withTimeout(observe(browser, siteOrigin(env), id, html, viewport), CHECK_TIMEOUT_MS);
+    return await withTimeout(observe(browser, renderOrigin(siteOrigin(env)), id, html, viewport), CHECK_TIMEOUT_MS);
   } finally {
     await browser.close().catch(() => {});
     await recordCheckTime(env.DB, Date.now() - started, Date.now()).catch((err) =>
@@ -310,7 +312,7 @@ async function observe(
   viewport: CheckViewport,
 ): Promise<{ obs: CheckObservations; screenshot: Uint8Array | null }> {
   const page = await browser.newPage();
-  const obs: CheckObservations = { loadMs: 0, loaded: false, console: [], pageErrors: [], failedRequests: [], navigationsBlocked: [], dom: null };
+  const obs: CheckObservations = { loadMs: 0, loaded: false, loadError: null, console: [], pageErrors: [], failedRequests: [], navigationsBlocked: [], dom: null };
   const ours = new Set<string>();
   try {
     await page.setViewport(CHECK_VIEWPORTS[viewport]);
@@ -318,6 +320,10 @@ async function observe(
       const type = String(msg.type());
       if (type !== "error" && type !== "warn" && type !== "warning") return;
       if (obs.console.length >= MAX_CONSOLE) return;
+      // Chrome's "Failed to load resource" repeats a failed request, which
+      // failed_requests already lists (and requests we block on purpose,
+      // like aired.sh's favicon, aren't the page's fault).
+      if (msg.text().startsWith("Failed to load resource")) return;
       const loc = msg.location();
       obs.console.push({ level: type === "error" ? "error" : "warning", text: msg.text(), source: loc?.url ? `${loc.url}${loc.lineNumber !== undefined ? `:${loc.lineNumber + 1}` : ""}` : null });
     });
@@ -339,20 +345,37 @@ async function observe(
     });
 
     const t0 = Date.now();
+    // A timeout is a slow page; any other failure means the document itself never loaded.
     obs.loaded = await page
       .goto(url, { waitUntil: "load", timeout: CHECK_LOAD_TIMEOUT_MS })
       .then(() => true)
-      .catch(() => false);
+      .catch((err: unknown) => {
+        const message = String((err as Error)?.message ?? err);
+        if (!/timeout|timed out/i.test(message)) obs.loadError = message;
+        return false;
+      });
     obs.loadMs = Date.now() - t0;
     await page
       .evaluate("Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 1500))]).then(() => true)")
       .catch(() => {});
     await sleep(CHECK_SETTLE_MS);
     obs.dom = (await page.evaluate(DOM_PROBE).catch(() => null)) as CheckObservations["dom"];
+    // Without a viewport tag a phone widens the layout to fit the page, so compare with the real screen.
+    if (obs.dom !== null) obs.dom.viewportWidth = CHECK_VIEWPORTS[viewport].width;
     const screenshot = (await page.screenshot({ type: "jpeg", quality: CHECK_SHOT_QUALITY }).catch(() => null)) as Uint8Array | null;
     return { obs, screenshot };
   } finally {
     await page.close().catch(() => {});
+  }
+}
+
+function sameDocument(a: string, b: string): boolean {
+  try {
+    const x = new URL(a);
+    const y = new URL(b);
+    return x.host === y.host && x.pathname === y.pathname && x.search === y.search;
+  } catch {
+    return false;
   }
 }
 

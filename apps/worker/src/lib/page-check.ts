@@ -106,6 +106,8 @@ export type CheckObservations = {
   loadMs: number;
   /** The load event fired before CHECK_LOAD_TIMEOUT_MS. */
   loaded: boolean;
+  /** Why the document itself failed to load (not a timeout), or null. */
+  loadError: string | null;
   console: { level: "error" | "warning"; text: string; source: string | null }[];
   pageErrors: string[];
   failedRequests: { url: string; status: number | null; error: string | null; type: string }[];
@@ -118,7 +120,10 @@ export type CheckObservations = {
     brokenImages: number;
     scrollWidth: number;
     scrollHeight: number;
+    /** The screen's width in CSS pixels (the check's viewport, not what the page widened it to). */
     viewportWidth: number;
+    /** A <meta name="viewport"> is present (phones need it to show the page at their width). */
+    hasViewportMeta: boolean;
     transferBytes: number;
     resourceCount: number;
   } | null;
@@ -186,8 +191,10 @@ export function buildReport(input: {
   if (dom !== null && dom.brokenImages > 0) {
     issues.push({ severity: "error", code: "broken_image", message: `${plural(dom.brokenImages, "image")} failed to show` });
   }
-  const blank = dom === null || (dom.textChars === 0 && dom.visibleMedia === 0);
-  if (dom === null) {
+  const blank = obs.loadError !== null || dom === null || (dom.textChars === 0 && dom.visibleMedia === 0);
+  if (obs.loadError !== null) {
+    issues.push({ severity: "error", code: "no_render", message: `The page didn't load: ${clip(obs.loadError, 160)}` });
+  } else if (dom === null) {
     issues.push({ severity: "error", code: "no_render", message: "The page didn't render at all" });
   } else if (blank) {
     issues.push({ severity: "error", code: "blank", message: "The page renders blank: no visible text, images, canvas or SVG" });
@@ -195,7 +202,7 @@ export function buildReport(input: {
   if (obs.navigationsBlocked.length > 0) {
     issues.push({ severity: "warning", code: "navigates_away", message: `The page tries to leave for ${clip(obs.navigationsBlocked[0]!, 120)}` });
   }
-  if (!obs.loaded) {
+  if (!obs.loaded && obs.loadError === null) {
     issues.push({ severity: "warning", code: "slow_load", message: `The page hadn't finished loading after ${CHECK_LOAD_TIMEOUT_MS / 1000} seconds` });
   }
   if (input.htmlBytes > HEAVY_HTML_BYTES) {
@@ -206,6 +213,9 @@ export function buildReport(input: {
   }
   if (dom !== null && dom.scrollHeight > TALL_PAGE_PX) {
     issues.push({ severity: "warning", code: "very_tall", message: `The page is ${dom.scrollHeight} px tall` });
+  }
+  if (dom !== null && input.viewport === "mobile" && !dom.hasViewportMeta) {
+    issues.push({ severity: "warning", code: "no_viewport_meta", message: 'No <meta name="viewport" content="width=device-width, initial-scale=1">: phones show the page zoomed out' });
   }
   if (dom !== null && dom.scrollWidth > dom.viewportWidth + 1) {
     issues.push({ severity: "warning", code: "too_wide", message: `The page is ${dom.scrollWidth} px wide on a ${dom.viewportWidth} px screen, so it scrolls sideways` });
@@ -294,6 +304,7 @@ export const DOM_PROBE = `(() => {
     scrollWidth: Math.max(de.scrollWidth, body ? body.scrollWidth : 0),
     scrollHeight: Math.max(de.scrollHeight, body ? body.scrollHeight : 0),
     viewportWidth: window.innerWidth,
+    hasViewportMeta: !!document.querySelector('meta[name="viewport" i]'),
     transferBytes: res.reduce((n, e) => n + (e.transferSize || e.encodedBodySize || 0), 0) + (nav ? nav.encodedBodySize || 0 : 0),
     resourceCount: res.length,
   };

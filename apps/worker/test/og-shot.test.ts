@@ -168,7 +168,7 @@ test("og-render.ts: renders the stored HTML in the sandbox, never through /p/:id
   // A page updated or deleted mid-render doesn't get the old image.
   assert.match(code, /current === null \|\| current\.etag !== job\.htmlEtag/);
   // The public preview is only taken for pages allowed one; the tile always.
-  assert.match(code, /capture\(browser, siteOrigin\(env\), job\.id, job\.html, shotAllowed\(job\.page, Date\.now\(\)\)\)/);
+  assert.match(code, /capture\(browser, renderOrigin\(siteOrigin\(env\)\), job\.id, job\.html, shotAllowed\(job\.page, Date\.now\(\)\)\)/);
   assert.match(code, /const og = withOg \?/);
 });
 

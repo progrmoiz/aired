@@ -1,6 +1,6 @@
 /**
- * Link-preview screenshots: the rules, with no runtime imports so tests load
- * them directly. The browser work is in og-render.ts.
+ * Link-preview screenshots: the rules, importing only origin.ts (which has no
+ * imports), so tests load them directly. The browser work is in og-render.ts.
  *
  * After a publish or update, the page is drawn in a browser and stored next
  * to its HTML:
@@ -22,6 +22,8 @@
  * (OG_SHOT_DAILY_SECONDS, default 8 minutes) and, after a 429, stops trying
  * until the limit lifts. A page that misses out keeps the card: no retries.
  */
+
+import { PRODUCTION_ORIGIN } from "./origin.ts";
 
 export const SHOT_WIDTH = 1200;
 export const SHOT_HEIGHT = 630;
@@ -51,6 +53,23 @@ export const DEFAULT_DAILY_BUDGET_MS = 8 * 60 * 1000;
 
 /** After a 429 that isn't the daily limit (too many browsers, or one too soon). */
 export const RATE_LIMIT_BACKOFF_MS = 60_000;
+
+/**
+ * The origin the browser is shown the page at. Browser Rendering refuses
+ * local addresses (net::ERR_BLOCKED_BY_ADMINISTRATOR) before any request
+ * interception, so a local SITE_ORIGIN (wrangler dev) renders at aired.sh
+ * instead; the stored HTML is still what's served, and aired.sh itself
+ * stays blocked.
+ */
+export function renderOrigin(origin: string): string {
+  try {
+    const host = new URL(origin).hostname;
+    const local = host === "localhost" || host.endsWith(".localhost") || host === "[::1]" || /^127\./.test(host) || /^(10|192\.168)\./.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host) || host === "0.0.0.0";
+    return local ? PRODUCTION_ORIGIN : origin;
+  } catch {
+    return PRODUCTION_ORIGIN;
+  }
+}
 
 export function shotKey(id: string): string {
   return `pages/${id}/shot.jpg`;

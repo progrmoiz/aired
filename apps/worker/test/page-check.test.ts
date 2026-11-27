@@ -30,6 +30,7 @@ const dom = (over: Partial<NonNullable<CheckObservations["dom"]>> = {}): NonNull
   scrollWidth: 1280,
   scrollHeight: 2000,
   viewportWidth: 1280,
+  hasViewportMeta: true,
   transferBytes: 50_000,
   resourceCount: 3,
   ...over,
@@ -37,6 +38,7 @@ const dom = (over: Partial<NonNullable<CheckObservations["dom"]>> = {}): NonNull
 const obs = (over: Partial<CheckObservations> = {}): CheckObservations => ({
   loadMs: 420,
   loaded: true,
+  loadError: null,
   console: [],
   pageErrors: [],
   failedRequests: [],
@@ -84,6 +86,14 @@ test("blank: no text and no media is an error; media alone or text alone isn't",
   assert.deepEqual(none.issues.map((i) => i.code), ["no_render"]);
 });
 
+test("a document that never loads is an error, not a slow page", () => {
+  const r = report(obs({ loaded: false, loadError: "net::ERR_CONNECTION_REFUSED at http://localhost:8821/p/abc", dom: dom({ title: "localhost", textChars: 74 }) }));
+  assert.equal(r.ok, false);
+  assert.equal(r.blank, true, "Chrome's error page isn't the page");
+  assert.deepEqual(r.issues.map((i) => i.code), ["no_render"]);
+  assert.match(r.issues[0]!.message, /The page didn't load: net::ERR_CONNECTION_REFUSED/);
+});
+
 test("heavy, tall, wide, slow and navigating pages warn but still pass", () => {
   const r = report(
     obs({
@@ -97,6 +107,15 @@ test("heavy, tall, wide, slow and navigating pages warn but still pass", () => {
   assert.equal(r.ok, true);
   assert.deepEqual(r.issues.map((i) => i.code).sort(), ["console_warning", "heavy_html", "heavy_page", "navigates_away", "slow_load", "too_wide", "very_tall"]);
   assert.ok(r.issues.every((i) => i.severity === "warning"));
+});
+
+test("on a phone, a page with no viewport tag gets a warning (only on mobile)", () => {
+  const o = obs({ dom: dom({ hasViewportMeta: false, scrollWidth: 980, viewportWidth: 390 }) });
+  const mobile = buildReport({ id: "abc", url: "u", viewport: "mobile", htmlBytes: 100, obs: o, now: NOW, screenshotUrl: null });
+  assert.equal(mobile.ok, true);
+  assert.deepEqual(mobile.issues.map((i) => i.code), ["no_viewport_meta", "too_wide"]);
+  const desktop = report(obs({ dom: dom({ hasViewportMeta: false }) }));
+  assert.deepEqual(desktop.issues, []);
 });
 
 test("a noisy page can't flood the report", () => {
@@ -215,4 +234,14 @@ test("wiring: the check route asks for the owner, rate-limits, and spends the bu
   // Mounted before api.ts, so /api/pages/:id/check isn't taken by another route.
   const index = src("src/index.ts");
   assert.ok(index.indexOf('app.route("/api", pageTools);') < index.indexOf('app.route("/api", api);'));
+});
+
+test("local origins render at aired.sh, since Browser Rendering refuses local addresses", async () => {
+  const { renderOrigin } = await import("../src/lib/og-shot.ts");
+  for (const o of ["http://localhost:8821", "http://127.0.0.1:8787", "http://app.localhost", "http://192.168.1.5:8787", "http://10.0.0.2", "http://172.20.0.1"]) {
+    assert.equal(renderOrigin(o), "https://aired.sh", o);
+  }
+  assert.equal(renderOrigin("https://aired.sh"), "https://aired.sh");
+  assert.equal(renderOrigin("https://staging.example.com"), "https://staging.example.com");
+  assert.equal(renderOrigin("http://172.32.0.1"), "http://172.32.0.1", "not private");
 });
