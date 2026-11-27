@@ -40,7 +40,11 @@ export const SITE_EVENT_ITEMS = [
   'claude_code',
   'codex',
   'cursor',
-  'mcp_url',
+  'vscode',
+  'windsurf',
+  'claude_app',
+  'chatgpt_app',
+  'mcp_url', // the old "copy the server address" row, kept so earlier counts still read
 ] as const;
 
 export type SiteEventPage = (typeof SITE_EVENT_PAGES)[number];
