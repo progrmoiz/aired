@@ -1,8 +1,14 @@
 # Send an HTML page to a client
 
-A report, a dashboard, a landing page mockup or a proposal built with Claude or ChatGPT. Publish it here and send one link that opens on their phone or laptop, with no download and no sign-in.
+**Send one link instead of an attachment.** It opens on your client's phone as a page, and you can fix it later without sending a new one.
 
 Source: https://aired.sh/share-html-with-client
+
+## How to do it
+
+1. **Publish the page** Give it a clear title; that's what they see in the preview.
+2. **Send one link** No download, no account, no blocked attachment.
+3. **Update it in place** Fix a typo and the same link shows the new page.
 
 ## How to send it
 
@@ -59,5 +65,3 @@ Not yet. Removing it, or replacing it with your logo, is part of the planned Pro
 ### Is it free?
 
 Yes. Publishing, PINs and viewing are free, and there's no limit on views.
-
-Updated November 2026.

@@ -1,8 +1,14 @@
 # Share a Claude artifact with anyone
 
-Claude can share artifacts itself, and inside Claude that works well. When the person you're sending it to doesn't use Claude, your workspace has sharing turned off, or the page came from Claude Code or a script, paste the HTML here and send a normal link.
+**Ask Claude for one HTML file, publish it here, and send the link.** It opens for anyone, including people who don't use Claude.
 
 Source: https://aired.sh/share-claude-artifacts
+
+## How to do it
+
+1. **Ask Claude for one file** Interactive artifacts often need this to open on their own.
+2. **Paste or drop it here** Copy the code, or download the file.
+3. **Send the link** It opens in any browser, with no sign-in.
 
 ## Two ways to share a Claude artifact
 
@@ -77,5 +83,3 @@ Seven days by default. You can choose 1 hour, 1 day, 30 days or permanent.
 ### Is it free?
 
 Yes. aired is free and open source.
-
-Updated November 2026.

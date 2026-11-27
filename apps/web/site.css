@@ -866,6 +866,85 @@ select.field option { background: var(--surface); }
 }
 .agent-row p a { color: var(--text-1); }
 .agent .setup { min-width: 190px; }
+
+/* Guide layout v2 (`main.g2`, DESIGN.md §9.3): answer first, then read like an
+   article. A serif title, a lead that answers the search, three pictured steps,
+   a compact publish panel, then one centred column of brighter, larger text
+   with few boxes. Every guide uses it. */
+.g2 { --g2-body: color-mix(in srgb, var(--text-1) 78%, var(--text-2)); }
+.g2-top { max-width: 720px; margin: 0 auto; padding-top: 56px; }
+@media (max-width: 880px) { .g2-top { padding-top: 32px; } }
+.g2-title { margin-top: 18px; font-family: 'Instrument Serif', 'Iowan Old Style', Charter, Georgia, serif; font-weight: 400; font-size: clamp(44px, 7vw, 68px); line-height: 1.02; letter-spacing: -0.012em; color: var(--text-1); text-wrap: balance; }
+.g2-lead { margin-top: 20px; font-size: 20px; line-height: 1.5; color: var(--g2-body); max-width: 34em; text-wrap: pretty; }
+.g2-lead b { color: var(--text-1); font-weight: 600; }
+.g2-meta { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--text-3); }
+
+.g2-steps { list-style: none; max-width: 880px; margin: 44px auto 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; counter-reset: g2s; }
+@media (max-width: 760px) { .g2-steps { grid-template-columns: minmax(0, 1fr); gap: 20px; } }
+.g2-steps li { counter-increment: g2s; min-width: 0; }
+.g2-vis { height: 112px; display: grid; place-items: center; border-radius: 14px; background: var(--surface); border: 1px solid var(--aired-hairline); }
+.g2-steps b { display: block; margin-top: 14px; font-size: 16px; font-weight: 600; color: var(--text-1); }
+.g2-steps b::before { content: counter(g2s) "  "; font: 500 12px var(--mono); color: var(--text-3); }
+.g2-steps p { margin-top: 4px; font-size: 14.5px; line-height: 1.55; color: var(--text-2); }
+.g2-file { padding: 8px 12px; border: 1px dashed var(--border-2); border-radius: 8px; font: 12.5px var(--mono); color: var(--text-1); background: var(--bg); }
+.g2-pin { display: flex; gap: 6px; }
+.g2-pin i { width: 30px; height: 36px; display: grid; place-items: center; border-radius: 7px; border: 1px solid var(--border-2); background: var(--bg); font: 500 15px var(--mono); font-style: normal; color: var(--text-1); }
+.g2-pin i.cur { border-color: var(--text-2); }
+.g2-send { display: grid; gap: 6px; font-size: 12.5px; }
+.g2-send span { display: flex; justify-content: space-between; gap: 14px; padding: 6px 10px; border-radius: 7px; border: 1px solid var(--border-2); background: var(--bg); color: var(--text-1); }
+.g2-send em { font-style: normal; color: var(--text-3); }
+
+.g2-try { max-width: 720px; margin: 40px auto 0; padding: 18px; border: 1px solid var(--aired-hairline); border-radius: 16px; background: color-mix(in srgb, var(--surface) 60%, transparent); scroll-margin-top: 24px; }
+.g2-try-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; }
+.g2-try h2 { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+.g2-try-head p { font-size: 13px; color: var(--text-3); }
+.g2-try .form { margin-top: 12px; }
+.g2-try .paste-area textarea { height: 120px; }
+.g2-try .opts .kb { top: 94px; }
+.g2-try .proof { margin-top: 10px; }
+
+.g2-prose { max-width: 680px; margin: 72px auto 0; font-size: 17.5px; line-height: 1.7; color: var(--g2-body); }
+.g2-prose h2 { font-size: 27px; margin-top: 64px; }
+.g2-prose h2:first-child { margin-top: 0; }
+.g2-prose p, .g2-prose ul, .g2-prose ol { margin-top: 16px; }
+.g2-prose strong { color: var(--text-1); }
+.g2-prose li + li { margin-top: 10px; }
+.g2-prose .table-wrap { border: 0; border-radius: 0; background: none; overflow-x: auto; }
+.g2-prose table { font-size: 15px; }
+.g2-prose th { background: none; color: var(--text-3); font-size: 13px; font-weight: 500; border-bottom-color: var(--border-2); }
+.g2-prose th, .g2-prose td { padding: 12px 14px 12px 0; }
+.g2-prose td { color: var(--g2-body); }
+.g2-prose tr.us td { color: var(--text-1); }
+.g2-prose .note { font-size: 13px; }
+.g2-prose .acc summary { font-size: 17px; }
+.g2-prose .acc details p { font-size: 16px; color: var(--g2-body); }
+@media (min-width: 900px) { .g2-prose figure.explain { margin-left: -60px; margin-right: -60px; } }
+@media (max-width: 760px) {
+  .g2-steps li { display: grid; grid-template-columns: 132px minmax(0, 1fr); grid-template-rows: auto 1fr; column-gap: 14px; align-items: start; }
+  .g2-vis { grid-row: 1 / 3; height: 84px; }
+  .g2-steps b { margin-top: 2px; }
+  .g2-pin i { width: 24px; height: 30px; font-size: 13px; }
+  .g2-file { padding: 6px 8px; font-size: 11px; }
+  .g2-send span { gap: 8px; padding: 4px 8px; font-size: 11.5px; }
+}
+.g2-link { padding: 7px 12px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--aired-ok) 45%, transparent); font: 12px var(--mono); color: var(--ok); background: var(--bg); max-width: 90%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g2-say { max-width: 86%; padding: 8px 12px; border-radius: 12px 12px 12px 4px; background: var(--surface-2); border: 1px solid var(--border-2); font-size: 12.5px; line-height: 1.4; color: var(--text-1); text-align: left; }
+.g2-facts b::before { content: none; }
+.g2-shot { margin: 40px 0 0; }
+.g2-shot .crop { margin-top: 0; }
+.g2-prose ol.steps { display: block; margin-top: 16px; padding-left: 22px; counter-reset: none; list-style: decimal; }
+.g2-prose ol.steps li { padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+.g2-prose ol.steps li::before { content: none; }
+.g2-prose ol.steps li strong { display: inline; margin: 0; font-size: inherit; }
+.g2-prose h3 { margin-top: 32px; font-size: 19px; letter-spacing: -0.01em; color: var(--text-1); }
+.g2-prose pre { font-size: 13px; line-height: 1.6; }
+@media (max-width: 760px) { .g2-link { font-size: 10.5px; padding: 5px 8px; } .g2-say { font-size: 11px; padding: 6px 8px; } }
+
+.g2-prose ol.steps li + li { margin-top: 10px; }
+.g2-prose ol.steps li { font-size: inherit; line-height: inherit; color: inherit; }
+.g2-prose ol.steps li strong { color: var(--text-1); }
+.g2-shot { max-width: 500px; margin-left: auto; margin-right: auto; }
+.g2-shot .report.game .board { max-width: 300px; margin-left: auto; margin-right: auto; }
 .cx-ic { flex: none; width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); display: grid; place-items: center; color: var(--text-1); }
 .cx-ic svg { width: 18px; height: 18px; }
 .cx-nm { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
