@@ -140,12 +140,22 @@ export function guideMarkdown(html: string, slug: string): string {
   const doc = window.document;
   doc.write(html);
   const h1 = doc.querySelector("h1");
-  const lede = doc.querySelector(".hero .lede");
+  const lede = doc.querySelector(".g2-lead") ?? doc.querySelector(".hero .lede");
   const article = doc.querySelector("article.prose");
   if (!h1 || !article) throw new Error(`${slug}: no h1 or article`);
   const out: string[] = [`# ${line(h1 as unknown as Node)}`];
   if (lede) out.push(line(lede as unknown as Node));
   out.push(`Source: ${ORIGIN}/${slug}`);
+  // v2 guides put the steps above the article as pictured cards (.g2-steps).
+  const steps = Array.from(doc.querySelectorAll(".g2-steps > li"));
+  if (steps.length) {
+    out.push("## How to do it");
+    out.push(steps.map((li, i) => {
+      const title = squash(li.querySelector("b")?.textContent ?? "").trim();
+      const text = line(li.querySelector("p") as unknown as Node);
+      return `${i + 1}. **${title}** ${text}`;
+    }).join("\n"));
+  }
   blocks(article as unknown as Node, out);
   window.happyDOM.close();
   return out.filter((b) => b !== "").join("\n\n") + "\n";
