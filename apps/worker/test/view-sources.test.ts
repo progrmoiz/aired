@@ -8,6 +8,7 @@ test("referrer hosts get friendly names, and unknown sites keep their host", () 
     ["", "direct", "Direct or an app"],
     ["app.slack.com", "slack", "Slack"],
     ["com.slack", "slack", "Slack"],
+    ["slack-redir.net", "slack", "Slack"],
     ["mail.google.com", "gmail", "Gmail"],
     ["com.google.android.gm", "gmail", "Gmail"],
     ["google.com", "google", "Google Search"],
@@ -55,6 +56,9 @@ test("the dashboard never fetches favicons or flags from another site", () => {
   assert.doesNotMatch(src, /favicon\.ico|s2\/favicons|faviconkit|icon\.horse|icons\.duckduckgo|logo\.clearbit|flagcdn|flagsapi|cdn\.jsdelivr|unpkg\.com/i);
   const icons = readFileSync(new URL("../../dashboard/src/components/source-icon.tsx", import.meta.url), "utf8");
   assert.match(icons, /src=\{`\/dashboard-assets\/flags\/\$\{code\}\.svg`\}/);
+  // Source icons come only from the report's signed /api/favicon URLs.
+  assert.match(icons, /<img src=\{icon\}/);
+  assert.doesNotMatch(icons, /simple-icons/);
   const vite = readFileSync(new URL("../../dashboard/vite.config.ts", import.meta.url), "utf8");
   assert.match(vite, /country-flag-icons\/3x2\//);
 });

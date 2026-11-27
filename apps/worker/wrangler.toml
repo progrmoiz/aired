@@ -129,6 +129,12 @@ name = "OAUTH_BURST"
 namespace_id = "1006"
 simple = { limit = 5, period = 60 }
 
+# Referrer favicon fetches on an R2 miss (src/routes/favicon.ts), per account.
+[[ratelimits]]
+name = "FAVICON_BURST"
+namespace_id = "1007"
+simple = { limit = 30, period = 60 }
+
 # Custom domain
 [[routes]]
 pattern = "aired.sh/*"

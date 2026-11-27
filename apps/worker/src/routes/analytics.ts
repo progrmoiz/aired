@@ -3,6 +3,7 @@ import type { AppBindings } from '../types.js';
 import { getEntitlements, planLimitError } from '../lib/entitlements.ts';
 import { siteOrigin } from '../lib/origin.ts';
 import { getPageRow } from '../lib/pages-store.ts';
+import { iconUrls } from '../lib/favicon.ts';
 import { MAX_DAYS, analyticsConfig, demoReport, loadReport, parseOffset, parseRange, type Report, type Scope, type Window } from '../lib/analytics.ts';
 
 /**
@@ -58,6 +59,7 @@ analytics.get('/', async (c) => {
   }
   return c.json({
     ...report,
+    icons: await icons(c, report),
     pages: (report.pages ?? []).filter((p) => titles.has(p.id)).map((p) => ({ ...p, title: titles.get(p.id) ?? null })),
   });
 });
@@ -80,12 +82,20 @@ analytics.get('/pages/:id', async (c) => {
   }
   const report = await answer(c, { kind: 'page', id }, w);
   if (report instanceof Response) return report;
-  return c.json({ ...report, page: { id: row.id, title: row.title } });
+  return c.json({ ...report, icons: await icons(c, report), page: { id: row.id, title: row.title } });
 });
 
 type Ctx = Context<AppBindings>;
 
 /** The report from the cache, demo data, or Analytics Engine; or an error response. */
+/**
+ * Signed /api/favicon URLs for the report's referrer hosts (lib/favicon.ts):
+ * only hosts in the caller's own report can have their icon fetched.
+ */
+function icons(c: Ctx, report: Report): Promise<Record<string, string>> {
+  return iconUrls(c.env.SESSION_SECRET, [...report.referrers.map((r) => r.host), report.peak?.host ?? '']);
+}
+
 /** The window from ?range and ?offset, or a 400. */
 function windowOf(c: Ctx): Window | Response {
   const range = parseRange(c.req.query('range'));

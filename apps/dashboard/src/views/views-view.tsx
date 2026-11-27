@@ -105,12 +105,12 @@ function ReportBody({ report, allTime, perPage }: { report: Report; allTime: num
           <Kpi label="Busiest day" value={report.peak ? report.peak.views.toLocaleString() : '—'} sub={report.peak ? dayWords(report.peak.day) : 'No views yet'} />
           <Kpi name label="Most viewers from" value={topCountry ? countryName(topCountry.code) : '—'} icon={topCountry && <CountryFlag code={topCountry.code} />}
             sub={topCountry ? plural(topCountry.views, 'view') : 'No views yet'} />
-          <Kpi name label="Most came from" value={topSource ? sourceName(topSource.host) : '—'} icon={topSource && <SourceIcon host={topSource.host} />}
+          <Kpi name label="Most came from" value={topSource ? sourceName(topSource.host) : '—'} icon={topSource && <SourceIcon host={topSource.host} icon={report.icons?.[topSource.host]} />}
             sub={topSource ? plural(topSource.views, 'view') : 'No views yet'} />
           <Kpi label="All time" value={allTime === null ? '—' : allTime.toLocaleString()} sub={allTime === 1 ? 'view' : 'views'} />
         </div>
         <div className="px-3 pt-2 pb-3 sm:px-4">
-          <AreaChart days={report.days} peak={report.peak} current={report.offset === 0} />
+          <AreaChart days={report.days} peak={report.peak} icon={report.peak ? report.icons?.[report.peak.host] : undefined} current={report.offset === 0} />
         </div>
       </Card>
 
@@ -119,7 +119,7 @@ function ReportBody({ report, allTime, perPage }: { report: Report; allTime: num
           <RankedCard label="Sources" total={report.total} tabs={[
             {
               key: 'site', label: 'Site or app', empty: 'No views in this time yet.',
-              rows: report.referrers.map((r) => ({ key: r.host || 'direct', label: sourceName(r.host), title: r.host || undefined, views: r.views, icon: <SourceIcon host={r.host} /> })),
+              rows: report.referrers.map((r) => ({ key: r.host || 'direct', label: sourceName(r.host), title: r.host || undefined, views: r.views, icon: <SourceIcon host={r.host} icon={report.icons?.[r.host]} /> })),
             },
             {
               key: 'type', label: 'Type', empty: 'No views in this time yet.',

@@ -1,8 +1,8 @@
 // Where a view came from, in plain words: a referrer host (lib/view-event.ts
-// on the Worker keeps only the host) becomes a friendly name and an icon key.
-// components/source-icon.tsx draws the icon from bundled SVGs; nothing is
-// ever fetched from the site itself or a favicon service, so no one learns
-// which sites send traffic. No imports, so the Worker's tests load it.
+// on the Worker keeps only the host) becomes a friendly name and a kind
+// (the Type tab). Icons aren't here: every source shows the favicon the
+// Worker fetched for it (components/source-icon.tsx). No imports, so the
+// Worker's tests load it.
 
 export type SourceKey =
   | 'direct' | 'other'
@@ -18,7 +18,7 @@ const SOURCES: [RegExp, SourceKey, string][] = [
   [/^(outlook\.(live|office|office365)\.com|com\.microsoft\.office\.outlook)$/, 'outlook', 'Outlook'],
   [/^(mail\.proton\.me|ch\.protonmail\.android)$/, 'protonmail', 'Proton Mail'],
   [/^(www\.)?icloud\.com$/, 'icloud', 'iCloud Mail'],
-  [/^([a-z0-9-]+\.)?slack\.com$|^com\.slack$/, 'slack', 'Slack'],
+  [/^([a-z0-9-]+\.)?slack\.com$|^com\.slack$|^slack-redir\.net$/, 'slack', 'Slack'],
   [/^teams\.(microsoft|live|cloud\.microsoft)(\.com)?$|^com\.microsoft\.teams$/, 'teams', 'Microsoft Teams'],
   [/^(discord\.com|discordapp\.com|com\.discord)$/, 'discord', 'Discord'],
   [/^(web\.whatsapp\.com|wa\.me|whatsapp\.com|com\.whatsapp)$/, 'whatsapp', 'WhatsApp'],

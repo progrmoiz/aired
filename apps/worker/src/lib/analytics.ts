@@ -248,7 +248,7 @@ export function demoReport(scope: Scope, w: Window, nowMs: number, pageIds: read
     days,
     peak: total > 0 ? { day: top.day, views: top.views, host: 'mail.google.com' } : null,
     countries: split(['US', 'GB', 'DE', 'IN', 'JP', 'BR', 'CA', 'FR', 'NL', 'ES', 'AU', 'XX'], [38, 16, 11, 9, 7, 6, 4, 3, 2, 2, 1, 1]).map(({ k, views }) => ({ code: k, views })),
-    referrers: split(['', 'app.slack.com', 'mail.google.com', 'linkedin.com', 'github.com', 'chatgpt.com', 'claude.ai', 'teams.microsoft.com', 't.co', 'blog.example.com'], [36, 22, 14, 9, 7, 5, 4, 3, 2, 1]).map(({ k, views }) => ({ host: k, views })),
+    referrers: split(['', 'app.slack.com', 'mail.google.com', 'linkedin.com', 'github.com', 'chatgpt.com', 'claude.ai', 'stackoverflow.com', 'teams.microsoft.com', 't.co', 'dev.to', 'vercel.com', 'news.ycombinator.com'], [34, 20, 13, 9, 7, 5, 4, 3, 3, 2, 2, 1, 1]).map(({ k, views }) => ({ host: k, views })),
   };
   if (scope.kind === 'owner') {
     report.pages = pageIds.slice(0, LIST_N).map((id, i) => ({ id, views: Math.max(1, Math.round(total / 2 ** (i + 1))) }));
