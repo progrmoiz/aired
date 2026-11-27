@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { guideMarkdown, GUIDES } from "../scripts/guide-md.ts";
 import {
   SITE_EVENT_ITEMS,
@@ -91,4 +91,18 @@ test("POST /api/site-event writes one data point for a known click and refuses t
   assert.equal((await post(JSON.stringify({ page: "share-vite-app", item: "steal" }))).status, 400);
   assert.equal((await post("not json")).status, 400);
   assert.equal(points.length, 1, "refused clicks write nothing");
+});
+
+test("every page's Guides link opens /guides, and /guides lists all nine guides", () => {
+  const dir = new URL("../../web/", import.meta.url);
+  for (const f of readdirSync(dir).filter((n) => n.endsWith(".html"))) {
+    const html = web(f);
+    assert.doesNotMatch(html, /<a href="\/html-to-link"[^>]*>Guides<\/a>/, `${f} still sends Guides to /html-to-link`);
+  }
+  const guides = web("guides.html");
+  for (const slug of GUIDES) assert.ok(guides.includes(`class="gcard" href="/${slug}"`), `/guides misses ${slug}`);
+  for (const slug of GUIDES) {
+    const linkedFrom = GUIDES.filter((other) => other !== slug && web(`${other}.html`).includes(`class="gcard" href="/${slug}"`));
+    assert.ok(linkedFrom.length >= 2, `${slug} is linked from only ${linkedFrom.length} other guides`);
+  }
 });
