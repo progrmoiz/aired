@@ -1,5 +1,11 @@
 export type Env = {
   PAGES_BUCKET: R2Bucket;
+  /**
+   * Backups (lib/backup.ts): nightly KV + D1 snapshots and the sweep's copies
+   * of the files it deletes. Optional so tests run without it; without it the
+   * sweep deletes nothing.
+   */
+  BACKUP_BUCKET?: R2Bucket;
   PAGES_KV: KVNamespace;
   // Cloudflare Workers static assets binding (populated by [assets] in wrangler.toml)
   ASSETS: Fetcher;

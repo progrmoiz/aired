@@ -134,7 +134,8 @@ test("index.ts wires the request id first, health probes, and the scheduled erro
   assert.ok(rid > 0 && rid < index.indexOf('app.use("*", corsMiddleware);'), "request id runs before CORS");
   assert.match(index, /checkHealth\(storageProbes\(c\.env\)\)/);
   assert.match(index, /ctx\.waitUntil\(runScheduled\(controller\.cron, env\)\)/);
-  assert.match(index, /logError\("scheduled_failed", err, \{ cron, job: "expired_sweep" \}\);\s*throw err;/);
+  assert.match(index, /logError\("scheduled_failed", err, \{ cron, job \}\);\s*failure \?\?= err;/);
+  assert.match(index, /if \(failure !== null\) throw failure;/);
   const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
   assert.match(toml, /\[observability\]\r?\nenabled = true/);
 });

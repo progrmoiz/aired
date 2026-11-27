@@ -24,10 +24,13 @@ export const ALERT_EVENTS = [
   "billing_webhook_failed",
   // An error reached the global error handler (the caller got a 500).
   "unhandled_error",
-  // The cron run threw before finishing the expired-page sweep.
+  // A cron job (expired-page sweep or backup) threw.
   "scheduled_failed",
   // GET /health found KV, D1 or R2 failing.
   "health_check_failed",
+  // A nightly backup snapshot started over a day and a half ago and still
+  // hasn't finished (lib/backup.ts): the newest good backup is getting old.
+  "backup_stale",
 ] as const;
 
 type Sink = Pick<Console, "log" | "warn" | "error">;
