@@ -214,8 +214,13 @@ test("the card: handshake, then the result drawn with its screenshot and buttons
   assert.equal(c.doc.querySelector(".url")!.textContent, "aired.sh/p/abc123");
   assert.equal(c.doc.querySelector(".shot img")!.getAttribute("src"), "https://aired.sh/og/abc123?card=1");
   assert.match(c.doc.querySelector(".eyebrow")!.textContent!, /Published/);
-  const buttons = [...c.doc.querySelectorAll(".actions button")].map((b) => b.textContent);
-  assert.deepEqual(buttons, ["Open", "Copy link"], "an anonymous page has no owner buttons");
+  const buttons = [...c.doc.querySelectorAll(".actions button")].map((b) => b.getAttribute("aria-label"));
+  assert.deepEqual(buttons, ["Copy link", "Open"], "an anonymous page has no owner buttons");
+  // Link-preview layout: the screenshot fills a full-width frame above the title.
+  const shot = c.doc.querySelector("article.card > button.shot");
+  assert.ok(shot && shot.nextElementSibling?.classList.contains("foot"), "screenshot on top, details under it");
+  const style = c.doc.querySelector("style")!.textContent!;
+  assert.match(style, /\.shot img\{[^}]*object-fit:cover/, "the screenshot covers its frame");
   assert.match(c.doc.querySelector(".facts")!.textContent!, /Expires/);
   // Nothing secret anywhere in what it drew.
   const drawn = c.doc.documentElement.outerHTML;
@@ -239,9 +244,11 @@ test("the card: the owner gets Views and Sharing, which open the dashboard", asy
     params: RESULT({ owner: "kim", update_token: null, claim_url: null }, { mine: true }),
   });
   const buttons = [...c.doc.querySelectorAll(".actions button")];
-  assert.deepEqual(buttons.map((b) => b.textContent), ["Open", "Copy link", "Views", "Sharing"]);
-  (buttons[2] as unknown as { click(): void }).click();
-  (buttons[3] as unknown as { click(): void }).click();
+  assert.deepEqual(buttons.map((b) => b.getAttribute("aria-label")), ["Views", "Sharing", "Copy link", "Open"]);
+  // Icon buttons say what they do to screen readers and on hover.
+  for (const b of buttons.slice(0, 3)) assert.equal(b.getAttribute("title"), b.getAttribute("aria-label"));
+  (buttons[0] as unknown as { click(): void }).click();
+  (buttons[1] as unknown as { click(): void }).click();
   const links = c.sent.filter((m) => m.method === "ui/open-link").map((m) => m.params.url);
   assert.deepEqual(links, ["https://aired.sh/dashboard#views/abc123", "https://aired.sh/dashboard#share/abc123"]);
   await c.window.happyDOM.close();
@@ -260,6 +267,9 @@ test("the card: get_page's views, access and expiry; a PIN page says so without 
   });
   const facts = [...c.doc.querySelectorAll(".facts li")].map((l) => l.textContent);
   assert.deepEqual(facts, ["12 views of 50", "PIN needed", "9 slides", "Never expires"]);
+  // A deck's screenshot is cropped past the dark bars at its sides.
+  assert.equal(c.doc.querySelector("article.card")!.getAttribute("data-kind"), "deck");
+  assert.match(c.doc.querySelector("style")!.textContent!, /\.card\[data-kind="deck"\] \.shot img\{transform:scale\(/);
   await c.window.happyDOM.close();
 });
 

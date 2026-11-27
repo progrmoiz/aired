@@ -11,7 +11,7 @@
  * (routes/mcp.ts) and the stdio one in the npm package (apps/mcp). It has no
  * imports; the server passes itself in.
  *
- * What the card shows: the page's screenshot (GET /og/:id, the link-preview
+ * What the card shows, laid out like a link preview: the page's screenshot (GET /og/:id, the link-preview
  * image, never the page in a frame), its title and link, views, who can open
  * it and when it expires, and buttons to open it, copy the link and, for the
  * signed-in owner, see its views and change who can open it (both in the
@@ -208,26 +208,28 @@ const STYLE = `
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:transparent}
 body{font:400 var(--aired-text-sm)/1.45 var(--aired-font-sans);color:var(--aired-text-1);-webkit-font-smoothing:antialiased}
-.card{display:grid;grid-template-columns:minmax(0,196px) minmax(0,1fr);gap:14px;align-items:start;padding:12px;background:var(--aired-surface);border:1px solid var(--aired-border);border-radius:var(--aired-radius-xl)}
-@media (max-width:480px){.card{grid-template-columns:minmax(0,1fr)}}
-.shot{display:block;position:relative;width:100%;height:0;padding:0 0 52.5%;margin:0;border-radius:var(--aired-radius-md);overflow:hidden;background:var(--aired-surface-2);border:1px solid var(--aired-hairline);cursor:pointer}
-.shot img{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;object-position:top}
-.shot:focus-visible,button:focus-visible{outline:2px solid var(--aired-ring);outline-offset:2px}
-.body{min-width:0;display:grid;gap:2px}
-.eyebrow{display:flex;align-items:center;gap:6px;font-size:var(--aired-text-xs);color:var(--aired-text-3)}
-.eyebrow svg{width:14px;height:14px;flex:none}
-.eyebrow .ok{color:var(--aired-ok)}
-h1{margin:2px 0 0;font-size:var(--aired-text-md);font-weight:500;letter-spacing:-0.01em;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.url{font-family:var(--aired-font-mono);font-size:var(--aired-text-xs);color:var(--aired-text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.facts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;padding:0;list-style:none}
-.facts li{font-size:var(--aired-text-xs);line-height:20px;padding:0 8px;border-radius:var(--aired-radius-full);background:var(--aired-chip-bg);color:var(--aired-chip-text);border:1px solid var(--aired-hairline);white-space:nowrap}
-.actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
-button{font:inherit;font-weight:500;height:30px;padding:0 10px;border-radius:var(--aired-radius-md);border:1px solid var(--aired-border-strong);background:var(--aired-surface-2);color:var(--aired-text-1);cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:background var(--aired-dur-fast) var(--aired-ease),border-color var(--aired-dur-fast) var(--aired-ease)}
+.card{background:var(--aired-surface);border:1px solid var(--aired-border);border-radius:var(--aired-radius-xl);overflow:hidden}
+.shot{display:block;position:relative;width:100%;height:0;padding:0 0 42%;margin:0;border:0;border-bottom:1px solid var(--aired-border);border-radius:0;background:var(--aired-surface-2);cursor:pointer;overflow:hidden}
+.shot img{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;object-position:top center}
+.card[data-kind="deck"] .shot img{transform:scale(1.072);transform-origin:50% 0}
+.eyebrow{position:absolute;right:10px;top:10px;display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;line-height:20px;padding:0 8px;border-radius:var(--aired-radius-full);background:var(--aired-surface);color:var(--aired-text-1);border:1px solid var(--aired-hairline)}
+.eyebrow svg{width:11px;height:11px;flex:none;color:var(--aired-mark)}
+.foot{display:flex;align-items:center;gap:12px;padding:12px 14px}
+.body{flex:1;min-width:0}
+h1{margin:0;font-size:15px;font-weight:500;letter-spacing:-0.01em;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.url{font-family:var(--aired-font-mono);font-size:var(--aired-text-xs);color:var(--aired-text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;user-select:all}
+.facts{display:flex;flex-wrap:wrap;margin:2px 0 0;padding:0;list-style:none;font-size:var(--aired-text-xs);color:var(--aired-text-3)}
+.facts li{white-space:nowrap}
+.facts li+li::before{content:"·";padding:0 6px}
+.actions{display:flex;gap:6px;flex:none}
+button{font:inherit;font-weight:500;height:30px;padding:0 10px;border-radius:var(--aired-radius-md);border:1px solid var(--aired-border-strong);background:var(--aired-surface-2);color:var(--aired-text-1);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:background var(--aired-dur-fast) var(--aired-ease),border-color var(--aired-dur-fast) var(--aired-ease)}
+button.icon{width:30px;padding:0}
 button:hover{border-color:var(--aired-text-3)}
 button.primary{background:var(--aired-primary);color:var(--aired-on-primary);border-color:transparent}
 button.primary:hover{background:var(--aired-primary-hover)}
 button svg{width:14px;height:14px;flex:none}
-.empty{padding:12px;color:var(--aired-text-3);font-size:var(--aired-text-xs)}
+.shot:focus-visible,button:focus-visible{outline:2px solid var(--aired-ring);outline-offset:2px}
+@media (max-width:440px){.foot{flex-wrap:wrap}.actions{width:100%;justify-content:flex-end}}
 @media (prefers-reduced-motion:reduce){button{transition:none}}
 `;
 
@@ -308,13 +310,21 @@ const SCRIPT = String.raw`
     window.open(url, "_blank", "noopener");
   }
 
+  // Copies, or failing that selects the link so the person can press ⌘C.
   function copy(text, button) {
+    function mark(label, icon) {
+      button.setAttribute("aria-label", label);
+      button.setAttribute("title", label);
+      button.innerHTML = icon;
+    }
     function done(ok) {
-      var label = button.querySelector("span");
-      var icon = button.querySelector("svg");
-      label.textContent = ok ? "Copied" : "Press ⌘C to copy";
-      if (ok) icon.outerHTML = ICON.check;
-      setTimeout(function () { label.textContent = "Copy link"; var i = button.querySelector("svg"); if (i) i.outerHTML = ICON.copy; }, 1600);
+      if (ok) mark("Copied", ICON.check);
+      else {
+        var u = root.querySelector(".url");
+        if (u && window.getSelection) { var r = document.createRange(); r.selectNodeContents(u); var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+        mark("Press ⌘C to copy", ICON.copy);
+      }
+      setTimeout(function () { mark("Copy link", ICON.copy); }, 1600);
     }
     function fallback() {
       var t = el("textarea", { "aria-hidden": "true", style: "position:fixed;opacity:0;top:0;left:0" });
@@ -363,23 +373,31 @@ const SCRIPT = String.raw`
     if (data.action === "restored" && typeof data.restored_from === "number") head = "Restored version " + data.restored_from;
 
     var img = el("img", { src: shotUrl, alt: "", loading: "eager", decoding: "async" });
+    img.addEventListener("load", size);
     // A new or changed page's screenshot is taken just after the call: look again once.
     if (data.action !== "page") setTimeout(function () { img.src = shotUrl + "&t=" + Date.now(); }, 7000);
-    var actions = [
-      el("button", { class: "primary", type: "button", onclick: function () { openLink(data.url); } }, [el("span", { html: ICON.open }).firstChild, el("span", { text: "Open" })]),
-      el("button", { type: "button", onclick: function (e) { copy(data.url, e.currentTarget); } }, [el("span", { html: ICON.copy }).firstChild, el("span", { text: "Copy link" })])
-    ];
-    if (data.mine) {
-      actions.push(el("button", { type: "button", onclick: function () { openLink(origin + "/dashboard#views/" + encodeURIComponent(data.id)); } }, [el("span", { html: ICON.views }).firstChild, el("span", { text: "Views" })]));
-      actions.push(el("button", { type: "button", onclick: function () { openLink(origin + "/dashboard#share/" + encodeURIComponent(data.id)); } }, [el("span", { html: ICON.share }).firstChild, el("span", { text: "Sharing" })]));
+    function iconButton(label, icon, onclick) {
+      return el("button", { class: "icon", type: "button", "aria-label": label, title: label, html: icon, onclick: onclick });
     }
-    var card = el("article", { class: "card", "aria-label": title }, [
-      el("button", { class: "shot", type: "button", "aria-label": "Open " + title, onclick: function () { openLink(data.url); } }, [img]),
-      el("div", { class: "body" }, [
-        el("div", { class: "eyebrow" }, [el("span", { html: ICON.mark, style: "display:inline-flex;color:var(--aired-mark)" }), el("span", { text: "aired · " + head })]),
-        el("h1", { text: title, title: title }),
-        el("div", { class: "url", text: bare }),
-        el("ul", { class: "facts" }, facts(data).map(function (f) { return el("li", { text: f }); })),
+    var actions = [];
+    if (data.mine) {
+      actions.push(iconButton("Views", ICON.views, function () { openLink(origin + "/dashboard#views/" + encodeURIComponent(data.id)); }));
+      actions.push(iconButton("Sharing", ICON.share, function () { openLink(origin + "/dashboard#share/" + encodeURIComponent(data.id)); }));
+    }
+    actions.push(iconButton("Copy link", ICON.copy, function (e) { copy(data.url, e.currentTarget); }));
+    actions.push(el("button", { class: "primary", type: "button", "aria-label": "Open", onclick: function () { openLink(data.url); } }, [el("span", { html: ICON.open }).firstChild, el("span", { text: "Open" })]));
+    // Link-preview layout: the screenshot full width on top, title and buttons under it.
+    var card = el("article", { class: "card", "aria-label": title, "data-kind": typeof data.kind === "string" ? data.kind : "page" }, [
+      el("button", { class: "shot", type: "button", "aria-label": "Open " + title, onclick: function () { openLink(data.url); } }, [
+        img,
+        el("span", { class: "eyebrow" }, [el("span", { html: ICON.mark }).firstChild, el("span", { text: head })])
+      ]),
+      el("div", { class: "foot" }, [
+        el("div", { class: "body" }, [
+          el("h1", { text: title, title: title }),
+          el("div", { class: "url", text: bare }),
+          el("ul", { class: "facts" }, facts(data).map(function (f) { return el("li", { text: f }); }))
+        ]),
         el("div", { class: "actions" }, actions)
       ])
     ]);
