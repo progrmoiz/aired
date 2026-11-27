@@ -15,7 +15,7 @@ Source: https://aired.sh/share-html-privately
 
 - **The link is random.** Each page gets an unguessable address like `aired.sh/p/k3J9xQ2mTa`. aired doesn't list pages anywhere for people to browse.
 - **Search engines are kept out.** Pages published without an account tell search engines not to list them, and search engines can't get past a PIN at all.
-- **Anyone with the link and PIN can open it.** If it's forwarded, the new person gets in too. That's the trade-off for viewers not needing an account.
+- **Anyone with the link and PIN can open it.** If it's forwarded, the new person gets in too. To stop that, share with named people instead (below).
 - **Without a PIN, the title shows in link previews.** Slack, WhatsApp and iMessage show the page title when the link is pasted. With a PIN, they only see the PIN screen.
 
 ## Private sharing options, compared
@@ -23,19 +23,22 @@ Source: https://aired.sh/share-html-privately
 | Option | Viewer needs an account | Shows the page, not the code |
 | --- | --- | --- |
 | aired with a PIN | No | Yes |
+| aired, named people only | No, a one-time code by email | Yes |
 | Google Drive, shared with named people | Yes, a Google account | No, Drive shows the code |
 | Email attachment | No | Often not; many mail filters block .html files |
 | Claude, shared by email invite | Yes, a Claude account | Yes |
 
 ## Sharing with named people
 
-A page on aired opens for anyone with the link, and the PIN if you set one. aired can't yet limit a page to certain email addresses. If each viewer must sign in, use Google Drive or Claude's email invites from the table above.
+Sign in and list who may open a page: email addresses, and on Pro whole company domains like `@client.com`. Each person types their email on the page and gets a 6-digit code that works once. They don't need an account, and someone the link is forwarded to can't get in. Free allows 3 people per page; Pro allows 500 people and 25 domains.
+
+Set it in your dashboard's Share view, or from the command line with `aired set <id> --only alice@client.com,@client.com`. Taking someone off the list locks them out. See the [docs](https://aired.sh/docs) for the details.
 
 ## Questions
 
 ### Can I share an HTML file so only certain people can see it?
 
-Add a PIN and send it only to those people. The page won't open without it. Sharing by email address is planned for the paid plans.
+Yes. Sign in, then list their email addresses: each person types their email on the page and gets a one-time code. Free allows 3 people per page; Pro allows 500 people and whole company domains like @client.com. Or add a PIN and send it only to those people.
 
 ### Do the people I share with need an aired account?
 
