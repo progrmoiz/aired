@@ -103,6 +103,8 @@ Prompts (slash commands in clients that show them): `publish_report(about?, audi
 
 Resources: the skills, as text/markdown, for every caller: `skill://aired/SKILL.md` (the core skill), `skill://aired/references/cli.md`, `mcp.md`, `bundling.md` and `troubleshooting.md` (its references), and `skill://aired/aired-slides/SKILL.md`, `skill://aired/aired-dashboard/SKILL.md`, `skill://aired/aired-report/SKILL.md`, `skill://aired/aired-forms/SKILL.md`. The `make_slide_deck` prompt points at aired-slides; `publish_report` and `share_privately` at aired-report. Signed in (API key, /mcp/account, or `aired login` for the local server): `aired://page/{id}` for each of your pages (the newest 50 are listed), whose content is the page's HTML (or its Markdown, for a Markdown page). Another account's page or an anonymous page is refused.
 
+Page card (MCP Apps): publish_html, get_page, update_page and restore_version link to the UI resource `ui://aired/page-card-v1.html` (text/html;profile=mcp-app) through `_meta.ui.resourceUri`. Chat apps that support MCP Apps (Claude web, desktop and mobile; ChatGPT; VS Code; Cursor; Goose) draw it inline: the page's link-preview screenshot (/og/:id), title, link, views, access and expiry, with Open and Copy link, plus Views and Sharing in the dashboard for the signed-in owner. Its CSP allows images from aired only and no network calls; it never shows the update token, PIN or claim link. Text-only clients (Claude Code and others) get the same text and structuredContent as before. The local server has the same card for publish_html, get_page and restore_version.
+
 ### 4. HTTP API
 
 No SDK needed.

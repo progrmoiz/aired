@@ -17,7 +17,7 @@ echo "<h1>Hi</h1>" | npx aired --json  # stdin; JSON is automatic when piped
 npx aired report.html --pin 4821 --ttl 24h
 ```
 
-Over MCP it's `publish_html` with `html` or `markdown` (plus `title`, `pin`, `ttl_seconds`, `permanent`). Read `url`, `id` and `update_token` from the result's `structuredContent`, not from the text.
+Over MCP it's `publish_html` with `html` or `markdown` (plus `title`, `pin`, `ttl_seconds`, `permanent`). Read `url`, `id` and `update_token` from the result's `structuredContent`, not from the text. Chat apps with MCP Apps (Claude, ChatGPT, VS Code, Cursor) also show the person a card with the page's screenshot and link; still give the link in your reply.
 
 Markdown renders as a readable page in light and dark, with highlighted code, tables and task lists. Front matter `title:` (or the first `# heading`) sets the title. Raw HTML inside Markdown shows as text, so publish an `.html` file when you need custom HTML.
 

@@ -47,6 +47,7 @@ import {
   versionsText,
 } from "../../worker/src/lib/mcp-shapes.ts";
 import { registerPrompts, registerResources } from "../../worker/src/lib/mcp-extras.ts";
+import { carded, cardTitle, cardToolMeta, registerCard, withCard } from "../../worker/src/lib/mcp-card.ts";
 import { CONTENT_INPUT, GET_PAGE_DESCRIPTION, getPageInput, MISSING_CONTENT, registerTemplateTool } from "../../worker/src/lib/mcp-templates.ts";
 // The aired skills, bundled as text (esbuild/tsup loader for .md).
 import { SKILL_FILES } from "../../worker/src/lib/skill-files.ts";
@@ -204,6 +205,7 @@ server.registerTool(
     },
     outputSchema: outputShapes.publish_html,
     annotations: { title: "Publish HTML", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    _meta: cardToolMeta("publish_html"),
   },
   async ({ html, markdown, deck, file_path, title, pin, ttl_seconds, permanent, project, update_token, id, message }) => {
     // Resolve the content: HTML, or Markdown (a .md file counts as Markdown)
@@ -313,10 +315,20 @@ server.registerTool(
         if (result.presenter_url) lines.push(`Speaker view (notes, only for the signed-in owner): ${result.presenter_url}`);
       }
 
-      return {
-        content: [{ type: "text", text: lines.join("\n") }],
+      // The page card (lib/mcp-card.ts): a signed-in publish without a token makes your own page.
+      const answer = {
+        content: [{ type: "text" as const, text: lines.join("\n") }],
         structuredContent: publishOut(result, { updated: update_token !== undefined, owner: null }),
       };
+      return withCard(
+        answer,
+        {
+          action: update_token !== undefined ? "updated" : "published",
+          title: cardTitle({ title, ...(isMarkdown ? { markdown: content } : { html: content }) }),
+          mine: signedIn() && update_token === undefined,
+          origin: apiBase(),
+        },
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return {
@@ -335,8 +347,9 @@ server.registerTool(
     inputSchema: getPageInput,
     outputSchema: outputShapes.get_page,
     annotations: { title: "Get a page", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    _meta: cardToolMeta("get_page"),
   },
-  async ({ id, update_token, include_source }) => {
+  carded(apiBase(), async ({ id, update_token, include_source }) => {
     if (!PAGE_ID.test(id)) return toolError("That isn't a page id.");
     try {
       const headers: Record<string, string> = update_token ? { "X-Update-Token": update_token } : {};
@@ -347,7 +360,7 @@ server.registerTool(
     } catch (err) {
       return toolError(`Error: ${errorMessage(err)}`);
     }
-  },
+  }, (args, out) => ({ action: "page", title: typeof out.title === "string" ? out.title : null, mine: signedIn() && args.update_token === undefined })),
 );
 
 server.registerTool(
@@ -412,8 +425,9 @@ server.registerTool(
     inputSchema: restoreVersionInput,
     outputSchema: outputShapes.restore_version,
     annotations: { title: "Restore a page version", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    _meta: cardToolMeta("restore_version"),
   },
-  async ({ id, version, update_token, message }) => {
+  carded(apiBase(), async ({ id, version, update_token, message }) => {
     if (!PAGE_ID.test(id)) return toolError("That isn't a page id.");
     try {
       const out = restoreOut(
@@ -426,7 +440,7 @@ server.registerTool(
     } catch (err) {
       return toolError(`Error: ${errorMessage(err)}`);
     }
-  },
+  }, (args) => ({ action: "restored", title: null, mine: signedIn() && args.update_token === undefined })),
 );
 
 server.registerTool(
@@ -546,6 +560,7 @@ server.registerTool(
 );
 
 registerPrompts(server);
+registerCard(server, apiBase());
 // Signed in or not is read on each call, so `aired login` mid-session counts.
 registerResources(server, {
   origin: apiBase(),
