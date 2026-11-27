@@ -140,7 +140,7 @@ test("mcp.ts: the anonymous publish tool queues screenshots too", () => {
   const shots = code.match(/background\(refreshShot\(/g) ?? [];
   assert.equal(writes.length, 2);
   assert.equal(shots.length, 2);
-  assert.match(code, /createAiredMcpServer\(c\.env, signedIn, \(work\) => c\.executionCtx\.waitUntil\(work\)\)/);
+  assert.match(code, /createAiredMcpServer\(c\.env, signedIn, callApi, \(work\) => c\.executionCtx\.waitUntil\(work\)\)/);
 });
 
 test("og.ts: serves a screenshot only for a live page allowed one, else the card", () => {

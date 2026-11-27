@@ -1,12 +1,30 @@
 /**
- * Text for the signed-in remote MCP tools (routes/mcp.ts). Those tools pass
- * the call to the HTTP API with the caller's API key, so the API's own rules
- * (ownership, plan limits, rate limits, claims) apply unchanged; this file
- * turns the API's JSON answers into what an agent reads. No imports, so tests
- * load it directly. `origin` arguments are siteOrigin(env).
+ * Results for the remote MCP tools (routes/mcp.ts) that pass the call to the
+ * HTTP API, so the API's own rules (ownership, plan limits, rate limits,
+ * claims) apply unchanged. This file turns the API's JSON answers into what
+ * an agent reads: text, plus structuredContent in the shape the tool's
+ * outputSchema declares (lib/mcp-shapes.ts, shared with the stdio
+ * server). Its only import is that file. `origin` arguments are
+ * siteOrigin(env).
  */
+import {
+  accountOut,
+  feedbackOut,
+  listOut,
+  pageOut,
+  pageText,
+  publishOut,
+  setOptionsOut,
+  updateOut,
+} from './mcp-shapes.ts';
 
-export type ToolResult = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
+export type ToolResult = {
+  content: Array<{ type: 'text'; text: string }>;
+  structuredContent?: Record<string, unknown>;
+  isError?: boolean;
+};
+
+const withData = (r: ToolResult, data: object): ToolResult => ({ ...r, structuredContent: data as Record<string, unknown> });
 
 export const signInRequiredText = (origin: string): string =>
   `Sign in required: add aired as a connector at ${origin}/mcp/account (you sign in with your aired account), ` +
@@ -53,28 +71,58 @@ function upgradeLines(body: Obj): string[] {
 /** A publish or update answered by the API, for the signed-in publish_html tool. */
 export function publishResult(body: unknown, login: string): ToolResult {
   const b = (body ?? {}) as Obj;
-  return text([
+  return withData(text([
     `Published to ${String(b.url)}`,
     `Owner: @${login} (it shows in the aired dashboard; update or delete it by id with update_page and delete_page)`,
     expiryLine(b.expiresAt),
     ...upgradeLines(b),
-  ]);
+  ]), publishOut(body, { updated: false, owner: login }));
 }
 
-export function updateResult(body: unknown): ToolResult {
+function updateText(body: unknown): ToolResult {
   const b = (body ?? {}) as Obj;
   return text([`Updated ${String(b.url)}`, expiryLine(b.expiresAt), ...upgradeLines(b)]);
 }
 
+/** update_page. */
+export function updateResult(body: unknown): ToolResult {
+  return withData(updateText(body), updateOut(body));
+}
+
+/** publish_html that replaced a page (by id, or id and update token). `owner`: the login when it's the caller's page. */
+export function publishUpdateResult(body: unknown, owner: string | null): ToolResult {
+  return withData(updateText(body), publishOut(body, { updated: true, owner }));
+}
+
 export function deleteResult(id: string): ToolResult {
-  return text([`Deleted page ${id}.`]);
+  return withData(text([`Deleted page ${id}.`]), { id, deleted: true });
+}
+
+/** get_page: GET /api/pages/:id/details. */
+export function pageResult(body: unknown, origin: string): ToolResult {
+  const p = pageOut(body, origin);
+  return withData(text([pageText(p, 'Page')]), p);
+}
+
+/** set_options: PATCH /api/pages/:id. */
+export function setOptionsResult(body: unknown, origin: string): ToolResult {
+  const p = setOptionsOut(body, origin);
+  const what = p.changed.length > 0 ? `Changed ${p.changed.join(', ')} of` : 'Settings of';
+  return withData(text([pageText(p, what)]), p);
+}
+
+/** send_feedback: POST /api/feedback. */
+export function feedbackResult(body: unknown): ToolResult {
+  const f = feedbackOut(body);
+  return withData(text([`Feedback sent: ${f.id}`, f.message]), f);
 }
 
 /** GET /api/me/pages for list_pages. */
 export function listResult(body: unknown, origin: string): ToolResult {
   const b = (body ?? {}) as Obj;
   const pages = Array.isArray(b.pages) ? (b.pages as Obj[]) : [];
-  if (pages.length === 0) return text(['No pages yet.']);
+  const data = listOut(body, origin);
+  if (pages.length === 0) return withData(text(['No pages yet.']), data);
   const lines = pages.map((p) => {
     const bits = [
       `${String(p.id)}  ${origin}/p/${String(p.id)}`,
@@ -87,7 +135,7 @@ export function listResult(body: unknown, origin: string): ToolResult {
     return bits.join(' · ');
   });
   if (str(b.cursor)) lines.push('', `More pages: call list_pages with cursor "${String(b.cursor)}".`);
-  return text(lines);
+  return withData(text(lines), data);
 }
 
 /** GET /api/me for get_account. upgradeUrl is null when billing is off. */
@@ -110,5 +158,6 @@ export function accountResult(
     lines.push(`${billing.cancelAtPeriodEnd === true ? 'Ends' : 'Renews'}: ${String(billing.renewsAt).split('T')[0]}`);
   }
   if (plan !== 'pro' && opts.upgradeUrl !== null) lines.push(`upgrade_url: ${opts.upgradeUrl} (a person needs to open it)`);
-  return text(lines);
+  const publishLimit = limits.publishTier === 'pro' ? opts.proPublishLimit : opts.freePublishLimit;
+  return withData(text(lines), accountOut(body, { upgradeUrl: opts.upgradeUrl, publishLimit }));
 }

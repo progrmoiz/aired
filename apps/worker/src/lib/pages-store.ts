@@ -217,6 +217,27 @@ export async function updatePageContent(
   return result.meta.changes === 1;
 }
 
+/**
+ * New settings for a live page (set_options): title, PIN hash, view limit,
+ * expiry. False if the page is deleted or has expired in the meantime, so a
+ * dead page can't be brought back by giving it a new expiry.
+ */
+export async function updatePageOptions(
+  db: D1Database,
+  id: string,
+  change: { title: string | null; pin: string | null; reads: number | null; permanent: boolean; expiresAt: number | null },
+  now: number,
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE pages SET title = ?, pin = ?, reads = ?, permanent = ?, expires_at = ?, updated_at = ?
+       WHERE id = ? AND deleted_at IS NULL AND (expires_at IS NULL OR expires_at > ?)`,
+    )
+    .bind(change.title, change.pin, change.reads, change.permanent ? 1 : 0, change.expiresAt, now, id, now)
+    .run();
+  return result.meta.changes === 1;
+}
+
 /** Deleted: no token matches it again, and it leaves every list. */
 export async function markPageDeleted(db: D1Database, id: string, now: number): Promise<void> {
   await db

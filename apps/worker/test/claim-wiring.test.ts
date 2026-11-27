@@ -14,8 +14,13 @@ test("api.ts: publish-update, PUT and DELETE all read credentials from the D1 ro
   assert.doesNotMatch(code, /verifyToken\([^)]*metadata\.tokenHash/);
   assert.doesNotMatch(code, /getClaim|page_claims|PAGES_KV\.get\(`page:\$\{(existingId|id)\}`\)[\s\S]{0,200}verifyToken/);
   assert.match(code, /return \(await loadPage\(c\.env, id\)\) \?\? c\.json\(\{ error: "Page not found" \}, 404\)/);
-  assert.equal(count(code, /await pageFor\(c, /), 3);
+  // publish-update, PUT, DELETE, and the details and PATCH routes (set_options).
+  assert.equal(count(code, /await pageFor\(c, /), 5);
   assert.equal(count(code, /const creds = \{ ownerId: page\.row\.ownerId, tokenHash: page\.row\.tokenHash \};/), 3);
+  // Details and PATCH decide access from the row too (lib/page-options.ts pageAccess).
+  assert.match(code, /ownerId: page\.row\.ownerId,\s*userId: c\.get\("user"\)\?\.id \?\? null,/);
+  assert.match(code, /tokenMatches: token !== null && \(await verifyToken\(token, page\.row\.tokenHash\)\)/);
+  assert.equal(count(code, /const access = await ownerAccess\(c, page, /), 2);
 });
 
 test("api.ts: PUT accepts the owner's session, and DELETE checks the row's owner", () => {

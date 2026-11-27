@@ -17,6 +17,7 @@ import {
   resolvePage,
   rowFromMetadata,
   updatePageContent,
+  updatePageOptions,
   type PageRow,
 } from "./pages-store.ts";
 import { tombstoneClaim } from "./page-claims.ts";
@@ -24,7 +25,7 @@ import { forgetShots } from "./og-render.js";
 
 /**
  * The one way every route creates, updates, deletes or looks up a page
- * (routes/api.ts publish, PUT and DELETE, and the anonymous MCP tool in
+ * (routes/api.ts publish, PUT, PATCH and DELETE, and the anonymous MCP tool in
  * routes/mcp.ts). D1 `pages` is written first and decides; then R2 holds
  * the HTML and KV `page:<id>` the viewer's cached copy.
  *
@@ -157,6 +158,42 @@ export async function updatePage(
   }
   if (after.ownerId !== updated.ownerId || after.tokenHash !== updated.tokenHash) await refreshCache(env.PAGES_KV, after, now);
   return { metadata, expiresAt: metadata.expiresAt, htmlEtag: htmlObj?.etag ?? null };
+}
+
+/**
+ * New settings for a live page (set_options, PATCH /api/pages/:id): D1
+ * first, then the KV record rebuilt from the row, so the viewer sees the
+ * new PIN, view limit, title and expiry straight away. The HTML in R2 is
+ * left alone. `pinChanged` says whether `settings.pin` is new; when it
+ * isn't, the record keeps the PIN it has (as cacheRecord does).
+ *
+ * As in updatePage, the row is read again afterwards: if a delete marked it
+ * in between, the record is removed again. Throws PageGone when the page
+ * was deleted or expired before the write.
+ */
+export class PageGone extends Error {}
+
+export async function setPageOptions(
+  env: PageEnv,
+  page: LoadedPage,
+  settings: { title: string | null; pin: string | null; reads: number | null; permanent: boolean; expiresAt: number | null },
+  pinChanged: boolean,
+  now = Date.now(),
+): Promise<{ row: PageRow; metadata: PageMetadata }> {
+  const { row, kv } = page;
+  if (!(await updatePageOptions(env.DB, row.id, settings, now))) throw new PageGone("page was deleted or expired");
+  const updated: PageRow = { ...row, ...settings, updatedAt: now };
+  const base = cacheRecord(updated, kv);
+  const metadata: PageMetadata = pinChanged ? { ...base, pin: settings.pin } : base;
+  await env.PAGES_KV.put(kvKeys.page(row.id), serializeMetadata(metadata), kvOptions(updated.expiresAt, now));
+
+  const after = await getPageRow(env.DB, row.id);
+  if (after === null || after.deletedAt !== null) {
+    await env.PAGES_KV.delete(kvKeys.page(row.id)).catch(() => {});
+    throw new PageGone("page was deleted during the change");
+  }
+  if (after.ownerId !== updated.ownerId || after.tokenHash !== updated.tokenHash) await refreshCache(env.PAGES_KV, after, now);
+  return { row: after, metadata };
 }
 
 /** A page's HTML and KV record, a few tries before giving up. */

@@ -20,7 +20,7 @@ import { authMiddleware } from "./middleware/auth.js";
 import { requestIdMiddleware } from "./middleware/request-id.js";
 import { log, logError } from "./lib/log.js";
 import { cachedHealth, checkHealth, publicReport, storageProbes } from "./lib/health.js";
-import { countMcpToolCalls, isMcpToolCall } from "./lib/mcp-rpc.js";
+import { countMcpToolCalls, isMcpToolCall, mcpToolName } from "./lib/mcp-rpc.js";
 import { rateLimit } from "./middleware/rate-limit.js";
 import { TIERS } from "./lib/rate-limit-tiers.js";
 import { pageIdFromKey, sweepExpiredPages } from "./lib/expired-sweep.js";
@@ -137,9 +137,13 @@ async function mcpPostLimits(c: Context<AppBindings>, next: Next): Promise<Respo
   if (isMcpToolCall(body)) {
     // Signed-in callers (key or OAuth): a per-account limit on every tool
     // call (publishes also count against the publish limit inside the API).
-    // Everyone else: the publish limit.
+    // Everyone else: the publish limit for publish_html, and a per-IP limit
+    // for the tools that don't publish (get_page, set_options,
+    // send_feedback), so reading a page doesn't use up publishes. Those go
+    // through the API, whose own limits apply too.
     const via = c.get("via");
-    return via === "key" || via === "oauth" ? rateLimit(TIERS.mcp_key)(c, next) : publishRateLimit(c, next);
+    if (via === "key" || via === "oauth") return rateLimit(TIERS.mcp_key)(c, next);
+    return mcpToolName(body) === "publish_html" ? publishRateLimit(c, next) : rateLimit(TIERS.mcp_anon)(c, next);
   }
   await next();
 }

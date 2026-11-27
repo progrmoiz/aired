@@ -20,3 +20,25 @@ export interface TokenRecord {
   url: string
   created: string
 }
+
+/** GET /api/pages/:id/details and PATCH /api/pages/:id: the owner's view. Never the PIN. */
+export interface PageDetails {
+  id: string
+  url: string
+  title: string | null
+  size: number
+  readCount: number
+  reads: number | null
+  hasPin: boolean
+  permanent: boolean
+  createdAt: string
+  expiresAt: string | null
+  project: string | null
+  /** PATCH only: the settings that changed. */
+  changed?: string[]
+}
+
+export interface FeedbackResult {
+  id: string
+  message: string
+}

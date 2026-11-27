@@ -9,7 +9,9 @@ import { detectSpam, SPAM_REJECTION } from "../lib/spam.js";
 import { claimUrl } from "../lib/claim-url.js";
 import { hashPin } from "../lib/pin-hash.js";
 import { authorizePageWrite } from "../lib/claim-decision.js";
-import { createPage, deletePage, loadPage, StorageUnavailable, updatePage, type LoadedPage } from "../lib/page-write.ts";
+import { createPage, deletePage, loadPage, PageGone, setPageOptions, StorageUnavailable, updatePage, type LoadedPage } from "../lib/page-write.ts";
+import { applyOptions, changedSettings, pageAccess, pageDetails, parseOptions } from "../lib/page-options.ts";
+import { feedbackAllowed, feedbackId, insertFeedback, NOT_SUPPORT, parseFeedback } from "../lib/feedback.ts";
 import { billingEnabled, getEntitlements, planLimitError, upgradeUrl } from "../lib/entitlements.js";
 import { siteOrigin } from "../lib/origin.ts";
 import { refreshShot } from "../lib/og-render.js";
@@ -23,6 +25,7 @@ import {
   extractTitle,
   parseMetadata,
   normalizeProject,
+  hashToHex,
   DEFAULT_TTL,
   MAX_SIZE,
   PRO_MAX_SIZE,
@@ -372,6 +375,130 @@ api.delete("/pages/:id", requireCsrfHeader, async (c) => {
   }
 
   return c.json({ ok: true });
+});
+
+/**
+ * The update token a request carries for get_page and set_options: the
+ * body's update_token, else X-Update-Token (for API key callers, whose
+ * Authorization holds the key), else a non-key Bearer token.
+ */
+function sentUpdateToken(c: Context<AppBindings>, bodyToken?: unknown): string | null {
+  const header = c.req.header("X-Update-Token");
+  if (typeof bodyToken === "string" && bodyToken !== "") return bodyToken;
+  if (header !== undefined && header.trim() !== "") return header.trim();
+  return readUpdateToken(undefined, c.req.header("Authorization"));
+}
+
+/** The token or signed-in owner check shared by details and PATCH (lib/page-options.ts). */
+async function ownerAccess(c: Context<AppBindings>, page: LoadedPage, token: string | null) {
+  return pageAccess({
+    ownerId: page.row.ownerId,
+    userId: c.get("user")?.id ?? null,
+    tokenSent: token !== null,
+    tokenMatches: token !== null && (await verifyToken(token, page.row.tokenHash)),
+  });
+}
+
+/** The page's view count, from its KV record (where views are counted). */
+const viewCount = (page: LoadedPage) => page.kv?.readCount ?? 0;
+
+// GET /api/pages/:id/details — the owner's view of a page (get_page): title,
+// URL, size, views, view limit, expiry, whether it has a PIN (never the PIN)
+// and project. Owner by update token or signed-in owner; anyone else is refused.
+api.get("/pages/:id/details", rateLimit(TIERS.page_options), async (c) => {
+  const id = c.req.param("id") ?? "";
+  const page = await pageFor(c, id, "details");
+  if (page instanceof Response) return page;
+  const access = await ownerAccess(c, page, sentUpdateToken(c));
+  if (!access.ok) return c.json({ error: access.error }, access.status);
+  return c.json(pageDetails(page.row, viewCount(page), new URL(c.req.url).origin));
+});
+
+// PATCH /api/pages/:id — change a page's settings without sending its HTML
+// again (set_options, `aired set`): title, pin (null removes it), ttl or
+// permanent, reads (null removes the view limit). Owner by update token
+// (body, X-Update-Token or Bearer) or signed-in owner (session or API key).
+api.patch("/pages/:id", requireCsrfHeader, rateLimit(TIERS.page_options), async (c) => {
+  const id = c.req.param("id") ?? "";
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+  const parsed = parseOptions(body);
+  if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+  const { change } = parsed;
+
+  const page = await pageFor(c, id, "patch");
+  if (page instanceof Response) return page;
+  const access = await ownerAccess(c, page, sentUpdateToken(c, (body as Record<string, unknown>).update_token));
+  if (!access.ok) return c.json({ error: access.error }, access.status);
+
+  // A new title on an anonymous page is screened with its HTML, as an
+  // update would be, so a clean page can't be retitled into spam.
+  if (page.row.ownerId === null && typeof change.title === "string") {
+    const obj = await c.env.PAGES_BUCKET.get(`pages/${id}/index.html`);
+    const verdict = detectSpam(obj === null ? "" : await obj.text(), change.title);
+    if (verdict.spam) {
+      console.log({ event: "spam_rejected", route: "api_patch", reason: verdict.reason });
+      return c.json({ error: SPAM_REJECTION }, 422);
+    }
+  }
+
+  const now = Date.now();
+  const pinHash = typeof change.pin === "string" ? await hashPin(change.pin) : null;
+  const settings = applyOptions(page.row, change, pinHash, now);
+  let row;
+  try {
+    ({ row } = await setPageOptions(c.env, page, settings, change.pin !== undefined, now));
+  } catch (err) {
+    if (err instanceof PageGone) return c.json({ error: "Page not found" }, 404);
+    console.error("page options write failed", { id, err });
+    return c.json({ error: "Could not change this page's settings. Please try again." }, 503);
+  }
+  return c.json({ ...pageDetails(row, viewCount(page), new URL(c.req.url).origin), changed: changedSettings(change) });
+});
+
+// POST /api/feedback — feedback from agents and people about aired itself
+// (send_feedback, `aired feedback`; lib/feedback.ts). Works signed in or
+// not. Never page HTML. Answers an id to pass on to the user.
+api.post("/feedback", async (c) => {
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+  // The source, when the client didn't say: the MCP servers and CLI name themselves.
+  if (typeof body === "object" && body !== null && !Array.isArray(body) && (body as Record<string, unknown>).source === undefined) {
+    const ua = c.req.header("User-Agent") ?? "";
+    const source = ua.startsWith("aired-mcp") ? "mcp" : ua.startsWith("aired/") ? "cli" : undefined;
+    if (source !== undefined) (body as Record<string, unknown>).source = source;
+  }
+  const parsed = parseFeedback(body);
+  if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+
+  const user = c.get("user");
+  const ip = c.req.header("CF-Connecting-IP") ?? c.req.header("X-Forwarded-For") ?? "unknown";
+  const rateKey = await hashToHex(user !== null ? `user:${user.id}` : `ip:${ip}`, 16);
+  const now = Date.now();
+  try {
+    const allowed = await feedbackAllowed(c.env.DB, rateKey, now);
+    if (!allowed.ok) {
+      return c.json(
+        { error: allowed.reason === "caller" ? "Feedback limit reached: 10 an hour. Send it later, or not at all." : "aired isn't taking feedback right now. Try again tomorrow." },
+        429,
+      );
+    }
+    const id = feedbackId();
+    await insertFeedback(c.env.DB, id, parsed.input, { userId: user?.id ?? null, rateKey }, now);
+    console.log({ event: "feedback_received", id, kind: parsed.input.kind, impact: parsed.input.impact, source: parsed.input.source });
+    return c.json({ id, message: `${NOT_SUPPORT} Tell the user you sent feedback ${id}.` });
+  } catch (err) {
+    console.error("feedback write failed", { err });
+    return c.json({ error: "Could not save feedback. Please try again later." }, 503);
+  }
 });
 
 // GET /api/pages/:id — public metadata (no token required)
