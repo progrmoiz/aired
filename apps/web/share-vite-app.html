@@ -198,6 +198,22 @@
     <aside class="toc" aria-label="On this page"><p>On this page</p><a href="#steps">How to share it</a><a href="#agent">Or ask your AI agent</a><a href="#toolcraft">Toolcraft apps</a><a href="#gotchas">If the page is blank</a><a href="#size">How big it can be</a><a href="#example">A live example</a><a href="#faq">Questions</a></aside>
     <article class="prose">
       <h2 id="steps">How to share it</h2>
+      <figure class="explain vitex" data-steps="3" data-step="3" aria-labelledby="vitex-t">
+        <div class="ex-head"><p class="ex-title" id="vitex-t">What the single-file build does</p></div>
+        <div class="vitex-row" aria-hidden="true">
+          <div class="vitex-files"><span>index.html <i>2 KB</i></span><span>main.js <i>412 KB</i></span><span>vendor.js <i>980 KB</i></span><span>app.css <i>38 KB</i></span><span>inter.woff2 <i>96 KB</i></span><span>cover.jpg <i>310 KB</i></span></div>
+          <span class="ex-arrow"></span>
+          <div class="vitex-one"><b>index.html</b><small>1.8 MB, everything inside</small></div>
+          <span class="ex-arrow"></span>
+          <div class="vitex-link">aired.sh/p/dither-lab</div>
+        </div>
+        <figcaption><ol class="ex-caps">
+          <li>Your build is six files. A link to just one of them opens a blank page.</li>
+          <li>The plugin puts all six inside one <code>index.html</code>.</li>
+          <li>Publish that one file, and the link opens the working app.</li>
+        </ol></figcaption>
+      </figure>
+
       <ol class="steps">
         <li><strong>Add the single-file plugin.</strong> In your app's folder, run <code>npm i -D vite-plugin-singlefile</code>. It puts every script, stylesheet, font and imported image inside <code>index.html</code>.</li>
         <li><strong>Add a second build config.</strong> Save the file below as <code>vite.singlefile.config.ts</code> next to <code>vite.config.ts</code>. Your normal build stays as it is.</li>

@@ -123,6 +123,7 @@ function blocks(node: Node, out: string[]): void {
       for (const c of Array.from(el.childNodes)) if (c !== summary) blocks(c, out);
       return;
     }
+    case "figure": // explainers are pictures; the article's text says the same
     case "svg":
     case "script":
     case "style":
