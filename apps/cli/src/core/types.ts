@@ -10,6 +10,8 @@ export interface PublishResult {
   slides_with_notes?: number
   /** Deck only: the owner's speaker view with notes. */
   presenter_url?: string
+  /** The page's live version number after this publish or update (aired versions). */
+  version?: number
 }
 
 export interface PageInfo {

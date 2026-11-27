@@ -35,7 +35,9 @@ npx aired new deck && npx aired deck.md
 |---------|-------------|
 | `aired [file]` | Publish an HTML or Markdown file, directory, or stdin (default command) |
 | `aired new [template]` | Write a starter to fill in: `deck`, `deck-html`, `report`, `one-pager` (no name lists them) |
-| `aired update <id> <file>` | Update an existing page |
+| `aired update <id> <file>` | Update an existing page (`-m "note"` labels the version) |
+| `aired versions <id>` | List a page's history: every version kept, newest first |
+| `aired restore <id> <version>` | Put an earlier version back (it goes live as a new version) |
 | `aired delete <id>` | Delete a page |
 | `aired info <id>` | Show page metadata |
 | `aired set <id>` | Change PIN, expiry, view limit or title without re-uploading |
@@ -119,6 +121,18 @@ aired set abc123 --clear-pin --permanent   # PIN off, never expires
 
 `--clear-title` and `--clear-reads` remove those. PINs are 4–64 characters, TTLs a minute to a year (use `--permanent` beyond that), titles up to 200 characters. It uses the stored update token, else your sign-in or `AIRED_API_KEY` (your own pages only). Over MCP it's `set_options`; `get_page` reads a page's settings back (whether a PIN is on, never the PIN).
 
+## History and undo
+
+Every update keeps the content it replaces, so a bad update is never final:
+
+```bash
+aired update abc123 report.html -m "New Q4 numbers"   # the note shows in the history
+aired versions abc123                                # v4 live, v3, v2, v1 … who, when, size, note
+aired restore abc123 2                               # v2's content goes live as v5
+```
+
+A restore never rewrites history: the old content goes live as a new version, and the one it replaced stays, so `aired restore abc123 4` undoes it. Updates from the dashboard, the CLI, the API and MCP all count, and each version records who made it: `owner` (signed in), `token` (the update token) or `agent` (through MCP). Over MCP it's `list_versions` and `restore_version`; `get_page` shows the live version number and how many there are. Same owner rule as `aired set`, except that a page that has collected responses can be restored only by its owner, signed in. Free keeps the last 5 earlier versions; Pro the last 50, each for 90 days (the newest 5 stay however old). Deleting the page deletes its history.
+
 ## Check that the page works
 
 After publishing or updating, open it in aired's browser and see what a visitor would hit:
@@ -199,10 +213,12 @@ https://aired.sh/mcp/account
 
 | Tool | Needs | Does |
 |---|---|---|
-| `publish_html` | nothing | Publish; `html` or `markdown`, `deck`, `file_path` (STDIO only; `.md` is Markdown), `title`, `pin`, `ttl_seconds`, `permanent`; `id` + `update_token` to update |
-| `get_page` | owner, or the page's `update_token` | Title, URL, size, views, view limit, expiry, project, PIN on/off, doc or deck; `include_source` adds the Markdown/HTML as published and a deck's notes |
+| `publish_html` | nothing | Publish; `html` or `markdown`, `deck`, `file_path` (STDIO only; `.md` is Markdown), `title`, `pin`, `ttl_seconds`, `permanent`; `id` + `update_token` to update, `message` to label the version |
+| `get_page` | owner, or the page's `update_token` | Title, URL, size, views, view limit, expiry, project, PIN on/off, doc or deck, live `version` and how many `versions`; `include_source` adds the Markdown/HTML as published and a deck's notes |
 | `get_template` | nothing | Starters: `deck`, `deck-html`, `report`, `one-pager` (no name lists them) |
 | `set_options` | owner, or the page's `update_token` | Change `pin` (null removes), `ttl_seconds` or `permanent`, `view_limit` (null removes), `title`; signed in, `public_results` and `accept_responses` |
+| `list_versions` | owner, or the page's `update_token` | The page's history: every version kept, newest first, with who made it, when, size and note |
+| `restore_version` | owner, or the page's `update_token` | Put version `version` back; it goes live as a new version, so it can be undone. `message` labels it |
 | `check_page` | owner, or the page's `update_token` | Render the page in a browser: errors, failed files, blank screen, screenshot; `viewport` `desktop` or `mobile` |
 | `send_feedback` | nothing | Report a bug, friction or idea in aired (see Feedback) |
 | `get_responses` | sign-in, the page's owner | What viewers saved with `aired.collect`: entries, settings, limits; `format: "csv"` adds CSV |

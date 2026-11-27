@@ -59,12 +59,22 @@ import {
   outputShapes,
   patchBody,
   setOptionsInput,
+  LIST_VERSIONS_DESCRIPTION,
+  MESSAGE_INPUT,
+  RESTORE_VERSION_DESCRIPTION,
+  listVersionsInput,
+  restoreOut,
+  restoreText,
+  restoreVersionInput,
+  versionsOut,
+  versionsText,
 } from "../lib/mcp-shapes.ts";
 import { registerPrompts, registerResources } from "../lib/mcp-extras.ts";
 import { OWNER_REQUIRED_MESSAGE, replaceAllowed } from "../lib/page-options.ts";
 import { pageHasResponses } from "../lib/collect-store.ts";
 import { CONTENT_INPUT, GET_PAGE_DESCRIPTION, getPageInput, MISSING_CONTENT, registerTemplateTool } from "../lib/mcp-templates.ts";
 import { buildContent, contentFields } from "../lib/page-content.ts";
+import { versionAuthor } from "../lib/page-versions.ts";
 // The aired skill, bundled as text (wrangler.toml [[rules]]), served as a resource.
 import skill from "../../../cli/SKILL.md";
 
@@ -99,7 +109,7 @@ const PAGE_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const badId = (): ToolResult => ({ content: [{ type: "text", text: "That isn't a page id." }], isError: true });
 const errorText = (text: string): ToolResult => ({ content: [{ type: "text", text }], isError: true });
 
-function createAiredMcpServer(
+export function createAiredMcpServer(
   env: {
     PAGES_BUCKET: R2Bucket;
     PAGES_KV: KVNamespace;
@@ -116,7 +126,7 @@ function createAiredMcpServer(
 ) {
   const server = new McpServer({
     name: "aired",
-    version: "1.6.0",
+    version: "1.7.0",
   });
   const origin = siteOrigin(env);
 
@@ -125,7 +135,7 @@ function createAiredMcpServer(
     {
       title: "Publish HTML",
       description:
-        "Publish HTML or Markdown to a shareable URL. Returns a live URL that renders it in a browser. Send markdown instead of html for a clean, readable doc; for slides, send Markdown split on --- lines (or HTML with <section> slides) with deck: true, and get_template has ready-made starters. Pass update_token from a previous publish to update the same URL. With an aired API key, pages belong to your account (permanent by default) and you can update your own pages by id without a token. Change the PIN, expiry, view limit or title later with set_options.",
+        "Publish HTML or Markdown to a shareable URL. Returns a live URL that renders it in a browser. Send markdown instead of html for a clean, readable doc; for slides, send Markdown split on --- lines (or HTML with <section> slides) with deck: true, and get_template has ready-made starters. Pass update_token from a previous publish to update the same URL; the content it replaces is kept as a version (list_versions, restore_version). With an aired API key, pages belong to your account (permanent by default) and you can update your own pages by id without a token. Change the PIN, expiry, view limit or title later with set_options.",
       inputSchema: {
       html: z.string().optional().describe("HTML content to publish (or send markdown instead)"),
       ...CONTENT_INPUT,
@@ -148,14 +158,20 @@ function createAiredMcpServer(
         .string()
         .optional()
         .describe("Page ID — required when update_token is provided"),
+      ...MESSAGE_INPUT,
       },
       outputSchema: outputShapes.publish_html,
       annotations: { title: "Publish HTML", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
-    async ({ html, markdown, deck, title, pin, ttl_seconds, permanent, update_token, id: existingId }) => {
+    async ({ html, markdown, deck, title, pin, ttl_seconds, permanent, update_token, id: existingId, message }) => {
       if (html === undefined && markdown === undefined) return errorText(MISSING_CONTENT);
       // Sent on to the API as given; it renders Markdown and decks the same way.
-      const body = { ...(html !== undefined ? { html } : {}), ...(markdown !== undefined ? { markdown } : {}), ...(deck !== undefined ? { deck } : {}) };
+      const body = {
+        ...(html !== undefined ? { html } : {}),
+        ...(markdown !== undefined ? { markdown } : {}),
+        ...(deck !== undefined ? { deck } : {}),
+        ...(message !== undefined ? { message } : {}),
+      };
       if (signedIn !== null) {
         if (typeof update_token === "string" && typeof existingId !== "string") {
           return { content: [{ type: "text" as const, text: "When providing update_token, you must also provide the page id." }], isError: true };
@@ -251,7 +267,8 @@ function createAiredMcpServer(
           }
         }
         // Same update as the API: title, size and expiry move with the HTML.
-        const { metadata: updated, htmlEtag } = await updatePage(env, page, pageHtml, resolvedTitle, Date.now(), content.sidecar);
+        const author = versionAuthor({ viaToken: true, via: null, userAgent: "aired-mcp", message: message ?? null });
+        const { metadata: updated, htmlEtag, version } = await updatePage(env, page, pageHtml, resolvedTitle, Date.now(), content.sidecar, author);
         // Link-preview screenshot, after the response (lib/og-render.ts).
         background(refreshShot(env, existingId, updated, pageHtml, htmlEtag, { replacing: true }));
 
@@ -271,6 +288,7 @@ function createAiredMcpServer(
             owner: null,
             claim_url: null,
             upgrade_url: null,
+            ...(version !== null ? { version } : {}),
             ...contentOut(contentFields(origin, existingId, content.sidecar)),
           },
         };
@@ -325,7 +343,7 @@ function createAiredMcpServer(
       // D1 row, R2 HTML and KV cache record, or nothing (lib/page-write.ts).
       let htmlObj: R2Object | null;
       try {
-        htmlObj = await createPage(env, metadata, pageHtml, now.getTime(), content.sidecar);
+        htmlObj = await createPage(env, metadata, pageHtml, now.getTime(), content.sidecar, versionAuthor({ viaToken: false, via: null, userAgent: "aired-mcp", message: message ?? null }));
       } catch (err) {
         if (!(err instanceof StorageUnavailable)) throw err;
         console.error("MCP publish storage write failed", { id: pageId, err: err.message });
@@ -370,6 +388,7 @@ function createAiredMcpServer(
           owner: null,
           claim_url: claimUrl(origin, pageId, token),
           upgrade_url: null,
+          version: 1,
           ...contentOut(contentFields(origin, pageId, content.sidecar)),
         },
       };
@@ -433,6 +452,52 @@ function createAiredMcpServer(
       }
       const res = await callApi("PATCH", page, patchBody(args));
       return res.status === 200 ? setOptionsResult(res.body, origin) : apiErrorResult(res.status, res.body, origin);
+    },
+  );
+
+  server.registerTool(
+    "list_versions",
+    {
+      title: "List a page's versions",
+      description: LIST_VERSIONS_DESCRIPTION,
+      inputSchema: listVersionsInput,
+      outputSchema: outputShapes.list_versions,
+      annotations: { title: "List a page's versions", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ id, update_token }) => {
+      if (!PAGE_ID.test(id)) return badId();
+      if (signedIn === null && update_token === undefined) {
+        return errorText(`Pass the page's update_token, or sign in. ${signInRequiredText(origin)}`);
+      }
+      const headers: Record<string, string> = update_token ? { "X-Update-Token": update_token } : {};
+      const res = await callApi("GET", `/api/pages/${encodeURIComponent(id)}/versions`, undefined, headers);
+      if (res.status !== 200) return apiErrorResult(res.status, res.body, origin);
+      const out = versionsOut(res.body, origin);
+      return { content: [{ type: "text" as const, text: versionsText(out) }], structuredContent: out };
+    },
+  );
+
+  server.registerTool(
+    "restore_version",
+    {
+      title: "Restore a page version",
+      description: RESTORE_VERSION_DESCRIPTION,
+      inputSchema: restoreVersionInput,
+      outputSchema: outputShapes.restore_version,
+      annotations: { title: "Restore a page version", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    },
+    async ({ id, version, update_token, message }) => {
+      if (!PAGE_ID.test(id)) return badId();
+      if (signedIn === null && update_token === undefined) {
+        return errorText(`Pass the page's update_token, or sign in. ${signInRequiredText(origin)}`);
+      }
+      const res = await callApi("POST", `/api/pages/${encodeURIComponent(id)}/versions/${version}/restore`, {
+        ...(update_token !== undefined ? { update_token } : {}),
+        ...(message !== undefined ? { message } : {}),
+      });
+      if (res.status !== 200) return apiErrorResult(res.status, res.body, origin);
+      const out = restoreOut(res.body);
+      return { content: [{ type: "text" as const, text: restoreText(out) }], structuredContent: out };
     },
   );
 
@@ -506,17 +571,18 @@ function createAiredMcpServer(
     "update_page",
     {
       title: "Update a page",
-      description: "Replace the HTML (or Markdown) of one of your pages, keeping its URL (needs an API key; no update token).",
+      description: "Replace the HTML (or Markdown) of one of your pages, keeping its URL (needs an API key; no update token). The content it replaces is kept in the page's history (list_versions).",
       inputSchema: {
         id: z.string().describe("Page id, from publish_html or list_pages"),
         html: z.string().optional().describe("The new HTML (or send markdown instead)"),
         ...CONTENT_INPUT,
         title: z.string().optional().describe("New title"),
+        ...MESSAGE_INPUT,
       },
       outputSchema: outputShapes.update_page,
       annotations: { title: "Update a page", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
     },
-    async ({ id, html, markdown, deck, title }) => {
+    async ({ id, html, markdown, deck, title, message }) => {
       if (signedIn === null) return signInRequired(origin);
       if (!PAGE_ID.test(id)) return badId();
       if (html === undefined && markdown === undefined) return errorText(MISSING_CONTENT);
@@ -524,6 +590,7 @@ function createAiredMcpServer(
         ...(html !== undefined ? { html } : {}),
         ...(markdown !== undefined ? { markdown } : {}),
         ...(deck !== undefined ? { deck } : {}),
+        ...(message !== undefined ? { message } : {}),
         title,
       });
       return res.status === 200 ? updateResult(res.body) : apiErrorResult(res.status, res.body, origin);

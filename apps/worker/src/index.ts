@@ -4,6 +4,8 @@ import type { AppBindings } from "./types.js";
 import { api } from "./routes/api.js";
 import { pageTools } from "./routes/page-tools.ts";
 import { responses } from "./routes/responses.ts";
+import { versions } from "./routes/versions.ts";
+import { pruneVersions } from "./lib/page-versions.ts";
 import { collect } from "./routes/collect.ts";
 import { pruneCollectData } from "./lib/collect-store.ts";
 import { me } from "./routes/me.js";
@@ -195,6 +197,7 @@ app.route("/api/me", me);
 // Mount API routes
 app.route("/api", pageTools);
 app.route("/api", responses);
+app.route("/api", versions);
 app.route("/api", api);
 app.route("/api", report);
 
@@ -306,8 +309,10 @@ async function runExpiredSweep(env: Env): Promise<void> {
 /**
  * Old rows out of D1: rate-limit windows no request reads any more,
  * webhook dedupe ids past 30 days (lib/durable-limit.ts), and data-layer
- * entries past retention or left by deleted pages (lib/collect-store.ts). Once an hour, in
- * the first cron run after the hour.
+ * entries past retention or left by deleted pages (lib/collect-store.ts),
+ * and page versions past their plan's limits or left by deleted pages and
+ * accounts (lib/page-versions.ts). Once an hour, in the first cron run
+ * after the hour.
  */
 async function runHousekeeping(env: Env, now = Date.now()): Promise<void> {
   if (new Date(now).getUTCMinutes() >= 5) return;
@@ -315,7 +320,9 @@ async function runHousekeeping(env: Env, now = Date.now()): Promise<void> {
   const billingEvents = await pruneBillingEvents(env.DB, now);
   // Data-layer entries past their plan's retention, or of pages that are gone.
   const responses = await pruneCollectData(env.DB, now);
-  log("info", "housekeeping", { rateLimits, billingEvents, responses });
+  // Page history: removed accounts, gone pages, past the plan's days or count.
+  const versions = await pruneVersions(env, now);
+  log("info", "housekeeping", { rateLimits, billingEvents, responses, versions });
 }
 
 /**

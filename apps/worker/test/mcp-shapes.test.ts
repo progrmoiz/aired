@@ -122,8 +122,8 @@ test("both servers declare an outputSchema on every tool and keep their hints", 
   const stdio = readFileSync(new URL("../../mcp/src/index.ts", import.meta.url), "utf8");
   const tools = (code: string) => [...code.matchAll(/registerTool\(\s*"(\w+)",[\s\S]*?outputSchema: outputShapes\.(\w+),\s*annotations: \{ title: "[^"]+", readOnlyHint: (?:true|false), destructiveHint: (?:true|false), idempotentHint: (?:true|false), openWorldHint: (?:true|false) \}/g)].map((m) => [m[1], m[2]]);
   for (const [code, names] of [
-    [hosted, ["publish_html", "get_page", "set_options", "check_page", "send_feedback", "list_pages", "update_page", "delete_page", "get_responses", "update_data", "get_account"]],
-    [stdio, ["publish_html", "get_page", "set_options", "check_page", "send_feedback", "get_responses", "update_data"]],
+    [hosted, ["publish_html", "get_page", "set_options", "list_versions", "restore_version", "check_page", "send_feedback", "list_pages", "update_page", "delete_page", "get_responses", "update_data", "get_account"]],
+    [stdio, ["publish_html", "get_page", "set_options", "list_versions", "restore_version", "check_page", "send_feedback", "get_responses", "update_data"]],
   ] as const) {
     assert.doesNotMatch(code, /server\.tool\(/, "no tool registered without a schema");
     const found = tools(code);
@@ -132,5 +132,5 @@ test("both servers declare an outputSchema on every tool and keep their hints", 
     assert.equal((code.match(/registerTool\(/g) ?? []).length, names.length);
   }
   // Every success path of the stdio tools returns structured content.
-  assert.equal((stdio.match(/structuredContent:/g) ?? []).length, 7);
+  assert.equal((stdio.match(/structuredContent:/g) ?? []).length, 9);
 });

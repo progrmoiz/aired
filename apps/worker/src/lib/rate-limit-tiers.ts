@@ -37,6 +37,10 @@ export const TIERS = {
   // Page settings changes and owner detail reads (PATCH /api/pages/:id,
   // GET /api/pages/:id/details): each change writes D1 and KV.
   page_options:  { bucketPrefix: 'rl:opts',   limit: 60, windowSeconds: 3600 },
+  // Page history reads (routes/versions.ts): the list, and one version's
+  // HTML each, which the dashboard's History panel fetches for its previews.
+  // Restores count against page_options, like any other change.
+  versions:      { bucketPrefix: 'rl:vers',   limit: 300, windowSeconds: 3600 },
   // The owner's data-layer calls (routes/responses.ts): reading responses,
   // CSV, settings and update_data. Per caller.
   responses:     { bucketPrefix: 'rl:resp',   limit: 300, windowSeconds: 3600 },

@@ -175,8 +175,9 @@
     <h2>How long we keep it</h2>
     <ul>
       <li><strong>Pages</strong>: until they expire or you delete them. When a page expires, we stop serving it right away and delete its file within 30 days. A page that reaches its view limit stops being served, but we keep it until it expires or you delete it.</li>
-      <li><strong>Deleted pages</strong>: removed from storage right away.</li>
-      <li><strong>Your account</strong>: until you delete it. Deleting it ends every session (other browsers and CLI logins too), disconnects every app you connected, deletes your API keys, and removes your account record, sign-in records and email. Other sessions stop within about a minute. Your pages stay up as anonymous pages without your name. Delete them first if you want them gone. Everything visitors saved on your pages is deleted.</li>
+      <li><strong>Deleted pages</strong>: removed from storage right away, with every earlier version of them.</li>
+      <li><strong>Earlier versions of a page</strong>: when a page is updated, we keep what it replaced so it can be restored. On the Free plan we keep the last 5; on Pro the last 50, each for 90 days (the newest 5 stay however old). They go when the page is deleted or expires, or when you delete your account.</li>
+      <li><strong>Your account</strong>: until you delete it. Deleting it ends every session (other browsers and CLI logins too), disconnects every app you connected, deletes your API keys, and removes your account record, sign-in records and email. Other sessions stop within about a minute. Your pages stay up as anonymous pages without your name. Delete them first if you want them gone. Everything visitors saved on your pages is deleted, and so are the earlier versions of your pages.</li>
       <li><strong>What visitors save on a page</strong>: until the publisher deletes it, the page is deleted or expires, or the publisher's account is deleted. On the Free plan, each entry is also deleted 90 days after it was saved.</li>
       <li><strong>Billing records</strong>: until you delete your account. Then we delete your Stripe ids and plan history too. Link keeps its own record of each sale, under its own policy.</li>
       <li><strong>API keys</strong>: until you delete your account, revoked ones included.</li>

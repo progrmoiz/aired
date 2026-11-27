@@ -172,11 +172,12 @@ export async function updatePage(
   id: string,
   content: string | PageContent,
   token: string,
-  options: { title?: string } = {},
+  options: { title?: string; message?: string } = {},
   jwt?: string,
 ): Promise<PublishResult> {
   const body: Record<string, unknown> = { ...(typeof content === 'string' ? { html: content } : content), update_token: token }
   if (options.title !== undefined) body['title'] = options.title
+  if (options.message !== undefined) body['message'] = options.message
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -515,4 +516,65 @@ export async function checkPage(
     body: JSON.stringify(body),
   })
   return handleResponse<CheckReport>(resp, 'Check')
+}
+
+/** One version in a page's history (GET /api/pages/:id/versions). */
+export interface PageVersionInfo {
+  version: number
+  current: boolean
+  size: number
+  title: string | null
+  kind: 'page' | 'doc' | 'deck'
+  actor: string
+  client: string | null
+  message: string | null
+  restored_from: number | null
+  created_at: string | null
+  replaced_at: string | null
+  kept_until: string | null
+}
+
+export interface VersionsResult {
+  id: string
+  url: string
+  current: number | null
+  versions: PageVersionInfo[]
+  kept: { plan: string; versions: number; days: number | null; always_keep: number; summary: string }
+}
+
+export interface RestoreResult {
+  id: string
+  url: string
+  version: number | null
+  restored_from: number
+  expiresAt: string | null
+  kind?: string
+  slides?: number
+  presenter_url?: string
+}
+
+/** A page's history. `token` is the stored update token, '' when the session or API key owns the page. */
+export async function listVersions(baseUrl: string, id: string, token: string, jwt?: string): Promise<VersionsResult> {
+  const headers = callerHeaders(jwt)
+  if (token !== '') headers['X-Update-Token'] = token
+  const resp = await fetch(`${baseUrl}/api/pages/${encodeURIComponent(id)}/versions`, { headers })
+  return handleResponse<VersionsResult>(resp, 'Versions')
+}
+
+/** Put an earlier version back (POST /api/pages/:id/versions/:n/restore): it goes live as a new version. */
+export async function restoreVersion(
+  baseUrl: string,
+  id: string,
+  version: number,
+  opts: { token: string; jwt?: string; message?: string },
+): Promise<RestoreResult> {
+  const body: Record<string, unknown> = {}
+  if (opts.token !== '') body['update_token'] = opts.token
+  if (opts.message !== undefined) body['message'] = opts.message
+  const resp = await fetch(`${baseUrl}/api/pages/${encodeURIComponent(id)}/versions/${version}/restore`, {
+    method: 'POST',
+    headers: { ...callerHeaders(opts.jwt), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  return handleResponse<RestoreResult>(resp, 'Restore')
 }

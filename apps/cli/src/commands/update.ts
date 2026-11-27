@@ -27,6 +27,7 @@ export function makeUpdateCommand(globalOpts: () => GlobalOpts): Command {
     .option('-t, --title <title>', 'New title')
     .option('--deck', 'Show as slides: Markdown split on --- lines, or HTML <section> slides')
     .option('--markdown', 'Treat the file as Markdown (automatic for .md files)')
+    .option('-m, --message <note>', "A short note kept with this version in the page's history")
     .action(async (id, file, cmdOpts) => {
       const opts = globalOpts()
       const baseUrl = resolveApiUrl(opts)
@@ -60,7 +61,7 @@ export function makeUpdateCommand(globalOpts: () => GlobalOpts): Command {
           () => {
             const deck = cmdOpts.deck === true
             const content: PageContent = markdown ? { markdown: html, ...(deck ? { deck } : {}) } : deck ? { html, deck } : { html }
-            return updatePage(baseUrl, id, content, effectiveToken, { title: cmdOpts.title }, jwt)
+            return updatePage(baseUrl, id, content, effectiveToken, { title: cmdOpts.title, message: cmdOpts.message }, jwt)
           },
           opts,
         )
@@ -83,6 +84,9 @@ export function makeUpdateCommand(globalOpts: () => GlobalOpts): Command {
         } else {
           process.stdout.write(pc.green('Updated!') + ' ' + pc.bold(result.url) + '\n')
           process.stdout.write(pc.dim('Expires: ') + formatExpiry(result.expiresAt) + '\n')
+          if (typeof result.version === 'number') {
+            process.stdout.write(pc.dim('Version: ') + `${result.version} ` + pc.dim(`(the previous one is kept: aired versions ${id})`) + '\n')
+          }
           for (const line of contentLines(result)) process.stdout.write(line + '\n')
         }
       } catch (err) {

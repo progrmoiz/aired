@@ -32,6 +32,15 @@ import {
   publishOut,
   setOptionsInput,
   setOptionsOut,
+  LIST_VERSIONS_DESCRIPTION,
+  MESSAGE_INPUT,
+  RESTORE_VERSION_DESCRIPTION,
+  listVersionsInput,
+  restoreOut,
+  restoreText,
+  restoreVersionInput,
+  versionsOut,
+  versionsText,
 } from "../../worker/src/lib/mcp-shapes.ts";
 import { registerPrompts, registerResources } from "../../worker/src/lib/mcp-extras.ts";
 import { CONTENT_INPUT, GET_PAGE_DESCRIPTION, getPageInput, MISSING_CONTENT, registerTemplateTool } from "../../worker/src/lib/mcp-templates.ts";
@@ -143,6 +152,7 @@ async function publishHTML(
     project?: string;
     update_token?: string;
     id?: string;
+    message?: string;
   } = {},
 ): Promise<PublishResult> {
   const body: Record<string, unknown> = { ...content };
@@ -154,6 +164,7 @@ async function publishHTML(
   if (options.project !== undefined) body["project"] = options.project;
   if (options.update_token !== undefined) body["update_token"] = options.update_token;
   if (options.id !== undefined) body["id"] = options.id;
+  if (options.message !== undefined) body["message"] = options.message;
 
   return api<PublishResult>("POST", "/api/publish", body);
 }
@@ -173,7 +184,7 @@ server.registerTool(
   {
     title: "Publish HTML",
     description:
-      "Publish HTML or Markdown (a string or a file) to a shareable URL. Returns a live URL that renders it in a browser. Markdown (or a .md file) becomes a clean, readable doc; with deck: true it becomes slides split on --- lines, and HTML with <section> slides works too. get_template has ready-made starters. Pass update_token from a previous publish to update the same URL. Change the PIN, expiry, view limit or title later with set_options.",
+      "Publish HTML or Markdown (a string or a file) to a shareable URL. Returns a live URL that renders it in a browser. Markdown (or a .md file) becomes a clean, readable doc; with deck: true it becomes slides split on --- lines, and HTML with <section> slides works too. get_template has ready-made starters. Pass update_token from a previous publish to update the same URL; the content it replaces is kept as a version (list_versions, restore_version). Change the PIN, expiry, view limit or title later with set_options.",
     inputSchema: {
       html: z.string().optional().describe("HTML content to publish"),
       ...CONTENT_INPUT,
@@ -185,11 +196,12 @@ server.registerTool(
       project: z.string().optional().describe("Group this page under a project on your dashboard (e.g. the repo or app name). Not auto-detected over MCP — pass it explicitly to organize related pages together."),
       update_token: z.string().optional().describe("Pass a previously returned token to update the same URL instead of creating a new one"),
       id: z.string().optional().describe("Page ID — required when update_token is provided to update the same URL"),
+      ...MESSAGE_INPUT,
     },
     outputSchema: outputShapes.publish_html,
     annotations: { title: "Publish HTML", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   },
-  async ({ html, markdown, deck, file_path, title, pin, ttl_seconds, permanent, project, update_token, id }) => {
+  async ({ html, markdown, deck, file_path, title, pin, ttl_seconds, permanent, project, update_token, id, message }) => {
     // Resolve the content: HTML, or Markdown (a .md file counts as Markdown)
     let content: string;
     let isMarkdown = false;
@@ -275,6 +287,7 @@ server.registerTool(
         project,
         update_token,
         id,
+        message,
       });
 
       const lines: string[] = [];
@@ -360,6 +373,52 @@ server.registerTool(
       const page = setOptionsOut(body, apiBase());
       const lead = page.changed.length > 0 ? `Changed ${page.changed.join(", ")} of` : "Settings of";
       return { content: [{ type: "text" as const, text: pageText(page, lead) }], structuredContent: page };
+    } catch (err) {
+      return toolError(`Error: ${errorMessage(err)}`);
+    }
+  },
+);
+
+server.registerTool(
+  "list_versions",
+  {
+    title: "List a page's versions",
+    description: LIST_VERSIONS_DESCRIPTION,
+    inputSchema: listVersionsInput,
+    outputSchema: outputShapes.list_versions,
+    annotations: { title: "List a page's versions", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ id, update_token }) => {
+    if (!PAGE_ID.test(id)) return toolError("That isn't a page id.");
+    try {
+      const headers: Record<string, string> = update_token ? { "X-Update-Token": update_token } : {};
+      const out = versionsOut(await api<unknown>("GET", `/api/pages/${encodeURIComponent(id)}/versions`, undefined, headers), apiBase());
+      return { content: [{ type: "text" as const, text: versionsText(out) }], structuredContent: out };
+    } catch (err) {
+      return toolError(`Error: ${errorMessage(err)}`);
+    }
+  },
+);
+
+server.registerTool(
+  "restore_version",
+  {
+    title: "Restore a page version",
+    description: RESTORE_VERSION_DESCRIPTION,
+    inputSchema: restoreVersionInput,
+    outputSchema: outputShapes.restore_version,
+    annotations: { title: "Restore a page version", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  },
+  async ({ id, version, update_token, message }) => {
+    if (!PAGE_ID.test(id)) return toolError("That isn't a page id.");
+    try {
+      const out = restoreOut(
+        await api<unknown>("POST", `/api/pages/${encodeURIComponent(id)}/versions/${version}/restore`, {
+          ...(update_token !== undefined ? { update_token } : {}),
+          ...(message !== undefined ? { message } : {}),
+        }),
+      );
+      return { content: [{ type: "text" as const, text: restoreText(out) }], structuredContent: out };
     } catch (err) {
       return toolError(`Error: ${errorMessage(err)}`);
     }
