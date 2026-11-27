@@ -1,47 +1,9 @@
-import "./helpers/worker-loader.ts";
-import { register } from "node:module";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { skillsText } from "./helpers/skills.ts";
-import { fakeD1 } from "./helpers/d1.ts";
 
-// routes/mcp.ts bundles the skill as text (wrangler [[rules]]): load .md the
-// same way here. Its MCP library (agents) imports two Workers-only modules:
-// stand-ins with the classes it names.
-const workersStub =
-  "data:text/javascript," +
-  encodeURIComponent(
-    "class Base { constructor(ctx, env) { this.ctx = ctx; this.env = env; } } export class WorkerEntrypoint extends Base {} export class DurableObject extends Base {} export class WorkflowEntrypoint extends Base {} export class RpcTarget {} export const env = {};",
-  );
-const emailStub = "data:text/javascript," + encodeURIComponent("export class EmailMessage {}");
-register(
-  "data:text/javascript," +
-    encodeURIComponent(`
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-export async function resolve(spec, ctx, next) {
-  if (spec === "cloudflare:workers") return { url: ${JSON.stringify(workersStub)}, shortCircuit: true };
-  if (spec === "cloudflare:email") return { url: ${JSON.stringify(emailStub)}, shortCircuit: true };
-  return next(spec, ctx);
-}
-export async function load(url, ctx, next) {
-  if (url.endsWith(".md")) return { format: "module", source: "export default " + JSON.stringify(readFileSync(fileURLToPath(url), "utf8")), shortCircuit: true };
-  return next(url, ctx);
-}`),
-);
-
-// Page history end to end: the real API, history routes and both kinds of
-// MCP call, on fake bindings (D1 is real SQLite with the real migrations).
-const { Hono } = await import("hono");
-type Context = import("hono").Context;
-const { api } = await import("../src/routes/api.ts");
-const { versions } = await import("../src/routes/versions.ts");
-const { pageTools } = await import("../src/routes/page-tools.ts");
-const { applyApiContract } = await import("../src/middleware/api-contract.ts");
-const { createAiredMcpServer } = await import("../src/routes/mcp.ts");
-const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
-const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");
+import { setup } from "./helpers/hosted-mcp.ts";
 const { saveVersion, pruneVersions, trimVersions, versionAuthor, removeOwnerVersionsStatement, deleteRemovedVersions, listVersions, versionsPrefix } = await import(
   "../src/lib/page-versions.ts"
 );
@@ -50,86 +12,6 @@ const { deleteAccountRows } = await import("../src/lib/billing/forget.ts");
 const { releaseOwnerPagesStatement } = await import("../src/lib/pages-store.ts");
 
 const DAY = 86_400_000;
-
-function fakeKv(): KVNamespace {
-  const m = new Map<string, string>();
-  return {
-    async get(k: string, opts?: unknown) {
-      const v = m.get(k) ?? null;
-      const type = typeof opts === "string" ? opts : (opts as { type?: string } | undefined)?.type;
-      return v !== null && type === "json" ? JSON.parse(v) : v;
-    },
-    async put(k: string, v: string) { m.set(k, v); },
-    async delete(k: string) { m.delete(k); },
-    async list() { return { keys: [], list_complete: true, cursor: "" }; },
-  } as unknown as KVNamespace;
-}
-
-function fakeR2() {
-  const m = new Map<string, string>();
-  let n = 0;
-  const bucket = {
-    async put(k: string, v: string) { m.set(k, String(v)); return { key: k, etag: `e${++n}` }; },
-    async get(k: string) {
-      const v = m.get(k);
-      return v === undefined ? null : { text: async () => v, body: v, etag: "e1", customMetadata: {} };
-    },
-    async head(k: string) { return m.has(k) ? { key: k, etag: "e1" } : null; },
-    async delete(keys: string | string[]) { for (const k of [keys].flat()) m.delete(k); },
-    async list({ prefix = "" }: { prefix?: string } = {}) {
-      return { objects: [...m.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({ key, uploaded: new Date(), etag: "e1" })), truncated: false };
-    },
-  };
-  return { bucket: bucket as unknown as R2Bucket, m };
-}
-
-function setup() {
-  const d1 = fakeD1();
-  const r2 = fakeR2();
-  const env = { PAGES_KV: fakeKv(), PAGES_BUCKET: r2.bucket, DB: d1.db, SESSION_SECRET: "x".repeat(32), SITE_ORIGIN: "https://aired.sh" };
-  const app = new Hono();
-  // X-Test-User signs the request in (as an API key caller); X-Test-Via overrides how.
-  applyApiContract(app as never, (async (c: Context, next: () => Promise<void>) => {
-    const id = c.req.header("X-Test-User");
-    c.set("user", id === undefined ? null : { id: Number(id), login: `u${id}`, email: null, name: null });
-    c.set("via", id === undefined ? null : (c.req.header("X-Test-Via") ?? "key"));
-    c.set("jti", null);
-    c.set("requestId", "test");
-    await next();
-  }) as never);
-  app.route("/api", pageTools as never);
-  app.route("/api", versions as never);
-  app.route("/api", api as never);
-  const ctx = { waitUntil() {}, passThroughOnException() {}, props: {} };
-  let ip = 0;
-  const call = (path: string, init: RequestInit = {}) =>
-    app.request(`https://aired.sh${path}`, { ...init, headers: { "CF-Connecting-IP": `203.0.113.${++ip % 250}`, ...(init.headers ?? {}) } }, env, ctx as never);
-  const send = async (method: string, path: string, body: unknown, headers: Record<string, string> = {}) => {
-    const res = await call(path, { method, body: JSON.stringify(body), headers: { "Content-Type": "application/json", "X-Aired-Request": "1", ...headers } });
-    return { status: res.status, body: (await res.json()) as Record<string, any> };
-  };
-  const get = async (path: string, headers: Record<string, string> = {}) => {
-    const res = await call(path, { headers });
-    return { status: res.status, body: (await res.json()) as Record<string, any> };
-  };
-  /** An MCP client on the hosted server: anonymous, or signed in as `user` (an API key caller). */
-  const mcp = async (user?: number) => {
-    const callApi = async (method: string, path: string, body?: unknown, extra: Record<string, string> = {}) => {
-      const headers: Record<string, string> = { "User-Agent": "aired-mcp", "X-Aired-Request": "1", ...extra };
-      if (user !== undefined) headers["X-Test-User"] = String(user);
-      if (body !== undefined) headers["Content-Type"] = "application/json";
-      const res = await call(path, { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
-      return { status: res.status, body: await res.json().catch(() => null) };
-    };
-    const server = createAiredMcpServer(env as never, user === undefined ? null : { login: `u${user}`, origin: "https://aired.sh" }, callApi as never, () => {});
-    const [a, b] = InMemoryTransport.createLinkedPair();
-    const client = new Client({ name: "test", version: "1" });
-    await Promise.all([server.connect(a), client.connect(b)]);
-    return async (name: string, args: Record<string, unknown>) =>
-      (await client.callTool({ name, arguments: args })) as { isError?: boolean; structuredContent?: Record<string, any>; content: Array<{ text: string }> };
-  };
-  return { env, d1, r2: r2.m, call, send, get, mcp };
-}
 
 const kim = { "X-Test-User": "7" };
 const ana = { "X-Test-User": "8" };

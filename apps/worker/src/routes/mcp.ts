@@ -70,6 +70,7 @@ import {
   versionsText,
 } from "../lib/mcp-shapes.ts";
 import { registerPrompts, registerResources } from "../lib/mcp-extras.ts";
+import { carded, cardTitle, cardToolMeta, registerCard } from "../lib/mcp-card.ts";
 import { OWNER_REQUIRED_MESSAGE, replaceAllowed } from "../lib/page-options.ts";
 import { pageHasResponses } from "../lib/collect-store.ts";
 import { CONTENT_INPUT, GET_PAGE_DESCRIPTION, getPageInput, MISSING_CONTENT, registerTemplateTool } from "../lib/mcp-templates.ts";
@@ -162,8 +163,9 @@ export function createAiredMcpServer(
       },
       outputSchema: outputShapes.publish_html,
       annotations: { title: "Publish HTML", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      _meta: cardToolMeta("publish_html"),
     },
-    async ({ html, markdown, deck, title, pin, ttl_seconds, permanent, update_token, id: existingId, message }) => {
+    carded(origin, async ({ html, markdown, deck, title, pin, ttl_seconds, permanent, update_token, id: existingId, message }) => {
       if (html === undefined && markdown === undefined) return errorText(MISSING_CONTENT);
       // Sent on to the API as given; it renders Markdown and decks the same way.
       const body = {
@@ -392,7 +394,12 @@ export function createAiredMcpServer(
           ...contentOut(contentFields(origin, pageId, content.sidecar)),
         },
       };
-    },
+    }, (args, out) => ({
+      action: out.updated === true ? "updated" : "published",
+      title: cardTitle(args),
+      // Signed-in publishes of your own page name you as its owner; token updates and anonymous pages don't.
+      mine: signedIn !== null && typeof out.owner === "string",
+    })),
   );
 
   // --- Page settings and feedback (signed in, or with the page's token) -----
@@ -406,8 +413,9 @@ export function createAiredMcpServer(
       inputSchema: getPageInput,
       outputSchema: outputShapes.get_page,
       annotations: { title: "Get a page", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: cardToolMeta("get_page"),
     },
-    async ({ id, update_token, include_source }) => {
+    carded(origin, async ({ id, update_token, include_source }) => {
       if (!PAGE_ID.test(id)) return badId();
       if (signedIn === null && update_token === undefined) {
         return errorText(`Pass the page's update_token, or sign in. ${signInRequiredText(origin)}`);
@@ -418,7 +426,12 @@ export function createAiredMcpServer(
       if (include_source !== true) return pageResult(res.body, origin);
       const src = await callApi("GET", `/api/pages/${encodeURIComponent(id)}/source`, undefined, headers);
       return src.status === 200 ? pageResult(res.body, origin, src.body) : apiErrorResult(src.status, src.body, origin);
-    },
+    }, (args, out) => ({
+      action: "page",
+      title: typeof out.title === "string" ? out.title : null,
+      // Details without a token: the API let the signed-in caller in as the owner.
+      mine: signedIn !== null && args.update_token === undefined,
+    })),
   );
 
   server.registerTool(
@@ -485,8 +498,9 @@ export function createAiredMcpServer(
       inputSchema: restoreVersionInput,
       outputSchema: outputShapes.restore_version,
       annotations: { title: "Restore a page version", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      _meta: cardToolMeta("restore_version"),
     },
-    async ({ id, version, update_token, message }) => {
+    carded(origin, async ({ id, version, update_token, message }) => {
       if (!PAGE_ID.test(id)) return badId();
       if (signedIn === null && update_token === undefined) {
         return errorText(`Pass the page's update_token, or sign in. ${signInRequiredText(origin)}`);
@@ -498,7 +512,7 @@ export function createAiredMcpServer(
       if (res.status !== 200) return apiErrorResult(res.status, res.body, origin);
       const out = restoreOut(res.body);
       return { content: [{ type: "text" as const, text: restoreText(out) }], structuredContent: out };
-    },
+    }, (args) => ({ action: "restored", title: null, mine: signedIn !== null && args.update_token === undefined })),
   );
 
   server.registerTool(
@@ -581,8 +595,9 @@ export function createAiredMcpServer(
       },
       outputSchema: outputShapes.update_page,
       annotations: { title: "Update a page", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+      _meta: cardToolMeta("update_page"),
     },
-    async ({ id, html, markdown, deck, title, message }) => {
+    carded(origin, async ({ id, html, markdown, deck, title, message }) => {
       if (signedIn === null) return signInRequired(origin);
       if (!PAGE_ID.test(id)) return badId();
       if (html === undefined && markdown === undefined) return errorText(MISSING_CONTENT);
@@ -594,7 +609,7 @@ export function createAiredMcpServer(
         title,
       });
       return res.status === 200 ? updateResult(res.body) : apiErrorResult(res.status, res.body, origin);
-    },
+    }, (args) => ({ action: "updated", title: cardTitle(args), mine: true })),
   );
 
   server.registerTool(
@@ -679,6 +694,7 @@ export function createAiredMcpServer(
 
   registerTemplateTool(server);
   registerPrompts(server);
+  registerCard(server, origin);
   registerResources(server, {
     origin,
     signedIn: signedIn !== null,
