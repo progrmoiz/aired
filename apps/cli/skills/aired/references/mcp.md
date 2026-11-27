@@ -60,4 +60,15 @@ Every caller gets the skills:
 | `skill://aired/aired-report/SKILL.md` | Reports and private sharing |
 | `skill://aired/aired-forms/SKILL.md` | Pages that collect answers |
 
+Every caller also gets the page card, `ui://aired/page-card-v1.html` (below).
+
 Signed-in callers also get their own pages as `aired://page/{id}` (the newest 50 are listed). Reading one returns its HTML, or its Markdown for a Markdown page (a deck's HTML with its notes). Another account's page, or an anonymous one, is refused.
+
+## Page card (MCP Apps)
+
+Chat apps that support MCP Apps draw a card under `publish_html`, `get_page`, `update_page` and `restore_version`: the page's screenshot, title and link, views, who can open it and when it expires, with Open and Copy link, and Views and Sharing (in the dashboard) for the signed-in owner. Claude (web, desktop, mobile), ChatGPT, VS Code, Cursor and Goose show it; Claude Code and other text-only clients don't, and get the same text and `structuredContent` as always.
+
+- Nothing to call: the tools link to the card themselves (`_meta.ui.resourceUri`).
+- Still give the link in your reply. The card is for the person; not every client shows it.
+- The card never shows the update token, the PIN or the claim link. Pass those on in text as before, when the person needs them.
+- The local server (`npx aired --mcp`) shows the same card in desktop apps that run local servers, on `publish_html`, `get_page` and `restore_version`.

@@ -127,7 +127,7 @@ export function createAiredMcpServer(
 ) {
   const server = new McpServer({
     name: "aired",
-    version: "1.8.0",
+    version: "1.9.0",
   });
   const origin = siteOrigin(env);
 

@@ -332,3 +332,11 @@ test("the stdio server registers the card and links publish_html, get_page and r
   // update_page is hosted only: the stdio server updates through publish_html.
   assert.ok(!stdio.includes('registerTool(\n  "update_page"'));
 });
+
+test("the docs and skills describe the page card", () => {
+  for (const f of ["apps/web/docs.html", "apps/web/llms.txt", "apps/web/llms-full.txt", "apps/cli/skills/aired/references/mcp.md"]) {
+    const s = read(f);
+    assert.ok(s.includes(CARD_URI), `${f} names the card`);
+    for (const t of CARD_TOOLS) assert.ok(s.includes(t), `${f} names ${t}`);
+  }
+});
