@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 
-export const VIEWS = ['pages', 'views', 'responses', 'history', 'share', 'connect', 'billing', 'account'] as const
+export const VIEWS = ['pages', 'views', 'responses', 'history', 'share', 'page', 'connect', 'billing', 'account'] as const
 export type View = (typeof VIEWS)[number]
 
-const TITLES: Record<View, string> = { pages: 'your pages', views: 'views', responses: 'responses', history: 'page history', share: 'share', connect: 'connect your AI tools', billing: 'plan & billing', account: 'account' }
+const TITLES: Record<View, string> = { pages: 'your pages', views: 'views', responses: 'responses', history: 'page history', share: 'share', page: 'page', connect: 'connect your AI tools', billing: 'plan & billing', account: 'account' }
 
 const read = (): View => {
   const h = window.location.hash.replace('#', '').split('/')[0] as View

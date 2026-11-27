@@ -1,18 +1,15 @@
-// #share/<page id>: who can open one page. Anyone with the link, anyone with
-// a PIN, or only the people you name (emails, and whole domains on Pro), who
+// "Who can open it" for one page: anyone with the link, anyone with a PIN,
+// or only the people you name (emails, and whole domains on Pro), who
 // confirm their email with a one-time code. Below it, which of those people
-// opened the page: for the owner's eyes only.
+// opened the page: for the owner's eyes only. Lives in the page panel.
 import { useCallback, useEffect, useState, type KeyboardEvent } from 'react'
 import { toast } from 'sonner'
-import { ArrowLeftIcon, GlobeIcon, KeyRoundIcon, UsersIcon, XIcon } from 'lucide-react'
+import { GlobeIcon, KeyRoundIcon, UsersIcon, XIcon } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { CopyRow, ViewHeader } from '@/components/common'
-import { PdfCard } from '@/components/pdf-card'
-import type { PagesState } from '@/App'
 import { getJson, mutate, readJson } from '@/lib/api'
 import { relativeAge } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -38,8 +35,7 @@ const MODES: { key: Mode; icon: typeof GlobeIcon; label: string; detail: string 
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const DOMAIN = /^@?[a-z0-9-]+(\.[a-z0-9-]+)+$/i
-
-export function ShareView({ pageId, pages, isPro }: { pageId: string; pages: PagesState; isPro: boolean }) {
+export function AccessCard({ pageId, isPro, onSaved }: { pageId: string; isPro: boolean; onSaved?: () => void }) {
   const [state, setState] = useState<State>({ status: 'loading' })
   const [mode, setMode] = useState<Mode>('public')
   const [people, setPeople] = useState<string[]>([])
@@ -47,9 +43,6 @@ export function ShareView({ pageId, pages, isPro }: { pageId: string; pages: Pag
   const [pin, setPin] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const page = pages.status === 'ready' ? pages.pages.find((p) => p.id === pageId) : undefined
-  const title = page?.title || 'Untitled page'
-  const url = `${window.location.origin}/p/${pageId}`
 
   const load = useCallback(() => {
     if (!pageId) return
@@ -126,6 +119,7 @@ export function ShareView({ pageId, pages, isPro }: { pageId: string; pages: Pag
       }
       toast.success('Saved')
       load()
+      onSaved?.()
     } catch {
       setError('Could not save. Check your connection and try again.')
     } finally {
@@ -133,15 +127,9 @@ export function ShareView({ pageId, pages, isPro }: { pageId: string; pages: Pag
     }
   }
 
-  if (!pageId) {
-    return <ViewHeader title="Share" description="Open a page’s menu and pick Share." />
-  }
-
   return (
     <div className="grid min-w-0 gap-5">
-      <a href="#pages" className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeftIcon className="size-4" />Your pages</a>
-      <ViewHeader title={`Share “${title}”`} description="Choose who can open this page. Changes apply right away to the same link." />
-      {state.status === 'loading' && <div className="grid gap-5" aria-busy="true" aria-label="Loading"><Skeleton className="h-72 rounded-xl" /><Skeleton className="h-40 rounded-xl" /></div>}
+      {state.status === 'loading' && <Skeleton className="h-64 rounded-xl" aria-busy="true" aria-label="Loading" />}
       {state.status === 'missing' && (
         <Card className="flex-row flex-wrap items-center justify-between gap-3 px-5 py-4">
           <p className="text-sm text-muted-foreground">This page isn’t in your account.</p>
@@ -150,7 +138,7 @@ export function ShareView({ pageId, pages, isPro }: { pageId: string; pages: Pag
       )}
       {state.status === 'error' && (
         <Card className="flex-row flex-wrap items-center justify-between gap-3 px-5 py-4">
-          <p className="text-sm text-muted-foreground">Could not load this page’s sharing.</p>
+          <p className="text-sm text-muted-foreground">Could not load who can open this page.</p>
           <Button variant="outline" onClick={load}>Try again</Button>
         </Card>
       )}
@@ -244,13 +232,6 @@ export function ShareView({ pageId, pages, isPro }: { pageId: string; pages: Pag
               {error && <p className="text-[13px] text-destructive" role="alert">{error}</p>}
             </div>
           </Card>
-
-          <div className="grid gap-2">
-            <p className="text-sm font-medium">Link</p>
-            <CopyRow text={url} label="Copy link" />
-          </div>
-
-          <PdfCard pageId={pageId} isPro={isPro} />
 
           {(access.mode === 'people' || access.visitors.length > 0) && <Visitors visitors={access.visitors} />}
         </>

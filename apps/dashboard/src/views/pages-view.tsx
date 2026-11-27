@@ -5,7 +5,7 @@ import {
 import { toast } from 'sonner'
 import {
   ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon, ChartColumnIcon, ChevronDownIcon, ChevronRightIcon, ClockIcon, DownloadIcon, EllipsisIcon,
-  ExternalLinkIcon, EyeIcon, FileDownIcon, FileTextIcon, FlagIcon, FolderIcon, GlobeIcon, HistoryIcon, InboxIcon, LayoutGridIcon, ListIcon, LockIcon, SearchIcon, Share2Icon, Trash2Icon, UsersIcon,
+  ExternalLinkIcon, EyeIcon, FileDownIcon, FileTextIcon, FileUpIcon, QrCodeIcon, SlidersHorizontalIcon, FlagIcon, FolderIcon, GlobeIcon, HistoryIcon, InboxIcon, LayoutGridIcon, ListIcon, LockIcon, SearchIcon, Share2Icon, Trash2Icon, UsersIcon,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -38,12 +38,13 @@ import {
 } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
-type Filter = 'all' | 'active' | 'soon' | 'pin' | 'expired'
+type Filter = 'all' | 'active' | 'soon' | 'locked' | 'responses' | 'expired'
 const FILTERS: { key: Filter; label: string; test: (p: Page) => boolean }[] = [
   { key: 'all', label: 'All', test: () => true },
   { key: 'active', label: 'Live', test: (p) => !isExpired(p) },
   { key: 'soon', label: 'Expiring soon', test: isExpiringSoon },
-  { key: 'pin', label: 'With a PIN', test: (p) => p.hasPin },
+  { key: 'locked', label: 'Locked', test: (p) => p.hasPin || p.access === 'pin' || p.access === 'people' },
+  { key: 'responses', label: 'Has responses', test: (p) => (p.responses ?? 0) > 0 },
   { key: 'expired', label: 'Expired', test: isExpired },
 ]
 
@@ -196,11 +197,16 @@ function RealTile({ page: p, onDelete }: { page: Page; onDelete: (p: Page) => vo
       href={`/p/${p.id}`}
       page={{ id: p.id, title, expires: e.text, soon: isExpiringSoon(p), pin: p.hasPin, private: p.access === 'people', views: viewsOf(p), published: relativeAge(p.createdAt), dim: expired }}
       cover={<PageThumb id={p.id} title={title} tile={p.tile} enabled={!expired || limitReached(p)} fallback={<PageCover kind={kindOf(p)} title={title} link={`${host}/p/${p.id}`} />} />}
-      meta={
+      titleHref={`#page/${p.id}`}
+      meta={<>
         <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-sm text-subtle">
           <EyeIcon className="size-3.5 shrink-0" /><span className="truncate">{viewsWords(p)} {viewsOf(p) === 1 && !p.reads ? 'view' : 'views'} · {relativeAge(p.createdAt)}{p.project ? ` · ${p.project}` : ''}</span>
         </p>
-      }
+        <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-sm text-subtle" title={e.title || undefined}>
+          <ClockIcon className="size-3.5 shrink-0" />
+          <span className="truncate"><span className={cn(e.tone === 'warn' && 'text-warn')}>{e.text}</span> · {sizeWords(p.size)}</span>
+        </p>
+      </>}
       actions={<>
         <CopyLinkAction url={`${origin}/p/${p.id}`} name={title} />
         <PageMenu page={p} onDelete={onDelete} />
@@ -218,7 +224,10 @@ function PageMenu({ page, onDelete }: { page: Page; onDelete: (p: Page) => void 
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-48 rounded-xl p-1.5 shadow-pop">
         <DropdownMenuItem render={<a href={`/p/${page.id}`} target="_blank" rel="noopener noreferrer" />}><ExternalLinkIcon /> Open in a new tab</DropdownMenuItem>
+        <DropdownMenuItem render={<a href={`#page/${page.id}`} />}><SlidersHorizontalIcon /> Settings</DropdownMenuItem>
         <DropdownMenuItem render={<a href={`#share/${page.id}`} />}><Share2Icon /> Share</DropdownMenuItem>
+        <DropdownMenuItem render={<a href={`#page/${page.id}/replace`} />}><FileUpIcon /> Update from a file</DropdownMenuItem>
+        <DropdownMenuItem render={<a href={`#page/${page.id}/qr`} />}><QrCodeIcon /> QR code</DropdownMenuItem>
         <DropdownMenuItem render={<a href={`#views/${page.id}`} />}><ChartColumnIcon /> See views</DropdownMenuItem>
         <DropdownMenuItem render={<a href={`#responses/${page.id}`} />}><InboxIcon /> See responses</DropdownMenuItem>
         <DropdownMenuItem render={<a href={`#history/${page.id}`} />}><HistoryIcon /> See history</DropdownMenuItem>
