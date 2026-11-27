@@ -7,6 +7,8 @@ import { z } from "zod";
 import { AUTH_HEADER, CSRF_HEADER } from "@aired/core";
 import { readCliSession } from "./session.js";
 
+declare const __AIRED_VERSION__: string | undefined;
+
 const DEFAULT_API_URL = "https://aired.sh";
 
 type PackToString = (
@@ -102,7 +104,8 @@ async function publishHTML(
 
 const server = new McpServer({
   name: "aired",
-  version: "0.0.1",
+  // Set at build time by apps/cli/build.mjs (the npm package version).
+  version: typeof __AIRED_VERSION__ === "string" ? __AIRED_VERSION__ : "0.0.0-dev",
 });
 
 server.tool(

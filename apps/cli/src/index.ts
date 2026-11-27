@@ -20,7 +20,11 @@ if (process.argv.includes('--mcp')) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const path = require('node:path') as typeof import('node:path')
 
-  const mcpEntry = path.resolve(__dirname, '../../mcp/dist/index.js')
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fs = require('node:fs') as typeof import('node:fs')
+  // Published package: dist/mcp.cjs next to dist/cli.cjs. Monorepo dev build: apps/mcp/dist.
+  const bundled = path.resolve(__dirname, 'mcp.cjs')
+  const mcpEntry = fs.existsSync(bundled) ? bundled : path.resolve(__dirname, '../../mcp/dist/index.js')
 
   const child = spawn(process.execPath, [mcpEntry], {
     stdio: 'inherit',
@@ -29,7 +33,7 @@ if (process.argv.includes('--mcp')) {
 
   child.on('error', (err: Error) => {
     process.stderr.write(`MCP server failed to start: ${err.message}\n`)
-    process.stderr.write('Make sure @aired/mcp is built: pnpm --filter @aired/mcp build\n')
+    process.stderr.write(`Could not start ${mcpEntry}. Reinstall with: npm i -g aired@latest\n`)
     process.exit(1)
   })
 
