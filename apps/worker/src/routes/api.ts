@@ -464,23 +464,22 @@ api.get("/pages/:id/details", rateLimit(TIERS.page_options), async (c) => {
   if (page instanceof Response) return page;
   const access = await ownerAccess(c, page, sentUpdateToken(c));
   if (!access.ok) return apiError(c, access.status, access.code, access.error);
-  const allowed = await allowedFor(c, page.row, access.viaToken);
+  const allowed = await allowedFor(c, page.row);
   if (allowed instanceof Response) return allowed;
   return c.json({ ...pageDetails(page.row, await viewCount(c, page), siteOrigin(c.env)), ...(await kindDetails(c, id)), ...allowed });
 });
 
 /**
- * An "only these people" page's list, for its signed-in owner only: other
- * people's addresses don't go to whoever holds the update token. Empty for
- * other pages and other callers.
+ * An "only these people" page's list, for its signed-in owner only (a token
+ * sent too doesn't matter): other people's addresses don't go to whoever
+ * holds the update token. Empty for other pages and other callers.
  */
 async function allowedFor(
   c: Context<AppBindings>,
   row: { id: string; ownerId: number | null; access: "people" | null },
-  viaToken: boolean,
 ): Promise<{ allowed?: { emails: string[]; domains: string[] } } | Response> {
   const user = c.get("user");
-  if (row.access !== "people" || viaToken || user === null || row.ownerId !== user.id) return {};
+  if (row.access !== "people" || user === null || row.ownerId !== user.id) return {};
   try {
     return { allowed: fromEntries(await getAccessEntries(c.env.DB, row.id)) };
   } catch (err) {
@@ -532,7 +531,8 @@ api.patch("/pages/:id", requireCsrfHeader, rateLimit(TIERS.page_options), async 
     if (page.row.ownerId === null) {
       return apiError(c, 403, "owner_required", "Only pages in an account can be shared with named people. Sign in and keep the page in your account first.");
     }
-    if (access.viaToken || user === null || user.id !== page.row.ownerId) {
+    // A token sent alongside doesn't matter: what counts is the signed-in owner.
+    if (user === null || user.id !== page.row.ownerId) {
       return apiError(c, 403, "owner_required", "Only the page's owner, signed in (aired login, an API key or the dashboard), can change who can open it.");
     }
   }
@@ -576,7 +576,7 @@ api.patch("/pages/:id", requireCsrfHeader, rateLimit(TIERS.page_options), async 
       console.error("access list clear failed", { id, err });
     }
   }
-  const allowed = await allowedFor(c, row, access.viaToken);
+  const allowed = await allowedFor(c, row);
   if (allowed instanceof Response) return allowed;
   return c.json({ ...pageDetails(row, await viewCount(c, page), siteOrigin(c.env)), changed: changedSettings(change), ...allowed });
 });

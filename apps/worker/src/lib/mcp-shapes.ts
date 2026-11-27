@@ -26,6 +26,7 @@ export const pageShape = {
   views: z.number(),
   view_limit: z.number().nullable().describe("The page is gone after this many views; null: no limit"),
   has_pin: z.boolean().describe("Whether a PIN protects the page (the PIN itself is never returned)"),
+  access: z.enum(["public", "pin", "people"]).describe("Who can open it: anyone with the link, anyone with the PIN, or only the people on its list (they confirm their email with a code)"),
   permanent: z.boolean(),
   created_at: nullableString,
   expires_at: nullableString.describe("ISO time, or null when permanent"),
@@ -65,7 +66,8 @@ export const outputShapes = {
   get_page: { ...pageShape, kind: contentShape.kind, slides: contentShape.slides, ...sourceShape },
   set_options: {
     ...pageShape,
-    changed: z.array(z.string()).describe("Settings this call changed: title, pin, expiry, reads"),
+    allowed: z.object({ emails: z.array(z.string()), domains: z.array(z.string()) }).optional().describe("access \"people\" only, for the signed-in owner: who may open it. Domains without the @"),
+    changed: z.array(z.string()).describe("Settings this call changed: title, pin, expiry, reads, access"),
   },
   update_page: {
     id: z.string(),
@@ -183,6 +185,7 @@ export function pageOut(body: unknown, origin: string): PageOut {
     views: num(p.readCount) ?? 0,
     view_limit: num(p.reads),
     has_pin: p.hasPin === true,
+    access: p.access === "people" || p.access === "pin" || p.access === "public" ? p.access : p.hasPin === true ? "pin" : "public",
     permanent: p.permanent === true || (p.expiresAt === null && p.permanent === undefined),
     created_at: str(p.createdAt),
     expires_at: str(p.expiresAt),
@@ -224,7 +227,13 @@ export function getPageText(p: GetPageOut): string {
 
 export function setOptionsOut(body: unknown, origin: string): SetOptionsOut {
   const b = obj(body);
-  return { ...pageOut(b, origin), changed: Array.isArray(b.changed) ? b.changed.filter((c): c is string => typeof c === "string") : [] };
+  const a = obj(b.allowed);
+  const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
+  return {
+    ...pageOut(b, origin),
+    ...(b.allowed !== undefined && b.allowed !== null ? { allowed: { emails: strings(a.emails), domains: strings(a.domains) } } : {}),
+    changed: Array.isArray(b.changed) ? b.changed.filter((c): c is string => typeof c === "string") : [],
+  };
 }
 
 /** GET /api/me/pages. */
@@ -291,12 +300,14 @@ export function feedbackOut(body: unknown): FeedbackOut {
 }
 
 /** One line per page setting, for the text next to get_page and set_options. */
-export function pageText(p: PageOut, lead: string): string {
+export function pageText(p: PageOut & { allowed?: { emails: string[]; domains: string[] } }, lead: string): string {
+  const people = p.allowed === undefined ? [] : [...p.allowed.emails, ...p.allowed.domains.map((d) => `anyone @${d}`)];
   return [
     `${lead} ${p.url}`,
     `Title: ${p.title ?? "(untitled)"}`,
     `Views: ${p.views}${p.view_limit !== null ? ` of ${p.view_limit} allowed` : ""}`,
-    `PIN: ${p.has_pin ? "on" : "off"}`,
+    `Access: ${p.access === "people" ? "only the people on its list" : p.access === "pin" ? "anyone with the PIN" : "anyone with the link"}`,
+    ...(people.length > 0 ? [`People: ${people.join(", ")}`] : []),
     p.expires_at !== null ? `Expires: ${p.expires_at}` : "Expires: never (permanent)",
     `Size: ${p.size} bytes`,
     ...(p.project !== null ? [`Project: ${p.project}`] : []),
@@ -312,6 +323,17 @@ export const setOptionsInput = {
   ttl_seconds: z.number().int().optional().describe("Expire this many seconds from now (60 to 31536000). Makes a permanent page expire"),
   permanent: z.boolean().optional().describe("true: never expires. false: expires 7 days from now"),
   view_limit: z.number().int().nullable().optional().describe("Gone after this many views (1 to 1000000), or null to remove the limit"),
+  access: z
+    .object({
+      mode: z.enum(["public", "pin", "people"]),
+      emails: z.array(z.string()).optional(),
+      domains: z.array(z.string()).optional(),
+    })
+    .optional()
+    .describe(
+      'Who can open the page. "people": only these emails, and anyone at these domains (like "client.com"); each person types their email and gets a one-time code, and the page stays private. ' +
+        'Sending a list replaces the old one. "public": anyone with the link (removes the PIN and the list). "pin": the PIN in `pin`. Your own pages only, signed in. Free lists 3 people; whole domains need Pro',
+    ),
   public_results: z.boolean().optional().describe("Data layer: true lets every viewer read all entries with aired.collect.all(), as for a poll. Needs sign-in"),
   accept_responses: z.boolean().optional().describe("Data layer: false stops new entries (close a form or poll), true opens it again. Needs sign-in"),
 };
@@ -432,7 +454,7 @@ export function collectPatchBody(args: { public_results?: boolean; accept_respon
 
 /** Whether set_options changes any page setting (not just the data-layer ones). */
 export function changesPageSettings(args: Record<string, unknown>): boolean {
-  return ["title", "pin", "ttl_seconds", "permanent", "view_limit"].some((k) => args[k] !== undefined);
+  return ["title", "pin", "ttl_seconds", "permanent", "view_limit", "access"].some((k) => args[k] !== undefined);
 }
 
 /** set_options arguments as a PATCH /api/pages/:id body. */
@@ -442,6 +464,7 @@ export function patchBody(args: {
   ttl_seconds?: number;
   permanent?: boolean;
   view_limit?: number | null;
+  access?: { mode: "public" | "pin" | "people"; emails?: string[]; domains?: string[] };
   update_token?: string;
 }): Record<string, unknown> {
   const body: Record<string, unknown> = {};
@@ -450,6 +473,7 @@ export function patchBody(args: {
   if (args.ttl_seconds !== undefined) body.ttl = args.ttl_seconds;
   if (args.permanent !== undefined) body.permanent = args.permanent;
   if (args.view_limit !== undefined) body.reads = args.view_limit;
+  if (args.access !== undefined) body.access = args.access;
   if (args.update_token !== undefined) body.update_token = args.update_token;
   return body;
 }

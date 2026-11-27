@@ -543,3 +543,25 @@ test("wiring: the gate runs before the page is read from R2 or a view is counted
   assert.ok(get.indexOf("accessGate(") < get.indexOf("countPageView("), "gate before counting");
   assert.ok(get.indexOf("accessGate(") < get.indexOf("PAGES_BUCKET.get("), "gate before reading the HTML");
 });
+
+// --- Surfaces: MCP set_options and `aired set --only` ----------------------------
+
+test("set_options passes access through and shows the list to the owner", async () => {
+  const { patchBody, setOptionsOut, pageText, changesPageSettings } = await import("../src/lib/mcp-shapes.ts");
+  assert.deepEqual(patchBody({ access: { mode: "people", emails: ["a@client.com"], domains: ["client.com"] } }), { access: { mode: "people", emails: ["a@client.com"], domains: ["client.com"] } });
+  assert.equal(changesPageSettings({ access: { mode: "public" } }), true);
+  const out = setOptionsOut({
+    id: "p1", url: "https://aired.sh/p/p1", title: "Q4", size: 1, readCount: 0, reads: null, hasPin: false, access: "people",
+    permanent: true, createdAt: null, expiresAt: null, project: null, changed: ["access"], allowed: { emails: ["a@client.com"], domains: ["client.com"] },
+  }, "https://aired.sh");
+  assert.equal(out.access, "people");
+  assert.deepEqual(out.allowed, { emails: ["a@client.com"], domains: ["client.com"] });
+  assert.match(pageText(out, "Changed access of"), /Access: only the people on its list\nPeople: a@client\.com, anyone @client\.com/);
+});
+
+test("aired set --only splits emails and @domains", async () => {
+  const { accessFromOnly } = await import("../../cli/src/lib/access-flags.ts");
+  assert.deepEqual(accessFromOnly("alice@x.com, @client.com bob@x.com"), { access: { mode: "people", emails: ["alice@x.com", "bob@x.com"], domains: ["client.com"] } });
+  assert.ok("error" in accessFromOnly(""));
+  assert.match((accessFromOnly("client.com") as { error: string }).error, /@client\.com/);
+});

@@ -20,6 +20,8 @@ export type Page = {
   createdAt: string
   expiresAt: string | null
   hasPin: boolean
+  /** Who can open it. Older servers leave it out: then hasPin decides. */
+  access?: 'public' | 'pin' | 'people'
   project: string | null
   /** The dashboard tile's version and blurred placeholder, once the page has been drawn. */
   tile?: TileInfo | null
