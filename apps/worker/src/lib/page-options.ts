@@ -5,8 +5,11 @@
  * and the details an owner sees. The write itself is setPageOptions in
  * lib/page-write.ts.
  *
- * No runtime imports, so tests load it directly.
+ * Its only import is lib/access-list.ts, itself import-free, so tests load
+ * it directly.
  */
+
+import { parseAccess, type AccessInput } from "./access-list.ts";
 
 /** Longest title, in characters. */
 export const TITLE_MAX = 200;
@@ -21,7 +24,7 @@ export const READS_MAX = 1_000_000;
 /** The TTL `permanent: false` gives a page (DEFAULT_TTL in @aired/core). */
 const DEFAULT_TTL_SECONDS = 604800;
 
-const ALLOWED = ["title", "pin", "ttl", "permanent", "reads", "update_token"] as const;
+const ALLOWED = ["title", "pin", "ttl", "permanent", "reads", "access", "update_token"] as const;
 
 /**
  * A validated change. A key that's absent leaves that setting alone; null
@@ -32,6 +35,8 @@ export type OptionsChange = {
   pin?: string | null;
   expiry?: { permanent: true } | { ttlSeconds: number };
   reads?: number | null;
+  /** Who may open it (lib/access-list.ts). Plan limits are checked by the route. */
+  access?: AccessInput;
 };
 
 export type ParsedOptions = { ok: true; change: OptionsChange } | { ok: false; error: string };
@@ -46,7 +51,7 @@ export function parseOptions(body: unknown): ParsedOptions {
   const b = body as Record<string, unknown>;
   const unknown = Object.keys(b).filter((k) => !(ALLOWED as readonly string[]).includes(k));
   if (unknown.length > 0) {
-    return fail(`Unknown field${unknown.length > 1 ? "s" : ""}: ${unknown.join(", ")}. You can change title, pin, ttl, permanent and reads.`);
+    return fail(`Unknown field${unknown.length > 1 ? "s" : ""}: ${unknown.join(", ")}. You can change title, pin, ttl, permanent, reads and access.`);
   }
 
   const change: OptionsChange = {};
@@ -93,7 +98,16 @@ export function parseOptions(body: unknown): ParsedOptions {
     else change.reads = b.reads;
   }
 
-  if (Object.keys(change).length === 0) return fail("Nothing to change: send at least one of title, pin, ttl, permanent or reads");
+  if ("access" in b) {
+    const parsed = parseAccess(b.access);
+    if (!parsed.ok) return fail(parsed.error);
+    const mode = parsed.access.mode;
+    if (typeof change.pin === "string" && mode !== "pin") return fail(`A pin goes with access.mode "pin", not "${mode}"`);
+    if (change.pin === null && mode === "pin") return fail('access.mode "pin" needs a pin: send one, or keep the one the page has');
+    change.access = parsed.access;
+  }
+
+  if (Object.keys(change).length === 0) return fail("Nothing to change: send at least one of title, pin, ttl, permanent, reads or access");
   return { ok: true, change };
 }
 
@@ -106,6 +120,8 @@ export type PageSettings = {
   permanent: boolean;
   /** Unix ms, or null when permanent. */
   expiresAt: number | null;
+  /** 'people': only the listed people may open it. */
+  access: "people" | null;
 };
 
 /**
@@ -114,10 +130,23 @@ export type PageSettings = {
  * `change.pin` (unused when pin isn't set). Expiry always writes permanent
  * and expiresAt together.
  */
-export function settingsChange(change: OptionsChange, pinHash: string | null, now: number): Partial<PageSettings> {
+export function settingsChange(
+  change: OptionsChange,
+  pinHash: string | null,
+  now: number,
+  /** The page as it is: a new PIN on an "only these people" page makes it a PIN page. */
+  current: { access: "people" | null } = { access: null },
+): Partial<PageSettings> {
   const next: Partial<PageSettings> = {};
   if (change.title !== undefined) next.title = change.title;
   if (change.pin !== undefined) next.pin = change.pin === null ? null : pinHash;
+  // One way in at a time: the list, a PIN, or neither.
+  if (change.access !== undefined) {
+    next.access = change.access.mode === "people" ? "people" : null;
+    if (change.access.mode !== "pin") next.pin = null;
+  } else if (typeof change.pin === "string" && current.access === "people") {
+    next.access = null;
+  }
   if (change.reads !== undefined) next.reads = change.reads;
   if (change.expiry !== undefined) {
     if ("permanent" in change.expiry) {
@@ -138,6 +167,7 @@ export function changedSettings(change: OptionsChange): string[] {
   if (change.pin !== undefined) out.push("pin");
   if (change.expiry !== undefined) out.push("expiry");
   if (change.reads !== undefined) out.push("reads");
+  if (change.access !== undefined) out.push("access");
   return out;
 }
 
@@ -173,14 +203,22 @@ export type PageDetails = {
   readCount: number;
   reads: number | null;
   hasPin: boolean;
+  /** Who may open it: anyone, anyone with the PIN, or only the listed people. */
+  access: "public" | "pin" | "people";
   permanent: boolean;
   createdAt: string;
   expiresAt: string | null;
   project: string | null;
 };
 
+/** A page's access mode from its row. */
+export function accessMode(row: { pin: string | null; access?: "people" | null }): "public" | "pin" | "people" {
+  if (row.access === "people") return "people";
+  return row.pin !== null ? "pin" : "public";
+}
+
 export function pageDetails(
-  row: { id: string; title: string | null; size: number; pin: string | null; reads: number | null; permanent: boolean; createdAt: number; expiresAt: number | null; project: string | null },
+  row: { id: string; title: string | null; size: number; pin: string | null; reads: number | null; permanent: boolean; createdAt: number; expiresAt: number | null; project: string | null; access?: "people" | null },
   readCount: number,
   origin: string,
 ): PageDetails {
@@ -192,6 +230,7 @@ export function pageDetails(
     readCount,
     reads: row.reads,
     hasPin: row.pin !== null,
+    access: accessMode(row),
     permanent: row.permanent,
     createdAt: new Date(row.createdAt).toISOString(),
     expiresAt: row.expiresAt === null ? null : new Date(row.expiresAt).toISOString(),

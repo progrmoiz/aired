@@ -12,6 +12,7 @@ import {
   upgradeUrl,
 } from "../src/lib/entitlements.ts";
 import { COLLECT_LIMITS } from "../src/lib/collect-limits.ts";
+import { ACCESS_LIMITS } from "../src/lib/access-limits.ts";
 
 const now = new Date("2026-06-15T12:00:00Z");
 const future = "2026-07-15T12:00:00Z";
@@ -24,6 +25,7 @@ test("no subscription gets the free limits", () => {
     maxBytes: 2 * 1024 * 1024,
     publishTier: "authenticated",
     collect: COLLECT_LIMITS.free,
+    access: ACCESS_LIMITS.free,
   });
   assert.equal(FREE_MAX_BYTES, 2 * 1024 * 1024);
   assert.equal(PRO_MAX_BYTES, 10 * 1024 * 1024);
@@ -38,6 +40,7 @@ test("active, trialing and past_due subscriptions get Pro", () => {
       maxBytes: 10 * 1024 * 1024,
       publishTier: "pro",
       collect: COLLECT_LIMITS.pro,
+      access: ACCESS_LIMITS.pro,
     }, status);
     assert.equal(isEntitled({ status, currentPeriodEnd: future }, now), true, status);
   }
@@ -101,8 +104,8 @@ function fakeKv(store: Record<string, unknown>, opts: { throws?: boolean } = {})
   };
 }
 
-const FREE = { plan: "free", badge: true, maxBytes: FREE_MAX_BYTES, publishTier: "authenticated", collect: COLLECT_LIMITS.free };
-const PRO = { plan: "pro", badge: false, maxBytes: PRO_MAX_BYTES, publishTier: "pro", collect: COLLECT_LIMITS.pro };
+const FREE = { plan: "free", badge: true, maxBytes: FREE_MAX_BYTES, publishTier: "authenticated", collect: COLLECT_LIMITS.free, access: ACCESS_LIMITS.free };
+const PRO = { plan: "pro", badge: false, maxBytes: PRO_MAX_BYTES, publishTier: "pro", collect: COLLECT_LIMITS.pro, access: ACCESS_LIMITS.pro };
 const farFuture = new Date(Date.now() + 30 * DAY).toISOString();
 
 test("getEntitlements reads ent:<uid> as JSON with a 5-minute cache", async () => {

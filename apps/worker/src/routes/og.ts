@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { AppBindings } from "../types.js";
 import { parseMetadata } from "@aired/core";
 import { pageViewCounts, viewCountOf } from "../lib/view-counts.ts";
-import { cardTitle } from "../lib/public-meta.ts";
+import { cardTitle, isGated } from "../lib/public-meta.ts";
 import { SHOT_CONTENT_TYPE, ogCacheControl, shotAllowed, shotKey, versionFromEtag } from "../lib/og-shot.js";
 
 const og = new Hono<AppBindings>();
@@ -40,7 +40,7 @@ og.get("/og/:id", async (c) => {
     // A PIN-protected page's card shows neither its title nor its views
     // (lib/public-meta.ts).
     title = cardTitle(metadata);
-    views = metadata.pin !== null ? null : metadata.readCount;
+    views = isGated(metadata) ? null : metadata.readCount;
     if (views !== null) {
       try {
         views = viewCountOf(await pageViewCounts(c.env.DB, [id]), id, metadata.readCount);

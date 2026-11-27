@@ -104,6 +104,17 @@ export type Env = {
    * made-up numbers instead of calling Cloudflare, which keeps nothing locally.
    */
   ANALYTICS_DEMO?: string;
+  /**
+   * Email for "only these people" codes (lib/email-sender.ts). ACCESS_EMAIL
+   * is the Cloudflare Email Service binding (wrangler.toml [[send_email]]);
+   * RESEND_API_KEY a fallback provider; EMAIL_FROM the sender, e.g.
+   * `aired <access@mail.aired.sh>`. EMAIL_MODE "log" (local dev only, in
+   * .dev.vars) writes the email to the console instead of sending it.
+   */
+  ACCESS_EMAIL?: { send(message: { to: string; from: string | { email: string; name: string }; subject: string; text?: string; html?: string }): Promise<unknown> };
+  RESEND_API_KEY?: string;
+  EMAIL_FROM?: string;
+  EMAIL_MODE?: string;
 };
 
 export type AppBindings = {

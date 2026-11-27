@@ -63,7 +63,7 @@ test("wiring: details and PATCH go through pageFor and ownerAccess before anythi
   const api = readFileSync(new URL("../src/routes/api.ts", import.meta.url), "utf8");
   const details = api.slice(api.indexOf('api.get("/pages/:id/details"'), api.indexOf('api.patch("/pages/:id"'));
   assert.match(details, /rateLimit\(TIERS\.page_options\)/);
-  assert.match(details, /const access = await ownerAccess\(c, page, sentUpdateToken\(c\)\);\s*if \(!access\.ok\) return apiError\(c, access\.status, access\.code, access\.error\);\s*return c\.json\(\{ \.\.\.pageDetails\(/);
+  assert.match(details, /const access = await ownerAccess\(c, page, sentUpdateToken\(c\)\);\s*if \(!access\.ok\) return apiError\(c, access\.status, access\.code, access\.error\);\s*const allowed = await allowedFor\(c, page\.row, access\.viaToken\);/);
   const patch = api.slice(api.indexOf('api.patch("/pages/:id"'), api.indexOf('api.post("/feedback"'));
   assert.match(patch, /requireCsrfHeader, rateLimit\(TIERS\.page_options\)/);
   assert.ok(patch.indexOf("if (!access.ok)") < patch.indexOf("setPageOptions("), "access is checked before the write");
@@ -160,6 +160,7 @@ test("details never include the PIN or token, only whether a PIN is on", () => {
     readCount: 4,
     reads: 10,
     hasPin: true,
+    access: "pin",
     permanent: false,
     createdAt: new Date(NOW - HOUR).toISOString(),
     expiresAt: new Date(NOW + 24 * HOUR).toISOString(),

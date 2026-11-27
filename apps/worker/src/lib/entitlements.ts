@@ -1,4 +1,5 @@
 import { COLLECT_LIMITS, type CollectLimits } from './collect-limits.ts';
+import { ACCESS_LIMITS, type AccessLimits } from './access-limits.ts';
 
 export type Plan = 'free' | 'pro';
 
@@ -14,6 +15,8 @@ export type Entitlements = {
   publishTier: 'authenticated' | 'pro';
   /** Data layer limits (lib/collect-limits.ts). */
   collect: CollectLimits;
+  /** "Only these people" limits (lib/access-limits.ts). */
+  access: AccessLimits;
 };
 
 export const FREE_MAX_BYTES = 2 * 1024 * 1024;
@@ -35,8 +38,8 @@ export function upgradeUrl(origin: string, ref: string): string {
 
 const PAID_STATUSES = new Set(['active', 'trialing', 'past_due']);
 
-const FREE: Entitlements = { plan: 'free', badge: true, maxBytes: FREE_MAX_BYTES, publishTier: 'authenticated', collect: COLLECT_LIMITS.free };
-const PRO: Entitlements = { plan: 'pro', badge: false, maxBytes: PRO_MAX_BYTES, publishTier: 'pro', collect: COLLECT_LIMITS.pro };
+const FREE: Entitlements = { plan: 'free', badge: true, maxBytes: FREE_MAX_BYTES, publishTier: 'authenticated', collect: COLLECT_LIMITS.free, access: ACCESS_LIMITS.free };
+const PRO: Entitlements = { plan: 'pro', badge: false, maxBytes: PRO_MAX_BYTES, publishTier: 'pro', collect: COLLECT_LIMITS.pro, access: ACCESS_LIMITS.pro };
 
 export function isEntitled(state: SubscriptionState | null, now: Date): boolean {
   if (!state || !PAID_STATUSES.has(state.status) || !state.currentPeriodEnd) return false;
@@ -51,7 +54,7 @@ export function entitlementsFor(state: SubscriptionState | null, now: Date): Ent
 
 /** Body of the 402 a signed-in user gets when a free-plan limit blocks the request. */
 export function planLimitError(
-  limit: 'page_size' | 'publish_rate' | 'analytics' | 'responses' | 'live_data',
+  limit: 'page_size' | 'publish_rate' | 'analytics' | 'responses' | 'live_data' | 'access_people' | 'access_domains',
   origin: string,
   ref?: string,
 ): { error: string; code: 'plan_limit'; limit: string; upgrade_url: string } {
