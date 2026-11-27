@@ -25,6 +25,8 @@ export type Env = {
   REPORT_BURST?: RateLimit;
   DEVICE_BURST?: RateLimit;
   OAUTH_BURST?: RateLimit;
+  /** Favicon fetches on a cache miss (routes/favicon.ts), per account. */
+  FAVICON_BURST?: RateLimit;
   /** The OAuth grant store for the remote MCP (bound to the PAGES_KV namespace). */
   OAUTH_KV?: KVNamespace;
   /**

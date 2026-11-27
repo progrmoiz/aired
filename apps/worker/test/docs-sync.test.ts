@@ -70,6 +70,7 @@ test("the privacy policy describes Pro view analytics: what's kept, no IP, three
   assert.match(p, /which page, the day, your country, and the website that sent you, as its name only/);
   assert.match(p, /We don't store your IP address, your browser or device, or the full address you came from\./);
   assert.match(p, /kept in Cloudflare Analytics Engine for three months/);
+  assert.match(p, /aired may fetch the small icon \(favicon\) of a site that sent visitors and keep a copy/);
   assert.match(p, /<strong>View analytics<\/strong> \(page, day, country, referring website\): three months/);
   // It matches what the viewer writes (lib/view-event.ts).
   const event = readFileSync(new URL("../src/lib/view-event.ts", import.meta.url), "utf8");

@@ -225,6 +225,7 @@ function setup(over: Record<string, unknown> = {}) {
     },
   };
   const env = {
+    SESSION_SECRET: "test-secret",
     DB: db,
     PAGES_KV: kv,
     BILLING_ENABLED: "1",
@@ -313,6 +314,9 @@ test("Pro sees their own page's numbers", async () => {
     assert.equal(body.days.length, 7);
     assert.equal(body.total, 4);
     assert.deepEqual(body.peak, { day: today, views: 4, host: "t.co" });
+    // Only hosts in the caller's own data get a signed favicon URL.
+    assert.deepEqual(Object.keys((body as unknown as { icons: Record<string, string> }).icons), ["t.co"]);
+    assert.match((body as unknown as { icons: Record<string, string> }).icons["t.co"]!, /^\/api\/favicon\/x\.com\?s=[A-Za-z0-9_-]{22}$/);
     assert.equal(body.previousTotal, null);
     assert.deepEqual(body.countries, [{ code: "US", views: 4 }]);
     assert.equal(body.page.id, "mine");

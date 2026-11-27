@@ -12,6 +12,7 @@ import { dashboard } from "./routes/dashboard.js";
 import { billing, upgrade } from "./routes/billing.js";
 import { keys } from "./routes/keys.js";
 import { analytics } from "./routes/analytics.ts";
+import { favicon } from "./routes/favicon.ts";
 import { admin } from "./routes/admin.ts";
 import { authWorkos } from "./routes/auth-workos.js";
 import { authDevice, devicePage } from "./routes/auth-device.js";
@@ -176,6 +177,7 @@ app.route("/api/billing", billing);
 // Mount key routes before me, and me before api, so the longer paths match first
 app.route("/api/me/keys", keys);
 app.route("/api/me/analytics", analytics);
+app.route("/api/favicon", favicon);
 app.route("/api/me", me);
 
 // Mount API routes

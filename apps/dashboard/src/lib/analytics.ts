@@ -23,6 +23,8 @@ export type Report = {
   referrers: { host: string; views: number }[]
   pages?: { id: string; title: string | null; views: number }[]
   page?: { id: string; title: string | null }
+  /** Signed /api/favicon URLs, by referrer host. */
+  icons?: Record<string, string>
 }
 
 export type AnalyticsState =

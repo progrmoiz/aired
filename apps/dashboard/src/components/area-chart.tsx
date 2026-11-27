@@ -42,7 +42,7 @@ function smoothPath(pts: [number, number][]): string {
   return d
 }
 
-export function AreaChart({ days, peak, current }: { days: Report['days']; peak: Report['peak']; current: boolean }) {
+export function AreaChart({ days, peak, icon, current }: { days: Report['days']; peak: Report['peak']; icon?: string; current: boolean }) {
   const box = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
   const [active, setActive] = useState<number | null>(null)
@@ -138,7 +138,7 @@ export function AreaChart({ days, peak, current }: { days: Report['days']; peak:
             style={{ left: x(peakIndex), top: Math.max(PAD.top - 12, y(days[peakIndex]!.views) - 22) - 20 }}
             title={`Busiest day: ${dayWords(peak.day)}, ${plural(peak.views, 'view')}, mostly from ${sourceName(peak.host)}`}
           >
-            <SourceIcon host={peak.host} className="size-5 rounded-md" />
+            <SourceIcon host={peak.host} icon={icon} className="size-5 rounded-md" />
           </span>
         )}
       </div>
