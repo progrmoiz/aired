@@ -1,7 +1,7 @@
 import { USER_AGENT } from '../lib/constants.js'
 import { AUTH_HEADER, CSRF_HEADER } from '@aired/core'
 import type { User } from '@aired/core'
-import type { PublishResult, PageInfo, PageDetails, FeedbackResult } from './types.js'
+import type { PublishResult, PageInfo, PageDetails, FeedbackResult, CheckReport } from './types.js'
 
 /**
  * An API key from AIRED_API_KEY (for CI and agents), or null. When set, it's
@@ -491,4 +491,24 @@ export async function sendFeedback(baseUrl: string, feedback: Record<string, unk
     body: JSON.stringify(feedback),
   })
   return handleResponse<FeedbackResult>(resp, 'Feedback')
+}
+
+/**
+ * Render a page in aired's browser and report what's broken (POST
+ * /api/pages/:id/check). `token` is the stored update token, '' when the
+ * session or API key owns the page.
+ */
+export async function checkPage(
+  baseUrl: string,
+  id: string,
+  opts: { token: string; jwt?: string; viewport: 'desktop' | 'mobile' },
+): Promise<CheckReport> {
+  const body: Record<string, unknown> = { viewport: opts.viewport }
+  if (opts.token !== '') body['update_token'] = opts.token
+  const resp = await fetch(`${baseUrl}/api/pages/${encodeURIComponent(id)}/check`, {
+    method: 'POST',
+    headers: { ...callerHeaders(opts.jwt), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  return handleResponse<CheckReport>(resp, 'Check')
 }

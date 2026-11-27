@@ -27,6 +27,10 @@ export const TIERS = {
   // Page settings changes and owner detail reads (PATCH /api/pages/:id,
   // GET /api/pages/:id/details): each change writes D1 and KV.
   page_options:  { bucketPrefix: 'rl:opts',   limit: 60, windowSeconds: 3600 },
+  // Page checks (POST /api/pages/:id/check) each run a browser. The shared
+  // daily browser budget (lib/page-check.ts) is the real cap; CHECK_BURST
+  // adds a per-minute guard per caller, signed in or not.
+  page_check:    { bucketPrefix: 'rl:check',  limit: 20, windowSeconds: 3600 },
   // Agent feedback (POST /api/feedback), in front of the D1 limit of 10 an
   // hour (lib/feedback.ts), so a flood never reaches D1. Anonymous senders
   // also get REPORT_BURST's per-minute guard.

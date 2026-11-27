@@ -129,7 +129,7 @@ test("api.ts: deleting a page deletes its screenshots and placeholder", () => {
   const fn = write.slice(write.indexOf("export async function deletePage"));
   assert.match(fn.slice(0, fn.indexOf("\n}\n")), /await forgetShots\(env, row\.id\)/);
   const render = src("../src/lib/og-render.ts");
-  assert.match(render, /PAGES_BUCKET\.delete\(\[shotKey\(id\), tileKey\(id\)\]\)/);
+  assert.match(render, /PAGES_BUCKET\.delete\(\[shotKey\(id\), tileKey\(id\), checkShotKey\(id\)\]\)/);
   assert.match(render, /DELETE FROM page_shots WHERE id = \?/);
 });
 

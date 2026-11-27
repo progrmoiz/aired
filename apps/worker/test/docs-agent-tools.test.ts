@@ -43,8 +43,24 @@ test("the docs cover aired set, aired feedback and their endpoints", () => {
   assert.match(read("apps/web/llms.txt"), /10 an hour per caller/);
 });
 
-test("the CLI, its MCP server and the registry entry say 1.4.0", () => {
-  assert.equal(JSON.parse(read("apps/cli/package.json")).version, "1.4.0");
-  assert.equal(JSON.parse(read("server.json")).version, "1.4.0");
-  assert.match(read("apps/worker/src/routes/mcp.ts"), /name: "aired",\s*version: "1\.4\.0",/);
+test("the CLI, its MCP server and the registry entry say 1.5.0", () => {
+  assert.equal(JSON.parse(read("apps/cli/package.json")).version, "1.5.0");
+  assert.equal(JSON.parse(read("server.json")).version, "1.5.0");
+  assert.match(read("apps/worker/src/routes/mcp.ts"), /name: "aired",\s*version: "1\.5\.0",/);
+});
+
+test("the docs cover aired check, check_page, its endpoint, the prompts and the resources", async () => {
+  const { PROMPTS, SKILL_URI, PAGE_URI_TEMPLATE } = await import("../src/lib/mcp-extras.ts");
+  for (const f of ["apps/cli/SKILL.md", "apps/web/docs.html", "apps/web/llms.txt", "apps/web/llms-full.txt"]) {
+    const s = read(f);
+    for (const want of ["aired check", "check_page", SKILL_URI, PAGE_URI_TEMPLATE, ...PROMPTS.map((p) => p.name)]) assert.ok(s.includes(want), `${f} misses ${want}`);
+  }
+  for (const f of ["apps/web/docs.html", "apps/web/llms.txt", "apps/web/llms-full.txt"]) {
+    const s = read(f);
+    for (const want of ["/api/pages/:id/check", "/api/pages/:id/source", "check_budget"]) assert.ok(s.includes(want), `${f} misses ${want}`);
+  }
+  // The limits the docs give are the ones the code has.
+  assert.match(read("apps/worker/src/lib/page-check.ts"), /DEFAULT_CHECK_BUDGET_MS = 3 \* 60 \* 1000;/);
+  assert.match(read("apps/worker/src/lib/mcp-extras.ts"), /RESOURCE_LIST_MAX = 50;/);
+  for (const f of ["apps/cli/SKILL.md", "apps/web/docs.html", "apps/web/llms-full.txt"]) assert.match(read(f), /3 minutes/, f);
 });

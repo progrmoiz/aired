@@ -75,10 +75,15 @@ Tools, each returning text plus `structuredContent` that matches its `outputSche
 - `publish_html(html, title?, pin?, ttl_seconds?, permanent?, update_token?, id?)` → `{ id, url, updated, update_token, expires_at, owner, claim_url, upgrade_url }`
 - `get_page(id, update_token?)` → `{ id, url, title, size, views, view_limit, has_pin, permanent, created_at, expires_at, project }` (never the PIN)
 - `set_options(id, update_token?, title?, pin?, ttl_seconds?, permanent?, view_limit?)` → the same plus `changed`. `null` clears title, PIN or view limit.
+- `check_page(id, update_token?, viewport?, include_screenshot?)` → `{ id, url, ok, viewport, checked_at, load_ms, issues, console, failed_requests, page, blank, screenshot_url, screenshot_expires_at }`, plus the screenshot as an image. Opens the page in a real browser (desktop 1280×800 or mobile 390×844). `ok` is false on script or console errors, files that didn't load, broken images or a blank screen; slow, heavy, very tall or too-wide pages are warnings. Run it after each publish or update, fix, update the same id, check again. Small shared daily budget: once per change.
 - `send_feedback(kind, message, impact?, page_id?, tool?)` → `{ id, message }`. Feedback about aired itself; tell the user the id. Never page HTML.
 - Signed in only: `list_pages`, `update_page`, `delete_page`, `get_account`.
 
-The local server (`npx aired --mcp`) has publish_html (also `file_path`), get_page, set_options and send_feedback.
+The local server (`npx aired --mcp`) has publish_html (also `file_path`), get_page, set_options, check_page and send_feedback.
+
+Prompts (slash commands in clients that show them): `publish_report(about?, audience?)`, `make_slide_deck(topic?, slides?)`, `share_privately(what?, expires?, pin?)`, `check_and_fix(page?)`.
+
+Resources: `skill://aired/SKILL.md` (text/markdown, the aired skill) for every caller. Signed in (API key, /mcp/account, or `aired login` for the local server): `aired://page/{id}` for each of your pages (the newest 50 are listed), whose content is the page's HTML. Another account's page or an anonymous page is refused.
 
 ### 4. HTTP API
 
@@ -169,6 +174,29 @@ Change settings without sending the HTML again. Send only what should change; un
 ```
 
 Returns the details plus `changed` (the settings that moved). CLI: `aired set <id> --pin 4821 --ttl 24h`.
+
+### POST /api/pages/:id/check
+
+Render the page in Cloudflare Browser Rendering and report what a visitor would hit. Body `{ update_token?, viewport?: "desktop" | "mobile", inline_screenshot?: boolean }`; same credentials as PATCH (the owner, or the page's token). Example answer:
+
+```json
+{
+  "id": "a1b2c3d4e5", "url": "https://aired.sh/p/a1b2c3d4e5", "ok": false, "viewport": "desktop",
+  "checked_at": "2026-11-27T15:00:00.000Z", "load_ms": 640,
+  "issues": [{ "severity": "error", "code": "script_error", "message": "1 uncaught script error: Chart is not defined" }],
+  "console": [{ "level": "error", "text": "Chart is not defined", "source": null }],
+  "failed_requests": [],
+  "page": { "title": "Q3", "html_bytes": 4120, "text_chars": 812, "visible_media": 0, "width": 1280, "height": 1900, "transfer_bytes": 4120, "requests": 0 },
+  "blank": false,
+  "screenshot_url": "https://aired.sh/api/pages/a1b2c3d4e5/check.jpg?k=…", "screenshot_expires_at": "2026-11-28T15:00:00.000Z"
+}
+```
+
+Issue codes. Errors: `script_error`, `console_error`, `failed_request`, `broken_image`, `blank`, `no_render`. Warnings: `slow_load` (no load event in 10 s), `heavy_html` (over 1 MB), `heavy_page` (over 5 MB of files), `very_tall` (over 30,000 px), `too_wide` (scrolls sideways), `navigates_away`, `console_warning`. `inline_screenshot: true` adds `screenshot_base64`. The screenshot URL works for 24 hours and stops when the page is checked again, updated or deleted. Limits: 20 an hour and 3 a minute per caller, within a shared 3 minutes of browser time a day; when that's spent, 429 with `code: "check_budget"` and Retry-After until 00:00 UTC. 503 `check_busy`: the browser is busy, retry in a minute. CLI: `aired check <id>` (exits 1 when broken).
+
+### GET /api/pages/:id/source
+
+The owner's copy of the page's HTML: `{ id, url, title, size, html }`. Same credentials as /details. Never counts a view.
 
 ### POST /api/feedback
 

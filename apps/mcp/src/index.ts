@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { readFileSync, statSync, accessSync, constants } from "node:fs";
 import { readFile, access } from "node:fs/promises";
@@ -7,6 +7,10 @@ import { z } from "zod";
 import { AUTH_HEADER, CSRF_HEADER } from "@aired/core";
 import { readCliSession } from "./session.js";
 import {
+  CHECK_DESCRIPTION,
+  checkContent,
+  checkInput,
+  checkOut,
   FEEDBACK_DESCRIPTION,
   feedbackInput,
   feedbackOut,
@@ -18,6 +22,9 @@ import {
   setOptionsInput,
   setOptionsOut,
 } from "../../worker/src/lib/mcp-shapes.ts";
+import { registerPrompts, registerResources } from "../../worker/src/lib/mcp-extras.ts";
+// The aired skill, bundled as text (esbuild/tsup loader for .md).
+import skill from "../../cli/SKILL.md";
 
 declare const __AIRED_VERSION__: string | undefined;
 
@@ -96,6 +103,19 @@ async function api<T>(method: string, path: string, body?: unknown, extra: Recor
   }
   if (parsed === null) throw new Error("aired: unexpected response format");
   return parsed as T;
+}
+
+/** One aired API GET: status and parsed JSON, never throwing on a non-2xx answer. */
+async function apiGet(path: string): Promise<{ status: number; body: unknown }> {
+  const resp = await fetch(`${apiBase()}${path}`, {
+    headers: { "User-Agent": `aired-mcp/${typeof __AIRED_VERSION__ === "string" ? __AIRED_VERSION__ : "dev"}`, ...authHeaders() },
+  });
+  return { status: resp.status, body: await resp.json().catch(() => null) };
+}
+
+/** Signed in here: the CLI's sign-in or an API key. */
+function signedIn(): boolean {
+  return readCliSession() !== null || (process.env["AIRED_API_KEY"] ?? "").trim() !== "";
 }
 
 async function publishHTML(
@@ -313,6 +333,31 @@ server.registerTool(
 );
 
 server.registerTool(
+  "check_page",
+  {
+    title: "Check a page in a browser",
+    description: CHECK_DESCRIPTION,
+    inputSchema: checkInput,
+    outputSchema: outputShapes.check_page,
+    annotations: { title: "Check a page in a browser", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  },
+  async ({ id, update_token, viewport, include_screenshot }) => {
+    if (!PAGE_ID.test(id)) return toolError("That isn't a page id.");
+    const withImage = include_screenshot !== false;
+    try {
+      const body = await api<unknown>("POST", `/api/pages/${encodeURIComponent(id)}/check`, {
+        ...(update_token !== undefined ? { update_token } : {}),
+        ...(viewport !== undefined ? { viewport } : {}),
+        inline_screenshot: withImage,
+      });
+      return { content: checkContent(body, withImage), structuredContent: checkOut(body) };
+    } catch (err) {
+      return toolError(`Error: ${errorMessage(err)}`);
+    }
+  },
+);
+
+server.registerTool(
   "send_feedback",
   {
     title: "Send feedback to aired",
@@ -330,6 +375,18 @@ server.registerTool(
     }
   },
 );
+
+registerPrompts(server);
+// Signed in or not is read on each call, so `aired login` mid-session counts.
+registerResources(server, {
+  origin: apiBase(),
+  get signedIn() {
+    return signedIn();
+  },
+  get: apiGet,
+  skill,
+  ResourceTemplate,
+});
 
 async function main() {
   const transport = new StdioServerTransport();

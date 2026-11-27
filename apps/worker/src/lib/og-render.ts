@@ -21,11 +21,28 @@ import {
   shotAllowed,
   shotKey,
   tileKey,
-  utcDay,
-  type BudgetState,
+  readBudget,
+  addSpent,
+  setBlocked,
   type ShotPage,
   type ShotRow,
 } from "./og-shot.js";
+import {
+  CheckUnavailable,
+  CHECK_LOAD_TIMEOUT_MS,
+  CHECK_SETTLE_MS,
+  CHECK_SHOT_QUALITY,
+  CHECK_TIMEOUT_MS,
+  CHECK_VIEWPORTS,
+  DOM_PROBE,
+  MAX_CONSOLE,
+  MAX_REQUESTS,
+  checkGate,
+  checkShotKey,
+  recordCheckTime,
+  type CheckObservations,
+  type CheckViewport,
+} from "./page-check.ts";
 
 /**
  * Draws pages with Cloudflare Browser Rendering (rules in og-shot.ts): the
@@ -57,7 +74,6 @@ export type ShotJob = {
   htmlEtag: string | null;
 };
 
-const BUDGET_ROW = "browser";
 /** Don't start another page in a batch after this long (waitUntil has ~30 s). */
 const BATCH_START_BEFORE_MS = 12_000;
 
@@ -83,7 +99,7 @@ export async function refreshShot(
 /** Remove a page's images and its page_shots row (update, delete). */
 export async function forgetShots(env: Pick<ShotEnv, "PAGES_BUCKET" | "DB">, id: string): Promise<void> {
   await Promise.all([
-    env.PAGES_BUCKET.delete([shotKey(id), tileKey(id)]),
+    env.PAGES_BUCKET.delete([shotKey(id), tileKey(id), checkShotKey(id)]),
     env.DB.prepare("DELETE FROM page_shots WHERE id = ?").bind(id).run(),
   ]);
 }
@@ -172,37 +188,7 @@ async function capture(browser: Browser, origin: string, id: string, html: strin
   const page = await browser.newPage();
   try {
     await page.setViewport({ width: SHOT_WIDTH, height: SHOT_HEIGHT, deviceScaleFactor: 1 });
-    page.on("dialog", (d) => {
-      d.dismiss().catch(() => {});
-    });
-
-    const url = `${origin}/p/${encodeURIComponent(id)}`;
-    const body = injectEarlyScript(html, SANDBOX_SHIM);
-    let served = false;
-    await page.setRequestInterception(true);
-    page.on("request", (req) => {
-      const target = req.url();
-      if (!served && target === url && req.isNavigationRequest()) {
-        served = true;
-        req
-          .respond({
-            status: 200,
-            headers: { "Content-Security-Policy": PAGE_CSP },
-            contentType: "text/html; charset=utf-8",
-            body,
-          })
-          .catch(() => {});
-        return;
-      }
-      // The page can't leave (a redirect would screenshot someone else's
-      // site) and can't reach aired.sh (an embedded page would count a view).
-      const leaving = req.isNavigationRequest() && req.frame() === page.mainFrame();
-      if (leaving || isAired(target)) {
-        req.abort().catch(() => {});
-        return;
-      }
-      req.continue().catch(() => {});
-    });
+    const url = await serveStoredPage(page, origin, id, html);
 
     // A slow image or font shouldn't cost the screenshot: shoot what loaded.
     await page.goto(url, { waitUntil: "load", timeout: LOAD_TIMEOUT_MS }).catch(() => {});
@@ -226,6 +212,145 @@ async function capture(browser: Browser, origin: string, id: string, html: strin
       clip: { x: 0, y: 0, width: SHOT_WIDTH, height: TILE_HEIGHT, scale: PLACEHOLDER_SCALE },
     });
     return { og, tile, lqip: `data:image/jpeg;base64,${tiny as string}` };
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
+
+type BrowserPage = Awaited<ReturnType<Browser["newPage"]>>;
+
+/**
+ * Serve the stored HTML at the page's own URL, with the viewer's sandbox CSP
+ * and storage shim, and keep the page in: it can't navigate the tab away (a
+ * redirect would screenshot someone else's site) and can't reach aired.sh
+ * (an embedded page would count a view). Returns the URL to open.
+ * `onBlocked` hears about each request stopped that way.
+ */
+async function serveStoredPage(
+  page: BrowserPage,
+  origin: string,
+  id: string,
+  html: string,
+  onBlocked?: (url: string, navigation: boolean) => void,
+): Promise<string> {
+  page.on("dialog", (d) => {
+    d.dismiss().catch(() => {});
+  });
+  const url = `${origin}/p/${encodeURIComponent(id)}`;
+  const body = injectEarlyScript(html, SANDBOX_SHIM);
+  let served = false;
+  await page.setRequestInterception(true);
+  page.on("request", (req) => {
+    const target = req.url();
+    if (!served && target === url && req.isNavigationRequest()) {
+      served = true;
+      req
+        .respond({
+          status: 200,
+          headers: { "Content-Security-Policy": PAGE_CSP },
+          contentType: "text/html; charset=utf-8",
+          body,
+        })
+        .catch(() => {});
+      return;
+    }
+    const leaving = req.isNavigationRequest() && req.frame() === page.mainFrame();
+    if (leaving || isAired(target)) {
+      onBlocked?.(target, leaving);
+      req.abort().catch(() => {});
+      return;
+    }
+    req.continue().catch(() => {});
+  });
+  return url;
+}
+
+export type CheckEnv = ShotEnv & { CHECK_DAILY_SECONDS?: string };
+
+/**
+ * check_page: render a page and report what a visitor would hit (rules and
+ * report in page-check.ts). Spends the shared browser budget and the checks'
+ * own share of it; throws CheckUnavailable when either is used up. Returns
+ * what the browser saw and a JPEG of the first screen.
+ */
+export async function checkPage(
+  env: CheckEnv,
+  id: string,
+  html: string,
+  viewport: CheckViewport,
+): Promise<{ obs: CheckObservations; screenshot: Uint8Array | null }> {
+  if (env.BROWSER === undefined) throw new CheckUnavailable("no_browser", null);
+  await checkGate(env.DB, env, Date.now());
+
+  const started = Date.now();
+  let browser: Browser;
+  try {
+    browser = await puppeteer.launch(env.BROWSER);
+  } catch (err) {
+    const until = blockAfterError(String(err), Date.now());
+    if (until !== null) await setBlocked(env.DB, until).catch(() => {});
+    console.log({ event: "page_check_skipped", id, reason: until !== null ? "limit" : "launch", err: String(err) });
+    throw new CheckUnavailable("busy", until !== null ? Math.max(1, Math.ceil((until - Date.now()) / 1000)) : 60);
+  }
+  try {
+    return await withTimeout(observe(browser, siteOrigin(env), id, html, viewport), CHECK_TIMEOUT_MS);
+  } finally {
+    await browser.close().catch(() => {});
+    await recordCheckTime(env.DB, Date.now() - started, Date.now()).catch((err) =>
+      console.error("page check budget write failed", { err: String(err) }),
+    );
+  }
+}
+
+async function observe(
+  browser: Browser,
+  origin: string,
+  id: string,
+  html: string,
+  viewport: CheckViewport,
+): Promise<{ obs: CheckObservations; screenshot: Uint8Array | null }> {
+  const page = await browser.newPage();
+  const obs: CheckObservations = { loadMs: 0, loaded: false, console: [], pageErrors: [], failedRequests: [], navigationsBlocked: [], dom: null };
+  const ours = new Set<string>();
+  try {
+    await page.setViewport(CHECK_VIEWPORTS[viewport]);
+    page.on("console", (msg) => {
+      const type = String(msg.type());
+      if (type !== "error" && type !== "warn" && type !== "warning") return;
+      if (obs.console.length >= MAX_CONSOLE) return;
+      const loc = msg.location();
+      obs.console.push({ level: type === "error" ? "error" : "warning", text: msg.text(), source: loc?.url ? `${loc.url}${loc.lineNumber !== undefined ? `:${loc.lineNumber + 1}` : ""}` : null });
+    });
+    page.on("pageerror", (err) => {
+      if (obs.pageErrors.length < MAX_CONSOLE) obs.pageErrors.push(String((err as Error)?.message ?? err));
+    });
+    page.on("requestfailed", (req) => {
+      if (ours.has(req.url()) || obs.failedRequests.length >= MAX_REQUESTS) return;
+      obs.failedRequests.push({ url: req.url(), status: null, error: req.failure()?.errorText ?? "failed", type: req.resourceType() });
+    });
+    page.on("response", (res) => {
+      if (res.status() < 400 || obs.failedRequests.length >= MAX_REQUESTS) return;
+      const req = res.request();
+      obs.failedRequests.push({ url: res.url(), status: res.status(), error: null, type: req.resourceType() });
+    });
+    const url = await serveStoredPage(page, origin, id, html, (target, navigation) => {
+      ours.add(target);
+      if (navigation && obs.navigationsBlocked.length < 5) obs.navigationsBlocked.push(target);
+    });
+
+    const t0 = Date.now();
+    obs.loaded = await page
+      .goto(url, { waitUntil: "load", timeout: CHECK_LOAD_TIMEOUT_MS })
+      .then(() => true)
+      .catch(() => false);
+    obs.loadMs = Date.now() - t0;
+    await page
+      .evaluate("Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 1500))]).then(() => true)")
+      .catch(() => {});
+    await sleep(CHECK_SETTLE_MS);
+    obs.dom = (await page.evaluate(DOM_PROBE).catch(() => null)) as CheckObservations["dom"];
+    const screenshot = (await page.screenshot({ type: "jpeg", quality: CHECK_SHOT_QUALITY }).catch(() => null)) as Uint8Array | null;
+    return { obs, screenshot };
   } finally {
     await page.close().catch(() => {});
   }
@@ -280,34 +405,4 @@ async function claim(db: D1Database, jobs: ShotJob[], now: number): Promise<void
         .bind(j.id, j.htmlEtag, now),
     ),
   );
-}
-
-/** The budget row, or null when there's none yet. A D1 error skips the shot. */
-async function readBudget(db: D1Database): Promise<BudgetState | null> {
-  const row = await db
-    .prepare("SELECT day, spent_ms, blocked_until FROM og_shot_budget WHERE name = ?")
-    .bind(BUDGET_ROW)
-    .first<{ day: string; spent_ms: number; blocked_until: number }>();
-  return row === null ? null : { day: row.day, spentMs: row.spent_ms, blockedUntil: row.blocked_until };
-}
-
-async function addSpent(db: D1Database, ms: number, nowMs: number): Promise<void> {
-  await db
-    .prepare(
-      "INSERT INTO og_shot_budget (name, day, spent_ms, blocked_until) VALUES (?, ?, ?, 0) " +
-        "ON CONFLICT (name) DO UPDATE SET spent_ms = CASE WHEN og_shot_budget.day = excluded.day " +
-        "THEN og_shot_budget.spent_ms + excluded.spent_ms ELSE excluded.spent_ms END, day = excluded.day",
-    )
-    .bind(BUDGET_ROW, utcDay(nowMs), ms)
-    .run();
-}
-
-async function setBlocked(db: D1Database, until: number): Promise<void> {
-  await db
-    .prepare(
-      "INSERT INTO og_shot_budget (name, day, spent_ms, blocked_until) VALUES (?, ?, 0, ?) " +
-        "ON CONFLICT (name) DO UPDATE SET blocked_until = MAX(og_shot_budget.blocked_until, excluded.blocked_until)",
-    )
-    .bind(BUDGET_ROW, utcDay(Date.now()), until)
-    .run();
 }

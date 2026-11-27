@@ -98,6 +98,7 @@
             <tr><td><code>aired delete &lt;id&gt;</code></td><td>Delete a page</td></tr>
             <tr><td><code>aired info &lt;id&gt;</code></td><td>Show page metadata</td></tr>
             <tr><td><code>aired set &lt;id&gt;</code></td><td>Change the PIN (<code>--pin</code>, <code>--clear-pin</code>), expiry (<code>--ttl</code>, <code>--permanent</code>), view limit (<code>--reads</code>, <code>--clear-reads</code>) or title (<code>--title</code>, <code>--clear-title</code>) without uploading again</td></tr>
+            <tr><td><code>aired check &lt;id&gt;</code></td><td>Open the page in a real browser and report script and console errors, files that didn't load, broken images or a blank screen, with a screenshot. <code>--mobile</code> checks at phone size, <code>--screenshot shot.jpg</code> saves it, <code>--strict</code> also fails on warnings. Exits 1 when the page is broken, so it fits in CI</td></tr>
             <tr><td><code>aired feedback</code></td><td>Send the aired team a bug, friction or idea: <code>aired feedback --kind friction "what happened"</code>. Asks before sending in a terminal</td></tr>
             <tr><td><code>aired tokens</code></td><td>List stored update tokens</td></tr>
             <tr><td><code>aired tokens prune</code></td><td>Drop tokens for expired pages</td></tr>
@@ -145,7 +146,7 @@ url = "https://aired.sh/mcp"</code></pre>
         <div class="snip"><code>claude mcp add aired --transport http https://aired.sh/mcp/account</code><button type="button" class="btn sm copy-snippet" data-copy="claude mcp add aired --transport http https://aired.sh/mcp/account">Copy</button></div>
 
         <h3>Signed in with an API key</h3>
-        <p>For CI or clients without MCP sign-in, add your <a href="#api-keys">API key</a> as a header instead (on <code>/mcp</code> or <code>/mcp/account</code>). Without a key or a sign-in, <code>/mcp</code> offers anonymous <code>publish_html</code>, <code>get_page</code> and <code>set_options</code> with a page's <code>update_token</code>, and <code>send_feedback</code>.</p>
+        <p>For CI or clients without MCP sign-in, add your <a href="#api-keys">API key</a> as a header instead (on <code>/mcp</code> or <code>/mcp/account</code>). Without a key or a sign-in, <code>/mcp</code> offers anonymous <code>publish_html</code>, <code>get_page</code>, <code>set_options</code> and <code>check_page</code> with a page's <code>update_token</code>, and <code>send_feedback</code>.</p>
 <pre><code>{
   "mcpServers": {
     "aired": {
@@ -173,6 +174,7 @@ url = "https://aired.sh/mcp"</code></pre>
             <tr><td><code>publish_html</code></td><td>Anyone</td><td>Publish HTML and get <code>{ id, url, update_token, expires_at, claim_url }</code>. Pass <code>id</code> and <code>update_token</code> to replace a page's HTML.</td></tr>
             <tr><td><code>get_page</code></td><td>The owner, or anyone with the page's <code>update_token</code></td><td>Title, URL, size, views, view limit, expiry, project, and whether a PIN is on (never the PIN).</td></tr>
             <tr><td><code>set_options</code></td><td>The owner, or anyone with the page's <code>update_token</code></td><td>Change the PIN (<code>null</code> removes it), <code>ttl_seconds</code> or <code>permanent</code>, <code>view_limit</code> and <code>title</code> without sending the HTML again. Send only what should change.</td></tr>
+            <tr><td><code>check_page</code></td><td>The owner, or anyone with the page's <code>update_token</code></td><td>Open the page in a real browser (<code>viewport</code> <code>desktop</code> 1280×800 or <code>mobile</code> 390×844) and report <code>{ ok, issues, console, failed_requests, blank, page, screenshot_url }</code>. The screenshot also comes back as an image. <code>ok</code> is false on script or console errors, files that didn't load, broken images or a blank screen; slow, heavy, very tall or too-wide pages are warnings.</td></tr>
             <tr><td><code>send_feedback</code></td><td>Anyone</td><td>Tell the aired team about a <code>bug</code>, <code>friction</code> or an <code>idea</code>, with an <code>impact</code> (<code>blocked</code>, <code>worked_around</code>, <code>minor</code>). Returns an id to pass on to the user. Never send page HTML.</td></tr>
             <tr><td><code>list_pages</code></td><td>Signed in</td><td>Your pages, newest first, with a cursor.</td></tr>
             <tr><td><code>update_page</code></td><td>Signed in</td><td>Replace the HTML of your page by id, no token.</td></tr>
@@ -180,7 +182,14 @@ url = "https://aired.sh/mcp"</code></pre>
             <tr><td><code>get_account</code></td><td>Signed in</td><td>Plan, limits, renewal and an upgrade link for a person to open.</td></tr>
           </tbody>
         </table></div>
-        <p>The local server (<code>npx aired --mcp</code>) has <code>publish_html</code> (which also takes a <code>file_path</code> or a folder), <code>get_page</code>, <code>set_options</code> and <code>send_feedback</code>. It signs in with <code>aired login</code> or <code>AIRED_API_KEY</code>.</p>
+        <p>The local server (<code>npx aired --mcp</code>) has <code>publish_html</code> (which also takes a <code>file_path</code> or a folder), <code>get_page</code>, <code>set_options</code>, <code>check_page</code> and <code>send_feedback</code>. It signs in with <code>aired login</code> or <code>AIRED_API_KEY</code>.</p>
+
+        <h3 id="mcp-check">Checking a page</h3>
+        <p>Publish, then call <code>check_page</code>; fix what it reports, update the same page and check once more. Checks run in Cloudflare Browser Rendering and share a small daily budget: 3 minutes of browser time a day across all callers, plus 20 an hour and 3 a minute per caller. When it's spent the call answers <code>429</code> with <code>Retry-After</code> until 00:00 UTC. The screenshot URL works for 24 hours, for whoever has the link, and stops working when the page is checked again, updated or deleted. A check renders the stored page without its PIN (only the owner can ask for one) and never counts a view.</p>
+
+        <h3 id="mcp-prompts">Prompts and resources</h3>
+        <p>Clients that show MCP prompts list four as slash commands: <code>publish_report</code> (a one-page report), <code>make_slide_deck</code> (a keyboard-driven 16:9 deck that prints to PDF), <code>share_privately</code> (a PIN and an expiry, with the PIN sent separately) and <code>check_and_fix</code>. Each ends with a <code>check_page</code> pass.</p>
+        <p>Resources: <code>skill://aired/SKILL.md</code> is the aired skill, so a connected agent can read how to use aired without installing anything. Signed in (API key, <code>/mcp/account</code>, or <code>aired login</code> for the local server), your pages are <code>aired://page/{id}</code> resources: the newest 50 are listed, and reading one returns its HTML. Another account's page, or an anonymous page, is refused.</p>
 
         <h3>Tool: <code>publish_html</code></h3>
         <p>Inputs:</p>
@@ -223,6 +232,8 @@ url = "https://aired.sh/mcp"</code></pre>
             <tr><td><code>GET</code></td><td><code>/api/pages/:id</code></td><td>Public metadata: <code>{ id, title, size, readCount, expiresAt }</code>. No auth.</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/pages/:id/details</code></td><td>The owner's view: <code>{ id, url, title, size, readCount, reads, hasPin, permanent, createdAt, expiresAt, project }</code>. Never the PIN. Signed in as the owner, or the page's token in <code>X-Update-Token</code> (or <code>Authorization: Bearer</code>).</td></tr>
             <tr><td><code>PATCH</code></td><td><code>/api/pages/:id</code></td><td>Change settings without the HTML: <code>title</code>, <code>pin</code>, <code>ttl</code> or <code>permanent</code>, <code>reads</code>. Same credentials as PUT. Returns the details plus <code>changed</code>.</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/pages/:id/check</code></td><td>Body <code>{ update_token?, viewport?: "desktop" | "mobile", inline_screenshot? }</code>. Render the page in a browser and return the report <code>check_page</code> gives (<code>ok</code>, <code>issues</code>, <code>console</code>, <code>failed_requests</code>, <code>blank</code>, <code>page</code>, <code>screenshot_url</code>). Same credentials as PATCH. <code>429</code> with <code>code: "check_budget"</code> when today's browser time is spent.</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/pages/:id/source</code></td><td>The owner's copy of the HTML: <code>{ id, url, title, size, html }</code>. Same credentials as <code>/details</code>. Never counts a view.</td></tr>
             <tr><td><code>POST</code></td><td><code>/api/feedback</code></td><td>Body <code>{ kind, message, impact?, page_id?, tool? }</code>. Feedback about aired itself; works without signing in, 10 an hour. Returns <code>{ id, message }</code>.</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/stats</code></td><td>Aggregate counts: publishes, views and views per country. No page titles.</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/me/analytics</code></td><td>Pro, signed in or with an API key. <code>?range=7|30|90</code> (default 30) and <code>&amp;offset=N</code> to step back whole windows, within the last 90 days. Views per day, the total for the window before, the busiest day and its top referrer, and countries, referrer sites and pages across your pages, busiest first (up to 50 each). <code>/api/me/analytics/pages/:id</code> is the same for one of your pages. Free accounts get <code>402</code> with <code>code: "plan_limit"</code> and an <code>upgrade_url</code>.</td></tr>

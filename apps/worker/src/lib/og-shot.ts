@@ -169,3 +169,42 @@ export function ogCacheControl(kind: "shot" | "card", versionMatches: boolean): 
 export function tileCacheControl(versionMatches: boolean): string {
   return versionMatches ? "private, max-age=31536000, immutable" : "private, max-age=60";
 }
+
+type Db = { prepare(q: string): { bind(...v: unknown[]): { first<T>(): Promise<T | null>; run(): Promise<unknown> } } };
+
+/** The D1 og_shot_budget row all browser time adds to (screenshots and checks). */
+export const BUDGET_ROW = "browser";
+
+/**
+ * A row of D1 og_shot_budget, or null when there's none yet. A D1 error
+ * throws, which skips the shot or check. Typed structurally, so this file
+ * keeps no runtime imports.
+ */
+export async function readBudget(db: Db, name: string = BUDGET_ROW): Promise<BudgetState | null> {
+  const row = await db
+    .prepare("SELECT day, spent_ms, blocked_until FROM og_shot_budget WHERE name = ?")
+    .bind(name)
+    .first<{ day: string; spent_ms: number; blocked_until: number }>();
+  return row === null ? null : { day: row.day, spentMs: row.spent_ms, blockedUntil: row.blocked_until };
+}
+
+export async function addSpent(db: Db, ms: number, nowMs: number, name: string = BUDGET_ROW): Promise<void> {
+  await db
+    .prepare(
+      "INSERT INTO og_shot_budget (name, day, spent_ms, blocked_until) VALUES (?, ?, ?, 0) " +
+        "ON CONFLICT (name) DO UPDATE SET spent_ms = CASE WHEN og_shot_budget.day = excluded.day " +
+        "THEN og_shot_budget.spent_ms + excluded.spent_ms ELSE excluded.spent_ms END, day = excluded.day",
+    )
+    .bind(name, utcDay(nowMs), ms)
+    .run();
+}
+
+export async function setBlocked(db: Db, until: number): Promise<void> {
+  await db
+    .prepare(
+      "INSERT INTO og_shot_budget (name, day, spent_ms, blocked_until) VALUES (?, ?, 0, ?) " +
+        "ON CONFLICT (name) DO UPDATE SET blocked_until = MAX(og_shot_budget.blocked_until, excluded.blocked_until)",
+    )
+    .bind(BUDGET_ROW, utcDay(Date.now()), until)
+    .run();
+}

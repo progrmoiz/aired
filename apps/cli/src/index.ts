@@ -14,6 +14,7 @@ import { makeWhoamiCommand } from './commands/whoami.js'
 import { makeClaimCommand } from './commands/claim.js'
 import { makeSetCommand } from './commands/set.js'
 import { makeFeedbackCommand } from './commands/feedback.js'
+import { makeCheckCommand } from './commands/check.js'
 
 // Handle --mcp flag before Commander parses
 if (process.argv.includes('--mcp')) {
@@ -74,6 +75,7 @@ if (process.argv.includes('--mcp')) {
   program.addCommand(makeWhoamiCommand(getGlobalOpts))
   program.addCommand(makeClaimCommand(getGlobalOpts))
   program.addCommand(makeSetCommand(getGlobalOpts))
+  program.addCommand(makeCheckCommand(getGlobalOpts))
   program.addCommand(makeFeedbackCommand(getGlobalOpts))
 
   if (process.argv.length <= 2) {
