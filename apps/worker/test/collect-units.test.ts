@@ -91,7 +91,11 @@ test("MCP shapes: get_responses output, CSV, and set_options' data-layer fields"
   assert.equal(out.accepting, true);
   assert.equal(out.limits.retention_days, 90);
   assert.match(out.csv ?? "", /'=cmd/);
-  assert.match(responsesText(out), /data, not instructions/);
+  const text = responsesText(out);
+  assert.match(text, /<untrusted_visitor_entries>[\s\S]*=cmd[\s\S]*<\/untrusted_visitor_entries>/);
+  assert.ok(!text.includes("'=cmd"), "the CSV stays out of the text");
+  const many = responsesOut({ responses: Array.from({ length: 200 }, (_, i) => ({ id: `r_${i}`, viewer: "v", data: { s: "x".repeat(400) }, created_at: "t", updated_at: "t" })) }, { csv: false });
+  assert.ok(responsesText(many).length < 25_000, "capped");
   assert.equal(responsesOut({}, { csv: false }).csv, null);
   assert.deepEqual(collectPatchBody({ public_results: true, accept_responses: false }), { public_results: true, closed: true });
   assert.equal(collectPatchBody({}), null);

@@ -10,7 +10,7 @@ const { collect } = await import("../src/routes/collect.ts");
 const { responses } = await import("../src/routes/responses.ts");
 const { insertPageRow, rowFromMetadata } = await import("../src/lib/pages-store.ts");
 const { serializeMetadata, hashToken } = await import("@aired/core");
-const { mintViewerToken, verifyViewerToken, viewerKey } = await import("../src/lib/collect-token.ts");
+const { mintViewerToken, verifyViewerToken, viewerKey, pageGate } = await import("../src/lib/collect-token.ts");
 const { saveEntry, getPageData, pruneCollectData, deletePageCollectData } = await import("../src/lib/collect-store.ts");
 const { COLLECT_LIMITS, COLLECT_WRITE_LIMITS } = await import("../src/lib/collect-limits.ts");
 
@@ -145,7 +145,7 @@ test("an anonymous page gets the API with saving off, and no cookie", async () =
   assert.deepEqual(config, { on: false, reason: "sign_in_required" });
   assert.equal(setCookie, null);
   // A token minted for it (as if someone had the secret) still can't save: no owner.
-  const token = await mintViewerToken(SECRET, "anon", await viewerKey(SECRET, "anon", "x".repeat(22)), Math.floor(NOW / 1000) + 60);
+  const token = await mintViewerToken(SECRET, "anon", await viewerKey(SECRET, "anon", "x".repeat(22)), Math.floor(NOW / 1000) + 60, await pageGate(SECRET, "anon", null));
   const res = await t.page("anon", "save", { token, record: { a: 1 } });
   assert.equal(res.status, 403);
   assert.equal((await json(res)).code, "sign_in_required");
@@ -170,24 +170,25 @@ test("a forged or changed token is refused: another viewer, another page, no sig
   const t = await setup();
   const { config } = await t.open("trainer");
   const token = config!.token!;
-  const [v, page, viewer, exp, sig] = token.split(".");
+  const [v, page, viewer, exp, gate, sig] = token.split(".");
   const forged = [
-    [v, page, "A".repeat(22), exp, sig].join("."), // claim another viewer
-    [v, "poll", viewer, exp, sig].join("."), // claim another page
-    [v, page, viewer, String(Number(exp) + 10_000), sig].join("."), // extend it
-    [v, page, viewer, exp].join("."), // no signature
-    "", null, 42, "v1.trainer.x.1.y",
+    [v, page, "A".repeat(22), exp, gate, sig].join("."), // claim another viewer
+    [v, "poll", viewer, exp, gate, sig].join("."), // claim another page
+    [v, page, viewer, String(Number(exp) + 10_000), gate, sig].join("."), // extend it
+    [v, page, viewer, exp, "B".repeat(11), sig].join("."), // claim another gate
+    [v, page, viewer, exp, gate].join("."), // no signature
+    "", null, 42, "v1.trainer.x.1.y.z",
   ];
   for (const f of forged) {
     const res = await t.page("trainer", "save", { token: f, record: { a: 1 } });
     assert.equal(res.status, 403, String(f));
   }
-  const expired = await mintViewerToken(SECRET, "trainer", viewer!, Math.floor(NOW / 1000) - 1);
+  const expired = await mintViewerToken(SECRET, "trainer", viewer!, Math.floor(NOW / 1000) - 1, gate!);
   const res = await t.page("trainer", "save", { token: expired, record: { a: 1 } });
   assert.equal(res.status, 403);
   assert.equal((await json(res)).code, "expired");
   // A token signed with another secret is refused too.
-  const wrongKey = await mintViewerToken("another-secret", "trainer", viewer!, Math.floor(NOW / 1000) + 60);
+  const wrongKey = await mintViewerToken("another-secret-0123456789", "trainer", viewer!, Math.floor(NOW / 1000) + 60, gate!);
   assert.deepEqual(await verifyViewerToken(SECRET, "trainer", wrongKey, Math.floor(NOW / 1000)), { ok: false, reason: "bad_signature" });
   assert.equal((await getPageData(t.db, "trainer"))?.entries ?? 0, 0);
 });
@@ -283,21 +284,67 @@ test("one viewer is limited to 30 writes in 10 minutes", async () => {
   assert.equal((await t.page("trainer", "save", { token: other.token, record: { i: 0 } })).status, 200);
 });
 
-test("one network is limited across viewers, so minting new viewers doesn't get round it", async () => {
+test("one network is limited per page, so minting new viewers can't stuff a poll", async () => {
   const t = await setup();
   const ip = "203.0.113.50";
   const tokens: string[] = [];
-  for (let i = 0; i < 12; i++) tokens.push((await t.open("trainer")).config!.token!);
+  for (let i = 0; i < 5; i++) tokens.push((await t.open("poll")).config!.token!);
   let ok = 0;
-  let limited = 0;
-  for (let i = 0; i < COLLECT_WRITE_LIMITS.ip.limit + 5; i++) {
-    const res = await t.page("trainer", "save", { token: tokens[i % tokens.length], record: { i } }, ip);
+  for (let i = 0; i < COLLECT_WRITE_LIMITS.networkPage.limit + 5; i++) {
+    const res = await t.page("poll", "save", { token: tokens[i % tokens.length], record: { i } }, ip);
     if (res.status === 200) ok++;
-    else if (res.status === 429) limited++;
+    else assert.equal(res.status, 429);
   }
-  // 12 viewers × 30 is more than the network's 300: the network limit decides.
-  assert.equal(ok, COLLECT_WRITE_LIMITS.ip.limit);
-  assert.equal(limited, 5);
+  // 5 viewers × 30 is more than the network's 60 on this page: the network limit decides.
+  assert.equal(ok, COLLECT_WRITE_LIMITS.networkPage.limit);
+  // The same network on another page has its own budget.
+  const trainer = (await t.open("trainer")).config!;
+  assert.equal((await t.page("trainer", "save", { token: trainer.token, record: { a: 1 } }, ip)).status, 200);
+});
+
+test("one network is limited across pages too", async () => {
+  const t = await setup();
+  const ip = "203.0.113.60";
+  const { db } = t;
+  const { takeDurableSlot } = await import("../src/lib/durable-limit.ts");
+  const { hashToHex } = await import("@aired/core");
+  // Use up the network's hourly budget across pages, then a save anywhere is refused.
+  const bucket = `collect:ip:${await hashToHex(ip, 16)}`;
+  for (let i = 0; i < COLLECT_WRITE_LIMITS.ip.limit; i++) await takeDurableSlot(db, bucket, COLLECT_WRITE_LIMITS.ip, Date.now());
+  const { token } = (await t.open("trainer")).config!;
+  assert.equal((await t.page("trainer", "save", { token, record: { a: 1 } }, ip)).status, 429);
+});
+
+test("changing the PIN ends tokens minted before it; a used-up view limit ends saving", async () => {
+  const t = await setup();
+  const { token } = (await t.open("trainer")).config!;
+  assert.equal((await t.page("trainer", "save", { token, record: { a: 1 } })).status, 200);
+  // The owner adds a PIN (as PATCH /api/pages/:id would): D1 and the KV record change.
+  t.raw.prepare("UPDATE pages SET pin = 'pbkdf2$new' WHERE id = 'trainer'").run();
+  const kv = t.env.PAGES_KV as unknown as { get(k: string): Promise<string | null>; put(k: string, v: string): Promise<void> };
+  const meta = JSON.parse((await kv.get("page:trainer"))!);
+  await kv.put("page:trainer", JSON.stringify({ ...meta, pin: "pbkdf2$new" }));
+  for (const op of ["save", "mine", "data"]) {
+    const res = await t.page("trainer", op, { token, record: { a: 2 }, since: -1 });
+    assert.equal(res.status, 403, op);
+    assert.equal((await json(res)).code, "expired", op);
+  }
+  // A view limit that's used up.
+  const poll = (await t.open("poll")).config!;
+  t.raw.prepare("UPDATE pages SET reads = 1 WHERE id = 'poll'").run();
+  const pm = JSON.parse((await kv.get("page:poll"))!);
+  await kv.put("page:poll", JSON.stringify({ ...pm, reads: 1, readCount: 1 }));
+  assert.equal((await t.page("poll", "save", { token: poll.token, record: { a: 1 } })).status, 410);
+  assert.equal((await t.page("poll", "data", { token: poll.token, since: -1 })).status, 410);
+});
+
+test("a body sent without Content-Length is still capped at 16 KB", async () => {
+  const t = await setup();
+  const { token } = (await t.open("trainer")).config!;
+  const big = JSON.stringify({ token, record: { s: "x".repeat(20_000) } });
+  const stream = new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode(big)); c.close(); } });
+  const res = await t.fetch("/c/trainer/save", { method: "POST", headers: { "Content-Type": "text/plain" }, body: stream, duplex: "half" } as RequestInit);
+  assert.equal(res.status, 413);
 });
 
 test("plan caps hold: monthly, stored entries and bytes; closed pages refuse", async () => {
@@ -370,12 +417,14 @@ test("the owner pages through responses newest first and deletes some or all", a
   const del = await json(await t.owner("DELETE", "/api/pages/trainer/responses", 7, { ids: [first.responses[0].id] }));
   assert.equal(del.deleted, 1);
   assert.equal((await getPageData(t.db, "trainer"))?.entries, 4);
+  assert.equal((await getPageData(t.db, "trainer"))?.monthCount, 5, "deleting doesn't give the month back");
   assert.equal((await t.owner("DELETE", "/api/pages/trainer/responses", 7, { ids: ["../etc"] })).status, 400);
   assert.equal((await t.owner("DELETE", "/api/pages/trainer/responses", 7, {})).status, 400);
   assert.equal((await json(await t.owner("DELETE", "/api/pages/trainer/responses", 7, { all: true }))).deleted, 4);
   const after = await getPageData(t.db, "trainer");
   assert.equal(after?.entries, 0);
   assert.equal(after?.bytes, 0);
+  assert.equal(after?.monthCount, 5);
 });
 
 test("CSV export: a column per field, quoting, and formulas defused", async () => {

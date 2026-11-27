@@ -137,7 +137,7 @@ viewer.get("/p/:id", async (c) => {
   // window.aired for pages that use the data layer (lib/collect-page.ts):
   // a per-viewer token, so the response is never cached.
   const dataLayer = await dataLayerFor({
-    secret: c.env.SESSION_SECRET, origin: siteOrigin(c.env), id, ownerId: metadata.ownerId, html, cookie: getCookie(c, VIEWER_COOKIE), nowMs: now,
+    secret: c.env.SESSION_SECRET, origin: siteOrigin(c.env), id, ownerId: metadata.ownerId, pin: metadata.pin, html, cookie: getCookie(c, VIEWER_COOKIE), nowMs: now,
   });
   if (dataLayer !== null) {
     headers.set("Cache-Control", "private, no-store");

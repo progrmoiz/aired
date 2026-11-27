@@ -278,7 +278,7 @@ aired.data.subscribe((d) =&gt; { if (d) mrr.textContent = "$" + d.mrr.toLocaleSt
             <tr><td>CSV export</td><td>Yes</td><td>Yes</td></tr>
           </tbody>
         </table></div>
-        <p>On every plan: one entry is a JSON object of at most 8 KB, nested at most 5 deep; one viewer can save 30 times in 10 minutes, one network 300 times an hour, one page 1,000 times an hour; live data can change 120 times an hour. Only pages with an owner save data: on an anonymous page the calls reject with <code>sign_in_required</code>, because nobody could read what was saved. aired doesn't collect passwords, card numbers or other secrets: an entry with a field like <code>password</code>, <code>cvv</code> or <code>card_number</code>, or a value that looks like a card number, is refused (<code>blocked</code>). Deleting a page deletes its entries; deleting your account deletes all of them.</p>
+        <p>On every plan: one entry is a JSON object of at most 8 KB, nested at most 5 deep; one viewer (a browser) can save 30 times in 10 minutes, one network 60 times an hour on one page and 300 across pages, one page 1,000 times an hour; live data can change 120 times an hour. Only pages with an owner save data: on an anonymous page the calls reject with <code>sign_in_required</code>, because nobody could read what was saved. aired doesn't collect passwords, card numbers or other secrets: an entry with a field like <code>password</code>, <code>cvv</code> or <code>card_number</code>, or a value that looks like a card number, is refused (<code>blocked</code>). Deleting a page deletes its entries; deleting your account deletes all of them.</p>
       </section>
 
       <!-- ─── API ─── -->

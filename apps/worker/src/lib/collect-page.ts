@@ -9,7 +9,7 @@
 
 import { VIEWER_COOKIE_SECONDS, VIEWER_TOKEN_SECONDS } from "./collect-limits.ts";
 import { collectRuntime, usesDataLayer } from "./collect-runtime.ts";
-import { mintViewerToken, newViewerCookie, validViewerCookie, viewerCookieHeader, viewerKey } from "./collect-token.ts";
+import { mintViewerToken, newViewerCookie, pageGate, usableSecret, validViewerCookie, viewerCookieHeader, viewerKey } from "./collect-token.ts";
 
 export { VIEWER_COOKIE } from "./collect-token.ts";
 
@@ -20,16 +20,20 @@ export async function dataLayerFor(opts: {
   origin: string;
   id: string;
   ownerId: number | null;
+  /** The PIN as stored (a hash), or null: the token stops working when it changes. */
+  pin: string | null;
   html: string;
   cookie: string | undefined;
   nowMs: number;
 }): Promise<DataLayerPage | null> {
   if (!usesDataLayer(opts.html)) return null;
-  if (opts.ownerId === null) return { script: collectRuntime({ enabled: false, reason: "sign_in_required" }), setCookie: null };
+  // No owner (nobody could read the data), or no secret to sign with: saving stays off.
+  if (opts.ownerId === null || !usableSecret(opts.secret)) return { script: collectRuntime({ enabled: false, reason: "sign_in_required" }), setCookie: null };
   const existing = validViewerCookie(opts.cookie);
   const cookie = existing ?? newViewerCookie();
   const viewer = await viewerKey(opts.secret, opts.id, cookie);
-  const token = await mintViewerToken(opts.secret, opts.id, viewer, Math.floor(opts.nowMs / 1000) + VIEWER_TOKEN_SECONDS);
+  const gate = await pageGate(opts.secret, opts.id, opts.pin);
+  const token = await mintViewerToken(opts.secret, opts.id, viewer, Math.floor(opts.nowMs / 1000) + VIEWER_TOKEN_SECONDS, gate);
   return {
     script: collectRuntime({ enabled: true, origin: opts.origin, id: opts.id, token, viewer }),
     setCookie: existing === null ? viewerCookieHeader(cookie, VIEWER_COOKIE_SECONDS) : null,

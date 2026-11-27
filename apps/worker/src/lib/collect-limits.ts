@@ -52,11 +52,16 @@ export const ENTRY_KEY_MAX = 64;
  * in D1 rate_limits, so every isolate counts against the same row.
  *   viewer: one viewer on one page.
  *   ip: one address (IPv6 by /64) across every page, so minting new viewers
- *     doesn't get round the viewer limit. A class on one network fits.
+ *     doesn't get round the viewer limit.
+ *   networkPage: one address on one page. A viewer is a browser, not a
+ *     person: clearing cookies (or curl) makes a new one. This keeps one
+ *     address from stuffing a poll or using up a page's month. The cost: a
+ *     class or office behind one address shares 60 saves an hour per page.
  *   page: everyone on one page.
  */
 export const COLLECT_WRITE_LIMITS = {
   viewer: { limit: 30, windowSeconds: 10 * 60 },
+  networkPage: { limit: 60, windowSeconds: 60 * 60 },
   ip: { limit: 300, windowSeconds: 60 * 60 },
   page: { limit: 1_000, windowSeconds: 60 * 60 },
 } as const;

@@ -61,7 +61,7 @@ export function consentPage(facts: ConsentFacts, handle: string, login: string):
   return `${HEAD(`Connect ${facts.clientName} to aired`)}
   <p class="eyebrow">Connect an app</p>
   <h1>Allow ${name} to use your aired account?</h1>
-  <p class="lede">It will act as <b>@${escapeHtml(login)}</b>: list, read, publish, update and delete your pages (including their HTML), and read your plan. It can’t see your keys or billing, or delete your account.</p>
+  <p class="lede">It will act as <b>@${escapeHtml(login)}</b>: list, read, publish, update and delete your pages (including their HTML), read and delete what visitors saved on them, push live data to them, and read your plan. It can’t see your keys or billing, or delete your account.</p>
   <div class="panel box-pad">
     <div class="facts">
       ${who}

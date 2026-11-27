@@ -1,7 +1,9 @@
 import { Hono, type Context } from "hono";
 import type { AppBindings } from "../types.js";
 import { hashToHex } from "@aired/core";
-import { verifyViewerToken } from "../lib/collect-token.ts";
+import { pageGate, usableSecret, verifyViewerToken } from "../lib/collect-token.ts";
+import { bodyLimit } from "hono/body-limit";
+import { parseMetadata } from "@aired/core";
 import { validateEntryKey, validateRecord } from "../lib/collect-validate.ts";
 import {
   getLiveData,
@@ -75,7 +77,7 @@ const TOKEN_PROBLEMS: Record<string, Problem> = {
   default: { status: 403, code: "forbidden", error: "Reload the page and try again." },
 };
 
-type Caller = { id: string; viewer: string; body: Record<string, unknown> };
+type Caller = { id: string; viewer: string; gate: string; body: Record<string, unknown> };
 
 async function caller(c: Context<AppBindings>): Promise<Caller | Response> {
   const id = c.req.param("id") ?? "";
@@ -86,15 +88,23 @@ async function caller(c: Context<AppBindings>): Promise<Caller | Response> {
     c.header("Retry-After", "60");
     return problem(c, { status: 429, code: "rate_limited", error: "Too many requests. Wait a minute and try again." });
   }
+  if (!usableSecret(c.env.SESSION_SECRET)) return problem(c, { status: 503, code: "unavailable", error: "Saving isn't set up on this server." });
   const read = await readBody(c);
   if (!read.ok) return problem(c, read.problem);
   const check = await verifyViewerToken(c.env.SESSION_SECRET, id, read.body.token, Math.floor(Date.now() / 1000));
   if (!check.ok) return problem(c, TOKEN_PROBLEMS[check.reason] ?? TOKEN_PROBLEMS.default!);
-  return { id, viewer: check.viewer, body: read.body };
+  return { id, viewer: check.viewer, gate: check.gate, body: read.body };
 }
 
-/** The live page and its owner; a Response when it's gone or has no owner. */
-async function ownedPage(c: Context<AppBindings>, id: string): Promise<{ ownerId: number } | Response> {
+const PIN_CHANGED: Problem = { status: 403, code: "expired", error: "This page's access changed. Reload it to keep going." };
+
+/**
+ * The live page and its owner, for this caller; a Response when it's gone,
+ * has no owner, has used up its view limit, or its PIN changed since the
+ * token was minted.
+ */
+async function ownedPage(c: Context<AppBindings>, who: Caller): Promise<{ ownerId: number } | Response> {
+  const id = who.id;
   let page: Awaited<ReturnType<typeof loadPage>>;
   try {
     page = await loadPage(c.env, id);
@@ -105,6 +115,8 @@ async function ownedPage(c: Context<AppBindings>, id: string): Promise<{ ownerId
   if (page.row.ownerId === null) {
     return problem(c, { status: 403, code: "sign_in_required", error: "Only pages published from an aired account can save data." });
   }
+  if (page.row.reads !== null && (page.kv?.readCount ?? 0) >= page.row.reads) return problem(c, { status: 410, code: "gone", error: "This page is gone." });
+  if ((await pageGate(c.env.SESSION_SECRET, id, page.row.pin)) !== who.gate) return problem(c, PIN_CHANGED);
   return { ownerId: page.row.ownerId };
 }
 
@@ -115,6 +127,7 @@ async function writeAllowed(c: Context<AppBindings>, id: string, viewer: string)
   try {
     for (const [bucket, rule] of [
       [`collect:v:${id}:${viewer}`, COLLECT_WRITE_LIMITS.viewer],
+      [`collect:np:${id}:${ip}`, COLLECT_WRITE_LIMITS.networkPage],
       [`collect:ip:${ip}`, COLLECT_WRITE_LIMITS.ip],
       [`collect:p:${id}`, COLLECT_WRITE_LIMITS.page],
     ] as const) {
@@ -129,6 +142,9 @@ async function writeAllowed(c: Context<AppBindings>, id: string, viewer: string)
   return null;
 }
 
+// The 16 KB cap on bodies, streamed: a body sent without Content-Length stops there too.
+collect.use("/c/*", bodyLimit({ maxSize: BODY_MAX, onError: (c) => c.json({ error: "Request body too large.", code: "too_large" }, 413) }));
+
 collect.use("/c/*", async (c, next) => {
   await next();
   c.res.headers.set("Access-Control-Allow-Origin", "*");
@@ -140,7 +156,7 @@ collect.use("/c/*", async (c, next) => {
 collect.post("/c/:id/save", async (c) => {
   const who = await caller(c);
   if (who instanceof Response) return who;
-  const page = await ownedPage(c, who.id);
+  const page = await ownedPage(c, who);
   if (page instanceof Response) return page;
 
   const record = validateRecord(who.body.record);
@@ -175,7 +191,7 @@ collect.post("/c/:id/save", async (c) => {
 collect.post("/c/:id/mine", async (c) => {
   const who = await caller(c);
   if (who instanceof Response) return who;
-  const page = await ownedPage(c, who.id);
+  const page = await ownedPage(c, who);
   if (page instanceof Response) return page;
   const { entries } = await listEntries(c.env.DB, who.id, { viewer: who.viewer, limit: READ_PAGE_MAX, cursor: null });
   return c.json({ entries: entries.map((e) => viewerEntry(e, who.viewer)) });
@@ -184,7 +200,7 @@ collect.post("/c/:id/mine", async (c) => {
 collect.post("/c/:id/all", async (c) => {
   const who = await caller(c);
   if (who instanceof Response) return who;
-  const page = await ownedPage(c, who.id);
+  const page = await ownedPage(c, who);
   if (page instanceof Response) return page;
   const settings = await getPageData(c.env.DB, who.id);
   if (!settings?.publicResults) {
@@ -197,7 +213,7 @@ collect.post("/c/:id/all", async (c) => {
 collect.post("/c/:id/remove", async (c) => {
   const who = await caller(c);
   if (who instanceof Response) return who;
-  const page = await ownedPage(c, who.id);
+  const page = await ownedPage(c, who);
   if (page instanceof Response) return page;
   const target = who.body.id;
   if (typeof target !== "string" || target === "" || target.length > 64) {
@@ -215,8 +231,10 @@ collect.post("/c/:id/remove", async (c) => {
 collect.post("/c/:id/data", async (c) => {
   const who = await caller(c);
   if (who instanceof Response) return who;
-  const live = await c.env.PAGES_KV.get(`page:${who.id}`);
-  if (live === null) return problem(c, { status: 410, code: "gone", error: "This page is gone." });
+  const raw = await c.env.PAGES_KV.get(`page:${who.id}`);
+  const live = raw === null ? null : parseMetadata(raw);
+  if (live === null || (live.reads !== null && live.readCount >= live.reads)) return problem(c, { status: 410, code: "gone", error: "This page is gone." });
+  if ((await pageGate(c.env.SESSION_SECRET, who.id, live.pin)) !== who.gate) return problem(c, PIN_CHANGED);
   const since = typeof who.body.since === "number" ? who.body.since : -1;
   try {
     if (since >= 0 && (await liveDataVersion(c.env.DB, who.id)) === since) return c.json({ version: since, changed: false });

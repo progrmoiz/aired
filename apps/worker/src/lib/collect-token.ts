@@ -15,6 +15,11 @@
  *    it in the body; the route checks the signature, the expiry and that the
  *    page in the token is the page in the URL.
  *
+ * The token also carries the page's "gate": an HMAC of its PIN as stored
+ * (or of nothing, without a PIN). Adding, changing or removing the PIN
+ * changes the gate, so tokens minted before stop working at once instead
+ * of lasting their 7 days (the route compares it with the page as it is).
+ *
  * The viewer key is HMAC(secret, page id + cookie), cut to 22 characters: a
  * person has a different key on every page (owners can't match viewers
  * across pages), and the key can't be turned back into the cookie. A page
@@ -46,7 +51,13 @@ function fromB64url(s: string): Uint8Array | null {
   }
 }
 
+/** A secret too short to sign with: the data layer stays off rather than sign with it. */
+export function usableSecret(secret: string | undefined | null): secret is string {
+  return typeof secret === "string" && secret.length >= 16;
+}
+
 async function mac(secret: string, purpose: string, message: string): Promise<Uint8Array> {
+  if (!usableSecret(secret)) throw new Error("SESSION_SECRET is missing or too short");
   // A purpose string keeps these MACs apart from every other use of the secret.
   const key = await crypto.subtle.importKey("raw", enc.encode(`aired-collect:${purpose}:${secret}`), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   return new Uint8Array(await crypto.subtle.sign("HMAC", key, enc.encode(message)));
@@ -79,13 +90,20 @@ export async function viewerKey(secret: string, pageId: string, cookie: string):
   return b64url((await mac(secret, "viewer", `${pageId}\n${cookie}`)).subarray(0, 16)).slice(0, 22);
 }
 
-/** A token for one page and one viewer key, good until expSec. Format: v1.<page>.<viewer>.<exp>.<sig>. */
-export async function mintViewerToken(secret: string, pageId: string, viewer: string, expSec: number): Promise<string> {
-  const body = `v1.${pageId}.${viewer}.${expSec}`;
+/** The page's gate: 11 characters that change whenever its stored PIN does. */
+export async function pageGate(secret: string, pageId: string, pin: string | null): Promise<string> {
+  return b64url((await mac(secret, "gate", `${pageId}\n${pin ?? ""}`)).subarray(0, 8));
+}
+
+/** A token for one page, one viewer key and the page's gate, good until expSec. Format: v1.<page>.<viewer>.<exp>.<gate>.<sig>. */
+export async function mintViewerToken(secret: string, pageId: string, viewer: string, expSec: number, gate: string): Promise<string> {
+  const body = `v1.${pageId}.${viewer}.${expSec}.${gate}`;
   return `${body}.${b64url(await mac(secret, "token", body))}`;
 }
 
-export type TokenCheck = { ok: true; viewer: string } | { ok: false; reason: "malformed" | "bad_signature" | "expired" | "wrong_page" };
+export type TokenCheck =
+  | { ok: true; viewer: string; gate: string }
+  | { ok: false; reason: "malformed" | "bad_signature" | "expired" | "wrong_page" };
 
 /**
  * Check a token sent to /c/:pageId/*. The page in the token must be the page
@@ -94,15 +112,15 @@ export type TokenCheck = { ok: true; viewer: string } | { ok: false; reason: "ma
 export async function verifyViewerToken(secret: string, pageId: string, token: unknown, nowSec: number): Promise<TokenCheck> {
   if (typeof token !== "string" || token.length > 300) return { ok: false, reason: "malformed" };
   const parts = token.split(".");
-  if (parts.length !== 5 || parts[0] !== "v1") return { ok: false, reason: "malformed" };
-  const [, tokenPage, viewer, exp, sig] = parts as [string, string, string, string, string];
-  if (!PAGE_ID.test(tokenPage) || !VIEWER_KEY.test(viewer) || !/^\d{1,12}$/.test(exp)) return { ok: false, reason: "malformed" };
+  if (parts.length !== 6 || parts[0] !== "v1") return { ok: false, reason: "malformed" };
+  const [, tokenPage, viewer, exp, gate, sig] = parts as [string, string, string, string, string, string];
+  if (!PAGE_ID.test(tokenPage) || !VIEWER_KEY.test(viewer) || !/^\d{1,12}$/.test(exp) || !/^[A-Za-z0-9_-]{11}$/.test(gate)) return { ok: false, reason: "malformed" };
   const given = fromB64url(sig);
   if (given === null) return { ok: false, reason: "malformed" };
-  const want = await mac(secret, "token", `v1.${tokenPage}.${viewer}.${exp}`);
+  const want = await mac(secret, "token", `v1.${tokenPage}.${viewer}.${exp}.${gate}`);
   if (!sameBytes(given, want)) return { ok: false, reason: "bad_signature" };
   // Signature first, so a forged token learns nothing from the other checks.
   if (tokenPage !== pageId) return { ok: false, reason: "wrong_page" };
   if (Number(exp) <= nowSec) return { ok: false, reason: "expired" };
-  return { ok: true, viewer };
+  return { ok: true, viewer, gate };
 }

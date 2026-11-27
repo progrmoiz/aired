@@ -264,30 +264,25 @@ export async function listEntries(
   return { entries, cursor: more ? encodeEntryCursor(entries[entries.length - 1]!) : null };
 }
 
-/** Take deleted rows off the page's counters. */
-async function subtract(db: D1Database, pageId: string, rows: { size: number; created_at: number }[], nowMs: number): Promise<void> {
+/**
+ * Take deleted rows off what the page holds. The month's count stays: it
+ * counts entries saved this month, so deleting and saving again can't get
+ * round the monthly cap.
+ */
+async function subtract(db: D1Database, pageId: string, rows: { size: number }[]): Promise<void> {
   if (rows.length === 0) return;
   const bytes = rows.reduce((n, r) => n + r.size, 0);
-  const month = utcMonth(nowMs);
-  const thisMonth = rows.filter((r) => utcMonth(r.created_at) === month).length;
-  await db
-    .prepare(
-      `UPDATE page_data SET entries = MAX(entries - ?, 0), bytes = MAX(bytes - ?, 0),
-         month_count = CASE WHEN month = ? THEN MAX(month_count - ?, 0) ELSE month_count END
-       WHERE page_id = ?`,
-    )
-    .bind(rows.length, bytes, month, thisMonth, pageId)
-    .run();
+  await db.prepare("UPDATE page_data SET entries = MAX(entries - ?, 0), bytes = MAX(bytes - ?, 0) WHERE page_id = ?").bind(rows.length, bytes, pageId).run();
 }
 
 /** A viewer deletes one of their own entries, by id or by key. True if one went. */
 export async function removeOwnEntry(db: D1Database, pageId: string, viewer: string, idOrKey: string, nowMs: number): Promise<boolean> {
   const res = await db
-    .prepare("DELETE FROM responses WHERE page_id = ? AND viewer = ? AND (id = ? OR entry_key = ?) RETURNING size, created_at")
+    .prepare("DELETE FROM responses WHERE page_id = ? AND viewer = ? AND (id = ? OR entry_key = ?) RETURNING size")
     .bind(pageId, viewer, idOrKey, idOrKey)
-    .all<{ size: number; created_at: number }>();
+    .all<{ size: number }>();
   const rows = res.results ?? [];
-  await subtract(db, pageId, rows, nowMs);
+  await subtract(db, pageId, rows);
   return rows.length > 0;
 }
 
@@ -295,18 +290,18 @@ export async function removeOwnEntry(db: D1Database, pageId: string, viewer: str
 export async function deleteEntries(db: D1Database, pageId: string, ids: string[] | null, nowMs: number): Promise<number> {
   if (ids === null) {
     const res = await db.prepare("DELETE FROM responses WHERE page_id = ?").bind(pageId).run();
-    await db.prepare("UPDATE page_data SET entries = 0, bytes = 0, month_count = 0 WHERE page_id = ?").bind(pageId).run();
+    await db.prepare("UPDATE page_data SET entries = 0, bytes = 0 WHERE page_id = ?").bind(pageId).run();
     return res.meta.changes ?? 0;
   }
   let total = 0;
   for (let i = 0; i < ids.length; i += 90) {
     const chunk = ids.slice(i, i + 90);
     const res = await db
-      .prepare(`DELETE FROM responses WHERE page_id = ? AND id IN (${chunk.map(() => "?").join(", ")}) RETURNING size, created_at`)
+      .prepare(`DELETE FROM responses WHERE page_id = ? AND id IN (${chunk.map(() => "?").join(", ")}) RETURNING size`)
       .bind(pageId, ...chunk)
-      .all<{ size: number; created_at: number }>();
+      .all<{ size: number }>();
     const rows = res.results ?? [];
-    await subtract(db, pageId, rows, nowMs);
+    await subtract(db, pageId, rows);
     total += rows.length;
   }
   return total;
