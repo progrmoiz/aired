@@ -47,11 +47,21 @@ export async function putCode(db: D1Database, pageId: string, key: string, hash:
     .run();
 }
 
+function sameHex(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 /**
- * Try a code. First one try is reserved (attempts + 1, only while the code
- * is live and has tries left), then a right code deletes the row. Both are
- * single statements, so parallel guesses can't take more than maxAttempts
- * tries between them, and a code works once even if sent twice at once.
+ * Try a code: "ok" (right, and now used up), "wrong" (a live code, but not
+ * this one) or "none" (no live code with tries left). One statement
+ * reserves a try (attempts + 1, only while the code is live and has tries
+ * left) and hands back the stored hash, so parallel guesses can't take more
+ * than maxAttempts tries between them. A wrong code and no code cost the
+ * same one query, so timing doesn't say whether a code was sent. A right
+ * code then deletes the row, so it works once even if sent twice at once.
  */
 export async function useCode(
   db: D1Database,
@@ -60,17 +70,24 @@ export async function useCode(
   hash: string,
   now: number,
   maxAttempts: number,
-): Promise<boolean> {
+): Promise<"ok" | "wrong" | "none"> {
   const reserved = await db
-    .prepare("UPDATE access_codes SET attempts = attempts + 1 WHERE page_id = ? AND email_key = ? AND expires_at > ? AND attempts < ? RETURNING attempts")
+    .prepare("UPDATE access_codes SET attempts = attempts + 1 WHERE page_id = ? AND email_key = ? AND expires_at > ? AND attempts < ? RETURNING code_hash")
     .bind(pageId, key, now, maxAttempts)
-    .first<{ attempts: number }>();
-  if (reserved === null) return false;
+    .first<{ code_hash: string }>();
+  if (reserved === null) return "none";
+  if (!sameHex(reserved.code_hash, hash)) return "wrong";
   const used = await db
-    .prepare("DELETE FROM access_codes WHERE page_id = ? AND email_key = ? AND code_hash = ? AND expires_at > ? RETURNING page_id")
-    .bind(pageId, key, hash, now)
+    .prepare("DELETE FROM access_codes WHERE page_id = ? AND email_key = ? AND code_hash = ? RETURNING page_id")
+    .bind(pageId, key, hash)
     .first<{ page_id: string }>();
-  return used !== null;
+  return used !== null ? "ok" : "none";
+}
+
+/** How much of a durable limit's current window is used (0 when it has none or it ended). */
+export async function durableUsed(db: D1Database, bucket: string, now: number): Promise<number> {
+  const row = await db.prepare("SELECT count FROM rate_limits WHERE bucket = ? AND expires_at > ?").bind(bucket, now).first<{ count: number }>();
+  return row?.count ?? 0;
 }
 
 /** A listed person opened the page: first visit adds them, later ones count. */

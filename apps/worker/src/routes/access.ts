@@ -13,7 +13,7 @@ import { getEntitlements } from "../lib/entitlements.js";
 import { isEmail, normalizeEmail, onList, fromEntries } from "../lib/access-list.ts";
 import { ACCESS_COOKIE_SECONDS, ACCESS_RATE_LIMITS, CODE_MAX_ATTEMPTS, CODE_TTL_MS } from "../lib/access-limits.ts";
 import { accessCookieName, accessCookieValue, cleanCode, codeHash, emailKey, newCode, verifyAccessCookie } from "../lib/access-code.ts";
-import { getAccessEntries, listVisitors, putCode, recordVisit, useCode } from "../lib/access-store.ts";
+import { durableUsed, getAccessEntries, listVisitors, putCode, recordVisit, useCode } from "../lib/access-store.ts";
 import { accessCodeEmail, emailSenderFor } from "../lib/email-sender.ts";
 import { accessGatePage, gateHeaders, newNonce } from "../lib/access-page.ts";
 import { pageFor } from "./api.ts";
@@ -45,6 +45,7 @@ const PAGE_ID = /^[A-Za-z0-9_-]{1,64}$/;
 export const SENT_MESSAGE = "If this email has access, we've sent a code. Check your inbox.";
 export const BAD_CODE_MESSAGE = "That code isn't right or has expired. Check the email, or send a new code.";
 const SLOW_DOWN = "Too many tries. Wait a few minutes and try again.";
+const PAGE_LOCKED = "Too many wrong codes have been tried on this page today. Try again tomorrow, or ask the person who shared it.";
 
 async function jsonBody(c: Context<AppBindings>): Promise<Record<string, unknown> | Response> {
   if (!(c.req.header("Content-Type") ?? "").toLowerCase().startsWith("application/json")) {
@@ -99,7 +100,6 @@ access.post("/p/:id/access/send", async (c) => {
   try {
     const ok = await underLimits(c.env.DB, [
       [`acc:pe:${id}:${key}`, L.pageEmail],
-      [`acc:e:${key}`, L.email],
       [`acc:ip:${net}`, L.ip],
       [`acc:p:${id}`, L.page],
     ], now);
@@ -119,10 +119,20 @@ access.post("/p/:id/access/send", async (c) => {
 async function sendCodeIfListed(c: Context<AppBindings>, id: string, email: string, key: string, now: number): Promise<void> {
   const page = await restrictedPage(c.env.PAGES_KV, id);
   if (page === null) return;
-  if (!onList(email, await getAccessEntries(c.env.DB, id))) return;
+  const entries = await getAccessEntries(c.env.DB, id);
+  if (!onList(email, entries)) return;
   const sender = emailSenderFor(c.env);
   if (sender === null) {
     console.error({ event: "access_email_not_configured", id });
+    return;
+  }
+  // Counted only when a code is about to go out (lib/access-limits.ts).
+  if (!(await takeDurableSlot(c.env.DB, `acc:e:${key}`, ACCESS_RATE_LIMITS.email, now))) {
+    console.warn({ event: "access_email_send_cap", id });
+    return;
+  }
+  if (!entries.includes(email) && !(await takeDurableSlot(c.env.DB, `acc:dom:${id}`, ACCESS_RATE_LIMITS.domainCodes, now))) {
+    console.warn({ event: "access_domain_send_cap", id });
     return;
   }
   // The owner's daily cap: counted only for codes actually sent.
@@ -151,12 +161,15 @@ access.post("/p/:id/access/verify", async (c) => {
   const now = Date.now();
   const net = await networkKey(c);
   if (!(await underBurstLimit(c.env.PIN_GUESS, `acc:${id}:${net}`))) return apiError(c, 429, "rate_limited", SLOW_DOWN);
+  const failures = `acc:vf:${id}`;
   try {
-    const ok = await underLimits(c.env.DB, [
-      [`acc:vi:${id}:${net}`, ACCESS_RATE_LIMITS.verifyIp],
-      [`acc:vp:${id}`, ACCESS_RATE_LIMITS.verifyPage],
-    ], now);
-    if (!ok) return apiError(c, 429, "rate_limited", SLOW_DOWN);
+    if (!(await underLimits(c.env.DB, [[`acc:vi:${id}:${net}`, ACCESS_RATE_LIMITS.verifyIp]], now))) {
+      return apiError(c, 429, "rate_limited", SLOW_DOWN);
+    }
+    // The page's budget of wrong guesses (lib/access-limits.ts verifyFailures).
+    if ((await durableUsed(c.env.DB, failures, now)) >= ACCESS_RATE_LIMITS.verifyFailures.limit) {
+      return apiError(c, 429, "rate_limited", PAGE_LOCKED);
+    }
   } catch (err) {
     console.error("access verify limit check failed", { id, err });
     return apiError(c, 503, "unavailable", "Codes can't be checked right now. Try again in a minute.");
@@ -166,9 +179,15 @@ access.post("/p/:id/access/verify", async (c) => {
   try {
     const key = await emailKey(c.env.SESSION_SECRET, email);
     const page = await restrictedPage(c.env.PAGES_KV, id);
-    if (page !== null && (await useCode(c.env.DB, id, key, await codeHash(c.env.SESSION_SECRET, id, key, code), now, CODE_MAX_ATTEMPTS))) {
+    const result = page === null ? "none" : await useCode(c.env.DB, id, key, await codeHash(c.env.SESSION_SECRET, id, key, code), now, CODE_MAX_ATTEMPTS);
+    if (result === "ok") {
       // Still on the list: the owner may have taken them off since the code went out.
       allowed = onList(email, await getAccessEntries(c.env.DB, id));
+    } else if (result === "wrong") {
+      // A guess at a code that exists: it counts against the page, after the answer.
+      c.executionCtx.waitUntil(
+        takeDurableSlot(c.env.DB, failures, ACCESS_RATE_LIMITS.verifyFailures, now).catch((err) => console.error("access failure count failed", { id, err })),
+      );
     }
   } catch (err) {
     console.error("access verify failed", { id, err });
@@ -192,14 +211,19 @@ access.post("/p/:id/access/verify", async (c) => {
  * email (null for the owner), or the response to send instead: the gate,
  * or a 503 when the list can't be read (fail closed).
  */
-export async function accessGate(c: Context<AppBindings>, id: string, ownerId: number | null): Promise<{ email: string | null } | Response> {
-  const user = c.get("user");
-  if (user !== null && user !== undefined && ownerId !== null && user.id === ownerId) return { email: null };
+export async function accessGate(
+  c: Context<AppBindings>,
+  id: string,
+  ownerId: number | null,
+): Promise<{ email: string | null; entries: string[] } | Response> {
   const nonce = newNonce();
   const gate = () => new Response(accessGatePage({ id, nonce }), { status: 200, headers: gateHeaders(nonce) });
-  if (ownerId === null || !c.env.SESSION_SECRET) return gate();
-  const email = await verifyAccessCookie(c.env.SESSION_SECRET, id, getCookie(c, accessCookieName(id)), Math.floor(Date.now() / 1000));
-  if (email === null) return gate();
+  const user = c.get("user");
+  const isOwner = user !== null && user !== undefined && ownerId !== null && user.id === ownerId;
+  if (!isOwner && (ownerId === null || !c.env.SESSION_SECRET)) return gate();
+  const email = isOwner ? null : await verifyAccessCookie(c.env.SESSION_SECRET, id, getCookie(c, accessCookieName(id)), Math.floor(Date.now() / 1000));
+  if (!isOwner && email === null) return gate();
+  // The list, as it is now: who may come in, and what the page's data-layer tokens are tied to.
   let entries: string[];
   try {
     entries = await getAccessEntries(c.env.DB, id);
@@ -210,13 +234,13 @@ export async function accessGate(c: Context<AppBindings>, id: string, ownerId: n
       headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "Retry-After": "30" },
     });
   }
-  if (!onList(email, entries)) {
+  if (email !== null && !onList(email, entries)) {
     const res = gate();
     // The cookie is no good any more: take it away.
     res.headers.append("Set-Cookie", `${accessCookieName(id)}=; Path=/p/${id}; HttpOnly; Secure; SameSite=Lax; Max-Age=0`);
     return res;
   }
-  return { email };
+  return { email, entries };
 }
 
 /** Log a listed person's visit for the owner, in the background. */
