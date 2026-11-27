@@ -145,14 +145,6 @@
   <link rel="stylesheet" href="/fonts/fonts.css" />
   <link rel="stylesheet" href="/site.css" />
 </head>
-  <style>
-    .deckvis{background:#fff;color:#111113;border-radius:10px;aspect-ratio:16/9;padding:7% 8%;display:flex;flex-direction:column;justify-content:center;gap:6px;position:relative;box-shadow:0 0 0 1px var(--hairline)}
-    .deckvis b{font-size:clamp(18px,2.4vw,26px);font-weight:500;letter-spacing:-.02em}
-    .deckvis span{font-size:13px;color:#52525b}
-    .deckvis .n{position:absolute;right:12px;bottom:10px;font-size:11px;color:#84848a}
-    .deckbar{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:12px;color:var(--text-2)}
-    .deckbar i{font-style:normal;padding:4px 8px;border-radius:999px;background:var(--surface-2,#18181b);box-shadow:inset 0 0 0 1px var(--hairline)}
-  </style>
 </head>
 <body>
 <header><div class="wrap">
@@ -197,9 +189,9 @@
       <p class="proof"><b data-stat="publishes">10,827</b> pages published · opened <b data-stat="views">102,156</b> times</p>
     </div>
     <div class="side-vis">
-      <div class="seen-cap"><span>What they open</span><span class="mono">aired.sh/p/q3-update#/2</span></div>
-      <div class="deckvis" aria-label="Example slide"><b>What we shipped</b><span>• Faster checkout: two steps instead of five</span><span>• New dashboard for account managers</span><span class="n">2</span></div>
-      <div class="deckbar" aria-hidden="true"><i>‹ 2 / 7 ›</i><i>Present</i><i>Copy slide link</i></div>
+      <div class="seen-cap"><span>What they open</span><span class="mono">aired.sh/p/q3-update#/<span data-deck-url>2</span></span></div>
+      <div class="deckvis" data-deck role="img" aria-label="Example slides: what we shipped, what it changed, next quarter"><section class="on" data-n="2"><b>What we shipped</b><span>• Faster checkout: two steps instead of five</span><span>• New dashboard for account managers</span></section><section data-n="3"><b>What it changed</b><span>• 18% fewer people leave at checkout</span><span>• 40% fewer support tickets</span></section><section data-n="4"><b>Next quarter</b><span>• Mobile app beta</span><span>• Team accounts</span></section><span class="n" data-deck-n>2</span></div>
+      <div class="deckbar" aria-hidden="true"><i>‹ <span data-deck-count>2</span> / 7 ›</i><i>Present</i><i>Copy slide link</i></div>
       <ul class="ticklist side-ticks"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span><b>Present anywhere.</b> Arrow keys, a clicker, or swipe on a phone.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span><b>A link per slide.</b> Add #/3 to open slide 3.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span><b>Notes stay yours.</b> Viewers never get them.</span></li></ul>
     </div>
   </section>

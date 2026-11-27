@@ -8,6 +8,7 @@
   if (form) initForm();
   initShared();
   initAgentMenu();
+  initMotion();
 
   function initForm() {
   const htmlInput = document.getElementById("html-input");
@@ -796,6 +797,106 @@
           setTimeout(function () { label.textContent = orig; copyBtn.classList.remove("copied"); }, 1800);
         });
       });
+    });
+  }
+
+  // ── Motion: the moving hero pictures and the explainers in guide articles ──
+  // DESIGN.md §9.3 Motion: slow loops that pause off screen (and, for
+  // explainers, on hover or focus). With reduced motion, nothing moves and
+  // explainers show their last step.
+  function initMotion() {
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // Runs tick() every ms while el is on screen and not paused.
+    function loop(el, ms, tick, pauseOnHover) {
+      var visible = false, hovered = false, timer = null;
+      function run() {
+        clearTimeout(timer);
+        if (!visible || hovered) return;
+        timer = setTimeout(function () { tick(); run(); }, ms);
+      }
+      if ("IntersectionObserver" in window) {
+        new IntersectionObserver(function (entries) {
+          visible = entries[0].isIntersecting;
+          run();
+        }).observe(el);
+      } else { visible = true; run(); }
+      if (pauseOnHover) {
+        var on = function () { hovered = true; clearTimeout(timer); };
+        var off = function () { hovered = false; run(); };
+        el.addEventListener("mouseenter", on);
+        el.addEventListener("mouseleave", off);
+        el.addEventListener("focusin", on);
+        el.addEventListener("focusout", off);
+      }
+    }
+
+    // Slides hero: flip through the slides, keep the counter and address in step.
+    document.querySelectorAll("[data-deck]").forEach(function (deck) {
+      if (reduce) return;
+      var slides = deck.querySelectorAll("section");
+      var i = 0;
+      loop(deck, 2800, function () {
+        slides[i].classList.remove("on");
+        slides[i].classList.add("was");
+        i = (i + 1) % slides.length;
+        slides.forEach(function (sl, k) { if (k !== i && k !== (i + slides.length - 1) % slides.length) sl.classList.remove("was"); });
+        slides[i].classList.remove("was");
+        slides[i].classList.add("on");
+        var n = slides[i].getAttribute("data-n");
+        document.querySelectorAll("[data-deck-n], [data-deck-count], [data-deck-url]").forEach(function (t) { t.textContent = n; });
+      });
+    });
+
+    // Snake hero: the snake goes round the board and eats.
+    document.querySelectorAll(".report.game .board").forEach(function (board) {
+      if (reduce) return;
+      var cells = board.querySelectorAll("i");
+      var cols = 10;
+      var path = [];
+      var r, c;
+      for (c = 1; c <= 8; c++) path.push([2, c]);
+      for (r = 3; r <= 7; r++) path.push([r, 8]);
+      for (c = 7; c >= 1; c--) path.push([7, c]);
+      for (r = 6; r >= 3; r--) path.push([r, 1]);
+      var score = board.parentNode.querySelector(".game-top span");
+      var points = 14, head = 4, len = 4, food = 11;
+      function draw() {
+        cells.forEach(function (cell) { cell.className = ""; });
+        for (var k = 0; k < len; k++) {
+          var p = path[(head - k + path.length) % path.length];
+          cells[p[0] * cols + p[1]].className = k === 0 ? "h" : "s";
+        }
+        var f = path[food];
+        cells[f[0] * cols + f[1]].className = "f";
+      }
+      draw();
+      loop(board, 260, function () {
+        head = (head + 1) % path.length;
+        if (head === food) {
+          points += 1;
+          if (score) score.textContent = "Score " + points;
+          len = len >= 9 ? 4 : len + 1;
+          food = (head + 7 + (points % 5)) % path.length;
+        }
+        draw();
+      });
+    });
+
+    // Explainers: <figure class="explain" data-steps="3"> steps through
+    // data-step 1..n; buttons with data-mode switch what it shows.
+    document.querySelectorAll("figure.explain[data-steps]").forEach(function (fig) {
+      var n = Number(fig.getAttribute("data-steps"));
+      var set = function (k) { fig.setAttribute("data-step", String(k)); };
+      fig.querySelectorAll("[data-mode]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          fig.setAttribute("data-show", b.getAttribute("data-mode"));
+          fig.querySelectorAll("[data-mode]").forEach(function (o) { o.setAttribute("aria-pressed", String(o === b)); });
+          set(reduce ? n : 1);
+        });
+      });
+      if (reduce) { set(n); return; }
+      loop(fig, 2600, function () { set(Number(fig.getAttribute("data-step")) % n + 1); }, true);
     });
   }
 })();
