@@ -124,3 +124,33 @@ export async function verifyViewerToken(secret: string, pageId: string, token: u
   if (Number(exp) <= nowSec) return { ok: false, reason: "expired" };
   return { ok: true, viewer, gate };
 }
+
+/**
+ * A watch token: what an open page sends to POST /c/:id/live to ask whether
+ * its content was replaced (lib/live-reload.ts). It names one page and its
+ * gate and expires, like a viewer token, but names no viewer and is signed
+ * for its own purpose, so it can't be used to save or read anything.
+ * Format: w1.<page>.<exp>.<gate>.<sig>.
+ */
+export async function mintWatchToken(secret: string, pageId: string, expSec: number, gate: string): Promise<string> {
+  const body = `w1.${pageId}.${expSec}.${gate}`;
+  return `${body}.${b64url(await mac(secret, "watch", body))}`;
+}
+
+export type WatchCheck = { ok: true; gate: string } | { ok: false; reason: "malformed" | "bad_signature" | "expired" | "wrong_page" };
+
+/** Check a watch token sent to /c/:pageId/live: signed, for this page, not expired. */
+export async function verifyWatchToken(secret: string, pageId: string, token: unknown, nowSec: number): Promise<WatchCheck> {
+  if (typeof token !== "string" || token.length > 200) return { ok: false, reason: "malformed" };
+  const parts = token.split(".");
+  if (parts.length !== 5 || parts[0] !== "w1") return { ok: false, reason: "malformed" };
+  const [, tokenPage, exp, gate, sig] = parts as [string, string, string, string, string];
+  if (!PAGE_ID.test(tokenPage) || !/^\d{1,12}$/.test(exp) || !/^[A-Za-z0-9_-]{11}$/.test(gate)) return { ok: false, reason: "malformed" };
+  const given = fromB64url(sig);
+  if (given === null) return { ok: false, reason: "malformed" };
+  const want = await mac(secret, "watch", `w1.${tokenPage}.${exp}.${gate}`);
+  if (!sameBytes(given, want)) return { ok: false, reason: "bad_signature" };
+  if (tokenPage !== pageId) return { ok: false, reason: "wrong_page" };
+  if (Number(exp) <= nowSec) return { ok: false, reason: "expired" };
+  return { ok: true, gate };
+}

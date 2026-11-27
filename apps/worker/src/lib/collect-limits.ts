@@ -72,6 +72,13 @@ export const LIVE_DATA_PUSH_LIMIT = { limit: 120, windowSeconds: 60 * 60 } as co
 /** How often an open page asks whether its live data changed, in seconds. */
 export const LIVE_DATA_POLL_SECONDS = 15;
 
+/**
+ * How often an open page asks whether its content was replaced (a publish
+ * update, PUT, update_page or a restore; lib/live-reload.ts), in seconds,
+ * while its tab is showing. One small KV read and an R2 head per ask.
+ */
+export const LIVE_RELOAD_POLL_SECONDS = 5;
+
 /** How long the token the page gets lasts. A reload gets a new one. */
 export const VIEWER_TOKEN_SECONDS = 7 * 24 * 3600;
 /** How long the viewer cookie lasts, so the same browser stays the same viewer. */

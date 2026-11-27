@@ -87,6 +87,8 @@ export type Env = {
   PDF_BURST?: { limit(options: { key: string }): Promise<{ success: boolean }> };
   /** Workers Rate Limiting binding: data-layer calls per network per minute (routes/collect.ts). */
   COLLECT_BURST?: RateLimit;
+  /** Live-reload polls from open pages (routes/collect.ts /c/:id/live), per network. */
+  LIVE_BURST?: RateLimit;
   /** Workers Rate Limiting binding: page checks per caller per minute (routes/page-tools.ts). */
   CHECK_BURST?: { limit(options: { key: string }): Promise<{ success: boolean }> };
   /**

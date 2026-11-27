@@ -36,7 +36,7 @@ export type RuntimeConfig =
   | { enabled: false; reason: "sign_in_required" };
 
 /** A JSON value safe inside <script>: no </script>, no <!--, no line separators. */
-function scriptJson(v: unknown): string {
+export function scriptJson(v: unknown): string {
   return JSON.stringify(v)
     .replace(/</g, "\\u003c")
     .replace(/>/g, "\\u003e")

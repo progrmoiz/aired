@@ -183,6 +183,14 @@ name = "COLLECT_BURST"
 namespace_id = "1020"
 simple = { limit = 120, period = 60 }
 
+# Live-reload polls from open pages (routes/collect.ts /c/:id/live): a tab
+# that's showing asks every 5 seconds whether the page was updated, so 12 a
+# minute. 600 a minute per network leaves room for a room full of viewers.
+[[ratelimits]]
+name = "LIVE_BURST"
+namespace_id = "1021"
+simple = { limit = 600, period = 60 }
+
 # Email for "only these people" codes (lib/email-sender.ts): Cloudflare Email
 # Service. Off until the sending domain is onboarded (Compute > Email Service >
 # Email Sending > Onboard Domain, then the DNS records it adds). Then uncomment

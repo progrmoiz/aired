@@ -178,6 +178,7 @@ function fakeR2() {
       return v === undefined ? null : { etag: "e1", async text() { return v; }, body: new Blob([v]).stream() };
     },
     async put(key: string, v: string) { objects.set(key, v); return { etag: "e1" }; },
+    async head(key: string) { return objects.has(key) ? { key, etag: "e1" } : null; },
     async delete() {},
   };
 }
@@ -651,6 +652,28 @@ test("data-layer tokens stop working when the page goes private, and when someon
   // Taken off the list: her token stops working too.
   await t.share("poll", { mode: "people", emails: ["bob@client.com"] });
   assert.equal((await mine(aliceToken)).status, 403);
+});
+
+test("live reload: the gate carries no watch token; going private, or being taken off the list, ends one", async () => {
+  const t = await setup();
+  const liveOf = (html: string) => {
+    const m = /var L=(\{[^;]*\}),F=/.exec(html);
+    return m ? (JSON.parse(m[1]!) as { token: string; etag: string }) : null;
+  };
+  const poll = (l: { token: string; etag: string }) =>
+    t.fetch("/c/report/live", { method: "POST", headers: { "Content-Type": "text/plain", Origin: "null" }, body: JSON.stringify(l) });
+  const before = liveOf(await (await t.fetch("/p/report")).text())!;
+  assert.deepEqual(await body(await poll(before)), { changed: false });
+  await t.share("report", { mode: "people", emails: ["alice@client.com", "bob@client.com"] });
+  // The public tab's token is refused now; the gate has none.
+  assert.equal((await poll(before)).status, 403);
+  assert.equal(liveOf(await (await t.fetch("/p/report")).text()), null);
+  // A listed person's tab gets one, until she's taken off the list.
+  const cookie = await t.signInAs("report", "alice@client.com");
+  const alice = liveOf(await (await t.fetch("/p/report", { headers: { Cookie: cookie } })).text())!;
+  assert.deepEqual(await body(await poll(alice)), { changed: false });
+  await t.share("report", { mode: "people", emails: ["bob@client.com"] });
+  assert.equal((await poll(alice)).status, 403);
 });
 
 test("a content update racing a switch to people-only can't leave the page public in KV", async () => {

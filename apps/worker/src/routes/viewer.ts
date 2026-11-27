@@ -22,6 +22,7 @@ import { dataLayerFor, VIEWER_COOKIE } from "../lib/collect-page.ts";
 import { accessGate, logVisit } from "./access.ts";
 import { gateMaterial } from "../lib/access-list.ts";
 import { viewerPdfHref } from "../lib/pdf-export.ts";
+import { liveReloadFor } from "../lib/live-reload.ts";
 
 /** A page that has used up its view limit. */
 function viewLimitReached(): Response {
@@ -175,6 +176,15 @@ viewer.get("/p/:id", async (c) => {
   ).catch(() => null);
   if (pdfHref !== null && metadata.pin !== null) headers.set("Cache-Control", "private, no-store");
 
+  // Live reload (lib/live-reload.ts): an open tab picks up a new version
+  // of the page within seconds. Tied to the page's gate, like the data layer.
+  const liveReload = await liveReloadFor({
+    secret: c.env.SESSION_SECRET, origin: siteOrigin(c.env), id, gate: gateMaterial(metadata.pin, metadata.access, entries), etag: obj.etag, nowMs: now,
+  }).catch((err) => {
+    console.error("live reload token failed", { id, err });
+    return "";
+  });
+
   // The shim must run before page scripts, so it goes in after the bar's
   // own <head> injection.
   const wrappedHtml = injectEarlyScript(
@@ -188,7 +198,7 @@ viewer.get("/p/:id", async (c) => {
       imageVersion: versionFromEtag(obj.etag),
       pdfHref,
     }),
-    SANDBOX_SHIM + (dataLayer?.script ?? ""),
+    SANDBOX_SHIM + (dataLayer?.script ?? "") + liveReload,
   );
 
   return new Response(wrappedHtml, { status: 200, headers });

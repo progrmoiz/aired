@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
 import type { AppBindings } from "../types.js";
 import { hashToHex } from "@aired/core";
-import { pageGate, usableSecret, verifyViewerToken } from "../lib/collect-token.ts";
+import { pageGate, usableSecret, verifyViewerToken, verifyWatchToken } from "../lib/collect-token.ts";
 import { gateMaterial } from "../lib/access-list.ts";
 import { getAccessEntries } from "../lib/access-store.ts";
 
@@ -268,6 +268,47 @@ collect.post("/c/:id/data", async (c) => {
   } catch {
     return problem(c, { status: 503, code: "unavailable", error: "Couldn't load the data. Try again." });
   }
+});
+
+// Live reload (lib/live-reload.ts): an open page asks every few seconds
+// whether the HTML it was served is still the live one. Body: { token, etag }
+// with the watch token the page got. Answers { changed }. Cheap: the token,
+// the KV record, the gate and an R2 head. Its own per-minute guard
+// (LIVE_BURST), so a room full of viewers can't use up the data layer's.
+collect.post("/c/:id/live", async (c) => {
+  const id = c.req.param("id") ?? "";
+  if (!PAGE_ID.test(id)) return problem(c, { status: 404, code: "not_found", error: "Page not found" });
+  const network = await hashToHex(visitorNetwork(c.req.header("CF-Connecting-IP") ?? "unknown"), 16);
+  if (!(await underBurstLimit(c.env.LIVE_BURST, network))) {
+    c.header("Retry-After", "60");
+    return problem(c, { status: 429, code: "rate_limited", error: "Too many requests. Wait a minute and try again." });
+  }
+  if (!usableSecret(c.env.SESSION_SECRET)) return problem(c, { status: 503, code: "unavailable", error: "Live reload isn't set up on this server." });
+  const read = await readBody(c);
+  if (!read.ok) return problem(c, read.problem);
+  const check = await verifyWatchToken(c.env.SESSION_SECRET, id, read.body.token, Math.floor(Date.now() / 1000));
+  if (!check.ok) return problem(c, TOKEN_PROBLEMS[check.reason] ?? TOKEN_PROBLEMS.default!);
+  const etag = read.body.etag;
+  if (typeof etag !== "string" || etag === "" || etag.length > 100) return problem(c, { status: 400, code: "invalid_input", error: "Send the etag the page was served with." });
+  const raw = await c.env.PAGES_KV.get(`page:${id}`);
+  const live = raw === null ? null : parseMetadata(raw);
+  if (live === null || (live.reads !== null && live.readCount >= live.reads)) return problem(c, { status: 410, code: "gone", error: "This page is gone." });
+  if (live.expiresAt !== null && Date.parse(live.expiresAt) <= Date.now()) return problem(c, { status: 410, code: "gone", error: "This page is gone." });
+  let gate: string;
+  try {
+    gate = await currentGate(c, id, live.pin, live.access);
+  } catch {
+    return problem(c, { status: 503, code: "unavailable", error: "Couldn't reach storage. Try again." });
+  }
+  if (gate !== check.gate) return problem(c, PIN_CHANGED);
+  let head: R2Object | null;
+  try {
+    head = await c.env.PAGES_BUCKET.head(`pages/${id}/index.html`);
+  } catch {
+    return problem(c, { status: 503, code: "unavailable", error: "Couldn't reach storage. Try again." });
+  }
+  if (head === null) return problem(c, { status: 410, code: "gone", error: "This page is gone." });
+  return c.json({ changed: head.etag !== etag });
 });
 
 collect.on(["GET", "PUT", "PATCH", "DELETE"], "/c/:id/:op", (c) =>

@@ -10,7 +10,8 @@ const { collect } = await import("../src/routes/collect.ts");
 const { responses } = await import("../src/routes/responses.ts");
 const { insertPageRow, rowFromMetadata } = await import("../src/lib/pages-store.ts");
 const { serializeMetadata, hashToken } = await import("@aired/core");
-const { mintViewerToken, verifyViewerToken, viewerKey, pageGate } = await import("../src/lib/collect-token.ts");
+const { mintViewerToken, verifyViewerToken, viewerKey, pageGate, mintWatchToken } = await import("../src/lib/collect-token.ts");
+const { loadPage, updatePage, deletePage } = await import("../src/lib/page-write.ts");
 const { saveEntry, getPageData, pruneCollectData, deletePageCollectData } = await import("../src/lib/collect-store.ts");
 const { COLLECT_LIMITS, COLLECT_WRITE_LIMITS } = await import("../src/lib/collect-limits.ts");
 
@@ -22,14 +23,21 @@ const COLLECT_HTML = `<!doctype html><html><head><title>Programme</title></head>
 
 function fakeR2() {
   const objects = new Map<string, string>();
+  // Every put gets a new etag, as R2 gives new content one.
+  const etags = new Map<string, string>();
+  let n = 0;
   return {
     objects,
     async get(key: string) {
       const v = objects.get(key);
-      return v === undefined ? null : { etag: "e1", async text() { return v; }, body: new Blob([v]).stream() };
+      return v === undefined ? null : { etag: etags.get(key) ?? "e1", async text() { return v; }, body: new Blob([v]).stream() };
     },
-    async put(key: string, v: string) { objects.set(key, v); },
-    async delete() {},
+    async head(key: string) {
+      return objects.has(key) ? { key, etag: etags.get(key) ?? "e1" } : null;
+    },
+    async put(key: string, v: string) { objects.set(key, v); etags.set(key, `e${++n}`); return { key, etag: etags.get(key) }; },
+    async delete(keys: string | string[]) { for (const k of Array.isArray(keys) ? keys : [keys]) { objects.delete(k); etags.delete(k); } },
+    async list() { return { objects: [], truncated: false }; },
   };
 }
 
@@ -87,10 +95,12 @@ async function setup() {
     const res = await fetch(`/p/${id}`, cookie ? { headers: { Cookie: cookie } } : {});
     const html = await res.text();
     const cfg = /var C=(\{[^;]*\}),F=/.exec(html);
+    const live = /var L=(\{[^;]*\}),F=/.exec(html);
     const setCookie = res.headers.get("Set-Cookie");
     return {
       res, html,
       config: cfg ? (JSON.parse(cfg[1]!) as { on: boolean; token?: string; viewer?: string; reason?: string; base?: string }) : null,
+      live: live ? (JSON.parse(live[1]!) as { base: string; token: string; etag: string; ms: number }) : null,
       cookie: setCookie ? setCookie.split(";")[0]! : cookie,
       setCookie,
     };
@@ -107,7 +117,7 @@ const json = async (res: Response) => (await res.json()) as Record<string, any>;
 
 // --- Serving pages ----------------------------------------------------------
 
-test("a page that doesn't use the data layer is served as before: no script, cookie or token", async () => {
+test("a page that doesn't use the data layer gets no data API, cookie or viewer token (only live reload)", async () => {
   const t = await setup();
   const { res, html, config } = await t.open("plain");
   assert.equal(res.status, 200);
@@ -115,6 +125,7 @@ test("a page that doesn't use the data layer is served as before: no script, coo
   assert.equal(res.headers.get("Set-Cookie"), null);
   assert.ok(!html.includes("aired.collect"));
   assert.equal(res.headers.get("Cache-Control"), null);
+  assert.ok(html.includes("/c/plain\""), "the live-reload script is there");
 });
 
 test("an owned page that names aired.collect gets a token, a viewer cookie and no caching", async () => {
@@ -511,4 +522,78 @@ test("free entries get the plan's retention; Pro keeps them while the page lives
   const byId = new Map(rows.map((r) => [r.id, r.expires_at]));
   assert.equal(byId.get(free.ok ? free.entry.id : ""), NOW + 90 * 86_400_000);
   assert.equal(byId.get(pro.ok ? pro.entry.id : ""), null);
+});
+
+// --- Live reload ---------------------------------------------------------------
+
+test("live reload: every page gets a watch token; a poll says unchanged until the content is replaced", async () => {
+  const t = await setup();
+  for (const id of ["plain", "anon", "trainer"]) {
+    const { live, html } = await t.open(id);
+    assert.ok(live !== null, id);
+    assert.equal(live!.base, `https://aired.test/c/${id}`);
+    assert.equal(live!.ms, 5000);
+    assert.match(live!.token, /^w1\./);
+    for (const m of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) new Function(m[1]!);
+  }
+  const { live } = await t.open("plain");
+  const poll = (body: Record<string, unknown>, id = "plain") => t.page(id, "live", body);
+  assert.deepEqual(await json(await poll({ token: live!.token, etag: live!.etag })), { changed: false });
+  // An update (publish with a token, PUT, update_page and restores all go through updatePage).
+  const page = await loadPage(t.env as never, "plain");
+  await updatePage(t.env as never, page!, "<html><head></head><body>New version</body></html>", null, Date.now());
+  assert.deepEqual(await json(await poll({ token: live!.token, etag: live!.etag })), { changed: true });
+  // A tab opened now has the new etag, so it isn't told to reload again.
+  const fresh = (await t.open("plain")).live!;
+  assert.notEqual(fresh.etag, live!.etag);
+  assert.deepEqual(await json(await poll({ token: fresh.token, etag: fresh.etag })), { changed: false });
+  // No etag: refused.
+  assert.equal((await poll({ token: live!.token })).status, 400);
+});
+
+test("live reload: the watch token is for one page and can't save or read; others can't use it", async () => {
+  const t = await setup();
+  const { live, config } = await t.open("trainer");
+  // A watch token is no viewer token, and the other way round.
+  for (const op of ["save", "mine", "all", "data"]) {
+    assert.equal((await t.page("trainer", op, { token: live!.token, record: { a: 1 }, since: -1 })).status, 403, op);
+  }
+  assert.equal((await t.page("trainer", "live", { token: config!.token, etag: live!.etag })).status, 403);
+  // Another page's token, a forged one, an expired one.
+  const poll = (await t.open("poll")).live!;
+  assert.equal((await t.page("trainer", "live", { token: poll.token, etag: live!.etag })).status, 403);
+  const [w, page, exp, gate, sig] = live!.token.split(".");
+  for (const f of [[w, page, String(Number(exp) + 10_000), gate, sig].join("."), [w, page, exp, "B".repeat(11), sig].join("."), [w, page, exp, gate].join("."), "", 42]) {
+    assert.equal((await t.page("trainer", "live", { token: f, etag: live!.etag })).status, 403, String(f));
+  }
+  const expired = await mintWatchToken(SECRET, "trainer", Math.floor(NOW / 1000) - 1, gate!);
+  const res = await t.page("trainer", "live", { token: expired, etag: live!.etag });
+  assert.equal(res.status, 403);
+  assert.equal((await json(res)).code, "expired");
+});
+
+test("live reload: a PIN page's token comes only after the PIN; a new PIN, a deletion or a used-up view limit ends it", async () => {
+  const t = await setup();
+  const { live } = await t.open("plain");
+  // The owner adds a PIN: the row and the KV record change.
+  t.raw.prepare("UPDATE pages SET pin = 'pbkdf2$new' WHERE id = 'plain'").run();
+  const kv = t.env.PAGES_KV as unknown as { get(k: string): Promise<string | null>; put(k: string, v: string): Promise<void> };
+  const meta = JSON.parse((await kv.get("page:plain"))!);
+  await kv.put("page:plain", JSON.stringify({ ...meta, pin: "pbkdf2$new" }));
+  const res = await t.page("plain", "live", { token: live!.token, etag: live!.etag });
+  assert.equal(res.status, 403);
+  assert.equal((await json(res)).code, "expired");
+  // The PIN screen itself carries no token and no page.
+  const locked = await t.open("plain");
+  assert.equal(locked.live, null);
+  assert.ok(!locked.html.includes("/live"));
+  // A used-up view limit.
+  const poll = (await t.open("poll")).live!;
+  const pm = JSON.parse((await kv.get("page:poll"))!);
+  await kv.put("page:poll", JSON.stringify({ ...pm, reads: 1, readCount: 1 }));
+  assert.equal((await t.page("poll", "live", { token: poll.token, etag: poll.etag })).status, 410);
+  // A deleted page.
+  const other = (await t.open("other")).live!;
+  await deletePage(t.env as never, (await loadPage(t.env as never, "other"))!, () => {});
+  assert.equal((await t.page("other", "live", { token: other.token, etag: other.etag })).status, 410);
 });
