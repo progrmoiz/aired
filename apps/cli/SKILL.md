@@ -38,7 +38,7 @@ npx aired new deck && npx aired deck.md
 | `aired update <id> <file>` | Update an existing page |
 | `aired delete <id>` | Delete a page |
 | `aired info <id>` | Show page metadata |
-| `aired set <id>` | Change PIN, expiry, view limit or title without re-uploading |
+| `aired set <id>` | Change who can open it (PIN, or only named people), expiry, view limit or title without re-uploading |
 | `aired check <id>` | Open the page in a real browser and report errors (exits 1 if broken) |
 | `aired feedback` | Report a bug, friction or idea in aired itself |
 | `aired tokens` | List stored update tokens |
@@ -115,7 +115,11 @@ No need to publish again to add a PIN, extend expiry or rename a page:
 aired set abc123 --pin 4821 --ttl 24h      # PIN on, expires a day from now
 aired set abc123 --reads 50 --title "Q4"   # view limit and title
 aired set abc123 --clear-pin --permanent   # PIN off, never expires
+aired set abc123 --only alice@client.com,@client.com   # only these people (each gets an email code)
+aired set abc123 --public                  # anyone with the link again
 ```
+
+`--only` takes emails and whole domains (`@client.com`, Pro), comma-separated, and replaces the list. It needs sign-in (`aired login` or `AIRED_API_KEY`) and a page in your account. Free lists 3 people per page.
 
 `--clear-title` and `--clear-reads` remove those. PINs are 4–64 characters, TTLs a minute to a year (use `--permanent` beyond that), titles up to 200 characters. It uses the stored update token, else your sign-in or `AIRED_API_KEY` (your own pages only). Over MCP it's `set_options`; `get_page` reads a page's settings back (whether a PIN is on, never the PIN).
 

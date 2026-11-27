@@ -12,6 +12,14 @@ function formatExpiry(expiresAt: string | null): string {
   return new Date(expiresAt).toLocaleString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
+function accessLine(page: PageDetails): string {
+  const mode = page.access ?? (page.hasPin ? 'pin' : 'public')
+  if (mode === 'pin') return 'PIN'
+  if (mode === 'public') return 'anyone with the link'
+  const people = page.allowed ? [...page.allowed.emails, ...page.allowed.domains.map((d) => `@${d}`)] : []
+  return people.length > 0 ? `only ${people.join(', ')}` : 'only the people on its list'
+}
+
 /** A page's settings for a person to read (aired set). Never the PIN: only whether it's on. */
 export function printPageDetails(page: PageDetails): void {
   const views = page.reads !== null ? `${page.readCount} of ${page.reads}` : String(page.readCount)
@@ -21,7 +29,7 @@ export function printPageDetails(page: PageDetails): void {
     ['URL:     ', page.url],
     ['Size:    ', formatBytes(page.size)],
     ['Views:   ', views],
-    ['PIN:     ', page.hasPin ? 'on' : 'off'],
+    ['Access:  ', accessLine(page)],
     ['Expires: ', formatExpiry(page.expiresAt)],
   ]
   if (page.project !== null) lines.push(['Project: ', page.project])

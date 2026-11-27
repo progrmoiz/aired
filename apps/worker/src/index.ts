@@ -9,6 +9,8 @@ import { pruneCollectData } from "./lib/collect-store.ts";
 import { me } from "./routes/me.js";
 import { viewer } from "./routes/viewer.js";
 import { presenter } from "./routes/presenter.ts";
+import { access } from "./routes/access.ts";
+import { pruneAccessData } from "./lib/access-store.ts";
 import { report } from "./routes/report.js";
 import { handleMcp } from "./routes/mcp.js";
 import { og } from "./routes/og.js";
@@ -208,6 +210,9 @@ app.get("/device", devicePage);
 
 // A deck's speaker view, for its owner (routes/presenter.ts)
 app.route("/", presenter);
+
+// "Only these people": the gate's two steps and the owner's list (routes/access.ts).
+app.route("/", access);
 // The data layer's calls from published pages (POST /c/:id/*)
 app.route("/", collect);
 
@@ -315,7 +320,9 @@ async function runHousekeeping(env: Env, now = Date.now()): Promise<void> {
   const billingEvents = await pruneBillingEvents(env.DB, now);
   // Data-layer entries past their plan's retention, or of pages that are gone.
   const responses = await pruneCollectData(env.DB, now);
-  log("info", "housekeeping", { rateLimits, billingEvents, responses });
+  // Spent "only these people" codes, and lists and visit logs of pages that are gone.
+  const access = await pruneAccessData(env.DB, now);
+  log("info", "housekeeping", { rateLimits, billingEvents, responses, access });
 }
 
 /**

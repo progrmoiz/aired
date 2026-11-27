@@ -63,6 +63,12 @@ export function ViewsView({ pageId, pages }: { pageId: string; pages: PagesState
   return (
     <div className="grid min-w-0 gap-5">
       <ViewHeader title={title} description={description} action={picker} />
+      {page?.access === 'people' && (
+        <Card className="flex-row flex-wrap items-center justify-between gap-3 px-5 py-3">
+          <p className="text-sm text-muted-foreground">Only people you chose can open this page. See which of them opened it, and when.</p>
+          <a href={`#share/${page.id}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>Who opened it</a>
+        </Card>
+      )}
       {state.status === 'loading' && <LoadingReport />}
       {state.status === 'ready' && <ReportBody report={state.report} allTime={allTime} perPage={!!pageId} />}
       {state.status === 'locked' && <LockedPreview range={range} allTime={allTime} perPage={!!pageId} />}

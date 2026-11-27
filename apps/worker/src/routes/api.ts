@@ -22,6 +22,9 @@ import { apiError } from "../lib/errors.ts";
 import { publicPageMeta } from "../lib/public-meta.ts";
 import { buildContent, contentFields, kindOf, readSidecar } from "../lib/page-content.ts";
 import type { Entitlements } from "../lib/entitlements.js";
+import { fromEntries, overLimit, toEntries } from "../lib/access-list.ts";
+import { clearAccessList, getAccessEntries, replaceAccessList } from "../lib/access-store.ts";
+import { emailSenderFor } from "../lib/email-sender.ts";
 import {
   generateId,
   generateToken,
@@ -461,8 +464,29 @@ api.get("/pages/:id/details", rateLimit(TIERS.page_options), async (c) => {
   if (page instanceof Response) return page;
   const access = await ownerAccess(c, page, sentUpdateToken(c));
   if (!access.ok) return apiError(c, access.status, access.code, access.error);
-  return c.json({ ...pageDetails(page.row, await viewCount(c, page), siteOrigin(c.env)), ...(await kindDetails(c, id)) });
+  const allowed = await allowedFor(c, page.row);
+  if (allowed instanceof Response) return allowed;
+  return c.json({ ...pageDetails(page.row, await viewCount(c, page), siteOrigin(c.env)), ...(await kindDetails(c, id)), ...allowed });
 });
+
+/**
+ * An "only these people" page's list, for its signed-in owner only (a token
+ * sent too doesn't matter): other people's addresses don't go to whoever
+ * holds the update token. Empty for other pages and other callers.
+ */
+async function allowedFor(
+  c: Context<AppBindings>,
+  row: { id: string; ownerId: number | null; access: "people" | null },
+): Promise<{ allowed?: { emails: string[]; domains: string[] } } | Response> {
+  const user = c.get("user");
+  if (row.access !== "people" || user === null || row.ownerId !== user.id) return {};
+  try {
+    return { allowed: fromEntries(await getAccessEntries(c.env.DB, row.id)) };
+  } catch (err) {
+    console.error("access list lookup failed", { id: row.id, err });
+    return apiError(c, 503, "unavailable", "Could not load this page's settings. Please try again.");
+  }
+}
 
 // PATCH /api/pages/:id — change a page's settings without sending its HTML
 // again (set_options, `aired set`): title, pin (null removes it), ttl or
@@ -495,15 +519,66 @@ api.patch("/pages/:id", requireCsrfHeader, rateLimit(TIERS.page_options), async 
 
   const now = Date.now();
   const pinHash = typeof change.pin === "string" ? await hashPin(change.pin) : null;
+  const columns = settingsChange(change, pinHash, now, page.row);
+
+  // Who may open the page (lib/access-list.ts). Making a page "only these
+  // people", changing its list, or taking it out of that mode is for the
+  // signed-in owner: the list is other people's addresses.
+  const toPeople = change.access?.mode === "people";
+  const fromPeople = page.row.access === "people" && columns.access === null;
+  if (toPeople || fromPeople) {
+    const user = c.get("user");
+    if (page.row.ownerId === null) {
+      return apiError(c, 403, "owner_required", "Only pages in an account can be shared with named people. Sign in and keep the page in your account first.");
+    }
+    // A token sent alongside doesn't matter: what counts is the signed-in owner.
+    if (user === null || user.id !== page.row.ownerId) {
+      return apiError(c, 403, "owner_required", "Only the page's owner, signed in (aired login, an API key or the dashboard), can change who can open it.");
+    }
+  }
+  if (change.access?.mode === "pin" && change.pin === undefined && page.row.pin === null) {
+    return invalidInput(c, 'access.mode "pin" needs a pin: this page has none yet', "pin");
+  }
+  if (toPeople && change.access !== undefined) {
+    const ent = await getEntitlements(c.env, page.row.ownerId);
+    const over = overLimit(change.access, ent.access);
+    if (over !== null) {
+      const pro = ent.plan === "pro";
+      if (pro) return apiError(c, 400, "invalid_input", over.error.replace(" Remove some, or upgrade.", " Remove some."), { field: "access" });
+      return c.json({ ...planLimitError(over.limit, siteOrigin(c.env), "share"), error: over.error }, 402);
+    }
+    if (emailSenderFor(c.env) === null) {
+      return apiError(c, 503, "email_unavailable", "Sharing with named people needs email, which isn't set up on this server yet.");
+    }
+    // The list goes in first: a "people" page with an old or empty list
+    // lets fewer people in, never more.
+    try {
+      await replaceAccessList(c.env.DB, id, page.row.ownerId!, toEntries(change.access), now);
+    } catch (err) {
+      console.error("access list write failed", { id, err });
+      return apiError(c, 503, "unavailable", "Could not change who can open this page. Please try again.");
+    }
+  }
+
   let row;
   try {
-    ({ row } = await setPageOptions(c.env, page, settingsChange(change, pinHash, now), now));
+    ({ row } = await setPageOptions(c.env, page, columns, now));
   } catch (err) {
     if (err instanceof PageGone) return apiError(c, 404, "not_found", "Page not found");
     console.error("page options write failed", { id, err });
     return apiError(c, 503, "unavailable", "Could not change this page's settings. Please try again.");
   }
-  return c.json({ ...pageDetails(row, await viewCount(c, page), siteOrigin(c.env)), changed: changedSettings(change) });
+  // Out of "only these people": the list and live codes go once the page no longer checks them.
+  if (fromPeople) {
+    try {
+      await clearAccessList(c.env.DB, id);
+    } catch (err) {
+      console.error("access list clear failed", { id, err });
+    }
+  }
+  const allowed = await allowedFor(c, row);
+  if (allowed instanceof Response) return allowed;
+  return c.json({ ...pageDetails(row, await viewCount(c, page), siteOrigin(c.env)), changed: changedSettings(change), ...allowed });
 });
 
 // POST /api/feedback — feedback from agents and people about aired itself
@@ -559,7 +634,7 @@ api.get("/pages/:id", async (c) => {
   if (metadata === null) return apiError(c, 500, "internal_error", "Page metadata is corrupted");
 
   let readCount = metadata.readCount;
-  if (metadata.pin === null) {
+  if (metadata.pin === null && metadata.access !== "people") {
     try {
       readCount = viewCountOf(await pageViewCounts(c.env.DB, [id]), id, metadata.readCount);
     } catch (err) {

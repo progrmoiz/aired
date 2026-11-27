@@ -14,7 +14,9 @@ function d1() {
   db.exec(migration("0001_accounts_billing.sql"));
   db.exec(migration("0002_billing_customers.sql"));
   db.exec(migration("0006_api_keys.sql"));
+  db.exec(migration("0010_pages.sql"));
   db.exec(migration("0014_collect.sql"));
+  db.exec(migration("0017_page_access.sql"));
   const prepare = (sql: string) => {
     let args: unknown[] = [];
     const stmt = {
@@ -40,9 +42,13 @@ function seed(raw: DatabaseSync, uid: number, cus: string) {
   // What a viewer saved on one of their pages, and its live data.
   raw.prepare("INSERT INTO responses (id, page_id, owner_id, viewer, data, size, created_at, updated_at) VALUES (?, ?, ?, 'v', '{}', 2, 1, 1)").run(`r_${uid}`, `page${uid}`, uid);
   raw.prepare("INSERT INTO page_data (page_id, owner_id, data, updated_at) VALUES (?, ?, '[]', 1)").run(`page${uid}`, uid);
+  // An "only these people" list, a live code and who opened the page.
+  raw.prepare("INSERT INTO page_access (page_id, entry, owner_id, created_at) VALUES (?, 'client@example.com', ?, 1)").run(`page${uid}`, uid);
+  raw.prepare("INSERT INTO access_codes (page_id, email_key, code_hash, expires_at, attempts, created_at) VALUES (?, 'k', 'h', 9999999999999, 0, 1)").run(`page${uid}`);
+  raw.prepare("INSERT INTO access_log (page_id, email, owner_id, first_at, last_at, views) VALUES (?, 'client@example.com', ?, 1, 1, 1)").run(`page${uid}`, uid);
 }
 
-const OWNER_COLUMN: Record<string, string> = { users: "id", responses: "owner_id", page_data: "owner_id" };
+const OWNER_COLUMN: Record<string, string> = { users: "id", responses: "owner_id", page_data: "owner_id", page_access: "owner_id", access_log: "owner_id" };
 const count = (raw: DatabaseSync, table: string, uid: number) =>
   (raw.prepare(`SELECT count(*) AS n FROM ${table} WHERE ${OWNER_COLUMN[table] ?? "user_id"} = ?`).get(uid) as { n: number }).n;
 
@@ -51,10 +57,14 @@ test("account deletion removes the user's billing, sign-in and response rows, an
   seed(raw, 1, "cus_1");
   seed(raw, 2, "cus_2");
   await deleteAccountRows(db, 1);
-  for (const table of ["subscriptions", "billing_customers", "identities", "users", "api_keys", "responses", "page_data"]) {
+  for (const table of ["subscriptions", "billing_customers", "identities", "users", "api_keys", "responses", "page_data", "page_access", "access_log"]) {
     assert.equal(count(raw, table, 1), 0, table);
     assert.equal(count(raw, table, 2), 1, table);
   }
+  // The deleted owner's live codes go too; the other owner's stay.
+  const codes = (page: string) => (raw.prepare("SELECT count(*) AS n FROM access_codes WHERE page_id = ?").get(page) as { n: number }).n;
+  assert.equal(codes("page1"), 0);
+  assert.equal(codes("page2"), 1);
 });
 
 test("deleting an account with no billing rows is a no-op, not an error", async () => {

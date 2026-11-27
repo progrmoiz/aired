@@ -1,13 +1,13 @@
 // A page as a gallery tile: live preview, title, facts and quick actions.
 import type { ReactNode } from 'react'
-import { EllipsisIcon, EyeIcon, LockIcon } from 'lucide-react'
+import { EllipsisIcon, EyeIcon, LockIcon, UsersIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { CopyLinkAction, IconAction } from '@/components/icon-action'
 import { PagePreview } from '@/components/page-preview'
 import { cn } from '@/lib/utils'
 
-export type TilePage = { id: string; title: string; html?: string; expires: string; soon?: boolean; pin: boolean; views: number; published: string; dim?: boolean }
+export type TilePage = { id: string; title: string; html?: string; expires: string; soon?: boolean; pin: boolean; private?: boolean; views: number; published: string; dim?: boolean }
 
 /**
  * The top is a live preview when the page's HTML is at hand (mockups), or a
@@ -25,7 +25,7 @@ export function PageTile({ page, origin, meta, actions, onOpen, cover, href }: {
           onClick={onOpen ? (e) => { e.preventDefault(); onOpen() } : undefined} aria-label={`Open ${page.title}`} className={cn('relative block', page.dim && 'opacity-55 saturate-50')}>
           {cover ?? (page.html !== undefined && <PagePreview page={{ title: page.title, html: page.html }} />)}
           <span className="absolute inset-x-0 top-0 flex justify-between p-2.5">
-            {page.pin ? <Badge variant="overlay"><LockIcon />PIN</Badge> : <span />}
+            {page.private ? <Badge variant="overlay"><UsersIcon />Private</Badge> : page.pin ? <Badge variant="overlay"><LockIcon />PIN</Badge> : <span />}
             {(page.soon || page.dim) && <Badge variant="overlay">{page.expires}</Badge>}
           </span>
         </a>

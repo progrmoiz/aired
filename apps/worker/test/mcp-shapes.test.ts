@@ -52,6 +52,7 @@ test("get_page and set_options: the page's settings, snake_case, never the PIN",
     views: 3,
     view_limit: 10,
     has_pin: true,
+    access: "pin",
     permanent: false,
     created_at: "2026-11-27T10:00:00.000Z",
     expires_at: "2026-12-04T10:00:00.000Z",
@@ -59,7 +60,7 @@ test("get_page and set_options: the page's settings, snake_case, never the PIN",
   });
   const set = valid("set_options", setOptionsResult({ ...details, changed: ["pin", "expiry"] }, O));
   assert.deepEqual(set.changed, ["pin", "expiry"]);
-  assert.match(setOptionsResult({ ...details, changed: ["pin"] }, O).content[0]!.text, /^Changed pin of https:\/\/aired\.sh\/p\/p1\n[\s\S]*PIN: on/);
+  assert.match(setOptionsResult({ ...details, changed: ["pin"] }, O).content[0]!.text, /^Changed pin of https:\/\/aired\.sh\/p\/p1\n[\s\S]*Access: anyone with the PIN/);
   // A PIN the API might send by mistake still never comes out.
   assert.ok(!JSON.stringify(pageOut({ ...details, pin: "pbkdf2$secret" }, O)).includes("secret"));
 });
