@@ -832,3 +832,38 @@ select.field option { background: var(--surface); }
 @media (prefers-reduced-motion: reduce) {
   .explain *, .explain *::before { animation: none !important; transition: none !important; }
 }
+
+/* Connect page (/connect): one row per AI app, a button or three steps, then the address and example asks */
+.cx { margin-top: 40px; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.cx-app { display: grid; grid-template-columns: 200px minmax(0, 1fr) auto; grid-template-areas: "name body act" "name note act"; gap: 6px 28px; padding: 22px 24px; border-top: 1px solid var(--border); scroll-margin-top: 24px; }
+.cx-app:first-child { border-top: 0; }
+.cx-name { grid-area: name; display: flex; flex-direction: column; gap: 2px; }
+.cx-name b { font-weight: 500; font-size: 16px; }
+.cx-name span { font-size: 13px; color: var(--text-3); }
+.cx-steps, .cx-body { grid-area: body; font-size: 14px; color: var(--text-2); }
+.cx-steps { padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.cx-steps li::marker { color: var(--text-3); font-variant-numeric: tabular-nums; }
+.cx-steps b { color: var(--text-1); font-weight: 500; }
+.cx-steps .mono, .cx-body .mono { font-size: 13px; color: var(--text-1); }
+.cx-note { grid-area: note; font-size: 13px; color: var(--text-3); max-width: 60ch; }
+.cx-act { grid-area: act; align-self: start; }
+.cx-act .btn { min-width: 150px; }
+.cx-more { margin-top: 24px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.cx-card { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 22px 24px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.cx-card h2, .cx-faq h2 { font-size: 18px; letter-spacing: -0.01em; margin: 0; }
+.cx-card p { font-size: 14px; color: var(--text-2); }
+.cx-url { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 8px 8px 12px; min-width: 0; }
+.cx-url .mono { font-size: 13px; overflow-wrap: anywhere; min-width: 0; }
+.cx-asks { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: 14px; color: var(--text-1); }
+.cx-asks li { padding: 8px 12px; border-radius: 8px; background: var(--surface-2); }
+.cx-faq { margin-top: 56px; max-width: 720px; }
+.cx-faq h3 { font-size: 15px; font-weight: 500; margin-top: 22px; }
+.cx-faq p { font-size: 14px; color: var(--text-2); margin-top: 6px; }
+.cx-faq a { color: var(--text-1); text-decoration: underline; text-decoration-color: var(--border-2); text-underline-offset: 3px; }
+@media (max-width: 760px) {
+  .cx-app { grid-template-columns: minmax(0, 1fr); grid-template-areas: "name" "body" "act" "note"; gap: 10px; padding: 20px; }
+  .cx-act .btn { width: 100%; }
+  .cx-more { grid-template-columns: minmax(0, 1fr); }
+}
+.agent-row p a { color: var(--text-1); }
+.agent .setup { min-width: 190px; }
