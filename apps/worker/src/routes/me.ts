@@ -20,6 +20,7 @@ import { clearSessionCookie, readSessionCookie, readWorkosSessionCookie, clearWo
 import { billingEnabled, getEntitlements, isEntitled } from '../lib/entitlements.js';
 import { getCustomerId, getSubscription } from '../lib/billing/store.js';
 import { blocksAccountDeletion, deleteAccountRows } from '../lib/billing/forget.js';
+import { deleteRemovedVersions, removeOwnerVersionsStatement } from '../lib/page-versions.ts';
 import { identityEmails } from '../lib/users.js';
 import { revokeMcpGrants } from './mcp-oauth.js';
 import { workosEnabled, workosLogoutUrl } from '../lib/workos.js';
@@ -519,7 +520,10 @@ me.delete('/', requireWebSession, requireCsrfHeader, async (c) => {
   let claimIds: string[];
   try {
     const now = Date.now();
-    const [released, claims] = await deleteAccountRows(c.env.DB, userId, [
+    // The pages' history goes with the account: marked removed before the
+    // pages are released (lib/page-versions.ts), its files deleted below.
+    const [, released, claims] = await deleteAccountRows(c.env.DB, userId, [
+      removeOwnerVersionsStatement(c.env.DB, userId, now),
       releaseOwnerPagesStatement(c.env.DB, userId, now),
       releaseClaimsStatement(c.env.DB, userId),
     ]);
@@ -637,6 +641,12 @@ me.delete('/', requireWebSession, requireCsrfHeader, async (c) => {
     (async () => {
       const kv = c.env.PAGES_KV;
       const now = Date.now();
+      // The removed versions' files, then their rows; housekeeping does any left over.
+      try {
+        for (let i = 0; i < 10 && (await deleteRemovedVersions(c.env)) > 0; i++);
+      } catch (err) {
+        console.error('Failed to delete page versions during account deletion:', err);
+      }
       const done = new Set<string>();
       for (const row of releasedPages) {
         done.add(row.id);

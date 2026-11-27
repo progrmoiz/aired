@@ -13,6 +13,7 @@ and `scripts/backup-restore.ts`.
 | KV page records, accounts and indexes | Nightly snapshot in the backup bucket | 30 days | `backup-restore.ts prepare`, then `wrangler kv bulk put` |
 | R2 page files removed by the expired-page sweep | Copied to `trash/` just before the sweep deletes them | 14 days | `backup-restore.ts untrash` |
 | R2 page files otherwise | None. R2 is durable, and only a deliberate delete removes a file | — | — |
+| R2 page history (`pages/<id>/versions/`) | None. Its D1 rows (`page_versions`) are in the D1 snapshot; the files aren't copied | Free: the last 5; Pro: the last 50, 90 days each | Restore from the page's history (`aired restore`), not from backup |
 
 KV prefixes in the snapshot (`BACKUP_KV_PREFIXES`): `page:`, `user:`,
 `email:`, `ent:`, `svs:`, `projects_by_owner:`, `pages_by_owner:` and
@@ -25,6 +26,32 @@ D1 tables in the snapshot: every table except `d1_migrations` and
 
 Not covered: files a user deletes (gone on purpose), MCP OAuth grants, and
 the `stats:live` counter.
+
+## Page history
+
+Every content update copies what it replaces to
+`pages/<id>/versions/<key>.html` (and `.doc.json` for Markdown and decks),
+with a row in D1 `page_versions` (`lib/page-versions.ts`, migration 0016).
+What goes, and when:
+
+- **An update past the plan's count** (`lib/version-limits.ts`): the oldest
+  versions' files and rows go right after the update.
+- **Hourly housekeeping** (`pruneVersions`, logged in `housekeeping` as
+  `versions`): Pro versions past 90 days (never the newest 5), any page over
+  50, and the history of pages that are deleted or expired.
+- **Page delete**: every file under `pages/<id>/versions/`, then the rows,
+  straight away. If that fails, housekeeping finds the rows of the deleted
+  page.
+- **Account delete**: the rows of the account's pages are marked removed in
+  the same D1 batch as the account rows (before the pages become anonymous),
+  so nobody can list or restore them from then on. Their files go right
+  after the response, and housekeeping finishes any that didn't.
+- **The expired-page sweep** also matches version files, so any a failed
+  write left behind under an expired page goes the same way as its HTML
+  (copied to `trash/` first).
+
+A restored D1 snapshot can name version files that are gone since; listing
+shows them, and fetching or restoring one answers `410 version_gone`.
 
 ## Buckets
 

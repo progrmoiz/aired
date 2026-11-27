@@ -134,6 +134,13 @@ test("api.ts: deleting a page deletes its screenshots and placeholder", () => {
   assert.match(render, /DELETE FROM page_shots WHERE id = \?/);
 });
 
+test("versions.ts: a restore writes through updatePage and queues a screenshot", () => {
+  const code = src("../src/routes/versions.ts");
+  assert.doesNotMatch(code, /PAGES_BUCKET\.put\(/);
+  assert.equal((code.match(/await updatePage\(c\.env, /g) ?? []).length, 1);
+  assert.equal((code.match(/c\.executionCtx\.waitUntil\(refreshShot\([^)]*\{ replacing: true \}\)/g) ?? []).length, 1);
+});
+
 test("mcp.ts: the anonymous publish tool queues screenshots too", () => {
   const code = src("../src/routes/mcp.ts");
   assert.doesNotMatch(code, /PAGES_BUCKET\.put\(/);

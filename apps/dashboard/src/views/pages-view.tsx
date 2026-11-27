@@ -5,7 +5,7 @@ import {
 import { toast } from 'sonner'
 import {
   ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon, ChartColumnIcon, ChevronDownIcon, ChevronRightIcon, ClockIcon, DownloadIcon, EllipsisIcon,
-  ExternalLinkIcon, EyeIcon, FileTextIcon, FlagIcon, FolderIcon, GlobeIcon, InboxIcon, LayoutGridIcon, ListIcon, LockIcon, SearchIcon, Share2Icon, Trash2Icon, UsersIcon,
+  ExternalLinkIcon, EyeIcon, FileTextIcon, FlagIcon, FolderIcon, GlobeIcon, HistoryIcon, InboxIcon, LayoutGridIcon, ListIcon, LockIcon, SearchIcon, Share2Icon, Trash2Icon, UsersIcon,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -221,6 +221,7 @@ function PageMenu({ page, onDelete }: { page: Page; onDelete: (p: Page) => void 
         <DropdownMenuItem render={<a href={`#share/${page.id}`} />}><Share2Icon /> Share</DropdownMenuItem>
         <DropdownMenuItem render={<a href={`#views/${page.id}`} />}><ChartColumnIcon /> See views</DropdownMenuItem>
         <DropdownMenuItem render={<a href={`#responses/${page.id}`} />}><InboxIcon /> See responses</DropdownMenuItem>
+        <DropdownMenuItem render={<a href={`#history/${page.id}`} />}><HistoryIcon /> See history</DropdownMenuItem>
         <DropdownMenuItem render={<a href={`/abuse?id=${encodeURIComponent(page.id)}`} />}><FlagIcon /> Report a problem</DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onClick={() => onDelete(page)}><Trash2Icon /> Delete page</DropdownMenuItem>

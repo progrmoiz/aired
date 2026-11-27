@@ -21,6 +21,7 @@ import { refreshShot } from "../lib/og-render.js";
 import { apiError } from "../lib/errors.ts";
 import { publicPageMeta } from "../lib/public-meta.ts";
 import { buildContent, contentFields, kindOf, readSidecar } from "../lib/page-content.ts";
+import { versionAuthor, versionCounts, type VersionAuthor } from "../lib/page-versions.ts";
 import type { Entitlements } from "../lib/entitlements.js";
 import { fromEntries, overLimit, toEntries } from "../lib/access-list.ts";
 import { clearAccessList, getAccessEntries, replaceAccessList } from "../lib/access-store.ts";
@@ -143,7 +144,7 @@ api.post("/publish", publishRateLimit, async (c) => {
   // Shapes and bounds in @aired/core (schemas.ts); a wrong-typed field is ignored, as before.
   const parsed = parseBody(publishBody, json.body);
   if (!parsed.ok) return invalidInput(c, parsed.error, parsed.field);
-  const { title, pin, ttl, reads, permanent, project, update_token, id: existingId } = parsed.data;
+  const { title, pin, ttl, reads, permanent, project, update_token, id: existingId, message } = parsed.data;
   // Markdown is rendered and an HTML deck's notes are cut out here (lib/page-content.ts).
   const content = buildContent(parsed.data);
   const html = content.html;
@@ -187,7 +188,7 @@ api.post("/publish", publishRateLimit, async (c) => {
       }
     }
 
-    const { metadata: updated, expiresAt, htmlEtag } = await updatePage(c.env, page, html, resolvedTitle, Date.now(), content.sidecar);
+    const { metadata: updated, expiresAt, htmlEtag, version } = await updatePage(c.env, page, html, resolvedTitle, Date.now(), content.sidecar, authorOf(c, true, message));
 
     // Link-preview screenshot, after the response (lib/og-render.ts).
     c.executionCtx.waitUntil(refreshShot(c.env, existingId, updated, html, htmlEtag, { replacing: true }));
@@ -197,6 +198,7 @@ api.post("/publish", publishRateLimit, async (c) => {
       url: `${origin}/p/${existingId}`,
       update_token,
       expiresAt,
+      ...(version !== null ? { version } : {}),
       ...contentFields(origin, existingId, content.sidecar),
       ...upgradeHint(c, ent),
     });
@@ -241,7 +243,7 @@ api.post("/publish", publishRateLimit, async (c) => {
   // D1 row, R2 HTML and KV cache record, or nothing (lib/page-write.ts).
   let htmlObj: R2Object | null;
   try {
-    htmlObj = await createPage(c.env, metadata, html, now.getTime(), content.sidecar);
+    htmlObj = await createPage(c.env, metadata, html, now.getTime(), content.sidecar, authorOf(c, false, message));
   } catch (err) {
     if (err instanceof StorageUnavailable) {
       console.error("publish storage write failed", { id, err: err.message });
@@ -267,6 +269,7 @@ api.post("/publish", publishRateLimit, async (c) => {
     url: `${origin}/p/${id}`,
     update_token: token,
     expiresAt,
+    version: 1,
     ...contentFields(origin, id, content.sidecar),
     // Anonymous creates get a link to attach the page to an account later.
     ...(user === null ? { claim_url: claimUrl(siteOrigin(c.env), id, token) } : {}),
@@ -321,7 +324,8 @@ api.put("/pages/:id", requireCsrfHeader, async (c) => {
     }
   }
 
-  const { metadata: updated, expiresAt, htmlEtag } = await updatePage(c.env, page, html, resolvedTitle, Date.now(), content.sidecar);
+  const author = authorOf(c, auth.viaToken, parsed.data.message);
+  const { metadata: updated, expiresAt, htmlEtag, version } = await updatePage(c.env, page, html, resolvedTitle, Date.now(), content.sidecar, author);
 
   // Link-preview screenshot, after the response (lib/og-render.ts).
   c.executionCtx.waitUntil(refreshShot(c.env, id, updated, html, htmlEtag, { replacing: true }));
@@ -335,6 +339,7 @@ api.put("/pages/:id", requireCsrfHeader, async (c) => {
     url: `${origin}/p/${id}`,
     ...(returnToken !== undefined ? { update_token: returnToken } : {}),
     expiresAt,
+    ...(version !== null ? { version } : {}),
     ...contentFields(origin, id, content.sidecar),
     ...upgradeHint(c, ent),
   });
@@ -407,8 +412,13 @@ export function sentUpdateToken(c: Context<AppBindings>, bodyToken?: unknown): s
   return readUpdateToken(undefined, c.req.header("Authorization"));
 }
 
+/** Who is publishing or updating, for the page's history (lib/page-versions.ts). */
+export function authorOf(c: Context<AppBindings>, viaToken: boolean, message?: string, restoredFrom?: number): VersionAuthor {
+  return versionAuthor({ viaToken, via: c.get("via") ?? null, userAgent: c.req.header("User-Agent"), message: message ?? null, restoredFrom: restoredFrom ?? null });
+}
+
 /** null when this caller may replace the page's content; else the refusal (see replaceAllowed). */
-async function replaceRefusal(c: Context<AppBindings>, page: LoadedPage): Promise<Response | null> {
+export async function replaceRefusal(c: Context<AppBindings>, page: LoadedPage): Promise<Response | null> {
   if (page.row.ownerId === null) return null; // anonymous pages can't collect responses
   let hasResponses: boolean;
   try {
@@ -466,7 +476,7 @@ api.get("/pages/:id/details", rateLimit(TIERS.page_options), async (c) => {
   if (!access.ok) return apiError(c, access.status, access.code, access.error);
   const allowed = await allowedFor(c, page.row);
   if (allowed instanceof Response) return allowed;
-  return c.json({ ...pageDetails(page.row, await viewCount(c, page), siteOrigin(c.env)), ...(await kindDetails(c, id)), ...allowed });
+  return c.json({ ...pageDetails(page.row, await viewCount(c, page), siteOrigin(c.env)), ...(await kindDetails(c, id)), ...(await versionCounts(c.env.DB, id)), ...allowed });
 });
 
 /**

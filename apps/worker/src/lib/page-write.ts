@@ -16,8 +16,11 @@ import {
 } from "./pages-store.ts";
 import { forgetShots } from "./og-render.js";
 import { isPinHash } from "./pin-hash.js";
-import { sidecarKey, writeSidecar, type DocSidecar } from "./page-content.ts";
+import { kindOf, sidecarKey, writeSidecar, type DocSidecar } from "./page-content.ts";
 import { deletePageCollectData } from "./collect-store.ts";
+import { deletePageVersions, recordFirstVersion, saveVersion, trimVersions, UNKNOWN_AUTHOR, type VersionAuthor } from "./page-versions.ts";
+import { VERSION_LIMITS } from "./version-limits.ts";
+import { getEntitlements } from "./entitlements.js";
 import { deletePageAccessData } from "./access-store.ts";
 
 /**
@@ -33,7 +36,7 @@ import { deletePageAccessData } from "./access-store.ts";
  * (docs/pages-in-d1.md, "Retiring the old copies").
  */
 
-type PageEnv = { PAGES_KV: KVNamespace; PAGES_BUCKET: R2Bucket; DB: D1Database };
+type PageEnv = { PAGES_KV: KVNamespace; PAGES_BUCKET: R2Bucket; DB: D1Database; BILLING_ENABLED?: string };
 
 export const HTML_TYPE = { httpMetadata: { contentType: "text/html; charset=utf-8" } };
 
@@ -83,6 +86,8 @@ export async function createPage(
   now = Date.now(),
   /** Markdown source or deck notes, kept beside the HTML (lib/page-content.ts). */
   sidecar: DocSidecar | null = null,
+  /** Who published it, for the page's history (lib/page-versions.ts). */
+  author: VersionAuthor = UNKNOWN_AUTHOR,
 ): Promise<R2Object | null> {
   const row = rowFromMetadata(page, null, now);
   let inserted: boolean;
@@ -114,6 +119,13 @@ export async function createPage(
     if (limitHit(err)) throw new StorageUnavailable(String(err));
     throw err;
   }
+  // Version 1 in the page's history. If this fails, the first update adds it
+  // (as published before history was kept), so the page is fine either way.
+  try {
+    await recordFirstVersion(env.DB, page.id, { size: row.size, title: row.title, kind: kindOf(sidecar) }, author, now);
+  } catch (err) {
+    console.error({ event: "version_first_failed", id: page.id, error: String(err) });
+  }
   return htmlObj;
 }
 
@@ -127,6 +139,13 @@ export async function createPage(
  * meantime, what this update wrote is removed again, so a deleted page
  * can't come back. If a claim changed its owner or token, the KV record is
  * rebuilt from the row as it is now.
+ *
+ * Every update keeps what it replaces: before the new HTML is written, the
+ * old HTML and sidecar are copied to a version (lib/page-versions.ts), and
+ * afterwards the page is trimmed to its owner's plan (lib/version-limits.ts).
+ * If history can't be written the update still goes through, logged as
+ * version_save_failed. `version` in the answer is the new live version's
+ * number (null in that case).
  */
 export async function updatePage(
   env: PageEnv,
@@ -136,12 +155,21 @@ export async function updatePage(
   now = Date.now(),
   /** The new content's sidecar; null removes an old one (lib/page-content.ts). */
   sidecar: DocSidecar | null = null,
-): Promise<{ metadata: PageMetadata; expiresAt: string | null; htmlEtag: string | null }> {
+  /** Who is updating, for the page's history. */
+  author: VersionAuthor = UNKNOWN_AUTHOR,
+): Promise<{ metadata: PageMetadata; expiresAt: string | null; htmlEtag: string | null; version: number | null }> {
   const { row, kv } = page;
   const expiresAt = row.permanent ? null : now + DEFAULT_TTL * 1000;
   const updated: PageRow = { ...row, title: title ?? row.title, size: new TextEncoder().encode(html).byteLength, expiresAt, updatedAt: now };
   if (!(await updatePageContent(env.DB, row.id, { title: updated.title, size: updated.size, expiresAt }, now))) {
     throw new Error("page was deleted during the update");
+  }
+  const plan = (await getEntitlements(env, row.ownerId)).plan === "pro" ? "pro" : "free";
+  let version: number | null = null;
+  try {
+    ({ current: version } = await saveVersion(env, row.id, { size: row.size, title: row.title }, { size: updated.size, title: updated.title, kind: kindOf(sidecar) }, author, plan, now));
+  } catch (err) {
+    console.error({ event: "version_save_failed", id: row.id, error: String(err) });
   }
   const htmlObj = await env.PAGES_BUCKET.put(`pages/${row.id}/index.html`, html, HTML_TYPE);
   await writeSidecar(env.PAGES_BUCKET, row.id, sidecar);
@@ -159,7 +187,13 @@ export async function updatePage(
   if (after.ownerId !== updated.ownerId || after.tokenHash !== updated.tokenHash || after.access !== updated.access || after.pin !== updated.pin) {
     await refreshCache(env.PAGES_KV, after, now);
   }
-  return { metadata, expiresAt: metadata.expiresAt, htmlEtag: htmlObj?.etag ?? null };
+  // The oldest versions past the plan's count go; housekeeping retries a failure.
+  try {
+    await trimVersions(env, row.id, VERSION_LIMITS[plan].versions);
+  } catch (err) {
+    console.error({ event: "version_trim_failed", id: row.id, error: String(err) });
+  }
+  return { metadata, expiresAt: metadata.expiresAt, htmlEtag: htmlObj?.etag ?? null, version };
 }
 
 /**
@@ -250,6 +284,14 @@ export async function deletePage(env: PageEnv, page: LoadedPage, later: (work: P
     await deletePageCollectData(env.DB, row.id);
   } catch (err) {
     console.error("collect data cleanup failed on delete", { id: row.id, err });
+  }
+  // Its history goes too: the version files, then their rows. If this
+  // fails, hourly housekeeping finds the rows of a deleted page
+  // (lib/page-versions.ts pruneVersions).
+  try {
+    await deletePageVersions(env, row.id);
+  } catch (err) {
+    console.error("version cleanup failed on delete", { id: row.id, err });
   }
   // Its "only these people" list, codes and visit log. Housekeeping catches a failure here too.
   try {

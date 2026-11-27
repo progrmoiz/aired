@@ -16,6 +16,7 @@ import { makeSetCommand } from './commands/set.js'
 import { makeFeedbackCommand } from './commands/feedback.js'
 import { makeCheckCommand } from './commands/check.js'
 import { makeNewCommand } from './commands/new.js'
+import { makeRestoreCommand, makeVersionsCommand } from './commands/versions.js'
 
 // Handle --mcp flag before Commander parses
 if (process.argv.includes('--mcp')) {
@@ -79,6 +80,8 @@ if (process.argv.includes('--mcp')) {
   program.addCommand(makeCheckCommand(getGlobalOpts))
   program.addCommand(makeFeedbackCommand(getGlobalOpts))
   program.addCommand(makeNewCommand(getGlobalOpts))
+  program.addCommand(makeVersionsCommand(getGlobalOpts))
+  program.addCommand(makeRestoreCommand(getGlobalOpts))
 
   if (process.argv.length <= 2) {
     process.stderr.write(banner(getGlobalOpts()) + '\n')

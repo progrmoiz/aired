@@ -47,6 +47,25 @@ const sourceShape = {
   notes: z.array(z.string()).optional().describe("Deck only: speaker notes, one per slide (\"\" for none). Owner only"),
 };
 
+/** One version in a page's history (list_versions). */
+const versionShape = z.object({
+  version: z.number(),
+  current: z.boolean().describe("True for the live content"),
+  size: z.number().describe("Bytes of HTML"),
+  title: nullableString,
+  kind: z.enum(["page", "doc", "deck"]),
+  actor: z.string().describe("Who published it: owner (signed in), token (the update token), agent (through an MCP server) or unknown (before history was kept)"),
+  client: nullableString.describe("web, cli, mcp or api"),
+  message: nullableString.describe("The note sent with the update or restore"),
+  restored_from: z.number().nullable().describe("For a restore: the version it copied"),
+  created_at: nullableString.describe("When it went live; null if before history was kept"),
+  replaced_at: nullableString.describe("When a newer version replaced it; null for the live one"),
+  kept_until: nullableString.describe("When the plan's days run out for it; null: kept while the count allows"),
+});
+
+/** A version number on publish and update answers. */
+const versionField = { version: z.number().optional().describe("The page's live version number after this call (list_versions shows its history)") };
+
 export const outputShapes = {
   publish_html: {
     id: z.string(),
@@ -57,13 +76,21 @@ export const outputShapes = {
     owner: nullableString.describe("Your account login when the page is yours; null for anonymous pages and token updates"),
     claim_url: nullableString.describe("A person can open this to keep an anonymous page in their account"),
     upgrade_url: nullableString.describe("A person can open this to upgrade; agents can't pay"),
+    ...versionField,
     ...contentShape,
   },
   list_pages: {
     pages: z.array(z.object(pageShape)),
     cursor: nullableString.describe("Pass to list_pages for the next page of results; null at the end"),
   },
-  get_page: { ...pageShape, kind: contentShape.kind, slides: contentShape.slides, ...sourceShape },
+  get_page: {
+    ...pageShape,
+    kind: contentShape.kind,
+    slides: contentShape.slides,
+    version: z.number().optional().describe("The live version's number"),
+    versions: z.number().optional().describe("Versions in its history, the live one included; list_versions lists them"),
+    ...sourceShape,
+  },
   set_options: {
     ...pageShape,
     allowed: z.object({ emails: z.array(z.string()), domains: z.array(z.string()) }).optional().describe("access \"people\" only, for the signed-in owner: who may open it. Domains without the @"),
@@ -74,6 +101,28 @@ export const outputShapes = {
     url: z.string(),
     expires_at: nullableString,
     upgrade_url: nullableString,
+    ...versionField,
+    ...contentShape,
+  },
+  list_versions: {
+    id: z.string(),
+    url: z.string(),
+    current: z.number().nullable().describe("The live version's number"),
+    versions: z.array(versionShape).describe("Newest first; the live one is first"),
+    kept: z.object({
+      plan: z.string(),
+      versions: z.number().describe("Earlier versions kept per page"),
+      days: z.number().nullable().describe("Days an earlier version is kept; null: no day limit"),
+      always_keep: z.number().describe("The newest this many stay whatever their age"),
+      summary: z.string(),
+    }),
+  },
+  restore_version: {
+    id: z.string(),
+    url: z.string(),
+    version: z.number().nullable().describe("The new live version: the restored content, under a new number"),
+    restored_from: z.number(),
+    expires_at: nullableString,
     ...contentShape,
   },
   delete_page: {
@@ -167,6 +216,8 @@ export type FeedbackOut = Shape<typeof outputShapes.send_feedback>;
 export type CheckOut = Shape<typeof outputShapes.check_page>;
 export type ResponsesOut = Shape<typeof outputShapes.get_responses>;
 export type UpdateDataOut = Shape<typeof outputShapes.update_data>;
+export type ListVersionsOut = Shape<typeof outputShapes.list_versions>;
+export type RestoreVersionOut = Shape<typeof outputShapes.restore_version>;
 
 type Obj = Record<string, unknown>;
 const str = (v: unknown): string | null => (typeof v === "string" && v !== "" ? v : null);
@@ -200,7 +251,13 @@ export function pageOut(body: unknown, origin: string): PageOut {
 export function getPageOut(details: unknown, origin: string, source?: unknown): GetPageOut {
   const d = obj(details);
   const { kind, slides } = contentOut(d);
-  const out: GetPageOut = { ...pageOut(d, origin), ...(kind !== undefined ? { kind } : {}), ...(slides !== undefined ? { slides } : {}) };
+  const out: GetPageOut = {
+    ...pageOut(d, origin),
+    ...(kind !== undefined ? { kind } : {}),
+    ...(slides !== undefined ? { slides } : {}),
+    ...(num(d.version) !== null ? { version: num(d.version)! } : {}),
+    ...(num(d.versions) !== null ? { versions: num(d.versions)! } : {}),
+  };
   if (source === undefined) return out;
   const s = obj(source);
   const notes = Array.isArray(s.notes) ? s.notes.map((n) => (typeof n === "string" ? n : "")) : null;
@@ -217,6 +274,10 @@ export function getPageText(p: GetPageOut): string {
   const lines = [pageText(p, "Page")];
   if (p.kind === "doc") lines.push("Kind: doc (rendered from Markdown)");
   if (p.kind === "deck") lines.push(`Kind: deck, ${p.slides ?? 0} slides`);
+  if (p.version !== undefined) {
+    const earlier = Math.max((p.versions ?? 1) - 1, 0);
+    lines.push(`Version: ${p.version} (${earlier === 0 ? "no earlier versions kept" : `${earlier} earlier version${earlier === 1 ? "" : "s"} kept; list_versions shows them`})`);
+  }
   if (p.notes !== undefined) {
     const n = p.notes.map((t, i) => (t !== "" ? `Slide ${i + 1}: ${t}` : null)).filter((t) => t !== null);
     lines.push("", n.length > 0 ? `Speaker notes (owner only):\n${n.join("\n")}` : "No speaker notes.");
@@ -256,10 +317,14 @@ export function contentOut(body: unknown): { kind?: "page" | "doc" | "deck"; sli
   };
 }
 
+/** The version number an API answer carries, if any. */
+const versionOf = (b: Obj): { version?: number } => (num(b.version) !== null ? { version: num(b.version)! } : {});
+
 export function publishOut(body: unknown, opts: { updated: boolean; owner: string | null }): PublishOut {
   const b = obj(body);
   return {
     ...contentOut(b),
+    ...versionOf(b),
     id: String(b.id ?? ""),
     url: String(b.url ?? ""),
     updated: opts.updated,
@@ -274,7 +339,7 @@ export function publishOut(body: unknown, opts: { updated: boolean; owner: strin
 
 export function updateOut(body: unknown): UpdateOut {
   const b = obj(body);
-  return { id: String(b.id ?? ""), url: String(b.url ?? ""), expires_at: str(b.expiresAt), upgrade_url: str(obj(b.upgrade).url), ...contentOut(b) };
+  return { id: String(b.id ?? ""), url: String(b.url ?? ""), expires_at: str(b.expiresAt), upgrade_url: str(obj(b.upgrade).url), ...versionOf(b), ...contentOut(b) };
 }
 
 /** GET /api/me, with the limits the server words for it. */
@@ -522,3 +587,89 @@ export function checkContent(body: unknown, withImage: boolean): ({ type: "text"
     ...(withImage && typeof img === "string" && img !== "" ? [{ type: "image" as const, data: img, mimeType: "image/jpeg" }] : []),
   ];
 }
+
+// --- Page history (list_versions, restore_version) --------------------------
+
+/** publish_html and update_page: the note kept with the version an update makes. */
+export const MESSAGE_INPUT = {
+  message: z
+    .string()
+    .max(200)
+    .optional()
+    .describe("A short note kept with this version in the page's history, like a commit message (at most 200 characters)"),
+};
+
+export const LIST_VERSIONS_DESCRIPTION =
+  "A page's history: every version kept, newest first, the live one first. Each has a number, when it went live, who published it (owner, token or agent), its size, title and note. Every update and restore keeps the content it replaces. Then restore_version puts one back. For your own pages, or any page whose update_token you pass.";
+
+export const RESTORE_VERSION_DESCRIPTION =
+  "Put an earlier version of a page back. Its content goes live as a new version, so nothing in the history is lost and you can undo the restore the same way. Get the number from list_versions. For your own pages, or any page whose update_token you pass; a page that has collected responses needs its owner signed in.";
+
+export const listVersionsInput = {
+  id: z.string().describe("Page id, from publish_html or list_pages"),
+  update_token: z.string().optional().describe("The page's update token. Not needed for pages your account owns"),
+};
+
+export const restoreVersionInput = {
+  id: z.string().describe("Page id, from publish_html or list_pages"),
+  version: z.number().int().min(1).describe("The version to put back, from list_versions"),
+  update_token: z.string().optional().describe("The page's update token. Not needed for pages your account owns"),
+  ...MESSAGE_INPUT,
+};
+
+const versionOut = (v: unknown): ListVersionsOut["versions"][number] => {
+  const x = obj(v);
+  return {
+    version: num(x.version) ?? 0,
+    current: x.current === true,
+    size: num(x.size) ?? 0,
+    title: str(x.title),
+    kind: x.kind === "doc" || x.kind === "deck" ? x.kind : "page",
+    actor: str(x.actor) ?? "unknown",
+    client: str(x.client),
+    message: str(x.message),
+    restored_from: num(x.restored_from),
+    created_at: str(x.created_at),
+    replaced_at: str(x.replaced_at),
+    kept_until: str(x.kept_until),
+  };
+};
+
+/** GET /api/pages/:id/versions. */
+export function versionsOut(body: unknown, origin: string): ListVersionsOut {
+  const b = obj(body);
+  const k = obj(b.kept);
+  const id = String(b.id ?? "");
+  return {
+    id,
+    url: str(b.url) ?? `${origin}/p/${id}`,
+    current: num(b.current),
+    versions: (Array.isArray(b.versions) ? b.versions : []).map(versionOut),
+    kept: { plan: str(k.plan) ?? "free", versions: num(k.versions) ?? 0, days: num(k.days), always_keep: num(k.always_keep) ?? 0, summary: str(k.summary) ?? "" },
+  };
+}
+
+/** One line per version, for the text next to list_versions. */
+export function versionsText(v: ListVersionsOut): string {
+  const who = (x: ListVersionsOut["versions"][number]) => (x.actor === "unknown" ? "" : ` by ${x.actor}${x.client !== null ? ` (${x.client})` : ""}`);
+  const lines = v.versions.map((x) =>
+    [
+      `v${x.version}${x.current ? " (live)" : ""}`,
+      x.created_at ?? "before history",
+      `${x.size} bytes${who(x)}`,
+      ...(x.restored_from !== null ? [`restored from v${x.restored_from}`] : []),
+      ...(x.title !== null ? [`"${x.title}"`] : []),
+      ...(x.message !== null ? [`note: ${x.message}`] : []),
+    ].join(" · "),
+  );
+  return [`History of ${v.url}`, ...lines, v.kept.summary, ...(v.versions.length > 1 ? ["Put one back with restore_version."] : [])].join("\n");
+}
+
+/** POST /api/pages/:id/versions/:n/restore. */
+export function restoreOut(body: unknown): RestoreVersionOut {
+  const b = obj(body);
+  return { id: String(b.id ?? ""), url: String(b.url ?? ""), version: num(b.version), restored_from: num(b.restored_from) ?? 0, expires_at: str(b.expiresAt), ...contentOut(b) };
+}
+
+export const restoreText = (r: RestoreVersionOut): string =>
+  `Restored version ${r.restored_from} of ${r.url}${r.version !== null ? ` as version ${r.version}` : ""}. The version it replaced is kept: restore_version can undo this.`;

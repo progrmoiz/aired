@@ -23,6 +23,8 @@ export const PAGE_INPUT_LIMITS = {
   ttlMaxSeconds: 365 * 24 * 60 * 60,
   /** Highest view limit. */
   readsMax: 1_000_000,
+  /** Longest version note (`message`), in characters. */
+  messageMax: 200,
 } as const;
 
 const L = PAGE_INPUT_LIMITS;
@@ -61,6 +63,8 @@ const ttl = ifType(
   z.number().max(L.ttlMaxSeconds, `ttl can be at most ${L.ttlMaxSeconds} seconds (a year); use permanent for longer`),
 );
 const reads = ifType("number", z.number().max(L.readsMax, `reads can be at most ${L.readsMax}`));
+/** A short note kept with the version this update makes (page history). */
+const message = ifType("string", z.string().max(L.messageMax, `message can be at most ${L.messageMax} characters`));
 
 /** POST /api/publish: a new page, or an update with id + update_token. html, or markdown instead. */
 export const publishBody = z
@@ -76,6 +80,7 @@ export const publishBody = z
     project: z.unknown().optional(),
     update_token: ifType("string", z.string()),
     id: ifType("string", z.string()),
+    message,
   })
   .passthrough()
   .superRefine(htmlOrMarkdown);
@@ -88,6 +93,7 @@ export const updateBody = z
     deck,
     title,
     update_token: ifType("string", z.string()),
+    message,
   })
   .passthrough()
   .superRefine(htmlOrMarkdown);

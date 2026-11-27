@@ -49,6 +49,7 @@
       <a href="#cli">CLI</a>
       <a href="#mcp">MCP server</a>
       <a href="#api">HTTP API</a>
+      <a href="#history">History</a>
       <a href="#data">Saving data</a>
       <p>Reference</p>
       <a href="#endpoints">Endpoints</a>
@@ -99,7 +100,9 @@
             <tr><td><code>aired ./dir/</code></td><td>Bundle a directory into one HTML</td></tr>
             <tr><td><code>aired notes.md</code></td><td>Publish Markdown as a clean, readable page (or a deck, with <code>type: deck</code> front matter)</td></tr>
             <tr><td><code>aired new [template]</code></td><td>Write a starter to fill in: <code>deck</code>, <code>deck-html</code>, <code>report</code> or <code>one-pager</code>. No name lists them</td></tr>
-            <tr><td><code>aired update &lt;id&gt; &lt;file&gt;</code></td><td>Update an existing page</td></tr>
+            <tr><td><code>aired update &lt;id&gt; &lt;file&gt;</code></td><td>Update an existing page. <code>-m "note"</code> labels the version it makes</td></tr>
+            <tr><td><code>aired versions &lt;id&gt;</code></td><td>List the page's <a href="#history">history</a>: every version kept, newest first, with who made it, when, size and note</td></tr>
+            <tr><td><code>aired restore &lt;id&gt; &lt;version&gt;</code></td><td>Put an earlier version back. It goes live as a new version, so <code>aired restore</code> undoes it the same way</td></tr>
             <tr><td><code>aired delete &lt;id&gt;</code></td><td>Delete a page</td></tr>
             <tr><td><code>aired info &lt;id&gt;</code></td><td>Show page metadata</td></tr>
             <tr><td><code>aired set &lt;id&gt;</code></td><td>Change the PIN (<code>--pin</code>, <code>--clear-pin</code>), expiry (<code>--ttl</code>, <code>--permanent</code>), view limit (<code>--reads</code>, <code>--clear-reads</code>) or title (<code>--title</code>, <code>--clear-title</code>) without uploading again</td></tr>
@@ -155,7 +158,7 @@ url = "https://aired.sh/mcp"</code></pre>
         <div class="snip"><code>claude mcp add aired --transport http https://aired.sh/mcp/account</code><button type="button" class="btn sm copy-snippet" data-copy="claude mcp add aired --transport http https://aired.sh/mcp/account">Copy</button></div>
 
         <h3>Signed in with an API key</h3>
-        <p>For CI or clients without MCP sign-in, add your <a href="#api-keys">API key</a> as a header instead (on <code>/mcp</code> or <code>/mcp/account</code>). Without a key or a sign-in, <code>/mcp</code> offers anonymous <code>publish_html</code>, <code>get_page</code>, <code>set_options</code> and <code>check_page</code> with a page's <code>update_token</code>, and <code>send_feedback</code>.</p>
+        <p>For CI or clients without MCP sign-in, add your <a href="#api-keys">API key</a> as a header instead (on <code>/mcp</code> or <code>/mcp/account</code>). Without a key or a sign-in, <code>/mcp</code> offers anonymous <code>publish_html</code>, <code>get_page</code>, <code>set_options</code>, <code>list_versions</code>, <code>restore_version</code> and <code>check_page</code> with a page's <code>update_token</code>, and <code>send_feedback</code>.</p>
 <pre><code>{
   "mcpServers": {
     "aired": {
@@ -180,10 +183,12 @@ url = "https://aired.sh/mcp"</code></pre>
         <div class="table-wrap"><table>
           <thead><tr><th>Tool</th><th>Who can use it</th><th>What it does</th></tr></thead>
           <tbody>
-            <tr><td><code>publish_html</code></td><td>Anyone</td><td>Publish <code>html</code> or <code>markdown</code> (with <code>deck: true</code> for slides) and get <code>{ id, url, update_token, expires_at, claim_url }</code>, plus <code>kind</code>, <code>slides</code> and <code>presenter_url</code> for a doc or deck. Pass <code>id</code> and <code>update_token</code> to replace a page's content.</td></tr>
-            <tr><td><code>get_page</code></td><td>The owner, or anyone with the page's <code>update_token</code></td><td>Title, URL, size, views, view limit, expiry, project, whether a PIN is on (never the PIN), and <code>kind</code>. <code>include_source</code> adds the Markdown or HTML as published and a deck's speaker notes.</td></tr>
+            <tr><td><code>publish_html</code></td><td>Anyone</td><td>Publish <code>html</code> or <code>markdown</code> (with <code>deck: true</code> for slides) and get <code>{ id, url, update_token, expires_at, claim_url }</code>, plus <code>kind</code>, <code>slides</code> and <code>presenter_url</code> for a doc or deck. Pass <code>id</code> and <code>update_token</code> to replace a page's content; the content it replaces is kept (see <code>list_versions</code>), and <code>message</code> labels the new version.</td></tr>
+            <tr><td><code>get_page</code></td><td>The owner, or anyone with the page's <code>update_token</code></td><td>Title, URL, size, views, view limit, expiry, project, whether a PIN is on (never the PIN), and <code>kind</code>. <code>include_source</code> adds the Markdown or HTML as published and a deck's speaker notes. <code>version</code> is the live version and <code>versions</code> how many the history holds.</td></tr>
             <tr><td><code>get_template</code></td><td>Anyone</td><td>Starters with rules for filling them in: <code>deck</code>, <code>deck-html</code>, <code>report</code>, <code>one-pager</code>. No name lists them.</td></tr>
             <tr><td><code>set_options</code></td><td>The owner, or anyone with the page's <code>update_token</code></td><td>Change the PIN (<code>null</code> removes it), <code>ttl_seconds</code> or <code>permanent</code>, <code>view_limit</code> and <code>title</code> without sending the HTML again. Send only what should change. Signed in, also <code>public_results</code> and <code>accept_responses</code> for pages that <a href="#data">save data</a>.</td></tr>
+            <tr><td><code>list_versions</code></td><td>The owner, or anyone with the page's <code>update_token</code></td><td>The page's <a href="#history">history</a>, newest first, live version first: <code>{ current, versions: [{ version, current, size, title, kind, actor, client, message, restored_from, created_at, replaced_at, kept_until }], kept }</code>. <code>actor</code> is <code>owner</code>, <code>token</code>, <code>agent</code> or <code>unknown</code>.</td></tr>
+            <tr><td><code>restore_version</code></td><td>The owner, or anyone with the page's <code>update_token</code>; signed in for a page that has collected responses</td><td>Put <code>version</code> back. Its content goes live as a new version (<code>{ version, restored_from }</code>), and the one it replaced is kept, so it can be undone. <code>message</code> labels it.</td></tr>
             <tr><td><code>check_page</code></td><td>The owner, or anyone with the page's <code>update_token</code></td><td>Open the page in a real browser (<code>viewport</code> <code>desktop</code> 1280×800 or <code>mobile</code> 390×844) and report <code>{ ok, issues, console, failed_requests, blank, page, screenshot_url }</code>. The screenshot also comes back as an image. <code>ok</code> is false on script or console errors, files that didn't load, broken images or a blank screen; slow, heavy, very tall or too-wide pages are warnings.</td></tr>
             <tr><td><code>send_feedback</code></td><td>Anyone</td><td>Tell the aired team about a <code>bug</code>, <code>friction</code> or an <code>idea</code>, with an <code>impact</code> (<code>blocked</code>, <code>worked_around</code>, <code>minor</code>). Returns an id to pass on to the user. Never send page HTML.</td></tr>
             <tr><td><code>list_pages</code></td><td>Signed in</td><td>Your pages, newest first, with a cursor.</td></tr>
@@ -194,7 +199,7 @@ url = "https://aired.sh/mcp"</code></pre>
             <tr><td><code>get_account</code></td><td>Signed in</td><td>Plan, limits, renewal and an upgrade link for a person to open.</td></tr>
           </tbody>
         </table></div>
-        <p>The local server (<code>npx aired --mcp</code>) has <code>publish_html</code> (which also takes a <code>file_path</code> or a folder), <code>get_page</code>, <code>set_options</code>, <code>check_page</code>, <code>send_feedback</code>, <code>get_responses</code> and <code>update_data</code>. It signs in with <code>aired login</code> or <code>AIRED_API_KEY</code>.</p>
+        <p>The local server (<code>npx aired --mcp</code>) has <code>publish_html</code> (which also takes a <code>file_path</code> or a folder), <code>get_page</code>, <code>set_options</code>, <code>list_versions</code>, <code>restore_version</code>, <code>check_page</code>, <code>send_feedback</code>, <code>get_responses</code> and <code>update_data</code>. It signs in with <code>aired login</code> or <code>AIRED_API_KEY</code>.</p>
 
         <h3 id="mcp-check">Checking a page</h3>
         <p>Publish, then call <code>check_page</code>; fix what it reports, update the same page and check once more. Checks run in Cloudflare Browser Rendering and share a small daily budget: 3 minutes of browser time a day across all callers, of which each caller gets 2 minutes signed in or 1 minute per IP without an account (a check takes about 10–15 seconds), plus 20 an hour and 3 a minute. When a share is spent the call answers <code>429</code> (<code>check_budget</code>) with <code>Retry-After</code> until 00:00 UTC; <code>503</code> <code>check_busy</code> means try again after <code>Retry-After</code>. Each check gets its own screenshot URL; it works for 24 hours, for whoever has the link, and stops working when the page is updated or deleted. Relative files such as <code>app.js</code> show up as failed requests: a page is one file. A check renders the stored page without its PIN (only the owner can ask for one) and never counts a view.</p>
@@ -217,6 +222,24 @@ url = "https://aired.sh/mcp"</code></pre>
   "id":           "string, optional"
 }</code></pre>
         <p>Returns <code>{ id, url, updated, update_token, expires_at, owner, claim_url, upgrade_url }</code> as structured content. Set a view limit or change any of these later with <code>set_options</code>.</p>
+      </section>
+
+      <!-- ─── History ─── -->
+      <section id="history">
+        <h2>History and undo</h2>
+        <p>Every update keeps the content it replaces, whoever sends it: the dashboard, the CLI, the API or an agent over MCP. Each version records when it went live, who made it (<code>owner</code> signed in, <code>token</code> with the update token, <code>agent</code> through MCP), its size and title, and an optional note.</p>
+<pre><code>aired update abc123 report.html -m "New Q4 numbers"
+aired versions abc123        # v4 live, v3, v2, v1
+aired restore abc123 2       # v2's content goes live as v5</code></pre>
+        <p>A restore never rewrites history. The old content goes live as a new version and the one it replaced stays, so you can undo a restore the same way. Over MCP it's <code>list_versions</code> and <code>restore_version</code>; in the dashboard, a page's menu has <b>See history</b>, with a preview of each version and a Restore button. Who can see and restore is the same as for <code>get_page</code>; a page that has collected responses can be restored only by its owner, signed in.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Plan</th><th>Earlier versions kept</th></tr></thead>
+          <tbody>
+            <tr><td>Free (and anonymous pages)</td><td>The last 5</td></tr>
+            <tr><td>Pro</td><td>The last 50, each for 90 days; the newest 5 stay however old</td></tr>
+          </tbody>
+        </table></div>
+        <p>The live version doesn't count. The oldest go when an update goes past the count, and hourly housekeeping removes those past their days. Deleting a page deletes its history; deleting your account deletes the history of all your pages.</p>
       </section>
 
       <!-- ─── Saving data ─── -->
@@ -314,12 +337,15 @@ aired.data.subscribe((d) =&gt; { if (d) mrr.textContent = "$" + d.mrr.toLocaleSt
           <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
           <tbody>
             <tr><td><code>POST</code></td><td><code>/api/publish</code></td><td>Create a page from <code>html</code> or <code>markdown</code>. Returns <code>{ id, url, update_token, expiresAt }</code>, plus <code>kind</code>, <code>slides</code> and <code>presenter_url</code> for a doc or deck. Also updates if <code>id</code> + <code>update_token</code> are in the body.</td></tr>
-            <tr><td><code>PUT</code></td><td><code>/api/pages/:id</code></td><td>Update by <code>update_token</code> in the JSON body.</td></tr>
+            <tr><td><code>PUT</code></td><td><code>/api/pages/:id</code></td><td>Update by <code>update_token</code> in the JSON body. The content it replaces is kept in the page's <a href="#history">history</a>; an optional <code>message</code> (up to 200 characters) labels the new version, and the answer has its <code>version</code>.</td></tr>
             <tr><td><code>DELETE</code></td><td><code>/api/pages/:id</code></td><td>Delete by <code>Authorization: Bearer &lt;token&gt;</code> header.</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/pages/:id</code></td><td>Public metadata: <code>{ id, title, size, readCount, expiresAt, pinProtected }</code>. No auth. A PIN-protected page answers <code>title: null</code> and <code>readCount: 0</code> (its owner sees both in <code>/details</code>).</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/pages/:id/details</code></td><td>The owner's view: <code>{ id, url, title, size, readCount, reads, hasPin, access, permanent, createdAt, expiresAt, project }</code>, plus <code>allowed: { emails, domains }</code> for an <a href="#sharing">only-these-people</a> page when you're the signed-in owner. Never the PIN. Signed in as the owner, or the page's token in <code>X-Update-Token</code> (or <code>Authorization: Bearer</code>).</td></tr>
             <tr><td><code>PATCH</code></td><td><code>/api/pages/:id</code></td><td>Change settings without the HTML: <code>title</code>, <code>pin</code>, <code>ttl</code> or <code>permanent</code>, <code>reads</code>. Same credentials as PUT. Returns the details plus <code>changed</code>.</td></tr>
             <tr><td><code>POST</code></td><td><code>/api/pages/:id/check</code></td><td>Body <code>{ update_token?, viewport?: "desktop" | "mobile", inline_screenshot? }</code>. Render the page in a browser and return the report <code>check_page</code> gives (<code>ok</code>, <code>issues</code>, <code>console</code>, <code>failed_requests</code>, <code>blank</code>, <code>page</code>, <code>screenshot_url</code>). Same credentials as PATCH. <code>429</code> with <code>code: "check_budget"</code> when today's browser time is spent.</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/pages/:id/versions</code></td><td>The page's <a href="#history">history</a>: <code>{ id, url, current, versions: [...], kept: { plan, versions, days, always_keep, summary } }</code>, newest first. Same credentials as <code>/details</code>. 300 an hour.</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/pages/:id/versions/:n</code></td><td>One version with its content: the fields above plus <code>html</code>, <code>format</code> and <code>source</code> (the Markdown, for a doc). Same credentials. <code>404</code> <code>version_not_found</code>, <code>410</code> <code>version_gone</code>.</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/pages/:id/versions/:n/restore</code></td><td>Body <code>{ update_token?, message? }</code>. Version <code>n</code>'s content goes live as a new version: <code>{ id, url, version, restored_from, expiresAt }</code>. Same credentials as PUT, and a page that has collected responses needs its owner signed in (<code>403</code> <code>owner_required</code>). <code>409</code> <code>already_current</code> for the live version.</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/pages/:id/source</code></td><td>The owner's copy: <code>{ id, url, title, size, html, kind, format, source }</code>, plus <code>slides</code> and <code>notes</code> for a deck. <code>html</code> is the page as served; <code>source</code> is what was published (the Markdown, or a deck's HTML with its notes). Same credentials as <code>/details</code>. Never counts a view.</td></tr>
             <tr><td><code>POST</code></td><td><code>/api/feedback</code></td><td>Body <code>{ kind, message, impact?, page_id?, tool? }</code>. Feedback about aired itself; works without signing in, 10 an hour. Returns <code>{ id, message }</code>.</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/pages/:id/access</code></td><td>Who can open the page and who opened it: <code>{ mode, emails, domains, visitors: [{ email, first_opened_at, last_opened_at, views }] }</code>. Signed in as the owner only: the update token isn't enough.</td></tr>
@@ -475,6 +501,7 @@ curl -X POST https://aired.sh/p/a1b2c3d4e5/access/verify \
             <tr><td>Default TTL</td><td>7 days</td></tr>
             <tr><td>Max TTL</td><td>a year with <code>ttl</code>, or <code>permanent</code></td></tr>
             <tr><td>Request body</td><td>21 MB for publish, PUT and MCP; 1 MB for other API calls</td></tr>
+            <tr><td>Page history</td><td>The last 5 earlier versions on Free; 50 on Pro, each for 90 days. See <a href="#history">History</a></td></tr>
             <tr><td>Saved entries (<code>aired.collect</code>)</td><td>300 new a month per page on Free, 10,000 on Pro; 8 KB each. See <a href="#data-limits">Saving data</a></td></tr>
           </tbody>
         </table></div>

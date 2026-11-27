@@ -82,8 +82,8 @@ test("wiring: only an API key or an MCP OAuth token signs MCP callers in, and th
   assert.match(index, /if \(countMcpToolCalls\(body\) > 1\) \{/);
   assert.match(mcp, /if \(typeof update_token === "string" && typeof existingId !== "string"\) \{/);
   assert.match(mcp, /return isTokenUpdate \? publishUpdateResult\(res\.body, null\) : publishResult\(res\.body, signedIn\.login\);/);
-  // update_page, delete_page, get_page, check_page, get_responses and update_data check the id; set_options checks args.id.
-  assert.equal((mcp.match(/if \(!PAGE_ID\.test\(id\)\) return badId\(\);/g) ?? []).length, 6);
+  // update_page, delete_page, get_page, check_page, get_responses, update_data, list_versions and restore_version check the id; set_options checks args.id.
+  assert.equal((mcp.match(/if \(!PAGE_ID\.test\(id\)\) return badId\(\);/g) ?? []).length, 8);
   assert.match(mcp, /if \(!PAGE_ID\.test\(args\.id\)\) return badId\(\);/);
   const api = readFileSync(new URL("../src/routes/api.ts", import.meta.url), "utf8");
   assert.match(api, /if \(user !== null && creds\.ownerId === null\) \{\s*const verdict = detectSpam/);
