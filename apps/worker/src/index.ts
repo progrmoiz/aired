@@ -20,6 +20,7 @@ import { publishRateLimit } from "./middleware/rate-limit.js";
 import { corsMiddleware } from "./middleware/cors.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { requestIdMiddleware } from "./middleware/request-id.js";
+import { pruneBillingEvents, pruneRateLimits } from "./lib/durable-limit.ts";
 import { log, logError } from "./lib/log.js";
 import { cachedHealth, checkHealth, publicReport, storageProbes } from "./lib/health.js";
 import { countMcpToolCalls, isMcpToolCall, mcpToolName } from "./lib/mcp-rpc.js";
@@ -287,16 +288,30 @@ async function runExpiredSweep(env: Env): Promise<void> {
 }
 
 /**
+ * Old rows out of D1: rate-limit windows no request reads any more, and
+ * webhook dedupe ids past 30 days (lib/durable-limit.ts). Once an hour, in
+ * the first cron run after the hour.
+ */
+async function runHousekeeping(env: Env, now = Date.now()): Promise<void> {
+  if (new Date(now).getUTCMinutes() >= 5) return;
+  const rateLimits = await pruneRateLimits(env.DB, now);
+  const billingEvents = await pruneBillingEvents(env.DB, now);
+  log("info", "housekeeping", { rateLimits, billingEvents });
+}
+
+/**
  * Every cron run does each job in turn: the expired-page sweep, then the
  * nightly backup's next few chunks (lib/backup.ts; it does nothing until a
- * snapshot is due). One job failing doesn't stop the other. A throw is logged
- * as scheduled_failed (an alert event, lib/log.ts) with the cron expression
- * and job, then rethrown so Cloudflare still records the run as failed.
+ * snapshot is due), then hourly housekeeping. One job failing doesn't stop
+ * the others. A throw is logged as scheduled_failed (an alert event,
+ * lib/log.ts) with the cron expression and job, then rethrown so Cloudflare
+ * still records the run as failed.
  */
 async function runScheduled(cron: string, env: Env): Promise<void> {
   const jobs: Array<[string, (env: Env) => Promise<void>]> = [
     ["expired_sweep", runExpiredSweep],
     ["backup", runBackup],
+    ["housekeeping", runHousekeeping],
   ];
   let failure: unknown = null;
   for (const [job, run] of jobs) {
