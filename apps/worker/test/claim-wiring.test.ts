@@ -36,15 +36,15 @@ test("page-write.ts: loadPage reads the row (made from KV only if missing) and d
   assert.match(code, /const metadata = cacheRecord\(updated, kv\);/);
 });
 
-test("page-write.ts: DELETE marks the row and tombstones page_claims for a rollback", () => {
+test("page-write.ts: DELETE marks the row; the retired page_claims and KV indexes aren't written", () => {
   const code = src("lib/page-write.ts");
   // Marked first, so no update can bring the page back once a delete starts.
   const fn = code.slice(code.indexOf("export async function deletePage"));
   assert.match(fn, /^[^]*?\{\s*const \{ row \} = page;\s*await markPageDeleted\(env\.DB, row\.id, now\);\s*try \{\s*await removeContent\(env, row\.id\);/);
   // An update that raced a delete removes what it wrote.
   assert.match(code, /if \(after === null \|\| after\.deletedAt !== null\) \{\s*await removeContent\(env, row\.id\);/);
-  assert.match(code, /tombstoneClaim\(env\.DB, row\.id, now\)/);
-  assert.doesNotMatch(code, /DELETE FROM page_claims/);
+  assert.doesNotMatch(code, /tombstoneClaim|mirrorClaim|page_claims \(|DELETE FROM page_claims/);
+  assert.doesNotMatch(code, /owner-index|addPageToOwner|removePageFromOwner|bumpProjectCount|indexForOwner/);
 });
 
 test("mcp.ts: MCP updates read credentials from the D1 row", () => {
@@ -61,7 +61,9 @@ test("me.ts: claims go through runClaim on the row; account deletion releases pa
   assert.match(code, /replaceClaimToken: \(hash\) => replacePageToken\(env\.DB, pageId, userId, hash, Date\.now\(\)\)/);
   // Pages are released in the same batch as the account rows.
   assert.match(code, /await deleteAccountRows\(c\.env\.DB, userId, \[releaseOwnerPagesStatement\(c\.env\.DB, userId, now\)\]\)/);
-  assert.match(code, /releaseClaimsForOwner\(c\.env\.DB, userId\)/);
+  // Old pages without a row are still found through page_claims, read only.
+  assert.match(code, /claimIds = await claimedPageIds\(c\.env\.DB, userId\);/);
+  assert.doesNotMatch(code, /releaseClaimsForOwner|mirrorClaim|indexForOwner|indexPage/);
   // Lists and project counts come from D1, not the KV indexes.
   assert.match(code, /listOwnerPages\(c\.env\.DB, ownerId, filter, cursor, limit, Date\.now\(\)\)/);
   assert.match(code, /listOwnerProjects\(c\.env\.DB, user\.id, Date\.now\(\)\)/);

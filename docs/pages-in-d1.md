@@ -10,9 +10,9 @@ create, update, delete and lookup every route uses) and
 
 | Fact | Source of truth | Copies |
 |---|---|---|
-| Owner, update token, claim | `pages` row | KV `page:<id>` (viewer badge and indexing), `page_claims` (kept for a rollback) |
+| Owner, update token, claim | `pages` row | KV `page:<id>` (viewer badge and indexing). `page_claims` is retired: read for old pages with no row, never written |
 | Title, size, expiry, PIN, view limit, project | `pages` row | KV `page:<id>` |
-| The owner's page list and project counts | queries on `pages` | KV `pages_by_owner:`, `pages_by_owner_project:`, `projects_by_owner:` (kept for a rollback) |
+| The owner's page list and project counts | queries on `pages` | — (the KV `pages_by_owner:`, `pages_by_owner_project:` and `projects_by_owner:` indexes are retired; see the end) |
 | View count | KV `page:<id>` | — (WP9 moves it) |
 | HTML | R2 `pages/<id>/index.html` | — |
 
@@ -34,13 +34,13 @@ create, update, delete and lookup every route uses) and
 - **Viewer.** It still reads only KV `page:<id>`, as its cache.
 - **Account deletion.** It releases the account's pages in D1 in the
   same batch that deletes the account rows, so both happen or neither
-  does. KV records and the old indexes follow in the background.
+  does. KV records follow in the background, and the account's keys in
+  the retired KV indexes are deleted.
 - **Sweep.** The expired-page sweep keeps a file whose page D1 has as live,
   even if KV doesn't.
 
-The KV indexes and `page_claims` are still written, best-effort, so rolling
-back the code loses nothing. Nothing reads them for decisions. Retire them
-after a release with no rollback (see the end).
+The KV indexes and `page_claims` are no longer written (see "Retiring the
+old copies" at the end).
 
 ## Rehearsal
 
@@ -104,6 +104,10 @@ Each step is safe to stop after.
 
 ## Rollback
 
+This section is about rolling back past the pages-in-D1 release itself.
+Since the old copies were retired (below), that also needs the old copies
+rebuilt, so treat it as a last resort.
+
 - `pnpm exec wrangler rollback` restores the previous code. Leave D1 as it
   is: migration 0010 only added a table.
 - The old code reads `page_claims` and the KV indexes, which this code kept
@@ -137,13 +141,51 @@ Each step is safe to stop after.
     that first: `SELECT count(*) FROM users` against the number of
     `user:` keys in KV. If D1 is short, skip that statement.
 
-## Retiring the old copies (a later change)
+## Retiring the old copies
 
-After one release with no rollback:
-1. Stop writing the KV indexes (`indexForOwner`, and the removals in
-   `deletePage`) and `page_claims` (`mirrorClaim`, `tombstoneClaim`,
-   `releaseClaimsForOwner`).
-2. Drop the account-deletion walk over the KV owner index, and the
-   `resolvePage` fallback that reads `page_claims`.
-3. Delete the index keys with a one-off script. Keep `page_claims` in D1:
-   dropping a table isn't additive.
+Done after the pages-in-D1 release had run several releases with no
+rollback (branch with the durable limits and API contract, 2026-11-27):
+
+1. **Writes stopped.** Nothing writes the KV indexes (`pages_by_owner:`,
+   `pages_by_owner_project:`, `projects_by_owner:`) or `page_claims` any
+   more: `indexForOwner`, the index removals in `deletePage`, `mirrorClaim`,
+   `tombstoneClaim` on delete and `releaseClaimsForOwner` are gone, and so
+   is `src/lib/owner-index.ts`.
+2. **Reads left, on purpose.** `resolvePage` still makes a row from KV and
+   `page_claims` for a page that somehow has none, and account deletion
+   still finds such pages through `page_claims` (read only, `claimedPageIds`)
+   and the KV owner index, deleting that account's index keys as it goes.
+   Both are harmless and go once the keys below are deleted.
+3. **Rollback.** Rolling back one release (to code that dual-wrote) is fine:
+   that code already decided from D1 `pages`. Rolling back further, to code
+   from before `pages`, would read indexes and claims that stopped changing
+   here; don't.
+4. **Keep `page_claims`** in D1: dropping a table isn't additive.
+
+### Deleting the old index keys (not run yet)
+
+`apps/worker/scripts/retire-kv-indexes.mjs` lists the keys and prints the
+delete commands; it deletes nothing itself. From `apps/worker`, signed in
+with `wrangler login`:
+
+1. Check last night's KV snapshot finished (docs/backups.md), so the keys
+   are in a backup.
+2. List them (read only). It writes the key names as JSON arrays of up to
+   10,000 (one `wrangler kv bulk delete` call each) and prints the counts:
+   ```bash
+   node scripts/retire-kv-indexes.mjs list --out /tmp/aired-retire
+   ```
+   Expect roughly one `pages_by_owner:` key per owned page made before
+   2026-11-27, fewer `pages_by_owner_project:` keys, and one
+   `projects_by_owner:` key per account that used projects.
+3. Print the delete commands, read them, then run them yourself
+   (`wrangler kv bulk delete` asks before deleting):
+   ```bash
+   node scripts/retire-kv-indexes.mjs delete --out /tmp/aired-retire
+   ```
+4. Each key deleted is one KV write against the daily limit; spread a big
+   run over days if needed.
+5. Afterwards, the reads in step 2 above can go: drop the KV index walk in
+   account deletion. `page_claims` reads stay until every page is known to
+   have a row (`SELECT count(*) FROM page_claims c WHERE NOT EXISTS
+   (SELECT 1 FROM pages p WHERE p.id = c.page_id)` is 0).

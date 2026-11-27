@@ -103,8 +103,6 @@ export type ClaimDeps = {
   matches: TokenMatcher;
   /** Copy owner and hash into the KV record. Must not throw. */
   mirrorToKv: (ownerId: number, tokenHash: string) => Promise<void>;
-  /** Owner and project indexes, first claim only. Must not throw. */
-  indexPage: () => Promise<void>;
 };
 
 /** `token` is set only when a new token was issued. */
@@ -145,7 +143,6 @@ export async function runClaim(
   }
 
   await deps.mirrorToKv(input.userId, tokenHash);
-  if (plan === 'claim') await deps.indexPage();
   return { ok: true, token };
 }
 

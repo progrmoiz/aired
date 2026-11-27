@@ -32,7 +32,7 @@ import type { ClaimBatchResult } from '../lib/claim-decision.js';
 import { PREVIEW_HEADERS, previewDecision } from '../lib/page-preview.js';
 import { readShotRows, renderShots, type ShotJob } from '../lib/og-render.js';
 import { BACKFILL_MAX, SHOT_CONTENT_TYPE, needsBackfill, renderAllowed, tileCacheControl, tileInfo, tileKey, versionFromEtag } from '../lib/og-shot.js';
-import { DELETED_TOKEN_HASH, mirrorClaim, releaseClaimsForOwner } from '../lib/page-claims.ts';
+import { DELETED_TOKEN_HASH, claimedPageIds } from '../lib/page-claims.ts';
 import type { ClaimRecord } from '../lib/claim-decision.js';
 import {
   claimPageRow,
@@ -48,7 +48,7 @@ import {
   type PageRow,
   type ProjectFilter,
 } from '../lib/pages-store.ts';
-import { indexForOwner, loadPage, refreshCache, type LoadedPage } from '../lib/page-write.ts';
+import { loadPage, refreshCache, type LoadedPage } from '../lib/page-write.ts';
 import { pageViewCounts, viewCountOf } from '../lib/view-counts.ts';
 
 const me = new Hono<AppBindings>();
@@ -623,7 +623,7 @@ me.delete('/', requireWebSession, requireCsrfHeader, async (c) => {
   );
 
   // Step 5: waitUntil — bring the released pages' KV records in line, and
-  // clear the old KV owner and project indexes.
+  // delete this account's keys in the retired KV owner and project indexes.
   c.executionCtx.waitUntil(
     (async () => {
       const kv = c.env.PAGES_KV;
@@ -635,14 +635,14 @@ me.delete('/', requireWebSession, requireCsrfHeader, async (c) => {
       }
 
       // Pages from before D1 `pages` that have no row yet are found the old
-      // way: page_claims and the KV owner index. Each gets its row (from KV
-      // and its claim), is released there, and its KV record follows.
-      // page_claims is released too, for a rollback to the code before pages.
+      // way: page_claims and the KV owner index (both read only now). Each
+      // gets its row (from KV and its claim), is released there, and its KV
+      // record follows.
       let claimIds: string[] = [];
       try {
-        claimIds = [...(await releaseClaimsForOwner(c.env.DB, userId)).keys()];
+        claimIds = await claimedPageIds(c.env.DB, userId);
       } catch (err) {
-        console.error('Failed to release page claims during account deletion:', err);
+        console.error('Failed to read page claims during account deletion:', err);
       }
       const releaseLegacy = async (pageId: string) => {
         if (done.has(pageId)) return;
@@ -683,7 +683,7 @@ me.delete('/', requireWebSession, requireCsrfHeader, async (c) => {
         }
       }
 
-      // Finally, drop the project manifest.
+      // Finally, drop the project manifest (also retired).
       try {
         await kv.delete(kvKeys.projectsByOwner(userId));
       } catch (err) {
@@ -700,8 +700,8 @@ me.delete('/', requireWebSession, requireCsrfHeader, async (c) => {
  * Returns a Hono Response. Both claim and claim-batch call this.
  *
  * The page's D1 row decides who owns it and which token works
- * (lib/claim-decision.ts, lib/pages-store.ts). The KV record, the old
- * indexes and page_claims (for a rollback) are updated after it, best-effort.
+ * (lib/claim-decision.ts, lib/pages-store.ts). The KV record is updated
+ * after it, best-effort.
  */
 async function claimPage(
   env: { PAGES_KV: KVNamespace; PAGES_BUCKET: R2Bucket; DB: D1Database },
@@ -740,22 +740,15 @@ async function claimPage(
       hash: hashToken,
       matches: (hash) => verifyToken(updateToken, hash),
       // D1 already holds the claim, so failures here can't revive the old token.
-      mirrorToKv: async (ownerId) => {
+      mirrorToKv: async () => {
         try {
           const claimed = await getPageRow(env.DB, pageId);
           if (claimed === null) return;
           await refreshCache(env.PAGES_KV, claimed);
-          await mirrorClaim(env.DB, pageId, {
-            ownerId,
-            tokenHash: claimed.tokenHash,
-            prevTokenHash: claimed.prevTokenHash ?? DELETED_TOKEN_HASH,
-            claimedAt: claimed.claimedAt ?? 0,
-          });
         } catch (err) {
-          console.error('cache and page_claims mirror failed during claim', { pageId, userId, err });
+          console.error('cache refresh failed during claim', { pageId, userId, err });
         }
       },
-      indexPage: () => indexForOwner(env.PAGES_KV, userId, metadataFromRow(row, 0)),
     },
   );
 
