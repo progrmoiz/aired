@@ -3,10 +3,11 @@ import type { ClaimRecord } from './claim-decision.js';
 /**
  * D1 `page_claims`: the owner and current token hash of pages claimed before
  * D1 `pages` (migrations/0003_page_claims.sql). Retired: `pages` holds the
- * owner and token now, and nothing writes here any more. It's still read
- * for a page that somehow has no `pages` row yet (lib/pages-store.ts
- * ensurePageRow) and to find such pages on account deletion. The write
- * helpers left below are for tests that build that old state. Only type
+ * owner and token now, and publish, claim and delete no longer write here.
+ * It's still read for a page that somehow has no `pages` row yet
+ * (lib/pages-store.ts ensurePageRow), and account deletion still releases
+ * the owner's rows (releaseClaimsStatement). The other write helpers are
+ * for tests that build the old state. Only type
  * imports here, so tests can load it.
  *
  * Every query fails if migration 0003 isn't applied, and token checks then
@@ -97,16 +98,20 @@ export async function tombstoneClaim(db: D1Database, pageId: string, now: number
 }
 
 /**
- * The pages page_claims says this owner claimed: on account deletion, the
- * way to find a page from before D1 `pages` that has no row there yet. Reads
- * only; the page's `pages` row is what gets released.
+ * Account deletion's one write here: the owner's old claims become
+ * anonymous, in the same batch as the account rows (routes/me.ts). Without
+ * it, a page from before D1 `pages` that has no row yet would get one owned
+ * by the deleted id the next time it's touched (ensurePageRow), and ids are
+ * reused when the same person signs up again. RETURNING page_id gives the
+ * pages to look at afterwards (claimedPageIds reads them from the result).
  */
-export async function claimedPageIds(db: D1Database, ownerId: number): Promise<string[]> {
-  const { results } = await db
-    .prepare('SELECT page_id FROM page_claims WHERE owner_id = ?')
-    .bind(ownerId)
-    .all<{ page_id: string }>();
-  return results.map((r) => r.page_id);
+export function releaseClaimsStatement(db: D1Database, ownerId: number): D1PreparedStatement {
+  return db.prepare('UPDATE page_claims SET owner_id = NULL WHERE owner_id = ? RETURNING page_id').bind(ownerId);
+}
+
+/** The page ids a releaseClaimsStatement returned. */
+export function claimedPageIds(result: D1Result | undefined): string[] {
+  return ((result?.results ?? []) as Array<{ page_id: string }>).map((r) => r.page_id);
 }
 
 /** D1 allows 100 bound parameters per query; one goes to the owner id. */

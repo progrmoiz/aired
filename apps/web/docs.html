@@ -322,7 +322,7 @@ url = "https://aired.sh/mcp"</code></pre>
             <tr><td><code>410</code></td><td>Page reached its view limit (<code>reads</code>).</td></tr>
             <tr><td><code>413</code></td><td><code>payload_too_large</code>: the request body is over 21 MB (publish, PUT and the MCP endpoint) or 1 MB (everything else).</td></tr>
             <tr><td><code>422</code></td><td><code>spam_rejected</code>: the page looks like spam or phishing and wasn't published.</td></tr>
-            <tr><td><code>429</code></td><td><code>rate_limited</code>: 5 publishes an hour per IP anonymously, 30 an hour signed in on Free (402 when billing is on), 500 a day on Pro. Counted across all of aired over a sliding window.</td></tr>
+            <tr><td><code>429</code></td><td><code>rate_limited</code>: 5 publishes an hour per IP anonymously, 30 an hour signed in on Free (402 when billing is on), 500 a day on Pro. The window starts at your first publish and the full quota is back one window later.</td></tr>
             <tr><td><code>500</code> / <code>502</code></td><td><code>internal_error</code> / <code>bad_gateway</code>: something failed on our side or at the payment provider. Retry, and report it if it persists.</td></tr>
             <tr><td><code>503</code></td><td><code>unavailable</code> or <code>storage_unavailable</code>: a dependency is briefly unavailable (storage, the database, or a sign-in provider). Retry shortly.</td></tr>
           </tbody>

@@ -1,4 +1,4 @@
-import type { Context, Hono } from "hono";
+import type { Context, Hono, MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import type { AppBindings } from "../types.js";
 import { withErrorCodes } from "./error-codes.ts";
@@ -15,10 +15,12 @@ const pageBodyLimit = bodyLimit({ maxSize: PAGE_BODY_LIMIT_BYTES, onError: tooLa
 const smallBodyLimit = bodyLimit({ maxSize: BODY_LIMIT_BYTES, onError: tooLarge(BODY_LIMIT_BYTES) });
 
 /**
- * The rules every API request follows, whatever route answers it. index.ts
- * applies them after auth; the HTTP tests apply the same function.
+ * The rules every API request follows, whatever route answers it, with the
+ * caller's auth middleware in its place. index.ts passes authMiddleware; the
+ * HTTP tests pass a stand-in.
  *
- * - Every JSON error under /api and /auth carries a `code` (lib/errors.ts).
+ * - Every JSON error under /api and /auth carries a `code` (lib/errors.ts),
+ *   including auth's own (a revoked API key's 401), so this wraps auth.
  * - Bodies are capped before any route reads them: page HTML (publish, PUT,
  *   MCP) gets room for the Pro size limit as JSON, everything else 1 MB
  *   (lib/input-limits.ts). The plan's own size limit still applies after.
@@ -30,9 +32,10 @@ const smallBodyLimit = bodyLimit({ maxSize: BODY_LIMIT_BYTES, onError: tooLarge(
  *
  * JSON 404s for unknown /api paths are the app's notFound handler (index.ts).
  */
-export function applyApiContract(app: Hono<AppBindings>): void {
+export function applyApiContract(app: Hono<AppBindings>, auth: MiddlewareHandler<AppBindings>): void {
   app.use("/api/*", withErrorCodes);
   app.use("/auth/*", withErrorCodes);
+  app.use("*", auth);
   app.use("*", async (c, next) => {
     const path = new URL(c.req.url).pathname;
     if (PAGE_BODY.test(path)) return pageBodyLimit(c, next);

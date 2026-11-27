@@ -7,6 +7,7 @@ import {
   DELETED_TOKEN_HASH,
   claimedPageIds,
   getClaim,
+  releaseClaimsStatement,
   replaceClaimToken,
   tombstoneClaim,
   upsertClaim,
@@ -53,15 +54,17 @@ test("only the owner can replace the token", async () => {
   assert.equal((await getClaim(db, "p1"))?.tokenHash, "h_2");
 });
 
-test("account deletion finds an owner's old claims without changing them", async () => {
+test("account deletion releases only that owner's old claims and returns their pages", async () => {
   const db = d1();
   await upsertClaim(db, "p1", rec(1, "h_a"), "h_old");
   await upsertClaim(db, "p2", rec(1, "h_b"), "h_old");
   await upsertClaim(db, "p3", rec(2, "h_c"), "h_old");
-  assert.deepEqual((await claimedPageIds(db, 1)).sort(), ["p1", "p2"]);
-  // Read only: the rows are as they were.
-  assert.equal((await getClaim(db, "p1"))?.ownerId, 1);
+  const result = await releaseClaimsStatement(db, 1).all();
+  assert.deepEqual(claimedPageIds(result as D1Result).sort(), ["p1", "p2"]);
+  // Released, keeping the rotated hash; the other owner's row is untouched.
+  assert.deepEqual(await getClaim(db, "p1"), { ownerId: null, tokenHash: "h_a", prevTokenHash: "h_old", claimedAt: 1000 });
   assert.equal((await getClaim(db, "p3"))?.ownerId, 2);
+  assert.deepEqual(claimedPageIds(undefined), []);
 });
 
 test("a deleted page keeps a tombstone that can't be claimed or matched", async () => {
@@ -95,7 +98,7 @@ test("before the migration every query fails, so token checks fail closed", asyn
   const db = d1(false);
   await assert.rejects(getClaim(db, "p1"), /no such table/);
   await assert.rejects(claimedIds(db, 1, ["p1"]), /no such table/);
-  await assert.rejects(claimedPageIds(db, 1), /no such table/);
+  await assert.rejects(releaseClaimsStatement(db, 1).all(), /no such table/);
   await assert.rejects(tombstoneClaim(db, "p1", 1), /no such table/);
   await assert.rejects(upsertClaim(db, "p1", rec(1), "h_old"), /no such table/);
 });

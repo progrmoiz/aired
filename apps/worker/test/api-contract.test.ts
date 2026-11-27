@@ -6,6 +6,7 @@ import { fakeD1 } from "./helpers/d1.ts";
 // The real API router behind the same contract middleware index.ts applies
 // (middleware/api-contract.ts). index.ts itself needs the Workers runtime.
 const { Hono } = await import("hono");
+type Context = import("hono").Context;
 const { api } = await import("../src/routes/api.ts");
 const { applyApiContract, apiNotFound } = await import("../src/middleware/api-contract.ts");
 const { BODY_LIMIT_BYTES } = await import("../src/lib/input-limits.ts");
@@ -43,16 +44,17 @@ function setup() {
   const d1 = fakeD1();
   const env = { PAGES_KV: fakeKv(), PAGES_BUCKET: fakeR2(), DB: d1.db, SESSION_SECRET: "x".repeat(32) };
   const app = new Hono<{ Bindings: typeof env; Variables: { user: User | null; via: string | null; jti: string | null; requestId: string } }>();
-  // Stands in for authMiddleware: X-Test-User signs the request in as that id.
-  app.use("*", async (c, next) => {
+  // Stands in for authMiddleware: X-Test-User signs the request in as that
+  // id, and X-Test-Bad-Key answers 401 the way a revoked API key does.
+  applyApiContract(app as never, (async (c: Context, next: () => Promise<void>) => {
+    if (c.req.header("X-Test-Bad-Key") !== undefined) return c.json({ error: "Invalid or revoked API key" }, 401);
     const id = c.req.header("X-Test-User");
     c.set("user", id === undefined ? null : { id: Number(id), login: `u${id}`, email: null, name: null });
     c.set("via", id === undefined ? null : "key");
     c.set("jti", null);
     c.set("requestId", "test");
     await next();
-  });
-  applyApiContract(app as never);
+  }) as never);
   app.route("/api", api as never);
   app.get("/api/legacy-conflict", (c) => c.json({ error: "Already there" }, 409));
   app.get("/api/legacy-pending", (c) => c.json({ error: "authorization_pending" }, 400));
@@ -80,6 +82,8 @@ test("an unknown /api path answers a JSON 404 with a code", async () => {
 
 test("older routes that send only { error } get a code from the status, or their own code-like error", async () => {
   const s = setup();
+  // Auth's own errors too: it runs inside the error-code middleware.
+  assert.deepEqual(await (await s.call("/api/stats", { headers: { "X-Test-Bad-Key": "1" } })).json(), { error: "Invalid or revoked API key", code: "unauthorized" });
   assert.deepEqual(await (await s.call("/api/legacy-conflict")).json(), { error: "Already there", code: "conflict" });
   assert.deepEqual(await (await s.call("/api/legacy-pending")).json(), { error: "authorization_pending", code: "authorization_pending" });
 });

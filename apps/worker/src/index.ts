@@ -63,12 +63,11 @@ app.onError((err, c) => {
 });
 
 // Global middleware: request id first (so every later log line has it),
-// then CORS, then auth
+// then CORS, then auth inside the API contract: error codes around it (so
+// its own 401s get one), body limits and CSRF after (middleware/api-contract.ts).
 app.use("*", requestIdMiddleware);
 app.use("*", corsMiddleware);
-app.use("*", authMiddleware);
-// Error codes, body limits and CSRF for every API route (middleware/api-contract.ts).
-applyApiContract(app);
+applyApiContract(app, authMiddleware);
 
 // Health check: probes KV, D1 and R2 (lib/health.ts). 503 when any fails.
 const health = cachedHealth();

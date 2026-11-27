@@ -147,15 +147,18 @@ Done after the pages-in-D1 release had run several releases with no
 rollback (branch with the durable limits and API contract, 2026-11-27):
 
 1. **Writes stopped.** Nothing writes the KV indexes (`pages_by_owner:`,
-   `pages_by_owner_project:`, `projects_by_owner:`) or `page_claims` any
-   more: `indexForOwner`, the index removals in `deletePage`, `mirrorClaim`,
-   `tombstoneClaim` on delete and `releaseClaimsForOwner` are gone, and so
-   is `src/lib/owner-index.ts`.
-2. **Reads left, on purpose.** `resolvePage` still makes a row from KV and
-   `page_claims` for a page that somehow has none, and account deletion
-   still finds such pages through `page_claims` (read only, `claimedPageIds`)
-   and the KV owner index, deleting that account's index keys as it goes.
-   Both are harmless and go once the keys below are deleted.
+   `pages_by_owner_project:`, `projects_by_owner:`) any more, and publish,
+   claim and delete don't write `page_claims`: `indexForOwner`, the index
+   removals in `deletePage`, `mirrorClaim` and `tombstoneClaim` on delete
+   are gone, and so is `src/lib/owner-index.ts`.
+2. **What's left, on purpose.** `resolvePage` still makes a row from KV and
+   `page_claims` for a page that somehow has none. So account deletion
+   still releases the owner's `page_claims` rows (`releaseClaimsStatement`,
+   in the same batch as the account rows): otherwise such a page could get
+   a row owned by the deleted id, and ids come back when the same person
+   signs up again. It also walks the KV owner index, deleting that
+   account's keys as it goes; that walk goes once the keys below are
+   deleted.
 3. **Rollback.** Rolling back one release (to code that dual-wrote) is fine:
    that code already decided from D1 `pages`. Rolling back further, to code
    from before `pages`, would read indexes and claims that stopped changing

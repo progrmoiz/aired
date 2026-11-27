@@ -32,7 +32,7 @@ import type { ClaimBatchResult } from '../lib/claim-decision.js';
 import { PREVIEW_HEADERS, previewDecision } from '../lib/page-preview.js';
 import { readShotRows, renderShots, type ShotJob } from '../lib/og-render.js';
 import { BACKFILL_MAX, SHOT_CONTENT_TYPE, needsBackfill, renderAllowed, tileCacheControl, tileInfo, tileKey, versionFromEtag } from '../lib/og-shot.js';
-import { DELETED_TOKEN_HASH, claimedPageIds } from '../lib/page-claims.ts';
+import { DELETED_TOKEN_HASH, claimedPageIds, releaseClaimsStatement } from '../lib/page-claims.ts';
 import type { ClaimRecord } from '../lib/claim-decision.js';
 import {
   claimPageRow,
@@ -512,10 +512,16 @@ me.delete('/', requireWebSession, requireCsrfHeader, async (c) => {
   // failure leaves the account and its pages as they were, to retry. Their
   // KV records follow after the response.
   let releasedPages: PageRow[];
+  // Old pages with no `pages` row yet, released in page_claims in the same batch.
+  let claimIds: string[];
   try {
     const now = Date.now();
-    const [released] = await deleteAccountRows(c.env.DB, userId, [releaseOwnerPagesStatement(c.env.DB, userId, now)]);
+    const [released, claims] = await deleteAccountRows(c.env.DB, userId, [
+      releaseOwnerPagesStatement(c.env.DB, userId, now),
+      releaseClaimsStatement(c.env.DB, userId),
+    ]);
     releasedPages = releasedRows(released, now);
+    claimIds = claimedPageIds(claims);
   } catch (err) {
     console.error('Failed to delete account rows during account deletion:', err);
     // The marker above already ended every session, this one included.
@@ -635,15 +641,9 @@ me.delete('/', requireWebSession, requireCsrfHeader, async (c) => {
       }
 
       // Pages from before D1 `pages` that have no row yet are found the old
-      // way: page_claims and the KV owner index (both read only now). Each
-      // gets its row (from KV and its claim), is released there, and its KV
-      // record follows.
-      let claimIds: string[] = [];
-      try {
-        claimIds = await claimedPageIds(c.env.DB, userId);
-      } catch (err) {
-        console.error('Failed to read page claims during account deletion:', err);
-      }
+      // way: page_claims (released in the batch above) and the KV owner
+      // index. Each gets its row, is released there, and its KV record
+      // follows.
       const releaseLegacy = async (pageId: string) => {
         if (done.has(pageId)) return;
         done.add(pageId);

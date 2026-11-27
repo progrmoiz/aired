@@ -60,9 +60,9 @@ test("me.ts: claims go through runClaim on the row; account deletion releases pa
   assert.match(code, /upsertClaim: \(record, checkedHash\) => claimPageRow\(env\.DB, pageId, record, checkedHash\)/);
   assert.match(code, /replaceClaimToken: \(hash\) => replacePageToken\(env\.DB, pageId, userId, hash, Date\.now\(\)\)/);
   // Pages are released in the same batch as the account rows.
-  assert.match(code, /await deleteAccountRows\(c\.env\.DB, userId, \[releaseOwnerPagesStatement\(c\.env\.DB, userId, now\)\]\)/);
-  // Old pages without a row are still found through page_claims, read only.
-  assert.match(code, /claimIds = await claimedPageIds\(c\.env\.DB, userId\);/);
+  // Old claims too, so a page without a row can't come back owned by the deleted id.
+  assert.match(code, /await deleteAccountRows\(c\.env\.DB, userId, \[\s*releaseOwnerPagesStatement\(c\.env\.DB, userId, now\),\s*releaseClaimsStatement\(c\.env\.DB, userId\),\s*\]\)/);
+  assert.match(code, /claimIds = claimedPageIds\(claims\);/);
   assert.doesNotMatch(code, /releaseClaimsForOwner|mirrorClaim|indexForOwner|indexPage/);
   // Lists and project counts come from D1, not the KV indexes.
   assert.match(code, /listOwnerPages\(c\.env\.DB, ownerId, filter, cursor, limit, Date\.now\(\)\)/);

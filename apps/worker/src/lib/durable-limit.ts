@@ -2,29 +2,31 @@
  * Durable rate limits in D1 `rate_limits` (migrations/0013_rate_limits.sql),
  * for the limits that are a plan promise: publishes (5 an hour per IP
  * anonymous, 30 an hour signed in, 500 a day on Pro). Every isolate counts
- * against the same rows, unlike the in-memory limiter.
+ * against the same row, unlike the in-memory limiter.
  *
- * A sliding window from two fixed ones: the current window's count plus the
- * previous window's, weighted by how much of the previous window still
- * falls inside the last `windowSeconds`. One statement checks and counts:
- * it adds one only if the result stays within the limit, and returns no row
- * when it wouldn't. So a refused request writes nothing, and two requests
- * at once can't both take the last slot.
+ * The same rule the in-memory limiter always had: a bucket's window starts
+ * at its first request and lasts `windowSeconds`; up to `limit` requests
+ * fit in it; the next request after it ends starts a new window. So a
+ * caller can use the whole quota at once and gets all of it back one window
+ * later. One statement checks and counts: it adds one only while the count
+ * is under the limit (or the window has ended), and returns no row
+ * otherwise. So a refused request writes nothing, and two requests at once
+ * can't both take the last slot.
  *
  * No runtime imports, so tests load it directly.
  */
 
 export type DurableLimit = { limit: number; windowSeconds: number };
 
-/** Rows stay readable for two windows: the current and, as "previous", the next. */
-const ROW_LIFETIME_WINDOWS = 2;
-
+// In SET, every column refers to the row as it was, so all three CASEs see
+// the old expires_at.
 const CHECK_AND_COUNT = `
-INSERT INTO rate_limits (bucket, window_start, count, expires_at)
-SELECT ?, ?, 1, ?
-WHERE 1 + ? * COALESCE((SELECT p.count FROM rate_limits p WHERE p.bucket = ? AND p.window_start = ?), 0) <= ?
-ON CONFLICT (bucket, window_start) DO UPDATE SET count = rate_limits.count + 1
-WHERE rate_limits.count + 1 + ? * COALESCE((SELECT p.count FROM rate_limits p WHERE p.bucket = ? AND p.window_start = ?), 0) <= ?
+INSERT INTO rate_limits (bucket, window_start, count, expires_at) VALUES (?, ?, 1, ?)
+ON CONFLICT (bucket) DO UPDATE SET
+  window_start = CASE WHEN rate_limits.expires_at <= excluded.window_start THEN excluded.window_start ELSE rate_limits.window_start END,
+  count = CASE WHEN rate_limits.expires_at <= excluded.window_start THEN 1 ELSE rate_limits.count + 1 END,
+  expires_at = CASE WHEN rate_limits.expires_at <= excluded.window_start THEN excluded.expires_at ELSE rate_limits.expires_at END
+WHERE rate_limits.expires_at <= excluded.window_start OR rate_limits.count < ?
 RETURNING count`;
 
 /**
@@ -38,23 +40,19 @@ export async function takeDurableSlot(
   { limit, windowSeconds }: DurableLimit,
   nowMs: number,
 ): Promise<boolean> {
-  const now = nowMs / 1000;
-  const windowStart = Math.floor(now / windowSeconds) * windowSeconds;
-  const previousWeight = (windowSeconds - (now - windowStart)) / windowSeconds;
-  const previousStart = windowStart - windowSeconds;
-  const previous = [previousWeight, bucket, previousStart, limit];
+  const now = Math.floor(nowMs);
   const row = await db
     .prepare(CHECK_AND_COUNT)
-    .bind(bucket, windowStart, windowStart + ROW_LIFETIME_WINDOWS * windowSeconds, ...previous, ...previous)
+    .bind(bucket, now, now + windowSeconds * 1000, limit)
     .first<{ count: number }>();
   return row !== null;
 }
 
-/** Delete rows no window reads any more. Returns how many went. */
+/** Delete rows whose window has ended: the next request starts afresh either way. Returns how many went. */
 export async function pruneRateLimits(db: D1Database, nowMs: number): Promise<number> {
   const res = await db
-    .prepare("DELETE FROM rate_limits WHERE expires_at < ?")
-    .bind(Math.floor(nowMs / 1000))
+    .prepare("DELETE FROM rate_limits WHERE expires_at <= ?")
+    .bind(Math.floor(nowMs))
     .run();
   return res.meta.changes ?? 0;
 }
