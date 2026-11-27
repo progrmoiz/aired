@@ -179,3 +179,36 @@ test("templates: unique names, and each publishes as it says", () => {
   assert.equal(getTemplate("onepager")?.name, "one-pager");
   assert.equal(getTemplate("nope"), null);
 });
+
+test("the speaker view follows only the slides window it's linked to, whose messages come from a sandboxed (null) origin", async () => {
+  const { presenterPage } = await import("../src/lib/presenter-page.ts");
+  const deck = buildContent({ markdown: getTemplate("deck")!.content }).sidecar!;
+  const html = presenterPage({ id: "abc123", title: "Q3", nonce: "n0nce", deck });
+  const script = /<script nonce="n0nce">([\s\S]*?)<\/script>/.exec(html)![1]!;
+  const window = new Window({ url: "https://aired.sh/p/abc123/presenter#/1", width: 1000, height: 700 });
+  const sent: unknown[] = [];
+  // Messages are built in the page's realm: kept as JSON so they compare plainly.
+  const slides = { closed: false, postMessage: (m: unknown, target: string) => sent.push(JSON.parse(JSON.stringify({ m, target }))) };
+  Object.defineProperty(window, "opener", { value: slides, configurable: true });
+  window.document.write(html.replace(/<script nonce[\s\S]*?<\/script>/, ""));
+  window.eval(script);
+  try {
+  const now = () => window.document.querySelector("#now-n")!.textContent;
+  // It says hello to the slides that opened it, without naming an origin they can't have.
+  assert.deepEqual(sent.at(-1), { m: { aired: "deck", hello: 1 }, target: "*" });
+  window.dispatchEvent(new window.MessageEvent("message", { data: { aired: "deck", slide: 4 }, origin: "null", source: slides as never }));
+  assert.equal(now(), "Slide 4 of 7");
+  assert.equal(window.document.querySelector("#status")!.textContent, "In step with the slides");
+  // Another window, or no window, is ignored even with the right shape.
+  window.dispatchEvent(new window.MessageEvent("message", { data: { aired: "deck", slide: 2 }, origin: "null", source: {} as never }));
+  window.dispatchEvent(new window.MessageEvent("message", { data: { aired: "deck", slide: 2 }, origin: "null", source: null }));
+  window.dispatchEvent(new window.MessageEvent("message", { data: { aired: "deck", slide: 2 }, origin: "https://evil.example", source: slides as never }));
+  assert.equal(now(), "Slide 4 of 7");
+  // Next in the speaker view moves the slides; only a slide number is sent, never a note.
+  (window.document.querySelector("#next") as unknown as { click(): void }).click();
+  assert.deepEqual(sent.at(-1), { m: { aired: "deck", go: 5 }, target: "*" });
+  assert.ok(!JSON.stringify(sent).includes("checkout"));
+  } finally {
+    await window.happyDOM.close();
+  }
+});

@@ -84,6 +84,12 @@ ${opts.signedIn ? `<a href="/p/${escapeHtml(opts.id)}">Open the slides</a>` : `<
   return shell("Speaker view · aired", body, "");
 }
 
+/**
+ * The speaker view's script. The slides run sandboxed in an opaque origin
+ * (middleware/security.ts), so messages to them can't name an origin and
+ * theirs arrive with origin "null". What decides is which window sent it:
+ * only the one this page opened, or was opened by. Only slide numbers cross.
+ */
 const SCRIPT = `(function(){
 var d=document,items=d.querySelectorAll("[data-slide]"),N=items.length,cur=0,deck=null,linked=false,started=null;
 var deckUrl=location.pathname.replace(/\\/presenter\\/?$/,"");
@@ -99,9 +105,9 @@ var h="#/"+(i+1);if(location.hash!==h)history.replaceState(null,"",h);
 if(started===null&&i>0)start();
 if(send!==false)post({aired:"deck",go:i+1})}
 function target(){if(deck&&!deck.closed)return deck;if(window.opener&&!window.opener.closed)return window.opener;return null}
-function post(m){var w=target();if(!w)return;try{w.postMessage(m,location.origin)}catch(e){}}
+function post(m){var w=target();if(!w)return;try{w.postMessage(m,"*")}catch(e){}}
 function status(){var s=$("#status");if(linked&&target()){s.className="status on";s.textContent="In step with the slides"}else{s.className="status";s.textContent="Open the slides from here to keep them in step"}}
-window.addEventListener("message",function(e){if(e.origin!==location.origin||!e.source||e.source!==target())return;var m=e.data;if(!m||m.aired!=="deck"||typeof m.slide!=="number")return;linked=true;status();show(Math.floor(m.slide)-1,false)});
+window.addEventListener("message",function(e){if((e.origin!=="null"&&e.origin!==location.origin)||!e.source||e.source!==target())return;var m=e.data;if(!m||m.aired!=="deck"||typeof m.slide!=="number")return;linked=true;status();show(Math.floor(m.slide)-1,false)});
 $("#open").addEventListener("click",function(){deck=window.open(deckUrl+"#/"+(cur+1),"aired-deck-"+deckUrl.split("/")[2]);linked=!!deck;status();if(started===null)start()});
 $("#prev").addEventListener("click",function(){show(cur-1)});$("#next").addEventListener("click",function(){show(cur+1)});
 for(var b=0;b<buttons.length;b++)(function(i){buttons[i].addEventListener("click",function(){show(i)})})(b);

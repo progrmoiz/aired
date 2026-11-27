@@ -41,6 +41,7 @@ import {
 import {
   CHECK_DESCRIPTION,
   FEEDBACK_DESCRIPTION,
+  contentOut,
   checkContent,
   checkInput,
   checkOut,
@@ -51,7 +52,7 @@ import {
 } from "../lib/mcp-shapes.ts";
 import { registerPrompts, registerResources } from "../lib/mcp-extras.ts";
 import { CONTENT_INPUT, GET_PAGE_DESCRIPTION, getPageInput, MISSING_CONTENT, registerTemplateTool } from "../lib/mcp-templates.ts";
-import { buildContent } from "../lib/page-content.ts";
+import { buildContent, contentFields } from "../lib/page-content.ts";
 // The aired skill, bundled as text (wrangler.toml [[rules]]), served as a resource.
 import skill from "../../../cli/SKILL.md";
 
@@ -244,6 +245,7 @@ function createAiredMcpServer(
             owner: null,
             claim_url: null,
             upgrade_url: null,
+            ...contentOut(contentFields(origin, existingId, content.sidecar)),
           },
         };
       }
@@ -342,6 +344,7 @@ function createAiredMcpServer(
           owner: null,
           claim_url: claimUrl(origin, pageId, token),
           upgrade_url: null,
+          ...contentOut(contentFields(origin, pageId, content.sidecar)),
         },
       };
     },
