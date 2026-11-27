@@ -6,6 +6,7 @@
   <title>Share slides as a link: Markdown or HTML decks with speaker notes — aired</title>
   <meta name="description" content="Turn a Markdown or HTML slide deck into a link anyone can open. Present full screen, link to any slide, and keep speaker notes private. Works with decks Claude or ChatGPT write." />
   <link rel="canonical" href="https://aired.sh/share-slides" />
+  <link rel="alternate" type="text/markdown" href="/share-slides.md" />
   <meta property="og:site_name" content="aired" />
   <meta property="og:url" content="https://aired.sh/share-slides" />
   <meta property="og:title" content="Share slides as a link: Markdown or HTML decks with speaker notes — aired" />
@@ -39,19 +40,25 @@
       {
         "@type": "BreadcrumbList",
         "itemListElement": [
-          {
-            "@type": "ListItem",
-            "position": 1,
-            "name": "aired",
-            "item": "https://aired.sh/"
-          },
-          {
-            "@type": "ListItem",
-            "position": 2,
-            "name": "Share slides",
-            "item": "https://aired.sh/share-slides"
-          }
-        ]
+            {
+              "@type": "ListItem",
+              "position": 1,
+              "name": "aired",
+              "item": "https://aired.sh/"
+            },
+            {
+              "@type": "ListItem",
+              "position": 2,
+              "name": "Guides",
+              "item": "https://aired.sh/guides"
+            },
+            {
+              "@type": "ListItem",
+              "position": 3,
+              "name": "Share slides",
+              "item": "https://aired.sh/share-slides"
+            }
+          ]
       },
       {
         "@type": "WebSite",
@@ -114,7 +121,7 @@
             "name": "Can Claude or ChatGPT write the deck?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Yes. Ask for a Markdown deck with --- between slides and Note: lines for what you'll say, or use the make_slide_deck prompt in aired's MCP server, which starts from aired's deck template."
+              "text": "Yes. Ask for a Markdown deck with --- between slides and Note: lines for what you'll say, or, if you've connected aired to your AI app, use aired's ready-made make_slide_deck prompt, which starts from aired's deck template."
             }
           },
           {
@@ -138,26 +145,18 @@
   <link rel="stylesheet" href="/fonts/fonts.css" />
   <link rel="stylesheet" href="/site.css" />
 </head>
-  <style>
-    .deckvis{background:#fff;color:#111113;border-radius:10px;aspect-ratio:16/9;padding:7% 8%;display:flex;flex-direction:column;justify-content:center;gap:6px;position:relative;box-shadow:0 0 0 1px var(--hairline)}
-    .deckvis b{font-size:clamp(18px,2.4vw,26px);font-weight:500;letter-spacing:-.02em}
-    .deckvis span{font-size:13px;color:#52525b}
-    .deckvis .n{position:absolute;right:12px;bottom:10px;font-size:11px;color:#84848a}
-    .deckbar{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:12px;color:var(--text-2)}
-    .deckbar i{font-style:normal;padding:4px 8px;border-radius:999px;background:var(--surface-2,#18181b);box-shadow:inset 0 0 0 1px var(--hairline)}
-  </style>
 </head>
 <body>
 <header><div class="wrap">
   <a class="logo" href="/" aria-label="aired home"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>aired</a>
-  <nav aria-label="Main"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link" class="on">Guides</a></nav>
+  <nav aria-label="Main"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/guides" class="on">Guides</a></nav>
   <div class="right"><a class="login" id="nav-auth" href="/auth/login?return=/dashboard">Log in</a><a class="start" href="#publish" data-publish>Start free</a></div>
 </div></header>
 
 <main class="wrap">
   <section class="hero inner" id="publish">
     <div>
-      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">aired</a><span aria-hidden="true">/</span><span>Share slides</span></nav>
+      <div class="crumbrow"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">aired</a><span aria-hidden="true">/</span><a href="/guides">Guides</a><span aria-hidden="true">/</span><span>Share slides</span></nav><div class="aimenu" data-agent="share-slides" data-task="make a slide deck and share it as an aired link"><button type="button" class="aimenu-copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy page</span></button><button type="button" class="aimenu-more" aria-haspopup="menu" aria-expanded="false" aria-label="More ways to use this page with AI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div></div>
       <h1>Share your slides as a link</h1>
       <p class="lede">Write a deck in Markdown, or let Claude or ChatGPT make one in HTML. Publish it here and send one link: people click through it on any device, you present it full screen, and your speaker notes stay private.</p>
       <form id="air-form" class="form" aria-label="Publish HTML">
@@ -190,9 +189,9 @@
       <p class="proof"><b data-stat="publishes">10,827</b> pages published · opened <b data-stat="views">102,156</b> times</p>
     </div>
     <div class="side-vis">
-      <div class="seen-cap"><span>What they open</span><span class="mono">aired.sh/p/q3-update#/2</span></div>
-      <div class="deckvis" aria-label="Example slide"><b>What we shipped</b><span>• Faster checkout: two steps instead of five</span><span>• New dashboard for account managers</span><span class="n">2</span></div>
-      <div class="deckbar" aria-hidden="true"><i>‹ 2 / 7 ›</i><i>Present</i><i>Copy slide link</i></div>
+      <div class="seen-cap"><span>What they open</span><span class="mono">aired.sh/p/q3-update#/<span data-deck-url>2</span></span></div>
+      <div class="deckvis" data-deck role="img" aria-label="Example slides: what we shipped, what it changed, next quarter"><section class="on" data-n="2"><b>What we shipped</b><span>• Faster checkout: two steps instead of five</span><span>• New dashboard for account managers</span></section><section data-n="3"><b>What it changed</b><span>• 18% fewer people leave at checkout</span><span>• 40% fewer support tickets</span></section><section data-n="4"><b>Next quarter</b><span>• Mobile app beta</span><span>• Team accounts</span></section><span class="n" data-deck-n>2</span></div>
+      <div class="deckbar" aria-hidden="true"><i>‹ <span data-deck-count>2</span> / 7 ›</i><i>Present</i><i>Copy slide link</i></div>
       <ul class="ticklist side-ticks"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span><b>Present anywhere.</b> Arrow keys, a clicker, or swipe on a phone.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span><b>A link per slide.</b> Add #/3 to open slide 3.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span><b>Notes stay yours.</b> Viewers never get them.</span></li></ul>
     </div>
   </section>
@@ -217,6 +216,22 @@ Note: Welcome everyone. Ten minutes, then questions.
 ## What we shipped
 - Faster checkout: two steps instead of five
 - New dashboard for account managers</code></pre>
+      <figure class="explain deckx" data-steps="3" data-step="2" aria-labelledby="deckx-t">
+        <div class="ex-head"><p class="ex-title" id="deckx-t">One Markdown file, three slides</p></div>
+        <div class="deckx-row" aria-hidden="true">
+          <div class="deckx-md"><span class="m0">---</span><span class="m0">type: deck</span><span class="m0">---</span><span class="s1"># Q3 update</span><span class="s1">Acme Co · October 2026</span><span class="s1 note">Note: Ten minutes, then questions.</span><span class="sep">---</span><span class="s2">## What we shipped</span><span class="s2">- Checkout in two steps</span><span class="s2">- New account dashboard</span><span class="s2 note">Note: Mention the 18% lift.</span><span class="sep">---</span><span class="s3">## Next quarter</span><span class="s3">- Mobile app beta</span></div>
+          <div class="deckx-stage">
+            <div class="deckx-slide"><div class="s1"><b class="t">Q3 update</b><span>Acme Co · October 2026</span></div><div class="s2"><b>What we shipped</b><span>• Checkout in two steps</span><span>• New account dashboard</span></div><div class="s3"><b>Next quarter</b><span>• Mobile app beta</span></div><i class="s1">1 / 3</i><i class="s2">2 / 3</i><i class="s3">3 / 3</i></div>
+            <p class="deckx-notes"><b>Only you see this:</b> <span class="s1">Ten minutes, then questions.</span><span class="s2">Mention the 18% lift.</span><span class="s3">No note on this slide.</span></p>
+          </div>
+        </div>
+        <figcaption><ol class="ex-caps">
+          <li>A line with one <code>#</code> starts the title slide.</li>
+          <li><code>---</code> starts the next slide, and <code>Note:</code> lines become your speaker notes.</li>
+          <li>Viewers see the slides. The notes stay in your speaker view.</li>
+        </ol></figcaption>
+      </figure>
+
       <p>A slide that starts with one <code>#</code> is a title slide; the rest start with <code>##</code>. Tables, code and images work. Drop the file in the box above, or from a terminal:</p>
       <ol class="steps">
         <li><strong>Start from a template:</strong> <code>npx aired new deck</code> writes <code>deck.md</code> with seven example slides.</li>
@@ -226,7 +241,7 @@ Note: Welcome everyone. Ten minutes, then questions.
       <p>Change a slide later with <code>npx aired update &lt;id&gt; deck.md</code>. The link stays the same, so nobody needs a new one.</p>
 
       <h2 id="html">Or use HTML slides</h2>
-      <p>For your own layouts, charts or brand colours, write HTML where each top-level <code>&lt;section&gt;</code> is a slide designed at 1280 × 720, and add <code>&lt;meta name="aired" content="deck"&gt;</code> to the head. aired scales each slide to fit the screen and adds the controls. <code>npx aired new deck-html</code> gives you a starting point. Decks made for reveal.js keep their notes the same way.</p>
+      <p>For your own layouts, charts or brand colours, write HTML where each top-level <code>&lt;section&gt;</code> is a slide designed at 1280 × 720, and add <code>&lt;meta name="aired" content="deck"&gt;</code> to the head. aired scales each slide to fit the screen and adds the controls. <code>npx aired new deck-html</code> gives you a starting point. Decks made for reveal.js, a popular HTML slide tool, keep their notes the same way.</p>
 
       <h2 id="present">Present it</h2>
       <ul>
@@ -241,7 +256,7 @@ Note: Welcome everyone. Ten minutes, then questions.
       <p>Publish while signed in, then press <kbd>S</kbd> on the slides (or open <code>/p/&lt;id&gt;/presenter</code>) for the speaker view: the notes for the current slide, what's next, a timer, and buttons that move the slides in the other window. Put the slides on the big screen and keep the speaker view on your laptop.</p>
 
       <h2 id="agents">Let your AI make the deck</h2>
-      <p>Claude, ChatGPT and coding agents write good Markdown decks. Ask for "a Markdown slide deck with --- between slides and Note: lines for what I'll say", then drop it above. With aired's <a href="/docs#mcp">MCP server</a> connected, the <code>make_slide_deck</code> prompt does the whole thing: it fetches the deck template, writes the slides and notes, publishes them and checks the result in a browser. The agent can fix a slide later at the same link.</p>
+      <p>Claude, ChatGPT and coding agents write good Markdown decks. Ask for "a Markdown slide deck with --- between slides and Note: lines for what I'll say", then drop it above. If you've <a href="/docs#mcp">connected aired to your AI app</a>, ask it to use aired's <code>make_slide_deck</code> prompt, a ready-made instruction that does the whole thing: it fetches the deck template, writes the slides and notes, publishes them and checks the result in a browser. The agent can fix a slide later at the same link.</p>
 
       <h2 id="faq">Questions</h2>
       <div class="acc">
@@ -249,7 +264,7 @@ Note: Welcome everyone. Ten minutes, then questions.
         <details><summary>Can I link to one slide?<i></i></summary><p>Yes. Add #/3 to the link to open slide 3. The link button on the slides copies the link to the slide you're on.</p></details>
         <details><summary>Can viewers see my speaker notes?<i></i></summary><p>No. aired cuts the notes out of the page when you publish. Only you see them, signed in, in the speaker view.</p></details>
         <details><summary>Can I turn the deck into a PDF?<i></i></summary><p>Yes. Print the page and choose Save as PDF: each slide goes on its own page.</p></details>
-        <details><summary>Can Claude or ChatGPT write the deck?<i></i></summary><p>Yes. Ask for a Markdown deck with --- between slides and Note: lines for what you'll say, or use the make_slide_deck prompt in aired's MCP server, which starts from aired's deck template.</p></details>
+        <details><summary>Can Claude or ChatGPT write the deck?<i></i></summary><p>Yes. Ask for a Markdown deck with --- between slides and Note: lines for what you'll say, or, if you've connected aired to your AI app, use aired's ready-made make_slide_deck prompt, which starts from aired's deck template.</p></details>
         <details><summary>Is it free?<i></i></summary><p>Yes. Publishing, presenting and viewing are free. Speaker notes need a free account, so aired knows the deck is yours.</p></details>
       </div>
 
@@ -260,20 +275,20 @@ Note: Welcome everyone. Ten minutes, then questions.
   <section class="more">
     <div class="sec-head"><p class="eyebrow">Guides</p><h2>More ways to share what you made</h2></div>
     <div class="gcards">
-      <a class="gcard" href="/html-to-link"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></span><b>Turn an HTML file into a link</b><span>Paste or drop a file and get a link anyone can open.</span><em>Read the guide →</em></a>
+      <a class="gcard" href="/share-html-with-client"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><b>Send a page to a client</b><span>One link that opens on their phone. No download.</span><em>Read the guide →</em></a>
       <a class="gcard" href="/share-claude-artifacts"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/></svg></span><b>Share a Claude artifact</b><span>Send what Claude made to people who don't use Claude.</span><em>Read the guide →</em></a>
       <a class="gcard" href="/share-chatgpt-html"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></span><b>Share HTML from ChatGPT</b><span>Turn ChatGPT's code into a page people can open.</span><em>Read the guide →</em></a>
+      <a class="gcard" href="/html-to-link"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></span><b>Turn an HTML file into a link</b><span>Paste or drop a file and get a link anyone can open.</span><em>Read the guide →</em></a>
       <a class="gcard" href="/password-protect-html"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><b>Password-protect a page</b><span>Add a PIN so only the people you tell can open it.</span><em>Read the guide →</em></a>
-      <a class="gcard" href="/share-html-privately"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 22 12s-1 2-3 4M6.6 6.6C4 8.3 2 12 2 12s3.5 7 10 7c1.7 0 3.2-.4 4.5-1"/></svg></span><b>Share a page privately</b><span>Keep a page out of search and away from strangers.</span><em>Read the guide →</em></a>
       <a class="gcard" href="/share-vite-app"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M18 9h-1M18 12h-1"/></svg></span><b>Share a Vite or React app</b><span>Send a tool you built so your client can use it.</span><em>Read the guide →</em></a>
     </div>
-    <p class="viewers" style="justify-content:flex-start">Publishing from code or an AI agent? <a href="/docs">Read the docs →</a></p>
+    <p class="viewers" style="justify-content:flex-start"><a href="/guides">All 9 guides →</a> <span aria-hidden="true">·</span> Publishing from code or an AI agent? <a href="/docs">Read the docs →</a></p>
   </section>
 </main>
 
 <footer><div class="wrap">
   <span>aired</span>
-  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/share-slides">Share slides</a><a href="/share-vite-app">Share a Vite app</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
+  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/guides">Guides</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/share-slides">Share slides</a><a href="/share-vite-app">Share a Vite app</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
 </div></footer>
 <script src="/app.js"></script>
 </body>

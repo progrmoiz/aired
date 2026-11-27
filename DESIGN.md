@@ -19,7 +19,7 @@ The single reference for building any UI in aired. Read before writing any compo
 
 Numbered, ordered by priority. When unsure, run the decision through these.
 
-1. **Speed is the feature.** Anything that delays the URL — modal, signup, toast, animation — is wrong. The page exists to turn HTML into a link in seconds.
+1. **Speed is the feature.** Anything that delays the URL — modal, signup, toast, animation — is wrong. The page exists to turn HTML into a link in seconds. The one place motion is welcome is an explainer inside a guide article (see §9.3, Motion): it shows how something works and never stands between anyone and the publish box.
 2. **Dense, not loud.** On tool pages body text is 14px and the max heading is 24px. Marketing pages may go to 15px body and a 44px H1, but stay quiet: no gradient text, no glow, no emoji.
 3. **Quiet by default.** Neutrals carry the layout. The primary button is light (`text-primary` fill, `bg` text), not purple. Brand purple is the logo mark, focus rings and section eyebrows.
 4. **States are not optional.** Every interactive element: default, hover, active, focus, disabled. Every async action: idle, pending, success, error.
@@ -293,9 +293,13 @@ Wide layout, max-width 1120px, built from standard landing-page blocks in `apps/
 Built from the shared kit at the end of `site.css`. Same header, footer, cards and buttons as the homepage.
 
 - **Guides:** hero with breadcrumb, H1, lede and the homepage publish form on the left; on the right "What they open" (an example page, a PIN screen or a comparison) and three ticks. Below: sticky "On this page" contents (hidden under 900px), the article in `.prose`, the first how-to list as numbered step cards (`ol.steps`), the FAQ as the homepage accordion (same text as the FAQPage JSON-LD), and cards for the other guides.
+- **Guides home (`/guides`):** breadcrumb, H1, lede, then the nine guides as card groups of three ("Start here", "Slides, apps and clients", "Privacy, and how aired compares"). Every guide's breadcrumb goes aired / Guides / title, and its closing cards pick six related guides plus "All 9 guides".
+- **Copy page menu:** the split button on the breadcrumb row of every guide and the docs (`.aimenu`, built by `app.js`). Copy page copies the guide's Markdown copy (`/<slug>.md`, written by `apps/worker/scripts/guide-md.ts`); the menu opens ChatGPT or Claude with the task typed in and copies install commands. Clicks count at `/api/site-event`.
+- **Explainers:** `figure.explain` inside a guide article, a picture of how something works with three numbered captions (PIN vs JavaScript password, the single-file build, Markdown to slides). Follows the Motion rule below.
 - **Docs:** eyebrow + H1 + four path cards (Skill, CLI, MCP, API), then contents + `.prose` with code blocks and `.snip` copy rows. Developer detail lives here, one click from every page.
 - **Dashboard:** a separate React app. See §9.4.
 - **Claim, abuse, 404:** `.duo` two columns: the task on the left in a `.panel`, context on the right (where the page goes, what happens next, popular guides).
+- **Motion (guides only):** an explainer inside a guide article may animate when the picture explains something words can't (where the page lives before a PIN, files merging into one, Markdown turning into slides). Rules: loop slowly (about 2.5 s a step), pause on hover and keyboard focus, pause when off screen, and show the last, most telling step when `prefers-reduced-motion` is set. Every step is readable at rest; nothing waits at `opacity: 0`. Never animate the publish box, the header, or anything that delays a link. Hero pictures may move only when the thing they show moves for real (a game, a deck).
 - Buttons are `.btn` (secondary), `.btn.solid` (the one primary action), `.btn.ghost`, `.btn.sm`. Fields are `.field` inside `.fl` labels.
 
 ### 9.4 Dashboard app (`apps/dashboard`, React + shadcn/ui on Base UI)
@@ -420,6 +424,7 @@ Append-only record of design decisions. One line per entry. Append on every nota
 2026-05-10 — Empty-state rule softened: one inline factual line allowed (required) when user has no breadcrumb to the next action; decorative cards still forbidden. Dashboard 0-pages state is the canonical example.
 2026-11-25 — Live numbers: count up on view, static charts on the totals, the top three countries from /api/stats with SVG flags from flag-icons (images, not emoji, so they render on Windows).
 2026-11-25 — Homepage and /pricing rebuilt as marketing pages (site.css): wide layout, bento and feature grids, plan cards, logo-wall CTA. Primary button is now light; purple limited to the mark, focus and eyebrows. Text tokens raised for contrast (secondary #a1a1a6, tertiary #84848a). Globe and live title ticker removed.
+2026-11-27 — Guides: own hero per guide (a launch plan, a client's homepage, a private link's settings), a moving snake and deck, three article explainers, a /guides home, a Copy page menu with Markdown copies, plain words for the jargon, and an odd last step card spans both columns. Motion allowed only for explainers and heroes that show something that really moves (§1, §9.3).
 2026-11-27 — Guide /share-vite-app added. New side visual `.report.tool` (a design tool: dotted canvas drawn with a CSS mask, a control panel with sliders and an Export button) for guides about sharing working apps rather than documents. Code blocks in guides reuse the docs `.prose pre` style with `data-lang` and a copy button.
 2026-11-26 — One token source: packages/ui-tokens/tokens.css feeds site.css (via /tokens.css) and the dashboard theme; a dark default and a proposed warm light set ([data-theme="warm"]). Dashboard directions A/B/C rebuilt only from shadcn primitives + aired variants + shared components (§9.5). Test guards the copy and the mappings.
 2026-11-25 — Dashboard moved to React + shadcn/ui (Base UI) + Tailwind v4 in apps/dashboard, built by wrangler into apps/web. Same sections and flows as the vanilla app shell below; page list is now a shadcn Data Table, confirmations are Alert Dialogs, new keys use a Dialog. See §9.4.

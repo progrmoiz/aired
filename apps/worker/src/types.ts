@@ -92,6 +92,12 @@ export type Env = {
    */
   VIEWS?: AnalyticsEngineDataset;
   /**
+   * Analytics Engine dataset `aired_site_events` (wrangler.toml): one data
+   * point per click on a guide's agent menu (lib/site-event.ts). Optional
+   * so tests and local dev run without it.
+   */
+  SITE_EVENTS?: AnalyticsEngineDataset;
+  /**
    * Secret: a Cloudflare API token with Account Analytics Read, for the
    * Analytics Engine SQL API that Pro analytics reads (lib/analytics.ts).
    * Unset: /api/me/analytics answers 503.

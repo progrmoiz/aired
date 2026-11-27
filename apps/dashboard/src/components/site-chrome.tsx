@@ -2,7 +2,7 @@
 // same product. (The header is TopBar.)
 
 const FOOTER = [
-  ['Pricing', '/pricing'], ['Docs', '/docs'], ['Guides', '/html-to-link'], ['Report abuse', '/abuse'],
+  ['Pricing', '/pricing'], ['Docs', '/docs'], ['Guides', '/guides'], ['Report abuse', '/abuse'],
   ['Terms', '/terms'], ['Privacy', '/privacy'], ['Refunds', '/refunds'], ['GitHub', 'https://github.com/progrmoiz/aired'],
 ] as const
 

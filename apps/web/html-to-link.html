@@ -6,6 +6,7 @@
   <title>HTML to link: share an HTML file online, free — aired</title>
   <meta name="description" content="Turn an HTML file into a link anyone can open. Paste the code or drop the file and get a URL in seconds. Free, no account, optional PIN." />
   <link rel="canonical" href="https://aired.sh/html-to-link" />
+  <link rel="alternate" type="text/markdown" href="/html-to-link.md" />
   <meta property="og:site_name" content="aired" />
   <meta property="og:url" content="https://aired.sh/html-to-link" />
   <meta property="og:title" content="HTML to link: share an HTML file online, free — aired" />
@@ -39,19 +40,25 @@
       {
         "@type": "BreadcrumbList",
         "itemListElement": [
-          {
-            "@type": "ListItem",
-            "position": 1,
-            "name": "aired",
-            "item": "https://aired.sh/"
-          },
-          {
-            "@type": "ListItem",
-            "position": 2,
-            "name": "HTML to link",
-            "item": "https://aired.sh/html-to-link"
-          }
-        ]
+            {
+              "@type": "ListItem",
+              "position": 1,
+              "name": "aired",
+              "item": "https://aired.sh/"
+            },
+            {
+              "@type": "ListItem",
+              "position": 2,
+              "name": "Guides",
+              "item": "https://aired.sh/guides"
+            },
+            {
+              "@type": "ListItem",
+              "position": 3,
+              "name": "HTML to link",
+              "item": "https://aired.sh/html-to-link"
+            }
+          ]
       },
       {
         "@type": "WebSite",
@@ -122,7 +129,7 @@
             "name": "My page uses separate CSS, JavaScript or image files. Will it work?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Put everything in one HTML file, or publish the folder with npx aired ./folder, which inlines the files for you."
+              "text": "Put everything in one HTML file, or publish the folder with npx aired ./folder, which puts the styles, scripts and images inside the page for you."
             }
           }
         ]
@@ -141,14 +148,14 @@
 <body>
 <header><div class="wrap">
   <a class="logo" href="/" aria-label="aired home"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>aired</a>
-  <nav aria-label="Main"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link" aria-current="page" class="on">Guides</a></nav>
+  <nav aria-label="Main"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/guides" class="on">Guides</a></nav>
   <div class="right"><a class="login" id="nav-auth" href="/auth/login?return=/dashboard">Log in</a><a class="start" href="#publish" data-publish>Start free</a></div>
 </div></header>
 
 <main class="wrap">
   <section class="hero inner" id="publish">
     <div>
-      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">aired</a><span aria-hidden="true">/</span><span>HTML to link</span></nav>
+      <div class="crumbrow"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">aired</a><span aria-hidden="true">/</span><a href="/guides">Guides</a><span aria-hidden="true">/</span><span>HTML to link</span></nav><div class="aimenu" data-agent="html-to-link" data-task="publish my HTML file on aired and get a link I can send"><button type="button" class="aimenu-copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy page</span></button><button type="button" class="aimenu-more" aria-haspopup="menu" aria-expanded="false" aria-label="More ways to use this page with AI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div></div>
       <h1>Turn an HTML file into a link</h1>
       <p class="lede">Paste the code or drop the <code>.html</code> file. You get a link to send by email, Slack or WhatsApp. The person who opens it sees the page, not the code, and they don't need an account.</p>
       <form id="air-form" class="form" aria-label="Publish HTML">
@@ -197,7 +204,7 @@
         <li><strong>Add a PIN if it's private.</strong> Visitors then type the PIN before they see the page.</li>
         <li><strong>Publish and send.</strong> Copy the link and share it. It opens on any phone or computer.</li>
       </ol>
-      <p>Keep the update token shown after you publish. It lets you replace or delete the page later. If you <a href="/auth/login?return=/dashboard">sign in with GitHub</a>, your pages are also listed in a dashboard where you can see views and delete them.</p>
+      <p>Keep the update token shown after you publish. It's a private key for that page: with it you can replace or delete the page later. If you <a href="/auth/login?return=/dashboard">sign in with GitHub</a>, your pages are also listed in a dashboard where you can see views and delete them.</p>
 
       <h2 id="why-not-email">Why emailing the .html file doesn't work</h2>
       <p>An HTML file is a web page that needs a browser to open it. Sent as an attachment it often goes wrong:</p>
@@ -241,7 +248,7 @@
         <details><summary>Can I change the page after I share the link?<i></i></summary><p>Yes. Keep the update token you get after publishing. With it, the aired CLI, the API or your AI agent can replace the page and the link stays the same.</p></details>
         <details><summary>Can I keep the page private?<i></i></summary><p>Add a PIN and only people who know it can open the page. Pages published without an account are also hidden from search engines.</p></details>
         <details><summary>Does the link work on phones?<i></i></summary><p>Yes. It is a normal web page, so it opens in any browser on any phone, tablet or computer.</p></details>
-        <details><summary>My page uses separate CSS, JavaScript or image files. Will it work?<i></i></summary><p>Put everything in one HTML file, or publish the folder with <code>npx aired ./folder</code>, which inlines the files for you.</p></details>
+        <details><summary>My page uses separate CSS, JavaScript or image files. Will it work?<i></i></summary><p>Put everything in one HTML file, or publish the folder with <code>npx aired ./folder</code>, which puts the styles, scripts and images inside the page for you.</p></details>
       </div>
 
       <p class="updated">Updated November 2026.</p>
@@ -254,18 +261,18 @@
     <div class="gcards">
       <a class="gcard" href="/share-claude-artifacts"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/></svg></span><b>Share a Claude artifact</b><span>Send what Claude made to people who don't use Claude.</span><em>Read the guide →</em></a>
       <a class="gcard" href="/share-chatgpt-html"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></span><b>Share HTML from ChatGPT</b><span>Turn ChatGPT's code into a page people can open.</span><em>Read the guide →</em></a>
+      <a class="gcard" href="/share-slides"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8"/></svg></span><b>Share your slides</b><span>A deck with speaker notes, as one link.</span><em>Read the guide →</em></a>
+      <a class="gcard" href="/share-vite-app"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M18 9h-1M18 12h-1"/></svg></span><b>Share a Vite or React app</b><span>Send a tool you built so your client can use it.</span><em>Read the guide →</em></a>
       <a class="gcard" href="/password-protect-html"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><b>Password-protect a page</b><span>Add a PIN so only the people you tell can open it.</span><em>Read the guide →</em></a>
-      <a class="gcard" href="/share-html-privately"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 22 12s-1 2-3 4M6.6 6.6C4 8.3 2 12 2 12s3.5 7 10 7c1.7 0 3.2-.4 4.5-1"/></svg></span><b>Share a page privately</b><span>Keep a page out of search and away from strangers.</span><em>Read the guide →</em></a>
       <a class="gcard" href="/share-html-with-client"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><b>Send a page to a client</b><span>One link that opens on their phone. No download.</span><em>Read the guide →</em></a>
-      <a class="gcard" href="/tiiny-host-alternative"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg></span><b>A Tiiny Host alternative</b><span>Quick HTML links without an email sign-up.</span><em>Read the guide →</em></a>
     </div>
-    <p class="viewers" style="justify-content:flex-start">Publishing from code or an AI agent? <a href="/docs">Read the docs →</a></p>
+    <p class="viewers" style="justify-content:flex-start"><a href="/guides">All 9 guides →</a> <span aria-hidden="true">·</span> Publishing from code or an AI agent? <a href="/docs">Read the docs →</a></p>
   </section>
 </main>
 
 <footer><div class="wrap">
   <span>aired</span>
-  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/share-slides">Share slides</a><a href="/share-vite-app">Share a Vite app</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
+  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/guides">Guides</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/share-slides">Share slides</a><a href="/share-vite-app">Share a Vite app</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
 </div></footer>
 <script src="/app.js"></script>
 </body>

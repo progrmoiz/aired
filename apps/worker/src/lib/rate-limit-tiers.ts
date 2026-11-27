@@ -52,6 +52,9 @@ export const TIERS = {
   // hour (lib/feedback.ts), so a flood never reaches D1. Anonymous senders
   // also get REPORT_BURST's per-minute guard.
   feedback:      { bucketPrefix: 'rl:feedback', limit: 20, windowSeconds: 3600, burst: 'REPORT_BURST' },
+  // Agent menu clicks on the guides (POST /api/site-event), per IP. Each is
+  // one Analytics Engine write; the cap keeps one visitor from padding counts.
+  site_event:    { bucketPrefix: 'rl:site',   limit: 60, windowSeconds: 3600 },
   // Remote MCP tool calls without a key that don't publish (get_page,
   // set_options, send_feedback), per IP. publish_html keeps the publish limit.
   mcp_anon:      { bucketPrefix: 'rl:mcpanon', limit: 60, windowSeconds: 3600 },

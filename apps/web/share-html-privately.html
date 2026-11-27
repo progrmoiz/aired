@@ -6,6 +6,7 @@
   <title>Share an HTML page privately with a few people — aired</title>
   <meta name="description" content="Share an HTML page with only the people you choose: a PIN, a link that expires, a view limit and no search indexing. Free, and viewers don&#x27;t need an account." />
   <link rel="canonical" href="https://aired.sh/share-html-privately" />
+  <link rel="alternate" type="text/markdown" href="/share-html-privately.md" />
   <meta property="og:site_name" content="aired" />
   <meta property="og:url" content="https://aired.sh/share-html-privately" />
   <meta property="og:title" content="Share an HTML page privately with a few people — aired" />
@@ -39,19 +40,25 @@
       {
         "@type": "BreadcrumbList",
         "itemListElement": [
-          {
-            "@type": "ListItem",
-            "position": 1,
-            "name": "aired",
-            "item": "https://aired.sh/"
-          },
-          {
-            "@type": "ListItem",
-            "position": 2,
-            "name": "Share HTML privately",
-            "item": "https://aired.sh/share-html-privately"
-          }
-        ]
+            {
+              "@type": "ListItem",
+              "position": 1,
+              "name": "aired",
+              "item": "https://aired.sh/"
+            },
+            {
+              "@type": "ListItem",
+              "position": 2,
+              "name": "Guides",
+              "item": "https://aired.sh/guides"
+            },
+            {
+              "@type": "ListItem",
+              "position": 3,
+              "name": "Share HTML privately",
+              "item": "https://aired.sh/share-html-privately"
+            }
+          ]
       },
       {
         "@type": "WebSite",
@@ -98,7 +105,7 @@
             "name": "Can someone find my page on Google?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Pages published without an account are marked noindex, and pages with a PIN can't be read by search engines. aired doesn't list pages publicly."
+              "text": "Pages published without an account tell search engines not to list them, and search engines can't get past a PIN. aired doesn't list pages publicly."
             }
           },
           {
@@ -133,14 +140,14 @@
 <body>
 <header><div class="wrap">
   <a class="logo" href="/" aria-label="aired home"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>aired</a>
-  <nav aria-label="Main"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link" class="on">Guides</a></nav>
+  <nav aria-label="Main"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/guides" class="on">Guides</a></nav>
   <div class="right"><a class="login" id="nav-auth" href="/auth/login?return=/dashboard">Log in</a><a class="start" href="#publish" data-publish>Start free</a></div>
 </div></header>
 
 <main class="wrap">
   <section class="hero inner" id="publish">
     <div>
-      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">aired</a><span aria-hidden="true">/</span><span>Share HTML privately</span></nav>
+      <div class="crumbrow"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">aired</a><span aria-hidden="true">/</span><a href="/guides">Guides</a><span aria-hidden="true">/</span><span>Share HTML privately</span></nav><div class="aimenu" data-agent="share-html-privately" data-task="share an HTML page privately on aired with a few people"><button type="button" class="aimenu-copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy page</span></button><button type="button" class="aimenu-more" aria-haspopup="menu" aria-expanded="false" aria-label="More ways to use this page with AI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div></div>
       <h1>Share an HTML page privately</h1>
       <p class="lede">For a draft, a client report or anything that isn't for the whole internet. Publish it with a PIN and a short expiry, send the link to the people who need it, and delete it when you're done.</p>
       <form id="air-form" class="form" aria-label="Publish HTML">
@@ -173,8 +180,8 @@
       <p class="proof"><b data-stat="publishes">10,827</b> pages published · opened <b data-stat="views">102,156</b> times</p>
     </div>
     <div class="side-vis">
-      <div class="seen-cap"><span>What they open</span><span class="mono">aired.sh/p/salary-review</span></div>
-      <div class="crop" aria-label="Example of a page that asks for a PIN"><div class="report pinpage"><div class="pin" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="lockic"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><p>This page is protected. Enter the PIN to open it.</p><div class="pin-dots"><i>•</i><i>•</i><i>•</i><i class="cur"></i></div><button type="button" tabindex="-1">Open page</button></div></div><span class="badge"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>Shared with aired</span></div>
+      <div class="seen-cap"><span>What you control</span><span class="mono">aired.sh/p/salary-review</span></div>
+      <div class="crop" aria-label="Example of a private page's settings"><div class="report linkset"><div class="ls-url"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>aired.sh/p/salary-review</div><dl><div><dt>PIN</dt><dd class="ok">On</dd></div><div><dt>Expires</dt><dd>in 23 hours</dd></div><div><dt>Opens left</dt><dd>3 of 5 <i class="ls-bar"><b style="width:60%"></b></i></dd></div><div><dt>Search engines</dt><dd>Not listed</dd></div></dl><p>Only people with the link and the PIN can open it.</p></div><span class="badge"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>Shared with aired</span></div>
       <ul class="ticklist side-ticks"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span><b>Free, no account.</b> Publish and send in seconds.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span><b>Opens anywhere.</b> Phone, tablet or laptop, in any browser.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span><b>Private if you want.</b> Add a PIN, pick when it expires.</span></li></ul>
     </div>
   </section>
@@ -187,13 +194,13 @@
         <li><strong>A PIN.</strong> Type one before you publish. The page doesn't load until it's entered, and the check happens on the server. See <a href="/password-protect-html">password-protect an HTML page</a>.</li>
         <li><strong>A short life.</strong> Pick 1 hour or 1 day for something quick. The link stops working when the time is up.</li>
         <li><strong>A view limit.</strong> With the CLI or the API, add <code>--reads 5</code> or <code>"reads": 5</code> and the page is gone after five opens.</li>
-        <li><strong>Delete it yourself.</strong> Keep the update token from the result, or sign in so your pages are listed in a dashboard where you can delete them.</li>
+        <li><strong>Delete it yourself.</strong> Keep the update token from the result (a private key for that page), or sign in so your pages are listed in a dashboard where you can delete them.</li>
       </ol>
 
       <h2 id="what-is-public">What is and isn't public</h2>
       <ul>
         <li><strong>The link is random.</strong> Each page gets an unguessable address like <code>aired.sh/p/k3J9xQ2mTa</code>. aired doesn't list pages anywhere for people to browse.</li>
-        <li><strong>Search engines are kept out.</strong> Pages published without an account are marked noindex, and pages with a PIN can't be read by crawlers at all.</li>
+        <li><strong>Search engines are kept out.</strong> Pages published without an account tell search engines not to list them, and search engines can't get past a PIN at all.</li>
         <li><strong>Anyone with the link and PIN can open it.</strong> If it's forwarded, the new person gets in too. That's the trade-off for viewers not needing an account.</li>
         <li><strong>Without a PIN, the title shows in link previews.</strong> Slack, WhatsApp and iMessage show the page title when the link is pasted. With a PIN, they only see the PIN screen.</li>
       </ul>
@@ -214,13 +221,13 @@
       </div>
 
       <h2 id="named">Sharing with named people</h2>
-      <p>Today a page on aired is open to anyone with the link (and the PIN, if you set one). Sharing with specific email addresses, where each person confirms their email once and doesn't need an account, is part of the paid plans being built. The <a href="/pricing">pricing page</a> shows what's coming.</p>
+      <p>A page on aired opens for anyone with the link, and the PIN if you set one. aired can't yet limit a page to certain email addresses. If each viewer must sign in, use Google Drive or Claude's email invites from the table above.</p>
 
       <h2 id="faq">Questions</h2>
       <div class="acc">
         <details open><summary>Can I share an HTML file so only certain people can see it?<i></i></summary><p>Add a PIN and send it only to those people. The page won't open without it. Sharing by email address is planned for the paid plans.</p></details>
         <details><summary>Do the people I share with need an aired account?<i></i></summary><p>No. They open the link in any browser and type the PIN if there is one.</p></details>
-        <details><summary>Can someone find my page on Google?<i></i></summary><p>Pages published without an account are marked noindex, and pages with a PIN can't be read by search engines. aired doesn't list pages publicly.</p></details>
+        <details><summary>Can someone find my page on Google?<i></i></summary><p>Pages published without an account tell search engines not to list them, and search engines can't get past a PIN. aired doesn't list pages publicly.</p></details>
         <details><summary>How do I stop people opening a link I already sent?<i></i></summary><p>Delete the page with its update token, or from your dashboard if you published while signed in. The link stops working at once.</p></details>
         <details><summary>Can I see who opened it?<i></i></summary><p>Signed-in users see a view count for each page. Who opened it, and when, is part of the planned Pro plan.</p></details>
       </div>
@@ -233,20 +240,20 @@
   <section class="more">
     <div class="sec-head"><p class="eyebrow">Guides</p><h2>More ways to share what you made</h2></div>
     <div class="gcards">
-      <a class="gcard" href="/html-to-link"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></span><b>Turn an HTML file into a link</b><span>Paste or drop a file and get a link anyone can open.</span><em>Read the guide →</em></a>
-      <a class="gcard" href="/share-claude-artifacts"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/></svg></span><b>Share a Claude artifact</b><span>Send what Claude made to people who don't use Claude.</span><em>Read the guide →</em></a>
-      <a class="gcard" href="/share-chatgpt-html"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></span><b>Share HTML from ChatGPT</b><span>Turn ChatGPT's code into a page people can open.</span><em>Read the guide →</em></a>
       <a class="gcard" href="/password-protect-html"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><b>Password-protect a page</b><span>Add a PIN so only the people you tell can open it.</span><em>Read the guide →</em></a>
       <a class="gcard" href="/share-html-with-client"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><b>Send a page to a client</b><span>One link that opens on their phone. No download.</span><em>Read the guide →</em></a>
+      <a class="gcard" href="/html-to-link"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></span><b>Turn an HTML file into a link</b><span>Paste or drop a file and get a link anyone can open.</span><em>Read the guide →</em></a>
+      <a class="gcard" href="/share-slides"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8"/></svg></span><b>Share your slides</b><span>A deck with speaker notes, as one link.</span><em>Read the guide →</em></a>
+      <a class="gcard" href="/share-claude-artifacts"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/></svg></span><b>Share a Claude artifact</b><span>Send what Claude made to people who don't use Claude.</span><em>Read the guide →</em></a>
       <a class="gcard" href="/tiiny-host-alternative"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg></span><b>A Tiiny Host alternative</b><span>Quick HTML links without an email sign-up.</span><em>Read the guide →</em></a>
     </div>
-    <p class="viewers" style="justify-content:flex-start">Publishing from code or an AI agent? <a href="/docs">Read the docs →</a></p>
+    <p class="viewers" style="justify-content:flex-start"><a href="/guides">All 9 guides →</a> <span aria-hidden="true">·</span> Publishing from code or an AI agent? <a href="/docs">Read the docs →</a></p>
   </section>
 </main>
 
 <footer><div class="wrap">
   <span>aired</span>
-  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/share-slides">Share slides</a><a href="/share-vite-app">Share a Vite app</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
+  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/guides">Guides</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/share-slides">Share slides</a><a href="/share-vite-app">Share a Vite app</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
 </div></footer>
 <script src="/app.js"></script>
 </body>

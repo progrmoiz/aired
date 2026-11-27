@@ -6,6 +6,7 @@
   <title>Share a Vite or React app as one link — aired</title>
   <meta name="description" content="Built a tool with Vite, Toolcraft, Claude Code or Cursor that only runs on localhost? Build it as one HTML file and send a link your client can open. No deploy, no hosting setup." />
   <link rel="canonical" href="https://aired.sh/share-vite-app" />
+  <link rel="alternate" type="text/markdown" href="/share-vite-app.md" />
   <meta property="og:site_name" content="aired" />
   <meta property="og:url" content="https://aired.sh/share-vite-app" />
   <meta property="og:title" content="Share a Vite or React app as one link — aired" />
@@ -39,19 +40,25 @@
       {
         "@type": "BreadcrumbList",
         "itemListElement": [
-          {
-            "@type": "ListItem",
-            "position": 1,
-            "name": "aired",
-            "item": "https://aired.sh/"
-          },
-          {
-            "@type": "ListItem",
-            "position": 2,
-            "name": "Share a Vite app",
-            "item": "https://aired.sh/share-vite-app"
-          }
-        ]
+            {
+              "@type": "ListItem",
+              "position": 1,
+              "name": "aired",
+              "item": "https://aired.sh/"
+            },
+            {
+              "@type": "ListItem",
+              "position": 2,
+              "name": "Guides",
+              "item": "https://aired.sh/guides"
+            },
+            {
+              "@type": "ListItem",
+              "position": 3,
+              "name": "Share a Vite app",
+              "item": "https://aired.sh/share-vite-app"
+            }
+          ]
       },
       {
         "@type": "WebSite",
@@ -141,16 +148,16 @@
 <body>
 <header><div class="wrap">
   <a class="logo" href="/" aria-label="aired home"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>aired</a>
-  <nav aria-label="Main"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link" class="on">Guides</a></nav>
+  <nav aria-label="Main"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/guides" class="on">Guides</a></nav>
   <div class="right"><a class="login" id="nav-auth" href="/auth/login?return=/dashboard">Log in</a><a class="start" href="#publish" data-publish>Start free</a></div>
 </div></header>
 
 <main class="wrap">
   <section class="hero inner" id="publish">
     <div>
-      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">aired</a><span aria-hidden="true">/</span><span>Share a Vite app</span></nav>
+      <div class="crumbrow"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">aired</a><span aria-hidden="true">/</span><a href="/guides">Guides</a><span aria-hidden="true">/</span><span>Share a Vite app</span></nav><div class="aimenu" data-agent="share-vite-app" data-task="build my Vite app as one HTML file and share it as an aired link"><button type="button" class="aimenu-copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy page</span></button><button type="button" class="aimenu-more" aria-haspopup="menu" aria-expanded="false" aria-label="More ways to use this page with AI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div></div>
       <h1>Share a Vite or React app as one link</h1>
-      <p class="lede">You built a tool with Vite, <a href="https://toolcraft.sh" target="_blank" rel="noopener">Toolcraft</a>, Claude Code or Cursor, and it only runs on your localhost. Build it as one HTML file, publish it, and send your client a link that opens the working app. No deploy and no hosting account.</p>
+      <p class="lede">You built a tool with Vite, <a href="https://toolcraft.sh" target="_blank" rel="noopener">Toolcraft</a> (an open-source kit for building design apps), Claude Code or Cursor, and it only runs on your localhost. Build it as one HTML file, publish it, and send your client a link that opens the working app. No deploy and no hosting account.</p>
       <form id="air-form" class="form" aria-label="Publish HTML">
         <div class="paste-area">
           <div id="empty-hint" class="hint" aria-hidden="true">Drop your single-file build<small>dist-single/index.html · 2 MB max</small></div>
@@ -191,6 +198,22 @@
     <aside class="toc" aria-label="On this page"><p>On this page</p><a href="#steps">How to share it</a><a href="#agent">Or ask your AI agent</a><a href="#toolcraft">Toolcraft apps</a><a href="#gotchas">If the page is blank</a><a href="#size">How big it can be</a><a href="#example">A live example</a><a href="#faq">Questions</a></aside>
     <article class="prose">
       <h2 id="steps">How to share it</h2>
+      <figure class="explain vitex" data-steps="3" data-step="3" aria-labelledby="vitex-t">
+        <div class="ex-head"><p class="ex-title" id="vitex-t">What the single-file build does</p></div>
+        <div class="vitex-row" aria-hidden="true">
+          <div class="vitex-files"><span>index.html <i>2 KB</i></span><span>main.js <i>412 KB</i></span><span>vendor.js <i>980 KB</i></span><span>app.css <i>38 KB</i></span><span>inter.woff2 <i>96 KB</i></span><span>cover.jpg <i>310 KB</i></span></div>
+          <span class="ex-arrow"></span>
+          <div class="vitex-one"><b>index.html</b><small>1.8 MB, everything inside</small></div>
+          <span class="ex-arrow"></span>
+          <div class="vitex-link">aired.sh/p/dither-lab</div>
+        </div>
+        <figcaption><ol class="ex-caps">
+          <li>Your build is six files. A link to just one of them opens a blank page.</li>
+          <li>The plugin puts all six inside one <code>index.html</code>.</li>
+          <li>Publish that one file, and the link opens the working app.</li>
+        </ol></figcaption>
+      </figure>
+
       <ol class="steps">
         <li><strong>Add the single-file plugin.</strong> In your app's folder, run <code>npm i -D vite-plugin-singlefile</code>. It puts every script, stylesheet, font and imported image inside <code>index.html</code>.</li>
         <li><strong>Add a second build config.</strong> Save the file below as <code>vite.singlefile.config.ts</code> next to <code>vite.config.ts</code>. Your normal build stays as it is.</li>
@@ -221,7 +244,7 @@ up inside the file. Build it, check dist-single/index.html works, then run
 npx aired dist-single/index.html --permanent and give me the link.</code></pre>
 
       <h2 id="toolcraft">Toolcraft apps</h2>
-      <p><a href="https://toolcraft.sh" target="_blank" rel="noopener">Toolcraft</a> apps need two more changes: it loads the app lazily, which trips a bug in Vite 8's bundler when everything goes into one file, and its router expects to live at <code>/</code>. This config handles both without editing the app's own code. It's what built the <a href="#example">live example below</a>.</p>
+      <p><a href="https://toolcraft.sh" target="_blank" rel="noopener">Toolcraft</a> apps need two more changes: it loads parts of the app only when they're needed, which trips a bug in Vite 8's bundler (the step that packs your code into files) when everything goes into one file, and its router expects to live at <code>/</code>. This config handles both without editing the app's own code. It's what built the <a href="#example">live example below</a>.</p>
 <pre data-lang="ts"><code>// vite.singlefile.config.ts for a Toolcraft app
 import { mergeConfig, type Plugin } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
@@ -256,9 +279,9 @@ export default mergeConfig(base, {
 
       <h2 id="gotchas">If the page is blank</h2>
       <ul>
-        <li><strong>"Not Found" or an empty screen with a router.</strong> React Router, TanStack Router and others read the URL path. Your app is built for <code>/</code>, but the link is <code>/p/&lt;id&gt;</code>. Switch to hash routing (<code>createHashRouter</code> in React Router, <code>createHashHistory</code> in TanStack Router).</li>
+        <li><strong>"Not Found" or an empty screen with a router.</strong> React Router, TanStack Router and others read the URL path. Your app is built for <code>/</code>, but the link is <code>/p/&lt;id&gt;</code>. Switch to hash routing, where the app's own address goes after a <code>#</code> (like <code>/p/abc#/settings</code>) so it never clashes with the link (<code>createHashRouter</code> in React Router, <code>createHashHistory</code> in TanStack Router).</li>
         <li><strong>Missing images or a default file.</strong> Files in <code>public/</code> that the app loads by URL aren't put into the single file. Import them in code instead (<code>import cover from "./cover.jpg"</code>) and shrink large ones first. A 7 MB PNG becomes 9.6 MB once it's inlined.</li>
-        <li><strong>An error in the console like "X is not defined".</strong> Usually a lazy <code>import()</code> that broke when everything was put in one file. Load that module normally, as the Toolcraft config above does.</li>
+        <li><strong>An error in the console like "X is not defined".</strong> Usually a lazy <code>import()</code> (code that loads part of the app later) that broke when everything was put in one file. Load that module normally, as the Toolcraft config above does.</li>
       </ul>
       <p>Test it the way your client will see it: publish with a short expiry, open the link, and check the browser console.</p>
 
@@ -286,19 +309,19 @@ export default mergeConfig(base, {
     <div class="sec-head"><p class="eyebrow">Guides</p><h2>More ways to share what you made</h2></div>
     <div class="gcards">
       <a class="gcard" href="/share-html-with-client"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><b>Send a page to a client</b><span>One link that opens on their phone. No download.</span><em>Read the guide →</em></a>
+      <a class="gcard" href="/share-slides"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8"/></svg></span><b>Share your slides</b><span>A deck with speaker notes, as one link.</span><em>Read the guide →</em></a>
       <a class="gcard" href="/html-to-link"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></span><b>Turn an HTML file into a link</b><span>Paste or drop a file and get a link anyone can open.</span><em>Read the guide →</em></a>
       <a class="gcard" href="/share-claude-artifacts"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/></svg></span><b>Share a Claude artifact</b><span>Send what Claude made to people who don't use Claude.</span><em>Read the guide →</em></a>
-      <a class="gcard" href="/share-chatgpt-html"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></span><b>Share HTML from ChatGPT</b><span>Turn ChatGPT's code into a page people can open.</span><em>Read the guide →</em></a>
       <a class="gcard" href="/password-protect-html"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><b>Password-protect a page</b><span>Add a PIN so only the people you tell can open it.</span><em>Read the guide →</em></a>
       <a class="gcard" href="/share-html-privately"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 22 12s-1 2-3 4M6.6 6.6C4 8.3 2 12 2 12s3.5 7 10 7c1.7 0 3.2-.4 4.5-1"/></svg></span><b>Share a page privately</b><span>Keep a page out of search and away from strangers.</span><em>Read the guide →</em></a>
     </div>
-    <p class="viewers" style="justify-content:flex-start">Publishing from code or an AI agent? <a href="/docs">Read the docs →</a></p>
+    <p class="viewers" style="justify-content:flex-start"><a href="/guides">All 9 guides →</a> <span aria-hidden="true">·</span> Publishing from code or an AI agent? <a href="/docs">Read the docs →</a></p>
   </section>
 </main>
 
 <footer><div class="wrap">
   <span>aired</span>
-  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/share-slides">Share slides</a><a href="/share-vite-app">Share a Vite app</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
+  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/guides">Guides</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/share-slides">Share slides</a><a href="/share-vite-app">Share a Vite app</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
 </div></footer>
 <script src="/app.js"></script>
 <script>

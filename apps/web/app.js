@@ -7,6 +7,8 @@
   const form = document.getElementById("air-form");
   if (form) initForm();
   initShared();
+  initAgentMenu();
+  initMotion();
 
   function initForm() {
   const htmlInput = document.getElementById("html-input");
@@ -620,5 +622,281 @@
       draw();
       addEventListener("resize", draw);
     }
+  }
+
+  // ── Agent menu: "Copy page" at the top of each guide and the docs ──
+  // The markup is one split button (.agent[data-agent][data-task]); the menu
+  // is built here. Clicks are counted by item at POST /api/site-event: page,
+  // item and day only (apps/worker/src/lib/site-event.ts).
+  function initAgentMenu() {
+    var roots = document.querySelectorAll(".aimenu[data-agent]");
+    if (!roots.length) return;
+    var canonical = document.querySelector('link[rel="canonical"]');
+    var pageUrl = canonical ? canonical.href : location.origin + location.pathname;
+    var origin = new URL(pageUrl).origin;
+    var mcpUrl = origin + "/mcp";
+    var cursorConfig = btoa(JSON.stringify({ url: mcpUrl }));
+    var ICON = {
+      chat: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',
+      doc: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+      term: '<path d="m4 17 6-5-6-5M12 19h8"/>',
+      plug: '<path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4"/>',
+      book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/>'
+    };
+    function icon(name) {
+      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICON[name] + "</svg>";
+    }
+    function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
+
+    function track(page, item) {
+      try {
+        fetch("/api/site-event", {
+          method: "POST",
+          keepalive: true,
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", "X-Aired-Request": "1" },
+          body: JSON.stringify({ page: page, item: item })
+        }).catch(function () {});
+      } catch (e) {}
+    }
+
+    function fallbackCopy(text) {
+      var ta = document.createElement("textarea");
+      ta.value = text; ta.style.position = "fixed"; ta.style.left = "-9999px";
+      document.body.appendChild(ta); ta.select();
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) {}
+      document.body.removeChild(ta);
+      return ok ? Promise.resolve() : Promise.reject(new Error("copy failed"));
+    }
+    function copyText(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text).catch(function () { return fallbackCopy(text); });
+      }
+      return fallbackCopy(text);
+    }
+    // Safari only lets a click copy text it fetches through ClipboardItem.
+    function copyFromUrl(url) {
+      var load = function () {
+        return fetch(url).then(function (r) { if (!r.ok) throw new Error("load failed"); return r.text(); });
+      };
+      if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+        var blob = load().then(function (t) { return new Blob([t], { type: "text/plain" }); });
+        return navigator.clipboard.write([new ClipboardItem({ "text/plain": blob })])
+          .catch(function () { return load().then(copyText); });
+      }
+      return load().then(copyText);
+    }
+    function flash(el, text, ok) {
+      var label = el.querySelector("[data-say]");
+      if (!label) return;
+      var orig = label.getAttribute("data-say");
+      label.textContent = text;
+      el.classList.toggle("copied", ok);
+      el.classList.toggle("failed", !ok);
+      clearTimeout(el._flash);
+      el._flash = setTimeout(function () { label.textContent = orig; el.classList.remove("copied", "failed"); }, 1800);
+    }
+
+    Array.prototype.forEach.call(roots, function (root, n) {
+      var page = root.getAttribute("data-agent");
+      var task = root.getAttribute("data-task") || "use aired";
+      var md = root.getAttribute("data-md") || "/" + page + ".md";
+      var setupHref = page === "docs" ? "#mcp" : "/docs#mcp";
+      var prompt = encodeURIComponent("Read " + pageUrl + " and help me " + task + ".");
+      var copyBtn = root.querySelector(".aimenu-copy");
+      var moreBtn = root.querySelector(".aimenu-more");
+      var menuId = "aimenu-menu-" + n;
+
+      var row = function (o) {
+        var tag = o.href ? "a" : "button";
+        var attrs = o.href
+          ? ' href="' + esc(o.href) + '"' + (o.newTab ? ' target="_blank" rel="noopener"' : "")
+          : ' type="button"';
+        return "<" + tag + ' class="aimenu-item" role="menuitem"' + attrs + ' data-item="' + o.item + '"' +
+          (o.copy ? ' data-copy="' + esc(o.copy) + '"' : "") + ">" + icon(o.icon) +
+          '<span><b>' + o.label + '</b><small data-say="' + esc(o.say) + '">' + o.say + "</small></span></" + tag + ">";
+      };
+      var menu = document.createElement("div");
+      menu.className = "aimenu-menu";
+      menu.id = menuId;
+      menu.setAttribute("role", "menu");
+      menu.setAttribute("aria-label", "Use this page with AI");
+      menu.hidden = true;
+      menu.innerHTML =
+        '<p class="aimenu-grp">Use with AI</p>' +
+        row({ item: "chatgpt", icon: "chat", label: "Open in ChatGPT", say: "Opens with this page and the task", href: "https://chatgpt.com/?q=" + prompt, newTab: true }) +
+        row({ item: "claude", icon: "chat", label: "Open in Claude", say: "Opens with this page and the task", href: "https://claude.ai/new?q=" + prompt, newTab: true }) +
+        row({ item: "open_markdown", icon: "doc", label: "View as Markdown", say: "Plain text for any AI tool", href: md, newTab: true }) +
+        '<p class="aimenu-grp">Add aired to your agent</p>' +
+        row({ item: "claude_code", icon: "term", label: "Claude Code", say: "Copy the install command", copy: "claude mcp add aired --transport http " + mcpUrl }) +
+        row({ item: "codex", icon: "term", label: "Codex", say: "Copy the install command", copy: "codex mcp add aired --url " + mcpUrl }) +
+        row({ item: "cursor", icon: "plug", label: "Cursor", say: "Install in one click", href: "cursor://anysphere.cursor-deeplink/mcp/install?name=aired&config=" + encodeURIComponent(cursorConfig) }) +
+        row({ item: "mcp_url", icon: "plug", label: "ChatGPT, Claude Desktop, VS Code", say: "Copy the server address", copy: mcpUrl }) +
+        '<a class="aimenu-all" href="' + setupHref + '">All setup options <span aria-hidden="true">→</span></a>';
+      root.appendChild(menu);
+      moreBtn.setAttribute("aria-controls", menuId);
+
+      var items = function () { return Array.prototype.slice.call(menu.querySelectorAll(".aimenu-item, .aimenu-all")); };
+      function place() {
+        menu.style.left = ""; menu.style.right = "";
+        var r = root.getBoundingClientRect();
+        var w = Math.min(320, document.documentElement.clientWidth - 32);
+        if (r.right - w < 16) menu.style.left = "0"; else menu.style.right = "0";
+      }
+      function open(focusFirst) {
+        menu.hidden = false;
+        moreBtn.setAttribute("aria-expanded", "true");
+        place();
+        if (focusFirst) items()[0].focus();
+      }
+      function close(refocus) {
+        if (menu.hidden) return;
+        menu.hidden = true;
+        moreBtn.setAttribute("aria-expanded", "false");
+        if (refocus) moreBtn.focus();
+      }
+      moreBtn.addEventListener("click", function () {
+        if (menu.hidden) open(false); else close(false);
+      });
+      moreBtn.addEventListener("keydown", function (e) {
+        if (e.key === "ArrowDown") { e.preventDefault(); open(true); }
+      });
+      menu.addEventListener("keydown", function (e) {
+        var list = items(), i = list.indexOf(document.activeElement);
+        if (e.key === "ArrowDown") { e.preventDefault(); list[(i + 1) % list.length].focus(); }
+        else if (e.key === "ArrowUp") { e.preventDefault(); list[(i - 1 + list.length) % list.length].focus(); }
+        else if (e.key === "Tab") close(false);
+      });
+      document.addEventListener("click", function (e) { if (!root.contains(e.target)) close(false); });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && !menu.hidden) { e.preventDefault(); close(root.contains(document.activeElement)); }
+      });
+
+      menu.addEventListener("click", function (e) {
+        var el = e.target.closest(".aimenu-item");
+        if (!el) return;
+        track(page, el.getAttribute("data-item"));
+        var text = el.getAttribute("data-copy");
+        if (text) {
+          copyText(text).then(function () { flash(el, "Copied. Paste it in your terminal or app", true); },
+            function () { flash(el, text, false); });
+        }
+      });
+
+      copyBtn.addEventListener("click", function () {
+        track(page, "copy_page");
+        var label = copyBtn.querySelector("span");
+        var orig = label.textContent;
+        copyFromUrl(md).then(function () {
+          label.textContent = "Copied";
+          copyBtn.classList.add("copied");
+        }, function () {
+          label.textContent = "Couldn't copy";
+        }).then(function () {
+          setTimeout(function () { label.textContent = orig; copyBtn.classList.remove("copied"); }, 1800);
+        });
+      });
+    });
+  }
+
+  // ── Motion: the moving hero pictures and the explainers in guide articles ──
+  // DESIGN.md §9.3 Motion: slow loops that pause off screen (and, for
+  // explainers, on hover or focus). With reduced motion, nothing moves and
+  // explainers show their last step.
+  function initMotion() {
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // Runs tick() every ms while el is on screen and not paused.
+    function loop(el, ms, tick, pauseOnHover) {
+      var visible = false, hovered = false, timer = null;
+      function run() {
+        clearTimeout(timer);
+        if (!visible || hovered) return;
+        timer = setTimeout(function () { tick(); run(); }, ms);
+      }
+      if ("IntersectionObserver" in window) {
+        new IntersectionObserver(function (entries) {
+          visible = entries[0].isIntersecting;
+          run();
+        }).observe(el);
+      } else { visible = true; run(); }
+      if (pauseOnHover) {
+        var on = function () { hovered = true; clearTimeout(timer); };
+        var off = function () { hovered = false; run(); };
+        el.addEventListener("mouseenter", on);
+        el.addEventListener("mouseleave", off);
+        el.addEventListener("focusin", on);
+        el.addEventListener("focusout", off);
+      }
+    }
+
+    // Slides hero: flip through the slides, keep the counter and address in step.
+    document.querySelectorAll("[data-deck]").forEach(function (deck) {
+      if (reduce) return;
+      var slides = deck.querySelectorAll("section");
+      var i = 0;
+      loop(deck, 2800, function () {
+        slides[i].classList.remove("on");
+        slides[i].classList.add("was");
+        i = (i + 1) % slides.length;
+        slides.forEach(function (sl, k) { if (k !== i && k !== (i + slides.length - 1) % slides.length) sl.classList.remove("was"); });
+        slides[i].classList.remove("was");
+        slides[i].classList.add("on");
+        var n = slides[i].getAttribute("data-n");
+        document.querySelectorAll("[data-deck-n], [data-deck-count], [data-deck-url]").forEach(function (t) { t.textContent = n; });
+      });
+    });
+
+    // Snake hero: the snake goes round the board and eats.
+    document.querySelectorAll(".report.game .board").forEach(function (board) {
+      if (reduce) return;
+      var cells = board.querySelectorAll("i");
+      var cols = 10;
+      var path = [];
+      var r, c;
+      for (c = 1; c <= 8; c++) path.push([2, c]);
+      for (r = 3; r <= 7; r++) path.push([r, 8]);
+      for (c = 7; c >= 1; c--) path.push([7, c]);
+      for (r = 6; r >= 3; r--) path.push([r, 1]);
+      var score = board.parentNode.querySelector(".game-top span");
+      var points = 14, head = 4, len = 4, food = 11;
+      function draw() {
+        cells.forEach(function (cell) { cell.className = ""; });
+        for (var k = 0; k < len; k++) {
+          var p = path[(head - k + path.length) % path.length];
+          cells[p[0] * cols + p[1]].className = k === 0 ? "h" : "s";
+        }
+        var f = path[food];
+        cells[f[0] * cols + f[1]].className = "f";
+      }
+      draw();
+      loop(board, 260, function () {
+        head = (head + 1) % path.length;
+        if (head === food) {
+          points += 1;
+          if (score) score.textContent = "Score " + points;
+          len = len >= 9 ? 4 : len + 1;
+          food = (head + 7 + (points % 5)) % path.length;
+        }
+        draw();
+      });
+    });
+
+    // Explainers: <figure class="explain" data-steps="3"> steps through
+    // data-step 1..n; buttons with data-mode switch what it shows.
+    document.querySelectorAll("figure.explain[data-steps]").forEach(function (fig) {
+      var n = Number(fig.getAttribute("data-steps"));
+      var set = function (k) { fig.setAttribute("data-step", String(k)); };
+      fig.querySelectorAll("[data-mode]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          fig.setAttribute("data-show", b.getAttribute("data-mode"));
+          fig.querySelectorAll("[data-mode]").forEach(function (o) { o.setAttribute("aria-pressed", String(o === b)); });
+          set(reduce ? n : 1);
+        });
+      });
+      if (reduce) { set(n); return; }
+      loop(fig, 2600, function () { set(Number(fig.getAttribute("data-step")) % n + 1); }, true);
+    });
   }
 })();
