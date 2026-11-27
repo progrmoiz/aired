@@ -3,9 +3,19 @@
  * sign-in. Link (Stripe) keeps its own record of each sale. No imports, so
  * tests run it against the real migrations on node:sqlite.
  */
-export async function deleteAccountRows(db: D1Database, uid: number): Promise<void> {
+export async function deleteAccountRows(
+  db: D1Database,
+  uid: number,
+  /**
+   * Statements that must commit with the deletion or not at all (the
+   * account's pages becoming anonymous). Their results come first in the
+   * returned array.
+   */
+  alongside: D1PreparedStatement[] = [],
+): Promise<D1Result[]> {
   // Children before the users row they reference.
-  await db.batch([
+  return db.batch([
+    ...alongside,
     // API keys stop working with the account.
     db.prepare('DELETE FROM api_keys WHERE user_id = ?').bind(uid),
     db.prepare('DELETE FROM subscriptions WHERE user_id = ?').bind(uid),

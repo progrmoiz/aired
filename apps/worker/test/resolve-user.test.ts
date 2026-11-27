@@ -218,7 +218,7 @@ test("if the GitHub link can't be made, the WorkOS identity isn't tied to the ne
 
 test("account deletion clears only email index entries that still point at the account", () => {
   const me = readFileSync(new URL("../src/routes/me.ts", import.meta.url), "utf8");
-  assert.match(me, /linkedEmails = await identityEmails\(c\.env\.DB, userId\);[\s\S]*await deleteAccountRows\(c\.env\.DB, userId\);/);
+  assert.match(me, /linkedEmails = await identityEmails\(c\.env\.DB, userId\);[\s\S]*await deleteAccountRows\(c\.env\.DB, userId, /);
   assert.match(me, /if \(\(await c\.env\.PAGES_KV\.get\(kvKeys\.emailIndex\(email\)\)\) === String\(userId\)\) \{/);
 });
 

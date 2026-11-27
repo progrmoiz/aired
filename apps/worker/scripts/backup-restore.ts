@@ -118,7 +118,7 @@ if (command === "status") {
     restored++;
   }
   if (restored === 0) die(`nothing in trash for ${a.id}`);
-  console.log("\nThe page also needs its KV record back (and, after WP10, its D1 pages row): see docs/backups.md.");
+  console.log("\nThe page also needs its D1 pages row made live again and its KV record back: see docs/backups.md.");
 } else {
   die("usage: backup-restore.ts status|download|prepare|untrash ... (see the comment at the top)");
 }

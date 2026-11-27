@@ -6,6 +6,12 @@ export type Env = {
    * sweep deletes nothing.
    */
   BACKUP_BUCKET?: R2Bucket;
+  /**
+   * Secret (`wrangler secret put ADMIN_TOKEN`, 32+ characters) that turns on
+   * /api/admin/* (routes/admin.ts), sent as X-Admin-Token. Unset: those
+   * routes answer 404. Delete it when the job it was set for is done.
+   */
+  ADMIN_TOKEN?: string;
   PAGES_KV: KVNamespace;
   // Cloudflare Workers static assets binding (populated by [assets] in wrangler.toml)
   ASSETS: Fetcher;

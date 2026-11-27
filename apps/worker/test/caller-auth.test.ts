@@ -269,5 +269,5 @@ test("account deletion writes the revocation marker before deleting, and refuses
   const me = readFileSync(new URL("../src/routes/me.ts", import.meta.url), "utf8");
   const marker = me.indexOf("await revokeAllSessions(c.env.PAGES_KV, userId);\n  } catch (err) {\n    console.error('Failed to set the revocation marker during account deletion:', err);\n    return c.json(");
   assert.ok(marker > 0, "fails closed");
-  assert.ok(marker < me.indexOf("await deleteAccountRows(c.env.DB, userId);"), "marker first");
+  assert.ok(marker < me.indexOf("await deleteAccountRows(c.env.DB, userId, "), "marker first");
 });

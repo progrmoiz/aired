@@ -11,6 +11,7 @@ import { auth } from "./routes/auth.js";
 import { dashboard } from "./routes/dashboard.js";
 import { billing, upgrade } from "./routes/billing.js";
 import { keys } from "./routes/keys.js";
+import { admin } from "./routes/admin.ts";
 import { authWorkos } from "./routes/auth-workos.js";
 import { authDevice, devicePage } from "./routes/auth-device.js";
 import { publishRateLimit } from "./middleware/rate-limit.js";
@@ -25,6 +26,7 @@ import { TIERS } from "./lib/rate-limit-tiers.js";
 import { pageIdFromKey, sweepExpiredPages } from "./lib/expired-sweep.js";
 import { withAssetCache } from "./lib/asset-cache.js";
 import { preserveSweptFiles, runBackup } from "./lib/backup-bindings.ts";
+import { livePageIds } from "./lib/pages-store.ts";
 import { API_KEY_PREFIX, kvKeys } from "@aired/core";
 import { loadUserRecord, signedInUser } from "./lib/user-record.js";
 import { bearerToken } from "./lib/page-token.js";
@@ -160,6 +162,9 @@ app.route("/auth", authWorkos);
 app.route("/auth", authDevice);
 app.route("/auth", auth);
 
+// Operator endpoints, off unless ADMIN_TOKEN is set (routes/admin.ts)
+app.route("/api/admin", admin);
+
 // Mount billing routes before api so /api/billing/* matches first
 app.route("/api/billing", billing);
 
@@ -214,6 +219,7 @@ async function runExpiredSweep(env: Env): Promise<void> {
         };
       },
       pageExists: async (id) => (await env.PAGES_KV.get(kvKeys.page(id))) !== null,
+      livePages: (ids) => livePageIds(env.DB, ids, Date.now()),
       // Copied to the backup bucket first (trash/, 14 days): a KV record lost
       // by mistake must not take the only copy of a page with it.
       preserve: (files) => preserveSweptFiles(env, files),

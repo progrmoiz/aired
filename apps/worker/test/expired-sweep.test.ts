@@ -102,6 +102,23 @@ test("nothing is deleted when no copy could be made", async () => {
   assert.equal(f.state.candidates.size, 1);
 });
 
+test("a page D1 has as live keeps its files without a KV read; a D1 error falls back to KV", async () => {
+  const candidates = new Map([["pages/a/index.html", { etag: "e_a", firstSeen: NOW - CONFIRM_AFTER_MS }]]);
+  const f = fake([file("a"), file("b")], new Set(), { candidates });
+  let kvReads = 0;
+  const exists = f.deps.pageExists;
+  f.deps.pageExists = async (id) => { kvReads++; return exists(id); };
+  f.deps.livePages = async (ids) => { assert.deepEqual(ids, ["a", "b"]); return new Set(["a"]); };
+  const out = await sweepExpiredPages(f.deps, NOW);
+  assert.deepEqual(out.deleted, []);
+  assert.equal(kvReads, 1, "only b asks KV");
+  assert.equal(f.state.candidates.has("pages/a/index.html"), false, "a live page is unmarked");
+
+  const g = fake([file("a")], new Set(), { candidates: new Map(candidates) });
+  g.deps.livePages = async () => { throw new Error("d1 down"); };
+  assert.deepEqual((await sweepExpiredPages(g.deps, NOW)).deleted, ["pages/a/index.html"]);
+});
+
 test("seen again too soon: kept, and the first sighting isn't reset", async () => {
   const first = NOW - CONFIRM_AFTER_MS + 1;
   const f = fake([file("gone")], new Set(), { candidates: new Map([["pages/gone/index.html", { etag: "e_gone", firstSeen: first }]]) });
@@ -161,6 +178,7 @@ test("index.ts wires the cron to the sweep through kvKeys.page and the pages/ pr
   assert.match(code, /scheduled\(controller: ScheduledController, env: Env, ctx: ExecutionContext\) \{\s*ctx\.waitUntil\(runScheduled\(controller\.cron, env\)\)/);
   assert.match(code, /\["expired_sweep", runExpiredSweep\],\s*\["backup", runBackup\],/);
   assert.match(code, /preserve: \(files\) => preserveSweptFiles\(env, files\)/);
+  assert.match(code, /livePages: \(ids\) => livePageIds\(env\.DB, ids, Date\.now\(\)\)/);
   assert.match(code, /PAGES_KV\.get\(kvKeys\.page\(id\)\)\) !== null/);
   assert.match(code, /PAGES_BUCKET\.list\(\{ prefix: "pages\/"/);
   assert.match(code, /etag: o\.etag/);

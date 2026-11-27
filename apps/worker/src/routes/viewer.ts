@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import type { AppBindings } from "../types.js";
 import { parseMetadata, serializeMetadata } from "@aired/core";
+import { updatePagePin } from "../lib/pages-store.ts";
 import { applyPageHeaders } from "../middleware/security.js";
 import { loadStats, recordView, saveStats } from "../lib/stats.js";
 import { SANDBOX_SHIM, injectEarlyScript } from "../lib/sandbox-shim.js";
@@ -236,6 +237,8 @@ viewer.post("/p/:id/verify-pin", async (c) => {
         const write = viewWrite(fresh, Date.now());
         if (write.expired || write.options === null) return;
         await c.env.PAGES_KV.put(`page:${id}`, serializeMetadata({ ...fresh, pin: hashed }), write.options);
+        // The D1 row holds the PIN too (lib/pages-store.ts).
+        await updatePagePin(c.env.DB, id, fresh.pin, hashed, Date.now());
       })().catch((err) => {
         console.error("pin rehash failed", { id, err });
       }),

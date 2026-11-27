@@ -110,7 +110,9 @@ test("a screenshot asked for by its version keeps longer than the card", () => {
 
 test("api.ts: every page HTML write queues a screenshot after the response", () => {
   const code = src("../src/routes/api.ts");
-  const writes = code.match(/PAGES_BUCKET\.put\(`pages\/\$\{\w+\}\/index\.html`/g) ?? [];
+  // HTML is written only through lib/page-write.ts.
+  assert.doesNotMatch(code, /PAGES_BUCKET\.put\(/);
+  const writes = code.match(/await (createPage|updatePage)\(c\.env, /g) ?? [];
   const shots = code.match(/c\.executionCtx\.waitUntil\(refreshShot\(/g) ?? [];
   assert.equal(writes.length, 3, "publish create, publish update, PUT");
   assert.equal(shots.length, writes.length);
@@ -122,7 +124,10 @@ test("api.ts: every page HTML write queues a screenshot after the response", () 
 test("api.ts: deleting a page deletes its screenshots and placeholder", () => {
   const api = src("../src/routes/api.ts");
   const del = api.slice(api.indexOf('api.delete("/pages/:id"'));
-  assert.match(del.slice(0, del.indexOf("\n});")), /await forgetShots\(c\.env, id\)/);
+  assert.match(del.slice(0, del.indexOf("\n});")), /await deletePage\(c\.env, page, /);
+  const write = src("../src/lib/page-write.ts");
+  const fn = write.slice(write.indexOf("export async function deletePage"));
+  assert.match(fn.slice(0, fn.indexOf("\n}\n")), /await forgetShots\(env, row\.id\)/);
   const render = src("../src/lib/og-render.ts");
   assert.match(render, /PAGES_BUCKET\.delete\(\[shotKey\(id\), tileKey\(id\)\]\)/);
   assert.match(render, /DELETE FROM page_shots WHERE id = \?/);
@@ -130,7 +135,8 @@ test("api.ts: deleting a page deletes its screenshots and placeholder", () => {
 
 test("mcp.ts: the anonymous publish tool queues screenshots too", () => {
   const code = src("../src/routes/mcp.ts");
-  const writes = code.match(/PAGES_BUCKET\.put\(\s*`pages\/\$\{\w+\}\/index\.html`/g) ?? [];
+  assert.doesNotMatch(code, /PAGES_BUCKET\.put\(/);
+  const writes = code.match(/await (createPage|updatePage)\(env, /g) ?? [];
   const shots = code.match(/background\(refreshShot\(/g) ?? [];
   assert.equal(writes.length, 2);
   assert.equal(shots.length, 2);
@@ -214,12 +220,12 @@ test("me.ts: the tile route is owner-only and the list carries tiles", () => {
   const start = code.indexOf("me.get('/pages/:id/tile'");
   assert.ok(start > 0);
   const route = code.slice(start, code.indexOf("\n});", start));
-  assert.match(route, /ownedPage\(c, user\.id, id, null\)\) === null\) return c\.json\(\{ error: 'Page not found' \}, 404\)/);
+  assert.match(route, /ownedPage\(c, user\.id, id\)\) === null\) return c\.json\(\{ error: 'Page not found' \}, 404\)/);
   assert.match(route, /PAGES_BUCKET\.get\(tileKey\(id\)\)/);
   assert.doesNotMatch(route, /shotKey|PAGES_KV\.put|readCount/);
   // ownedPage uses the preview route's owner/expiry rule.
   const helper = code.slice(code.indexOf("async function ownedPage"), code.indexOf("me.get('/pages/:id/tile'"));
-  assert.match(helper, /previewDecision\(metadata, userId, isClaimed, Date\.now\(\)\)/);
+  assert.match(helper, /previewDecision\(facts, userId, false, Date\.now\(\)\)\.ok \? facts : null/);
   assert.match(code, /p\.tile = tileInfo\(rows\.get\(p\.id\)\)/);
 });
 
@@ -230,7 +236,7 @@ test("me.ts: the backfill checks ownership, skips recent tries and caps the batc
   const route = code.slice(start, code.indexOf("\n});", start));
   assert.match(route, /needsBackfill\(rows\.get\(id\), now\)/);
   assert.match(route, /jobs\.length >= BACKFILL_MAX/);
-  assert.match(route, /ownedPage\(c, user\.id, id, claimed\)/);
+  assert.match(route, /ownedPage\(c, user\.id, id\)/);
   assert.match(route, /renderShots\(c\.env, jobs\)/);
 });
 

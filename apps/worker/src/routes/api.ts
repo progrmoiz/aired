@@ -8,11 +8,11 @@ import { TIERS } from "../lib/rate-limit-tiers.js";
 import { detectSpam, SPAM_REJECTION } from "../lib/spam.js";
 import { claimUrl } from "../lib/claim-url.js";
 import { hashPin } from "../lib/pin-hash.js";
-import { authoritativeCredentials, authorizePageWrite } from "../lib/claim-decision.js";
-import { getClaim, tombstoneClaim } from "../lib/page-claims.js";
+import { authorizePageWrite } from "../lib/claim-decision.js";
+import { createPage, deletePage, loadPage, StorageUnavailable, updatePage, type LoadedPage } from "../lib/page-write.ts";
 import { billingEnabled, getEntitlements, planLimitError, upgradeUrl } from "../lib/entitlements.js";
 import { siteOrigin } from "../lib/origin.ts";
-import { forgetShots, refreshShot } from "../lib/og-render.js";
+import { refreshShot } from "../lib/og-render.js";
 import type { Entitlements } from "../lib/entitlements.js";
 import {
   generateId,
@@ -22,33 +22,32 @@ import {
   validateHtml,
   extractTitle,
   parseMetadata,
-  serializeMetadata,
   normalizeProject,
   DEFAULT_TTL,
   MAX_SIZE,
   PRO_MAX_SIZE,
 } from "@aired/core";
 import type { PageMetadata } from "@aired/core";
-import {
-  addPageToOwner,
-  removePageFromOwner,
-  addPageToOwnerProject,
-  removePageFromOwnerProject,
-  bumpProjectCount,
-} from "../lib/owner-index.js";
 
 const api = new Hono<AppBindings>();
 
 /**
- * The owner and token hash that count for a page. A claimed page's D1 row
- * wins over its KV record, which can be written back stale. Throws if D1
- * can't be read: callers fail closed rather than trust a possibly stale hash.
+ * The live page and the owner and token hash that count for it, from its D1
+ * row (lib/page-write.ts loadPage), never from the KV record, which can be
+ * written back stale. A D1 error answers 503: fail closed rather than trust
+ * a possibly stale hash.
  */
-async function credentialsFor(db: D1Database, id: string, metadata: PageMetadata) {
-  return authoritativeCredentials(() => getClaim(db, id), metadata.ownerId, metadata.tokenHash);
+async function pageFor(c: Context<AppBindings>, id: string, route: string): Promise<LoadedPage | Response> {
+  try {
+    return (await loadPage(c.env, id)) ?? c.json({ error: "Page not found" }, 404);
+  } catch (err) {
+    console.error("pages lookup failed", { route, id, err });
+    return c.json({ error: CREDENTIALS_UNAVAILABLE }, 503);
+  }
 }
 
 const CREDENTIALS_UNAVAILABLE = "Could not check this page's credentials. Please try again.";
+const STORAGE_FULL = "Service temporarily unavailable — storage write limit reached. Try again later.";
 
 /**
  * Validate HTML against the caller's plan size limit. `response` is the error
@@ -129,23 +128,10 @@ api.post("/publish", publishRateLimit, async (c) => {
 
   // Update path: update_token + id provided
   if (typeof update_token === "string" && typeof existingId === "string") {
-    const raw = await c.env.PAGES_KV.get(`page:${existingId}`);
-    if (raw === null) {
-      return c.json({ error: "Page not found" }, 404);
-    }
+    const page = await pageFor(c, existingId, "publish_update");
+    if (page instanceof Response) return page;
+    const creds = { ownerId: page.row.ownerId, tokenHash: page.row.tokenHash };
 
-    const metadata = parseMetadata(raw);
-    if (metadata === null) {
-      return c.json({ error: "Page metadata is corrupted" }, 500);
-    }
-
-    let creds: { ownerId: number | null; tokenHash: string };
-    try {
-      creds = await credentialsFor(c.env.DB, existingId, metadata);
-    } catch (err) {
-      console.error("page_claims lookup failed on publish update", { id: existingId, err });
-      return c.json({ error: CREDENTIALS_UNAVAILABLE }, 503);
-    }
     const valid = await verifyToken(update_token, creds.tokenHash);
     if (!valid) {
       return c.json({ error: "Invalid update token" }, 403);
@@ -161,34 +147,10 @@ api.post("/publish", publishRateLimit, async (c) => {
       }
     }
 
-    const htmlObj = await c.env.PAGES_BUCKET.put(`pages/${existingId}/index.html`, html, {
-      httpMetadata: { contentType: "text/html; charset=utf-8" },
-    });
-
-    const now = new Date();
-    const ttlSeconds = metadata.permanent ? null : DEFAULT_TTL;
-    const expiresAt = ttlSeconds !== null
-      ? new Date(now.getTime() + ttlSeconds * 1000).toISOString()
-      : null;
-
-    const updated: PageMetadata = {
-      ...metadata,
-      // Write the authoritative owner and hash, so a stale read can't undo a claim.
-      ownerId: creds.ownerId,
-      tokenHash: creds.tokenHash,
-      title: resolvedTitle ?? metadata.title,
-      size: new TextEncoder().encode(html).byteLength,
-      expiresAt,
-    };
-
-    const kvOptions: KVNamespacePutOptions = {};
-    if (ttlSeconds !== null) {
-      kvOptions.expirationTtl = ttlSeconds;
-    }
-    await c.env.PAGES_KV.put(`page:${existingId}`, serializeMetadata(updated), kvOptions);
+    const { metadata: updated, expiresAt, htmlEtag } = await updatePage(c.env, page, html, resolvedTitle);
 
     // Link-preview screenshot, after the response (lib/og-render.ts).
-    c.executionCtx.waitUntil(refreshShot(c.env, existingId, updated, html, htmlObj?.etag ?? null, { replacing: true }));
+    c.executionCtx.waitUntil(refreshShot(c.env, existingId, updated, html, htmlEtag, { replacing: true }));
 
     return c.json({
       id: existingId,
@@ -235,66 +197,16 @@ api.post("/publish", publishRateLimit, async (c) => {
     project: normalizeProject(project),
   };
 
+  // D1 row, R2 HTML and KV cache record, or nothing (lib/page-write.ts).
   let htmlObj: R2Object | null;
   try {
-    htmlObj = await c.env.PAGES_BUCKET.put(`pages/${id}/index.html`, html, {
-      httpMetadata: { contentType: "text/html; charset=utf-8" },
-    });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes("limit exceeded")) {
-      return c.json({ error: "Service temporarily unavailable — storage write limit reached. Try again later." }, 503);
+    htmlObj = await createPage(c.env, metadata, html, now.getTime());
+  } catch (err) {
+    if (err instanceof StorageUnavailable) {
+      console.error("publish storage write failed", { id, err: err.message });
+      return c.json({ error: STORAGE_FULL }, 503);
     }
     throw err;
-  }
-
-  const kvOptions: KVNamespacePutOptions = {};
-  if (ttlSeconds !== null) {
-    kvOptions.expirationTtl = ttlSeconds;
-  }
-
-  try {
-    await c.env.PAGES_KV.put(`page:${id}`, serializeMetadata(metadata), kvOptions);
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes("limit exceeded")) {
-      // HTML is in R2 but metadata failed — clean up
-      await c.env.PAGES_BUCKET.delete(`pages/${id}/index.html`).catch(() => {});
-      return c.json({ error: "Service temporarily unavailable — storage write limit reached. Try again later." }, 503);
-    }
-    throw err;
-  }
-
-  // Write owner index entry (best-effort; failure does not abort publish)
-  if (metadata.ownerId !== null) {
-    try {
-      await addPageToOwner(
-        c.env.PAGES_KV,
-        metadata.ownerId,
-        id,
-        metadata.createdAt,
-        metadata.expiresAt,
-      );
-    } catch (err) {
-      console.error('owner-index write failed', { id, ownerId: metadata.ownerId, err });
-    }
-
-    // Write owner+project index + bump the project manifest (best-effort)
-    if (metadata.project !== null) {
-      try {
-        await addPageToOwnerProject(
-          c.env.PAGES_KV,
-          metadata.ownerId,
-          metadata.project,
-          id,
-          metadata.createdAt,
-          metadata.expiresAt,
-        );
-        await bumpProjectCount(c.env.PAGES_KV, metadata.ownerId, metadata.project, 1);
-      } catch (err) {
-        console.error('owner-project-index write failed', { id, ownerId: metadata.ownerId, project: metadata.project, err });
-      }
-    }
   }
 
   // Increment publish counter (fire-and-forget)
@@ -352,25 +264,12 @@ api.put("/pages/:id", requireCsrfHeader, async (c) => {
     (typeof title === "string" && title.trim() ? title.trim() : null) ??
     extractTitle(html);
 
-  const raw = await c.env.PAGES_KV.get(`page:${id}`);
-  if (raw === null) {
-    return c.json({ error: "Page not found" }, 404);
-  }
-
-  const metadata = parseMetadata(raw);
-  if (metadata === null) {
-    return c.json({ error: "Page metadata is corrupted" }, 500);
-  }
+  const page = await pageFor(c, id, "put");
+  if (page instanceof Response) return page;
+  const creds = { ownerId: page.row.ownerId, tokenHash: page.row.tokenHash };
 
   // Authorization: update_token (body, else Bearer header) wins (R6); else owner JWT
   const putUser = c.get('user');
-  let creds: { ownerId: number | null; tokenHash: string };
-  try {
-    creds = await credentialsFor(c.env.DB, id, metadata);
-  } catch (err) {
-    console.error("page_claims lookup failed on update", { id, err });
-    return c.json({ error: CREDENTIALS_UNAVAILABLE }, 503);
-  }
   const auth = await authorizePageWrite({
     ownerId: creds.ownerId,
     tokenHash: creds.tokenHash,
@@ -397,34 +296,10 @@ api.put("/pages/:id", requireCsrfHeader, async (c) => {
     }
   }
 
-  const htmlObj = await c.env.PAGES_BUCKET.put(`pages/${id}/index.html`, html, {
-    httpMetadata: { contentType: "text/html; charset=utf-8" },
-  });
-
-  const now = new Date();
-  const ttlSeconds = metadata.permanent ? null : DEFAULT_TTL;
-  const expiresAt = ttlSeconds !== null
-    ? new Date(now.getTime() + ttlSeconds * 1000).toISOString()
-    : null;
-
-  const updated: PageMetadata = {
-    ...metadata,
-    // Write the authoritative owner and hash, so a stale read can't undo a claim.
-    ownerId: creds.ownerId,
-    tokenHash: creds.tokenHash,
-    title: resolvedTitle ?? metadata.title,
-    size: new TextEncoder().encode(html).byteLength,
-    expiresAt,
-  };
-
-  const kvOptions: KVNamespacePutOptions = {};
-  if (ttlSeconds !== null) {
-    kvOptions.expirationTtl = ttlSeconds;
-  }
-  await c.env.PAGES_KV.put(`page:${id}`, serializeMetadata(updated), kvOptions);
+  const { metadata: updated, expiresAt, htmlEtag } = await updatePage(c.env, page, html, resolvedTitle);
 
   // Link-preview screenshot, after the response (lib/og-render.ts).
-  c.executionCtx.waitUntil(refreshShot(c.env, id, updated, html, htmlObj?.etag ?? null, { replacing: true }));
+  c.executionCtx.waitUntil(refreshShot(c.env, id, updated, html, htmlEtag, { replacing: true }));
 
   const origin = new URL(c.req.url).origin;
   // Return the token string back (prefer the body token; if owner-JWT path used, no token in response)
@@ -444,15 +319,9 @@ api.delete("/pages/:id", requireCsrfHeader, async (c) => {
   const id = c.req.param("id") ?? "";
   const authHeader = c.req.header("Authorization");
 
-  const raw = await c.env.PAGES_KV.get(`page:${id}`);
-  if (raw === null) {
-    return c.json({ error: "Page not found" }, 404);
-  }
-
-  const metadata = parseMetadata(raw);
-  if (metadata === null) {
-    return c.json({ error: "Page metadata is corrupted" }, 500);
-  }
+  const page = await pageFor(c, id, "delete");
+  if (page instanceof Response) return page;
+  const creds = { ownerId: page.row.ownerId, tokenHash: page.row.tokenHash };
 
   const deleteUser = c.get('user');
   let authorized = false;
@@ -466,13 +335,6 @@ api.delete("/pages/:id", requireCsrfHeader, async (c) => {
     bodyToken = undefined;
   }
   const token = readUpdateToken(bodyToken, authHeader);
-  let creds: { ownerId: number | null; tokenHash: string };
-  try {
-    creds = await credentialsFor(c.env.DB, id, metadata);
-  } catch (err) {
-    console.error("page_claims lookup failed on delete", { id, err });
-    return c.json({ error: CREDENTIALS_UNAVAILABLE }, 503);
-  }
   if (token !== null) {
     const valid = await verifyToken(token, creds.tokenHash);
     if (valid) {
@@ -499,52 +361,14 @@ api.delete("/pages/:id", requireCsrfHeader, async (c) => {
     return c.json({ error: "Authorization: Bearer <update_token> is required" }, 401);
   }
 
-  await Promise.all([
-    c.env.PAGES_BUCKET.delete(`pages/${id}/index.html`),
-    c.env.PAGES_KV.delete(`page:${id}`),
-  ]);
-  // Its link-preview screenshot, dashboard tile and placeholder go too.
+  // The D1 row is marked first, then the HTML and cache record go
+  // (lib/page-write.ts). If the row can't be marked, nothing has changed and
+  // a retry works.
   try {
-    await forgetShots(c.env, id);
+    await deletePage(c.env, page, (work) => c.executionCtx.waitUntil(work));
   } catch (err) {
-    console.error("screenshot cleanup failed on delete", { id, err });
-  }
-  // Keep a tombstone row: a stale KV copy of the page, still readable in
-  // other regions for a while, must not let its old token bring it back.
-  try {
-    await tombstoneClaim(c.env.DB, id, Date.now());
-  } catch (err) {
-    console.error("page_claims tombstone failed", { id, err });
-  }
-
-  // Remove from owner index (best-effort)
-  if (creds.ownerId !== null) {
-    try {
-      await removePageFromOwner(
-        c.env.PAGES_KV,
-        creds.ownerId,
-        id,
-        metadata.createdAt,
-      );
-    } catch (err) {
-      console.error('owner-index delete failed', { id, ownerId: creds.ownerId, err });
-    }
-
-    // Remove from owner+project index + decrement the manifest (best-effort)
-    if (metadata.project !== null) {
-      try {
-        await removePageFromOwnerProject(
-          c.env.PAGES_KV,
-          creds.ownerId,
-          metadata.project,
-          id,
-          metadata.createdAt,
-        );
-        await bumpProjectCount(c.env.PAGES_KV, creds.ownerId, metadata.project, -1);
-      } catch (err) {
-        console.error('owner-project-index delete failed', { id, ownerId: creds.ownerId, project: metadata.project, err });
-      }
-    }
+    console.error("page delete failed", { id, err });
+    return c.json({ error: "Could not delete this page. Please try again." }, 503);
   }
 
   return c.json({ ok: true });
