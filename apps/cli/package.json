@@ -4,7 +4,7 @@
   "description": "Publish HTML artifacts to shareable URLs instantly",
   "type": "module",
   "bin": {
-    "aired": "./bin/aired"
+    "aired": "bin/aired"
   },
   "files": [
     "dist/cli.cjs",
@@ -34,7 +34,7 @@
   "author": "Abdul Moiz",
   "repository": {
     "type": "git",
-    "url": "https://github.com/progrmoiz/aired.git",
+    "url": "git+https://github.com/progrmoiz/aired.git",
     "directory": "apps/cli"
   },
   "dependencies": {
