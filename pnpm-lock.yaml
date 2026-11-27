@@ -196,6 +196,10 @@ importers:
         version: 4.161.0(@cloudflare/workers-types@4.20260317.1)(@types/node@22.19.15)
 
   packages/core:
+    dependencies:
+      zod:
+        specifier: ^3.22.0
+        version: 3.25.76
     devDependencies:
       typescript:
         specifier: ^5.7.0

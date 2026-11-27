@@ -138,7 +138,8 @@
 
       const res = await fetch("/api/publish", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        // Signed-in browsers must send it (the API's CSRF check).
+        headers: { "Content-Type": "application/json", "X-Aired-Request": "1" },
         body: JSON.stringify(body),
       });
 

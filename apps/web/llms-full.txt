@@ -110,12 +110,12 @@ Body:
 
 ```
 {
-  "html":      "<!doctype html>...",   // required, max 2 MB
-  "title":     "My dashboard",         // optional, auto-extracted from <title>
-  "ttl":       604800,                 // optional seconds (default 604800)
+  "html":      "<!doctype html>...",   // required, max 2 MB (10 MB on Pro)
+  "title":     "My dashboard",         // optional, from <title>; cut to 200 characters
+  "ttl":       604800,                 // optional seconds (default 604800), at most 31536000
   "permanent": false,                  // optional, true overrides ttl
-  "pin":       "1234",                 // optional, viewer must enter to view
-  "reads":     10,                     // optional, stop opening after N views
+  "pin":       "1234",                 // optional, at most 64 characters
+  "reads":     10,                     // optional, stop opening after N views, at most 1000000
 
   // Update an existing artifact in one call:
   "id":           "a1b2c3d4e5",
@@ -123,7 +123,7 @@ Body:
 }
 ```
 
-Returns `{ id, url, update_token, expiresAt }`. Store the `update_token` — it is the only credential.
+Returns `{ id, url, update_token, expiresAt }`. Store the `update_token` — it is the only credential. A field of the wrong type is ignored; a value past its bound is a 400 `invalid_input` naming the `field`.
 
 ### PUT /api/pages/:id
 
@@ -141,13 +141,15 @@ Update existing artifact. Token goes in the body as `update_token`, or as an `Au
 
 Delete artifact. Token goes in the `Authorization: Bearer <token>` header, or as `update_token` in a JSON body.
 
+PUT and DELETE answer the same way without a working credential: 401 `token_required` when nothing was sent, 403 `not_owner` when signed in but it isn't your page, 403 `invalid_token` for a wrong token.
+
 ### API keys
 
 Create a key (`aired_sk_…`) under **API keys** in the dashboard; it's shown once. Send `Authorization: Bearer aired_sk_…` on any request and it runs as your account: published pages are yours and permanent by default, and you can update (PUT) or delete (DELETE) your own pages with the key alone, without an update token. When the key takes the Authorization header and you also want to pass an update token, put it in the JSON body. The CLI and local MCP server read `AIRED_API_KEY`. On the remote MCP server, the same header adds `list_pages`, `update_page`, `delete_page` and `get_account`. A key can't create keys, open billing or delete the account. Plan limits answer 402 with an `upgrade_url` that a person must open.
 
 ### GET /api/pages/:id
 
-Public metadata: `{ id, title, size, readCount, expiresAt }`. No auth.
+Public metadata: `{ id, title, size, readCount, expiresAt, pinProtected }`. No auth. A PIN-protected page answers `title: null` and `readCount: 0`; its owner sees both in `/details`. Its `/og/:id` card shows neither.
 
 ### GET /api/pages/:id/details
 
@@ -186,6 +188,12 @@ Body `{ id, reason }`. No auth. Flags an artifact for abuse review.
 
 Body `{ pin }`. On success sets an `HttpOnly`, `SameSite=Strict` cookie scoped to `/p/:id` for 1 hour.
 
+### Errors
+
+Every error from `/api/*` and `/auth/*` is JSON: `{ "error": "<message>", "code": "<code>" }`. `code` is stable; `error` is for people. Codes: `invalid_json`, `invalid_input` (with `field`), `invalid_html` (400); `token_required` (401); `plan_limit` (402, with `limit` and `upgrade_url`); `invalid_token`, `not_owner`, `forbidden` (403); `not_found` (404); `payload_too_large` (413); `spam_rejected` (422); `rate_limited` (429); `internal_error` (500); `unavailable`, `storage_unavailable` (503). Others follow the status (`conflict` for 409, `gone` for 410) unless the route names its own (`key_limit`, `already_pro`).
+
+A browser signed in to aired (the session cookie) must send `X-Aired-Request: 1` on every POST, PUT, PATCH and DELETE to `/api` and `/auth`, or gets 403. Requests without the cookie (curl, the CLI, agents, API keys) don't need it.
+
 ---
 
 ## Behavior details
@@ -206,7 +214,8 @@ Body `{ pin }`. On success sets an `HttpOnly`, `SameSite=Strict` cookie scoped t
 | Max page size | 2 MB (Free), 10 MB (Pro) |
 | Publishes | 5/hour per IP anonymously, 30/hour signed in on Free, 500/day on Pro |
 | Default TTL | 7 days |
-| Max TTL | permanent |
+| Max TTL | a year with `ttl`, or `permanent` |
+| Request body | 21 MB for publish, PUT and MCP; 1 MB otherwise |
 
 Pro ($12/month or $108/year) removes the aired badge and raises the limits. aired is also open source: you can run it yourself (see https://aired.sh/docs#self-host).
 

@@ -38,7 +38,7 @@ test("signed-in publishes get the account limit, not the per-IP one", () => {
 });
 
 test("Pro publishes get 500 a day per account", () => {
-  assert.deepEqual(TIERS.pro, { bucketPrefix: "rl:pro", limit: 500, windowSeconds: 86400 });
+  assert.deepEqual(TIERS.pro, { bucketPrefix: "rl:pro", limit: 500, windowSeconds: 86400, durable: true });
 });
 
 test("billing routes get 10 Stripe calls an hour per account", () => {

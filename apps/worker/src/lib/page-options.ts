@@ -147,7 +147,9 @@ export function changedSettings(change: OptionsChange): string[] {
  * gets an error; another account's page is refused like a wrong token.
  * `tokenMatches` is false when no token was sent.
  */
-export type AccessDecision = { ok: true; viaToken: boolean } | { ok: false; status: 401 | 403; error: string };
+export type AccessDecision =
+  | { ok: true; viaToken: boolean }
+  | { ok: false; status: 401 | 403; code: "token_required" | "invalid_token" | "not_owner"; error: string };
 
 export function pageAccess(input: {
   ownerId: number | null;
@@ -157,9 +159,9 @@ export function pageAccess(input: {
 }): AccessDecision {
   if (input.tokenSent && input.tokenMatches) return { ok: true, viaToken: true };
   if (input.userId !== null && input.ownerId !== null && input.ownerId === input.userId) return { ok: true, viaToken: false };
-  if (input.tokenSent) return { ok: false, status: 403, error: "Invalid update token" };
-  if (input.userId !== null) return { ok: false, status: 403, error: "This page isn't in your account. Use its update token instead." };
-  return { ok: false, status: 401, error: "Sign in (API key or aired login) or send the page's update token" };
+  if (input.tokenSent) return { ok: false, status: 403, code: "invalid_token", error: "Invalid update token" };
+  if (input.userId !== null) return { ok: false, status: 403, code: "not_owner", error: "This page isn't in your account. Use its update token instead." };
+  return { ok: false, status: 401, code: "token_required", error: "Sign in (API key or aired login) or send the page's update token" };
 }
 
 /** A page as its owner sees it (get_page, set_options). Never the PIN or token. */

@@ -1,10 +1,14 @@
 import type { ClaimRecord } from './claim-decision.js';
 
 /**
- * D1 `page_claims`: the owner and current token hash of every claimed page
- * (migrations/0003_page_claims.sql). KV page records are a cache of this for
- * claimed pages; every token check reads here first. Rows are released or
- * tombstoned, never deleted. Only type imports here, so tests can load it.
+ * D1 `page_claims`: the owner and current token hash of pages claimed before
+ * D1 `pages` (migrations/0003_page_claims.sql). Retired: `pages` holds the
+ * owner and token now, and publish, claim and delete no longer write here.
+ * It's still read for a page that somehow has no `pages` row yet
+ * (lib/pages-store.ts ensurePageRow), and account deletion still releases
+ * the owner's rows (releaseClaimsStatement). The other write helpers are
+ * for tests that build the old state. Only type
+ * imports here, so tests can load it.
  *
  * Every query fails if migration 0003 isn't applied, and token checks then
  * fail closed. `npm run deploy` applies migrations before deploying.
@@ -94,37 +98,20 @@ export async function tombstoneClaim(db: D1Database, pageId: string, now: number
 }
 
 /**
- * Account deletion: the owner's claimed pages become anonymous, keeping their
- * rotated token hash. Returns page id → token hash, for mirroring into KV.
+ * Account deletion's one write here: the owner's old claims become
+ * anonymous, in the same batch as the account rows (routes/me.ts). Without
+ * it, a page from before D1 `pages` that has no row yet would get one owned
+ * by the deleted id the next time it's touched (ensurePageRow), and ids are
+ * reused when the same person signs up again. RETURNING page_id gives the
+ * pages to look at afterwards (claimedPageIds reads them from the result).
  */
-export async function releaseClaimsForOwner(
-  db: D1Database,
-  ownerId: number,
-): Promise<Map<string, string>> {
-  const { results } = await db
-    .prepare('UPDATE page_claims SET owner_id = NULL WHERE owner_id = ? RETURNING page_id, token_hash')
-    .bind(ownerId)
-    .all<{ page_id: string; token_hash: string }>();
-  return new Map(results.map((r) => [r.page_id, r.token_hash]));
+export function releaseClaimsStatement(db: D1Database, ownerId: number): D1PreparedStatement {
+  return db.prepare('UPDATE page_claims SET owner_id = NULL WHERE owner_id = ? RETURNING page_id').bind(ownerId);
 }
 
-/**
- * Copy a claim made on D1 `pages` into page_claims, so code from before the
- * pages table reads the same owner and token after a rollback.
- */
-export async function mirrorClaim(db: D1Database, pageId: string, record: ClaimRecord): Promise<void> {
-  await db
-    .prepare(
-      `INSERT INTO page_claims (page_id, owner_id, token_hash, prev_token_hash, claimed_at)
-       VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT (page_id) DO UPDATE SET
-         owner_id = excluded.owner_id,
-         token_hash = excluded.token_hash,
-         prev_token_hash = excluded.prev_token_hash,
-         claimed_at = excluded.claimed_at`,
-    )
-    .bind(pageId, record.ownerId, record.tokenHash, record.prevTokenHash, record.claimedAt)
-    .run();
+/** The page ids a releaseClaimsStatement returned. */
+export function claimedPageIds(result: D1Result | undefined): string[] {
+  return ((result?.results ?? []) as Array<{ page_id: string }>).map((r) => r.page_id);
 }
 
 /** D1 allows 100 bound parameters per query; one goes to the owner id. */

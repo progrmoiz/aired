@@ -5,8 +5,9 @@ import { DatabaseSync } from "node:sqlite";
 import {
   claimedIds,
   DELETED_TOKEN_HASH,
+  claimedPageIds,
   getClaim,
-  releaseClaimsForOwner,
+  releaseClaimsStatement,
   replaceClaimToken,
   tombstoneClaim,
   upsertClaim,
@@ -53,19 +54,17 @@ test("only the owner can replace the token", async () => {
   assert.equal((await getClaim(db, "p1"))?.tokenHash, "h_2");
 });
 
-test("account deletion releases rows, keeps the rotated hash, and lets the page be claimed again", async () => {
+test("account deletion releases only that owner's old claims and returns their pages", async () => {
   const db = d1();
   await upsertClaim(db, "p1", rec(1, "h_a"), "h_old");
   await upsertClaim(db, "p2", rec(1, "h_b"), "h_old");
   await upsertClaim(db, "p3", rec(2, "h_c"), "h_old");
-  const released = await releaseClaimsForOwner(db, 1);
-  assert.deepEqual([...released].sort(), [["p1", "h_a"], ["p2", "h_b"]]);
+  const result = await releaseClaimsStatement(db, 1).all();
+  assert.deepEqual(claimedPageIds(result as D1Result).sort(), ["p1", "p2"]);
+  // Released, keeping the rotated hash; the other owner's row is untouched.
   assert.deepEqual(await getClaim(db, "p1"), { ownerId: null, tokenHash: "h_a", prevTokenHash: "h_old", claimedAt: 1000 });
   assert.equal((await getClaim(db, "p3"))?.ownerId, 2);
-  // A released row is taken over only by a claim verified against its current hash.
-  assert.equal(await upsertClaim(db, "p1", { ownerId: 5, tokenHash: "h_5", prevTokenHash: "h_old", claimedAt: 2000 }, "h_old"), false);
-  assert.equal(await upsertClaim(db, "p1", { ownerId: 5, tokenHash: "h_5", prevTokenHash: "h_a", claimedAt: 2000 }, "h_a"), true);
-  assert.equal((await getClaim(db, "p1"))?.ownerId, 5);
+  assert.deepEqual(claimedPageIds(undefined), []);
 });
 
 test("a deleted page keeps a tombstone that can't be claimed or matched", async () => {
@@ -99,7 +98,7 @@ test("before the migration every query fails, so token checks fail closed", asyn
   const db = d1(false);
   await assert.rejects(getClaim(db, "p1"), /no such table/);
   await assert.rejects(claimedIds(db, 1, ["p1"]), /no such table/);
-  await assert.rejects(releaseClaimsForOwner(db, 1), /no such table/);
+  await assert.rejects(releaseClaimsStatement(db, 1).all(), /no such table/);
   await assert.rejects(tombstoneClaim(db, "p1", 1), /no such table/);
   await assert.rejects(upsertClaim(db, "p1", rec(1), "h_old"), /no such table/);
 });

@@ -35,7 +35,7 @@ export async function startWorkosSignIn(c: Context<AppBindings>, authState: Auth
 
 // GET /auth/login?return= — the one sign-in entry point. With WorkOS off it
 // hands over to /auth/github, which counts the attempt itself.
-const loginRateLimit = rateLimit(TIERS.oauth_init);
+const loginRateLimit = rateLimit(TIERS.signin_start);
 authWorkos.get('/login', (c, next) => (workosEnabled(c.env) ? loginRateLimit(c, next) : next()), async (c) => {
   const returnParam = c.req.query('return') ?? '/dashboard';
   const returnPath = isAllowedReturn(returnParam) ? returnParam : '/dashboard';

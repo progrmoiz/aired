@@ -21,13 +21,14 @@ test("docs show the token format the code mints and the limits it enforces", () 
 
 test("the error table covers every status the API answers with", () => {
   const docs = web("docs.html");
-  for (const status of ["400", "401", "402", "403", "404", "409", "410", "422", "429", "500", "502", "503"]) {
+  for (const status of ["400", "401", "402", "403", "404", "409", "410", "413", "422", "429", "500", "502", "503"]) {
     assert.match(docs, new RegExp(`<code>${status}</code>`), status);
   }
   assert.match(docs, /code: "plan_limit"/);
   // Unknown /api/* paths answer JSON, so "errors are JSON" holds.
+  // (Tested over HTTP in api-contract.test.ts; here: index.ts uses it first.)
   const index = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
-  assert.match(index, /if \(path === "\/api" \|\| path\.startsWith\("\/api\/"\) \|\| path\.startsWith\("\/oauth\/"\)\) \{\s*return c\.json\(\{ error: "Not found" \}, 404\);/);
+  assert.match(index, /app\.notFound\(async \(c\) => \{[\s\S]{0,120}const apiMissing = apiNotFound\(c\);\s*if \(apiMissing !== null\) return apiMissing;/);
 });
 
 test("self-hosting docs name D1, the rate-limit bindings and the required secrets", () => {

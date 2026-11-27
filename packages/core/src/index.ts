@@ -7,6 +7,7 @@ export * from "./id.js";
 export * from "./jwt-claims.js";
 export * from "./keys.js";
 export * from "./metadata.js";
+export * from "./schemas.js";
 export * from "./token.js";
 export * from "./user.js";
 export * from "./validate.js";

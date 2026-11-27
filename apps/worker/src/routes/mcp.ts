@@ -13,7 +13,9 @@ import {
   verifyToken,
   validateHtml,
   extractTitle,
+  capTitle,
   DEFAULT_TTL,
+  PAGE_INPUT_LIMITS,
 } from "@aired/core";
 import type { PageMetadata } from "@aired/core";
 import { createPage, loadPage, StorageUnavailable, updatePage, type LoadedPage } from "../lib/page-write.ts";
@@ -95,11 +97,12 @@ function createAiredMcpServer(
       inputSchema: {
       html: z.string().describe("HTML content to publish"),
       title: z.string().optional().describe("Page title"),
-      pin: z.string().optional().describe("PIN to protect access"),
+      pin: z.string().max(PAGE_INPUT_LIMITS.pinMax).optional().describe("PIN to protect access"),
       ttl_seconds: z
         .number()
+        .max(PAGE_INPUT_LIMITS.ttlMaxSeconds)
         .optional()
-        .describe("Time to live in seconds (default: 604800 = 7 days)"),
+        .describe("Time to live in seconds (default: 604800 = 7 days; at most a year, use permanent for longer)"),
       permanent: z
         .boolean()
         .optional()
@@ -151,8 +154,7 @@ function createAiredMcpServer(
         };
       }
 
-      const resolvedTitle =
-        (title && title.trim() ? title.trim() : null) ?? extractTitle(html);
+      const resolvedTitle = capTitle(title) ?? capTitle(extractTitle(html));
 
       // Anonymous remote MCP publishes (no API key) are always screened.
       const verdict = detectSpam(html, resolvedTitle);

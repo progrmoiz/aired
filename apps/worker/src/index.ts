@@ -20,6 +20,9 @@ import { publishRateLimit } from "./middleware/rate-limit.js";
 import { corsMiddleware } from "./middleware/cors.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { requestIdMiddleware } from "./middleware/request-id.js";
+import { apiNotFound, applyApiContract } from "./middleware/api-contract.ts";
+import { apiError, codeForStatus } from "./lib/errors.ts";
+import { pruneBillingEvents, pruneRateLimits } from "./lib/durable-limit.ts";
 import { log, logError } from "./lib/log.js";
 import { cachedHealth, checkHealth, publicReport, storageProbes } from "./lib/health.js";
 import { countMcpToolCalls, isMcpToolCall, mcpToolName } from "./lib/mcp-rpc.js";
@@ -50,17 +53,21 @@ const app = new Hono<AppBindings>();
 // carry tokens) and answered with a generic 500.
 app.onError((err, c) => {
   if (err instanceof HTTPException) {
-    return c.json({ error: err.message }, err.status);
+    return apiError(c, err.status, codeForStatus(err.status), err.message);
   }
+  // A streamed body past its cap: bodyLimit (middleware/api-contract.ts)
+  // replaces this with its own 413, so it isn't a bug to log.
+  if (err.name === "BodyLimitError") return apiError(c, 413, "payload_too_large", "Request body too large");
   logError("unhandled_error", err, { method: c.req.method, path: new URL(c.req.url).pathname }, c.get("requestId"));
-  return c.json({ error: "Internal Server Error" }, 500);
+  return apiError(c, 500, "internal_error", "Internal Server Error");
 });
 
 // Global middleware: request id first (so every later log line has it),
-// then CORS, then auth
+// then CORS, then auth inside the API contract: error codes around it (so
+// its own 401s get one), body limits and CSRF after (middleware/api-contract.ts).
 app.use("*", requestIdMiddleware);
 app.use("*", corsMiddleware);
-app.use("*", authMiddleware);
+applyApiContract(app, authMiddleware);
 
 // Health check: probes KV, D1 and R2 (lib/health.ts). 503 when any fails.
 const health = cachedHealth();
@@ -199,10 +206,8 @@ app.route("/", viewer);
 // Cloudflare ASSETS binding handles routing to the correct file.
 app.notFound(async (c) => {
   // The API answers in JSON, including for paths it doesn't have.
-  const path = new URL(c.req.url).pathname;
-  if (path === "/api" || path.startsWith("/api/") || path.startsWith("/oauth/")) {
-    return c.json({ error: "Not found" }, 404);
-  }
+  const apiMissing = apiNotFound(c);
+  if (apiMissing !== null) return apiMissing;
   if (c.env.ASSETS) {
     return withAssetCache(await c.env.ASSETS.fetch(c.req.raw), new URL(c.req.url).pathname);
   }
@@ -287,16 +292,30 @@ async function runExpiredSweep(env: Env): Promise<void> {
 }
 
 /**
+ * Old rows out of D1: rate-limit windows no request reads any more, and
+ * webhook dedupe ids past 30 days (lib/durable-limit.ts). Once an hour, in
+ * the first cron run after the hour.
+ */
+async function runHousekeeping(env: Env, now = Date.now()): Promise<void> {
+  if (new Date(now).getUTCMinutes() >= 5) return;
+  const rateLimits = await pruneRateLimits(env.DB, now);
+  const billingEvents = await pruneBillingEvents(env.DB, now);
+  log("info", "housekeeping", { rateLimits, billingEvents });
+}
+
+/**
  * Every cron run does each job in turn: the expired-page sweep, then the
  * nightly backup's next few chunks (lib/backup.ts; it does nothing until a
- * snapshot is due). One job failing doesn't stop the other. A throw is logged
- * as scheduled_failed (an alert event, lib/log.ts) with the cron expression
- * and job, then rethrown so Cloudflare still records the run as failed.
+ * snapshot is due), then hourly housekeeping. One job failing doesn't stop
+ * the others. A throw is logged as scheduled_failed (an alert event,
+ * lib/log.ts) with the cron expression and job, then rethrown so Cloudflare
+ * still records the run as failed.
  */
 async function runScheduled(cron: string, env: Env): Promise<void> {
   const jobs: Array<[string, (env: Env) => Promise<void>]> = [
     ["expired_sweep", runExpiredSweep],
     ["backup", runBackup],
+    ["housekeeping", runHousekeeping],
   ];
   let failure: unknown = null;
   for (const [job, run] of jobs) {
