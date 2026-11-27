@@ -72,18 +72,21 @@ claude mcp add aired --transport http https://aired.sh/mcp/account
 
 Tools, each returning text plus `structuredContent` that matches its `outputSchema`:
 
-- `publish_html(html, title?, pin?, ttl_seconds?, permanent?, update_token?, id?)` → `{ id, url, updated, update_token, expires_at, owner, claim_url, upgrade_url }`
-- `get_page(id, update_token?)` → `{ id, url, title, size, views, view_limit, has_pin, permanent, created_at, expires_at, project }` (never the PIN)
+- `publish_html(html | markdown, deck?, title?, pin?, ttl_seconds?, permanent?, update_token?, id?)` → `{ id, url, updated, update_token, expires_at, owner, claim_url, upgrade_url }`, plus `kind`, `slides`, `presenter_url` for a Markdown doc or a deck
+- `get_page(id, update_token?, include_source?)` → `{ id, url, title, size, views, view_limit, has_pin, permanent, created_at, expires_at, project, kind?, slides? }` (never the PIN); `include_source` adds `source_format`, `source` (the Markdown or HTML as published) and a deck's `notes`
+- `get_template(name?)` → `{ templates, template }`: starters to fill in and publish (`deck`, `deck-html`, `report`, `one-pager`), each with rules and content
 - `set_options(id, update_token?, title?, pin?, ttl_seconds?, permanent?, view_limit?)` → the same plus `changed`. `null` clears title, PIN or view limit.
 - `check_page(id, update_token?, viewport?, include_screenshot?)` → `{ id, url, ok, viewport, checked_at, load_ms, issues, console, failed_requests, page, blank, screenshot_url, screenshot_expires_at }`, plus the screenshot as an image. Opens the page in a real browser (desktop 1280×800 or mobile 390×844). `ok` is false on script or console errors, files that didn't load, broken images or a blank screen; slow, heavy, very tall or too-wide pages are warnings. Run it after each publish or update, fix, update the same id, check again. Small shared daily budget: once per change.
 - `send_feedback(kind, message, impact?, page_id?, tool?)` → `{ id, message }`. Feedback about aired itself; tell the user the id. Never page HTML.
 - Signed in only: `list_pages`, `update_page`, `delete_page`, `get_account`.
 
-The local server (`npx aired --mcp`) has publish_html (also `file_path`), get_page, set_options, check_page and send_feedback.
+The local server (`npx aired --mcp`) has publish_html (also `file_path`; a `.md` file publishes as Markdown), get_page, set_options, check_page, send_feedback and get_template.
 
-Prompts (slash commands in clients that show them): `publish_report(about?, audience?)`, `make_slide_deck(topic?, slides?)`, `share_privately(what?, expires?, pin?)`, `check_and_fix(page?)`.
+Markdown and decks: `markdown` renders as a reading page (highlighted code, tables, task lists, light and dark; raw HTML shows as text). With `deck: true` or front matter `type: deck`, Markdown is split into slides on `---` lines; HTML with `<meta name="aired" content="deck">` uses its top-level `<section>`s as 1280×720 slides. `/p/{id}#/N` opens slide N (`#/3` is slide 3). Speaker notes (`Note:` lines and `<!-- comments -->` in Markdown, `<aside class="notes">` in HTML) are removed from the public page and shown only to the signed-in owner at `/p/{id}/presenter`.
 
-Resources: `skill://aired/SKILL.md` (text/markdown, the aired skill) for every caller. Signed in (API key, /mcp/account, or `aired login` for the local server): `aired://page/{id}` for each of your pages (the newest 50 are listed), whose content is the page's HTML. Another account's page or an anonymous page is refused.
+Prompts (slash commands in clients that show them): `publish_report(about?, audience?)`, `make_slide_deck(topic?, slides?)` (uses the deck template, with speaker notes), `share_privately(what?, expires?, pin?)`, `check_and_fix(page?)`.
+
+Resources: `skill://aired/SKILL.md` (text/markdown, the aired skill) for every caller. Signed in (API key, /mcp/account, or `aired login` for the local server): `aired://page/{id}` for each of your pages (the newest 50 are listed), whose content is the page's HTML (or its Markdown, for a Markdown page). Another account's page or an anonymous page is refused.
 
 ### 4. HTTP API
 
@@ -115,7 +118,9 @@ Body:
 
 ```
 {
-  "html":      "<!doctype html>...",   // required, max 2 MB (10 MB on Pro)
+  "html":      "<!doctype html>...",   // required unless markdown is sent; max 2 MB (10 MB on Pro)
+  "markdown":  "# Notes ...",          // optional, instead of html: rendered as a doc, or a deck
+  "deck":      true,                   // optional, show as slides
   "title":     "My dashboard",         // optional, from <title>; cut to 200 characters
   "ttl":       604800,                 // optional seconds (default 604800), at most 31536000
   "permanent": false,                  // optional, true overrides ttl
@@ -128,7 +133,7 @@ Body:
 }
 ```
 
-Returns `{ id, url, update_token, expiresAt }`. Store the `update_token` — it is the only credential. A field of the wrong type is ignored; a value past its bound is a 400 `invalid_input` naming the `field`.
+Returns `{ id, url, update_token, expiresAt }`, plus `kind` ("doc" or "deck"), `slides`, `slides_with_notes` and `presenter_url` when it's a doc or deck. Store the `update_token` — it is the only credential. A field of the wrong type is ignored; a value past its bound is a 400 `invalid_input` naming the `field`.
 
 ### PUT /api/pages/:id
 
@@ -136,7 +141,7 @@ Update existing artifact. Token goes in the body as `update_token`, or as an `Au
 
 ```
 {
-  "html": "...",
+  "html": "...",                // or "markdown": "...", with "deck": true for slides
   "title": "optional new title",
   "update_token": "at_..."
 }
@@ -198,7 +203,11 @@ Issue codes. Errors: `script_error`, `console_error`, `failed_request`, `broken_
 
 ### GET /api/pages/:id/source
 
-The owner's copy of the page's HTML: `{ id, url, title, size, html }`. Same credentials as /details. Never counts a view.
+The owner's copy: `{ id, url, title, size, html, kind, format, source }`, plus `slides` and `notes` for a deck. `html` is the page as served; `source` is what was published (the Markdown, or a deck's HTML with its notes). Same credentials as /details. Never counts a view.
+
+### GET /p/:id/presenter
+
+A deck's speaker view: each slide's notes, the next slide, a timer, and buttons that move the slides window. Only for the signed-in owner (session or API key); everyone else gets the same 403, whether or not the page is a deck.
 
 ### POST /api/feedback
 

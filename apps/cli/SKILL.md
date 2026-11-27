@@ -1,11 +1,11 @@
 ---
 name: aired
-description: Publishes HTML files or strings to shareable live URLs via aired.sh. Use when the user wants to share, deploy, or publish an HTML artifact, dashboard, visualization, report, or any generated HTML — or when an agent needs to make HTML viewable in a browser, or change a published page's PIN, expiry or view limit. Supports PIN protection, custom expiry, and stdin piping. Works without an account; sign in or use an API key to keep pages in one place.
+description: Publishes HTML or Markdown to shareable live URLs via aired.sh, including slide decks with speaker notes. Use when the user wants to share, deploy, or publish an HTML artifact, dashboard, visualization, report, Markdown doc or slide deck — or when an agent needs to make HTML viewable in a browser, or change a published page's PIN, expiry or view limit. Supports PIN protection, custom expiry, templates and stdin piping. Works without an account; sign in or use an API key to keep pages in one place.
 ---
 
 # aired
 
-Publish HTML artifacts to shareable URLs. No deploy pipeline. Anonymous publishing works with no account; signing in (or an API key) keeps your pages in a dashboard and raises the limits.
+Publish HTML, Markdown docs and slide decks to shareable URLs. No deploy pipeline. Anonymous publishing works with no account; signing in (or an API key) keeps your pages in a dashboard and raises the limits.
 
 ## Quick Start
 
@@ -21,13 +21,20 @@ echo "<h1>Hello</h1>" | npx aired --json | jq .url
 
 # PIN-protected, expires in 24h
 npx aired report.html --ttl 24h --pin secret123
+
+# Markdown → a clean, readable page
+npx aired notes.md
+
+# A slide deck from a template
+npx aired new deck && npx aired deck.md
 ```
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `aired [file]` | Publish HTML file, directory, or stdin (default command) |
+| `aired [file]` | Publish an HTML or Markdown file, directory, or stdin (default command) |
+| `aired new [template]` | Write a starter to fill in: `deck`, `deck-html`, `report`, `one-pager` (no name lists them) |
 | `aired update <id> <file>` | Update an existing page |
 | `aired delete <id>` | Delete a page |
 | `aired info <id>` | Show page metadata |
@@ -51,6 +58,8 @@ npx aired report.html --ttl 24h --pin secret123
 | `--ttl <duration>` | Expiry: `1h`, `24h`, `7d`, `30d` |
 | `--permanent` | No expiry |
 | `--reads <n>` | Stop opening after N views |
+| `--deck` | Show as slides (Markdown split on `---`, or HTML `<section>` slides) |
+| `--markdown` | Treat the input as Markdown (automatic for `.md` files; use it for stdin) |
 
 ## Global Flags
 
@@ -82,6 +91,21 @@ JSON output is automatic when stdout is piped — no flag needed.
 - **Humans:** `aired login` opens the browser (email code, Google or GitHub). Then publishes belong to the account and show in https://aired.sh/dashboard.
 - **Agents and CI:** create an API key in the dashboard (API keys) and set `AIRED_API_KEY=aired_sk_...`. The CLI, `aired --mcp` and the HTTP API (`Authorization: Bearer aired_sk_...`) then publish as that account. No browser needed.
 - A free-plan limit returns HTTP 402 with `code: "plan_limit"` and an `upgrade_url` for a person to open.
+
+## Markdown docs and slide decks
+
+**Docs.** Publish a `.md` file (or `markdown` over MCP and the API) and aired renders it: aired's type, light and dark to match the reader, highlighted code, tables, task lists (`- [ ]`, `- [x]`), linkable headings. Front matter `title:` sets the title (else the first `# heading`). Raw HTML in Markdown shows as text, so publish an `.html` file when you need custom HTML. The CLI puts local images (`![](./chart.png)`, up to 1 MB each) into the page. The Markdown is kept: `get_page` with `include_source` and the page resource return it.
+
+**Decks.** Two ways to write one:
+
+- Markdown with front matter `type: deck` (or `--deck` / `deck: true`): slides split on lines that are only `---`. A slide that starts with `# ` is a title slide; others start with `## `.
+- HTML with `<meta name="aired" content="deck">` (or `--deck`): each top-level `<section>` is a slide designed at 1280×720.
+
+aired adds the viewer: arrow keys, Space, Page Up/Down, swipe on phones, **F** or the Present button to present, and `/p/<id>#/3` opens slide 3 (the link button copies it). Print gives one slide per page, so Save as PDF makes a PDF deck.
+
+**Speaker notes.** In Markdown, a line starting with `Note:` (everything after it on that slide) or an `<!-- comment -->`; in HTML, `<aside class="notes">`. aired cuts them out of the public page when you publish. Only the signed-in owner sees them, in the speaker view at `/p/<id>/presenter` (or press **S** on the slides): notes, next slide, a timer, and buttons that move the slides window. Publish signed in to use it; an anonymous deck's notes come back only through `get_page` with its update token.
+
+**Templates.** `aired new deck` (or `deck-html`, `report`, `one-pager`) writes a starter; over MCP, `get_template` returns the same starters with rules for filling them in. The `make_slide_deck` and `publish_report` prompts use them.
 
 ## Change settings after publishing
 
@@ -153,8 +177,9 @@ https://aired.sh/mcp/account
 
 | Tool | Needs | Does |
 |---|---|---|
-| `publish_html` | nothing | Publish; `html`, `file_path` (STDIO only), `title`, `pin`, `ttl_seconds`, `permanent`; `id` + `update_token` to update |
-| `get_page` | owner, or the page's `update_token` | Title, URL, size, views, view limit, expiry, project, PIN on/off |
+| `publish_html` | nothing | Publish; `html` or `markdown`, `deck`, `file_path` (STDIO only; `.md` is Markdown), `title`, `pin`, `ttl_seconds`, `permanent`; `id` + `update_token` to update |
+| `get_page` | owner, or the page's `update_token` | Title, URL, size, views, view limit, expiry, project, PIN on/off, doc or deck; `include_source` adds the Markdown/HTML as published and a deck's notes |
+| `get_template` | nothing | Starters: `deck`, `deck-html`, `report`, `one-pager` (no name lists them) |
 | `set_options` | owner, or the page's `update_token` | Change `pin` (null removes), `ttl_seconds` or `permanent`, `view_limit` (null removes), `title` |
 | `check_page` | owner, or the page's `update_token` | Render the page in a browser: errors, failed files, blank screen, screenshot; `viewport` `desktop` or `mobile` |
 | `send_feedback` | nothing | Report a bug, friction or idea in aired (see Feedback) |
@@ -166,7 +191,7 @@ Every tool returns `structuredContent` (matching its `outputSchema`) next to the
 
 **Prompts** (slash commands in clients that show them): `publish_report`, `make_slide_deck`, `share_privately` (PIN and expiry, PIN sent separately) and `check_and_fix`.
 
-**Resources:** `skill://aired/SKILL.md` is this skill, for any connected agent. Signed-in callers also get their pages as `aired://page/{id}` (the newest 50 listed); reading one returns its HTML. Only your own pages: another account's page, or an anonymous one, is refused.
+**Resources:** `skill://aired/SKILL.md` is this skill, for any connected agent. Signed-in callers also get their pages as `aired://page/{id}` (the newest 50 listed); reading one returns its HTML, or its Markdown for a Markdown page (a deck's HTML with its notes). Only your own pages: another account's page, or an anonymous one, is refused.
 
 ## Gotchas
 

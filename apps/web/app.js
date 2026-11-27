@@ -56,7 +56,17 @@
     fileInput.value = ""; // reset so same file can be re-uploaded
   });
 
+  // A dropped .md file publishes as Markdown (a readable page, or slides with
+  // `type: deck`); so does pasted text with no HTML tags that reads as Markdown.
+  let fromMarkdownFile = false;
+  function looksLikeMarkdown(text) {
+    if (fromMarkdownFile) return true;
+    if (/<[a-zA-Z!/][^>]*>/.test(text)) return false;
+    return /^(---\s*\n|#{1,6}\s|[-*+]\s|\d+\.\s|>\s|```)/m.test(text);
+  }
+
   function readFileAsText(file) {
+    fromMarkdownFile = /\.(md|markdown|mdown|mkd)$/i.test(file.name || "");
     if (file.size > 2 * 1024 * 1024) {
       showError("File too large. Maximum size is 2 MB.");
       return;
@@ -97,6 +107,7 @@
       // Maybe they dropped text
       const text = e.dataTransfer.getData("text");
       if (text) {
+        fromMarkdownFile = false;
         htmlInput.value = text;
         updateCharCount();
       }
@@ -128,7 +139,7 @@
     setLoading(true);
 
     try {
-      const body = { html };
+      const body = looksLikeMarkdown(html) ? { markdown: html } : { html };
       if (pin) body.pin = pin;
       if (permanent) {
         body.permanent = true;
@@ -289,6 +300,7 @@
   newBtn.addEventListener("click", () => {
     hideResult();
     htmlInput.value = "";
+    fromMarkdownFile = false;
     pinInput.value = "";
     ttlSelect.value = "604800";
     updateCharCount();
