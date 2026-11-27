@@ -1,6 +1,6 @@
 /**
- * Link-preview screenshots: the rules, with no runtime imports so tests load
- * them directly. The browser work is in og-render.ts.
+ * Link-preview screenshots: the rules, importing only origin.ts (which has no
+ * imports), so tests load them directly. The browser work is in og-render.ts.
  *
  * After a publish or update, the page is drawn in a browser and stored next
  * to its HTML:
@@ -22,6 +22,8 @@
  * (OG_SHOT_DAILY_SECONDS, default 8 minutes) and, after a 429, stops trying
  * until the limit lifts. A page that misses out keeps the card: no retries.
  */
+
+import { PRODUCTION_ORIGIN } from "./origin.ts";
 
 export const SHOT_WIDTH = 1200;
 export const SHOT_HEIGHT = 630;
@@ -51,6 +53,23 @@ export const DEFAULT_DAILY_BUDGET_MS = 8 * 60 * 1000;
 
 /** After a 429 that isn't the daily limit (too many browsers, or one too soon). */
 export const RATE_LIMIT_BACKOFF_MS = 60_000;
+
+/**
+ * The origin the browser is shown the page at. Browser Rendering refuses
+ * local addresses (net::ERR_BLOCKED_BY_ADMINISTRATOR) before any request
+ * interception, so a local SITE_ORIGIN (wrangler dev) renders at aired.sh
+ * instead; the stored HTML is still what's served, and aired.sh itself
+ * stays blocked.
+ */
+export function renderOrigin(origin: string): string {
+  try {
+    const host = new URL(origin).hostname;
+    const local = host === "localhost" || host.endsWith(".localhost") || host === "[::1]" || /^127\./.test(host) || /^(10|192\.168)\./.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host) || host === "0.0.0.0";
+    return local ? PRODUCTION_ORIGIN : origin;
+  } catch {
+    return PRODUCTION_ORIGIN;
+  }
+}
 
 export function shotKey(id: string): string {
   return `pages/${id}/shot.jpg`;
@@ -168,4 +187,44 @@ export function ogCacheControl(kind: "shot" | "card", versionMatches: boolean): 
  */
 export function tileCacheControl(versionMatches: boolean): string {
   return versionMatches ? "private, max-age=31536000, immutable" : "private, max-age=60";
+}
+
+type Db = { prepare(q: string): { bind(...v: unknown[]): { first<T>(): Promise<T | null>; run(): Promise<unknown> } } };
+
+/** The D1 og_shot_budget row all browser time adds to (screenshots and checks). */
+export const BUDGET_ROW = "browser";
+
+/**
+ * A row of D1 og_shot_budget, or null when there's none yet. A D1 error
+ * throws, which skips the shot or check. Typed structurally, so this file
+ * keeps no runtime imports.
+ */
+export async function readBudget(db: Db, name: string = BUDGET_ROW): Promise<BudgetState | null> {
+  const row = await db
+    .prepare("SELECT day, spent_ms, blocked_until FROM og_shot_budget WHERE name = ?")
+    .bind(name)
+    .first<{ day: string; spent_ms: number; blocked_until: number }>();
+  return row === null ? null : { day: row.day, spentMs: row.spent_ms, blockedUntil: row.blocked_until };
+}
+
+export async function addSpent(db: Db, ms: number, nowMs: number, name: string = BUDGET_ROW): Promise<void> {
+  await db
+    .prepare(
+      // ms may be negative (a check settling its reservation); spent time never goes below 0.
+      "INSERT INTO og_shot_budget (name, day, spent_ms, blocked_until) VALUES (?, ?, MAX(0, ?), 0) " +
+        "ON CONFLICT (name) DO UPDATE SET spent_ms = CASE WHEN og_shot_budget.day = excluded.day " +
+        "THEN MAX(0, og_shot_budget.spent_ms + ?) ELSE excluded.spent_ms END, day = excluded.day",
+    )
+    .bind(name, utcDay(nowMs), ms, ms)
+    .run();
+}
+
+export async function setBlocked(db: Db, until: number, name: string = BUDGET_ROW): Promise<void> {
+  await db
+    .prepare(
+      "INSERT INTO og_shot_budget (name, day, spent_ms, blocked_until) VALUES (?, ?, 0, ?) " +
+        "ON CONFLICT (name) DO UPDATE SET blocked_until = MAX(og_shot_budget.blocked_until, excluded.blocked_until)",
+    )
+    .bind(name, utcDay(Date.now()), until)
+    .run();
 }

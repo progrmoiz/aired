@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createMcpHandler } from "agents/mcp";
 import { z } from "zod";
 import type { Context } from "hono";
@@ -38,7 +38,20 @@ import {
   updateResult,
   type ToolResult,
 } from "../lib/mcp-account.js";
-import { FEEDBACK_DESCRIPTION, feedbackInput, outputShapes, patchBody, setOptionsInput } from "../lib/mcp-shapes.ts";
+import {
+  CHECK_DESCRIPTION,
+  FEEDBACK_DESCRIPTION,
+  checkContent,
+  checkInput,
+  checkOut,
+  feedbackInput,
+  outputShapes,
+  patchBody,
+  setOptionsInput,
+} from "../lib/mcp-shapes.ts";
+import { registerPrompts, registerResources } from "../lib/mcp-extras.ts";
+// The aired skill, bundled as text (wrangler.toml [[rules]]), served as a resource.
+import skill from "../../../cli/SKILL.md";
 
 /**
  * A tool call passed to the HTTP API in-process. A signed-in caller's (API
@@ -84,7 +97,7 @@ function createAiredMcpServer(
 ) {
   const server = new McpServer({
     name: "aired",
-    version: "1.4.0",
+    version: "1.5.0",
   });
   const origin = siteOrigin(env);
 
@@ -367,6 +380,33 @@ function createAiredMcpServer(
   );
 
   server.registerTool(
+    "check_page",
+    {
+      title: "Check a page in a browser",
+      description: CHECK_DESCRIPTION,
+      inputSchema: checkInput,
+      outputSchema: outputShapes.check_page,
+      annotations: { title: "Check a page in a browser", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    async ({ id, update_token, viewport, include_screenshot }) => {
+      if (!PAGE_ID.test(id)) return badId();
+      if (signedIn === null && update_token === undefined) {
+        return errorText(`Pass the page's update_token, or sign in. ${signInRequiredText(origin)}`);
+      }
+      const withImage = include_screenshot !== false;
+      const res = await callApi("POST", `/api/pages/${encodeURIComponent(id)}/check`, {
+        ...(update_token !== undefined ? { update_token } : {}),
+        ...(viewport !== undefined ? { viewport } : {}),
+        inline_screenshot: withImage,
+      });
+      if (res.status === 200) return { content: checkContent(res.body, withImage), structuredContent: checkOut(res.body) };
+      // Not "wait before publishing again": a busy browser or a spent budget isn't about publishing.
+      if (res.status === 429 || res.status === 503) return errorText(String((res.body as { error?: unknown } | null)?.error ?? `The aired API answered ${res.status}.`));
+      return apiErrorResult(res.status, res.body, origin);
+    },
+  );
+
+  server.registerTool(
     "send_feedback",
     {
       title: "Send feedback to aired",
@@ -464,6 +504,15 @@ function createAiredMcpServer(
         : apiErrorResult(res.status, res.body, origin);
     },
   );
+
+  registerPrompts(server);
+  registerResources(server, {
+    origin,
+    signedIn: signedIn !== null,
+    get: (path) => callApi("GET", path),
+    skill,
+    ResourceTemplate,
+  });
 
   return server;
 }

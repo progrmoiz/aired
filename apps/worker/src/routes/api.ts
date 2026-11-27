@@ -48,7 +48,7 @@ const api = new Hono<AppBindings>();
  * written back stale. A D1 error answers 503: fail closed rather than trust
  * a possibly stale hash.
  */
-async function pageFor(c: Context<AppBindings>, id: string, route: string): Promise<LoadedPage | Response> {
+export async function pageFor(c: Context<AppBindings>, id: string, route: string): Promise<LoadedPage | Response> {
   try {
     return (await loadPage(c.env, id)) ?? apiError(c, 404, "not_found", "Page not found");
   } catch (err) {
@@ -383,7 +383,7 @@ api.delete("/pages/:id", requireCsrfHeader, async (c) => {
  * body's update_token, else X-Update-Token (for API key callers, whose
  * Authorization holds the key), else a non-key Bearer token.
  */
-function sentUpdateToken(c: Context<AppBindings>, bodyToken?: unknown): string | null {
+export function sentUpdateToken(c: Context<AppBindings>, bodyToken?: unknown): string | null {
   const header = c.req.header("X-Update-Token");
   if (typeof bodyToken === "string" && bodyToken !== "") return bodyToken;
   if (header !== undefined && header.trim() !== "") return header.trim();
@@ -391,7 +391,7 @@ function sentUpdateToken(c: Context<AppBindings>, bodyToken?: unknown): string |
 }
 
 /** The token or signed-in owner check shared by details and PATCH (lib/page-options.ts). */
-async function ownerAccess(c: Context<AppBindings>, page: LoadedPage, token: string | null) {
+export async function ownerAccess(c: Context<AppBindings>, page: LoadedPage, token: string | null) {
   return pageAccess({
     ownerId: page.row.ownerId,
     userId: c.get("user")?.id ?? null,

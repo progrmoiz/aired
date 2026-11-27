@@ -7,6 +7,13 @@ compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 workers_dev = true
 
+# Markdown imports are bundled as text: routes/mcp.ts serves apps/cli/SKILL.md
+# as an MCP resource, so the skill has one source.
+[[rules]]
+type = "Text"
+globs = ["**/*.md"]
+fallthrough = true
+
 # Workers Logs: every console.* call and one invocation log per request are
 # kept and queryable in the dashboard (Workers > aired > Logs). Objects from
 # lib/log.ts are indexed by field, so filter on event or requestId. All
@@ -142,6 +149,13 @@ simple = { limit = 10, period = 60 }
 name = "FAVICON_BURST"
 namespace_id = "1007"
 simple = { limit = 30, period = 60 }
+
+# Page checks (POST /api/pages/:id/check): each launches a browser, and
+# Browser Rendering starts one every few seconds at most. Per caller.
+[[ratelimits]]
+name = "CHECK_BURST"
+namespace_id = "1009"
+simple = { limit = 3, period = 60 }
 
 # Custom domain
 [[routes]]

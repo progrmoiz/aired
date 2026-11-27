@@ -2,6 +2,7 @@ import { Hono, type Context, type Next } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { AppBindings } from "./types.js";
 import { api } from "./routes/api.js";
+import { pageTools } from "./routes/page-tools.ts";
 import { me } from "./routes/me.js";
 import { viewer } from "./routes/viewer.js";
 import { report } from "./routes/report.js";
@@ -188,6 +189,7 @@ app.route("/api/favicon", favicon);
 app.route("/api/me", me);
 
 // Mount API routes
+app.route("/api", pageTools);
 app.route("/api", api);
 app.route("/api", report);
 

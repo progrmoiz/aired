@@ -44,3 +44,30 @@ export interface FeedbackResult {
   id: string
   message: string
 }
+
+/** POST /api/pages/:id/check: what a browser saw on the page (check_page). */
+export interface CheckReport {
+  id: string
+  url: string
+  /** No errors (warnings don't count). */
+  ok: boolean
+  viewport: 'desktop' | 'mobile'
+  checked_at: string
+  load_ms: number
+  issues: Array<{ severity: 'error' | 'warning'; code: string; message: string }>
+  console: Array<{ level: string; text: string; source: string | null }>
+  failed_requests: Array<{ url: string; status: number | null; error: string | null; type: string }>
+  page: {
+    title: string | null
+    html_bytes: number
+    text_chars: number
+    visible_media: number
+    width: number
+    height: number
+    transfer_bytes: number
+    requests: number
+  }
+  blank: boolean
+  screenshot_url: string | null
+  screenshot_expires_at: string | null
+}

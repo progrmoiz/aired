@@ -79,6 +79,10 @@ export type Env = {
   BROWSER?: Fetcher;
   /** Daily browser time for screenshots, in seconds (lib/og-shot.ts). Default 480; "0" turns them off. */
   OG_SHOT_DAILY_SECONDS?: string;
+  /** Daily browser time for check_page, in seconds, inside OG_SHOT_DAILY_SECONDS (lib/page-check.ts). Default 180; "0" turns checks off. */
+  CHECK_DAILY_SECONDS?: string;
+  /** Workers Rate Limiting binding: page checks per caller per minute (routes/page-tools.ts). */
+  CHECK_BURST?: { limit(options: { key: string }): Promise<{ success: boolean }> };
   /**
    * Analytics Engine dataset `aired_views` (wrangler.toml): one data point
    * per page view (lib/view-event.ts). Optional so tests run without it;

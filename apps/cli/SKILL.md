@@ -32,6 +32,7 @@ npx aired report.html --ttl 24h --pin secret123
 | `aired delete <id>` | Delete a page |
 | `aired info <id>` | Show page metadata |
 | `aired set <id>` | Change PIN, expiry, view limit or title without re-uploading |
+| `aired check <id>` | Open the page in a real browser and report errors (exits 1 if broken) |
 | `aired feedback` | Report a bug, friction or idea in aired itself |
 | `aired tokens` | List stored update tokens |
 | `aired tokens prune` | Remove tokens for expired pages |
@@ -66,9 +67,9 @@ JSON output is automatic when stdout is piped — no flag needed.
 | Code | Meaning |
 |------|---------|
 | 0 | Success |
-| 1 | API error |
-| 2 | Validation error (bad input, missing file, no token) |
-| 3 | Rate limited (see Limits) |
+| 1 | API error; for `aired check`, only "the page is broken" |
+| 2 | Validation error (bad input, missing file, no token); for `aired check`, also no access to the page |
+| 3 | Rate limited (see Limits); for `aired check`, also "the check didn't run, try later" (daily budget, browser busy) |
 
 ## Accounts, API keys and limits
 
@@ -93,6 +94,20 @@ aired set abc123 --clear-pin --permanent   # PIN off, never expires
 ```
 
 `--clear-title` and `--clear-reads` remove those. PINs are 4–64 characters, TTLs a minute to a year (use `--permanent` beyond that), titles up to 200 characters. It uses the stored update token, else your sign-in or `AIRED_API_KEY` (your own pages only). Over MCP it's `set_options`; `get_page` reads a page's settings back (whether a PIN is on, never the PIN).
+
+## Check that the page works
+
+After publishing or updating, open it in aired's browser and see what a visitor would hit:
+
+```bash
+aired check abc123                 # desktop, 1280×800
+aired check abc123 --mobile        # phone, 390×844
+aired check abc123 --screenshot shot.jpg --json
+```
+
+It reports script and console errors, files that didn't load (404s, blocked CDNs), broken images, a blank screen, and warnings for slow, heavy (over 1 MB of HTML or 5 MB of files), very tall or sideways-scrolling pages, with a screenshot URL that works for 24 hours (or until the page is updated or deleted). Relative files (`app.js`, `data.json`) show up as failed: a page is one file. `ok` is true when nothing is broken; warnings don't count (`--strict` fails on them too). It exits 1 only when the page is broken, 3 when the check couldn't run, so it fits in CI. Over MCP it's `check_page`, which also attaches the screenshot as an image.
+
+The loop: publish → check → fix what it reports → update the same id → check once more. Checks share a small daily browser budget: 3 minutes a day across everyone, and each caller's share is 2 minutes signed in or 1 minute per IP without an account (a check takes about 10–15 seconds), plus 20 an hour and 3 a minute: check once per change, not in a loop. When the budget is spent you get HTTP 429 (exit 3) until 00:00 UTC. Same owner rule as `aired set`.
 
 ## Feedback
 
@@ -141,12 +156,17 @@ https://aired.sh/mcp/account
 | `publish_html` | nothing | Publish; `html`, `file_path` (STDIO only), `title`, `pin`, `ttl_seconds`, `permanent`; `id` + `update_token` to update |
 | `get_page` | owner, or the page's `update_token` | Title, URL, size, views, view limit, expiry, project, PIN on/off |
 | `set_options` | owner, or the page's `update_token` | Change `pin` (null removes), `ttl_seconds` or `permanent`, `view_limit` (null removes), `title` |
+| `check_page` | owner, or the page's `update_token` | Render the page in a browser: errors, failed files, blank screen, screenshot; `viewport` `desktop` or `mobile` |
 | `send_feedback` | nothing | Report a bug, friction or idea in aired (see Feedback) |
 | `list_pages`, `update_page`, `delete_page`, `get_account` | sign-in (remote only) | Your pages and account |
 
 "Owner" means signed in as the page's account: `AIRED_API_KEY` or `aired login` for STDIO, an `Authorization: Bearer aired_sk_...` header on `https://aired.sh/mcp`, or `/mcp/account`.
 
 Every tool returns `structuredContent` (matching its `outputSchema`) next to the text, so read fields like `url`, `id`, `update_token` and `expires_at` from there rather than parsing the text.
+
+**Prompts** (slash commands in clients that show them): `publish_report`, `make_slide_deck`, `share_privately` (PIN and expiry, PIN sent separately) and `check_and_fix`.
+
+**Resources:** `skill://aired/SKILL.md` is this skill, for any connected agent. Signed-in callers also get their pages as `aired://page/{id}` (the newest 50 listed); reading one returns its HTML. Only your own pages: another account's page, or an anonymous one, is refused.
 
 ## Gotchas
 
