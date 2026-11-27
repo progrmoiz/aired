@@ -39,10 +39,10 @@ Agents should read the live docs at https://github.com/progrmoiz/aired before an
 - Anyone with the URL can view; anyone with the PIN (if set) can read protected content.
 
 ## Important API endpoints
-- POST /api/publish — publish HTML and receive `{ id, url, update_token, expiresAt }`. Body fields: `html` (required), `title?`, `ttl?` (seconds), `permanent?`, `pin?`, `reads?`. Pass `id` + `update_token` in the same body to update in one call.
+- POST /api/publish — publish HTML and receive `{ id, url, update_token, expiresAt }`. Body fields: `html` (required), `title?` (cut to 200 characters), `ttl?` (seconds, at most 31536000), `permanent?`, `pin?` (at most 64 characters), `reads?` (at most 1000000). Pass `id` + `update_token` in the same body to update in one call.
 - PUT /api/pages/:id — update an artifact. Pass `update_token` in the JSON body or as `Authorization: Bearer <update_token>`.
 - DELETE /api/pages/:id — delete an artifact. Pass `Authorization: Bearer <update_token>`, or `update_token` in a JSON body when Authorization carries an API key.
-- GET /api/pages/:id — public metadata: `{ id, title, size, readCount, expiresAt }`.
+- GET /api/pages/:id — public metadata: `{ id, title, size, readCount, expiresAt, pinProtected }`. A PIN-protected page answers `title: null` and `readCount: 0`.
 - GET /api/pages/:id/details — the owner's view: `{ id, url, title, size, readCount, reads, hasPin, permanent, createdAt, expiresAt, project }`, never the PIN. Signed in as the owner, or the token in `X-Update-Token` (or `Authorization: Bearer <update_token>`).
 - PATCH /api/pages/:id — change settings without the HTML. Body: `title?` (1–200 characters, null clears), `pin?` (4–64 characters, null removes), `ttl?` (60 to 31536000 seconds) or `permanent?`, `reads?` (1 to 1000000, null removes), `update_token?`. Unknown fields are refused. Returns the details plus `changed`.
 - POST /api/feedback — body `{ kind: "bug"|"friction"|"idea", message (10–2000 characters), impact?: "blocked"|"worked_around"|"minor", page_id?, tool? }`. No auth needed; 10 an hour per caller. Returns `{ id, message }`. Not a support channel.
@@ -54,7 +54,8 @@ Agents should read the live docs at https://github.com/progrmoiz/aired before an
 - Free, no account needed. Signing in adds a dashboard of your pages; Pro ($12/month or $108/year) removes the aired badge and raises the limits.
 - Max page size: 2 MB on Free, 10 MB on Pro.
 - Publishes: 5 per hour per IP anonymously, 30 per hour signed in on Free, 500 per day on Pro.
-- Default TTL is 7 days. Permanent TTL available; artifacts may be removed for abuse.
+- Default TTL is 7 days, at most a year with `ttl`; `permanent` for longer. Artifacts may be removed for abuse.
+- Request bodies: 21 MB for publish, PUT and MCP; 1 MB for other API calls (413 `payload_too_large`).
 
 ## Limitations and non-goals
 - Static HTML only. No server-side compute, no databases, no long-running jobs.
@@ -64,15 +65,17 @@ Agents should read the live docs at https://github.com/progrmoiz/aired before an
 - No custom domains and no team accounts. The dashboard shows view counts per page, not detailed analytics.
 
 ## Error recovery
-- API errors are JSON: `{ "error": "<message>" }`, sometimes with a `code`.
-- 400: invalid body, or the page is too large (over 2 MB anonymously or when billing is off, over 10 MB on any plan). Make it smaller.
-- 401: missing credentials, or an invalid or revoked API key.
+- API errors are JSON: `{ "error": "<message>", "code": "<code>" }`. Branch on `code`; `error` is for people.
+- 400: `invalid_json`, `invalid_input` (with `field`: missing html, or a value past its bound), or `invalid_html` (empty, relative asset paths, or too large: over 2 MB anonymously or when billing is off, over 10 MB on any plan). Make it smaller.
+- 401 `token_required`: no credential where one is needed. Also an invalid or revoked API key.
 - 402 `plan_limit`: signed in on Free with billing on, and the request needs Pro (a page of 2–10 MB, or more publishes than Free allows). Pass the `upgrade_url` to a person; agents can't pay.
-- 403: the update_token doesn't match the page, the page isn't in your account, or the action needs the aired website (API keys, billing, account deletion).
+- 403: `invalid_token` (the update_token doesn't match the page), `not_owner` (signed in, but not your page), or the action needs the aired website (API keys, billing, account deletion). PUT and DELETE answer the same way.
+- 404 `not_found`: no such page, or no such API path.
+- 413 `payload_too_large`: the request body is over its limit.
 - 409: a conflict, with a `code` such as `key_limit`.
-- 422: the page looks like spam or phishing and wasn't published.
-- 429: rate limited. Wait and retry later.
-- 503: a dependency is briefly unavailable. Retry shortly.
+- 422 `spam_rejected`: the page looks like spam or phishing and wasn't published.
+- 429 `rate_limited`: wait and retry later.
+- 503 `unavailable`: a dependency is briefly unavailable. Retry shortly.
 
 ## Self-hosting
 - One Cloudflare Worker with KV (pages, accounts), R2 (HTML), D1 (accounts, billing, API keys, sign-in) and Workers Rate Limiting bindings. PAGES_KV and OAUTH_KV share one KV id; replace the aired.sh [[routes]]. Secrets: SESSION_SECRET, SESSION_VALID_SINCE (sessions, API keys and MCP connections created before it stop working), GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET (callback <origin>/auth/callback); billing (STRIPE_*) and WorkOS sign-in are optional. `npm run deploy` in apps/worker applies the D1 migrations, then deploys. Details: https://aired.sh/docs#self-host

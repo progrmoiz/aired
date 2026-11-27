@@ -13,7 +13,7 @@ test("api.ts: publish-update, PUT and DELETE all read credentials from the D1 ro
   const code = src("routes/api.ts");
   assert.doesNotMatch(code, /verifyToken\([^)]*metadata\.tokenHash/);
   assert.doesNotMatch(code, /getClaim|page_claims|PAGES_KV\.get\(`page:\$\{(existingId|id)\}`\)[\s\S]{0,200}verifyToken/);
-  assert.match(code, /return \(await loadPage\(c\.env, id\)\) \?\? c\.json\(\{ error: "Page not found" \}, 404\)/);
+  assert.match(code, /return \(await loadPage\(c\.env, id\)\) \?\? apiError\(c, 404, "not_found", "Page not found"\)/);
   // publish-update, PUT, DELETE, and the details and PATCH routes (set_options).
   assert.equal(count(code, /await pageFor\(c, /), 5);
   assert.equal(count(code, /const creds = \{ ownerId: page\.row\.ownerId, tokenHash: page\.row\.tokenHash \};/), 3);

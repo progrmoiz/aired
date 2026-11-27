@@ -20,6 +20,8 @@ import { publishRateLimit } from "./middleware/rate-limit.js";
 import { corsMiddleware } from "./middleware/cors.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { requestIdMiddleware } from "./middleware/request-id.js";
+import { apiNotFound, applyApiContract } from "./middleware/api-contract.ts";
+import { apiError, codeForStatus } from "./lib/errors.ts";
 import { pruneBillingEvents, pruneRateLimits } from "./lib/durable-limit.ts";
 import { log, logError } from "./lib/log.js";
 import { cachedHealth, checkHealth, publicReport, storageProbes } from "./lib/health.js";
@@ -51,10 +53,13 @@ const app = new Hono<AppBindings>();
 // carry tokens) and answered with a generic 500.
 app.onError((err, c) => {
   if (err instanceof HTTPException) {
-    return c.json({ error: err.message }, err.status);
+    return apiError(c, err.status, codeForStatus(err.status), err.message);
   }
+  // A streamed body past its cap: bodyLimit (middleware/api-contract.ts)
+  // replaces this with its own 413, so it isn't a bug to log.
+  if (err.name === "BodyLimitError") return apiError(c, 413, "payload_too_large", "Request body too large");
   logError("unhandled_error", err, { method: c.req.method, path: new URL(c.req.url).pathname }, c.get("requestId"));
-  return c.json({ error: "Internal Server Error" }, 500);
+  return apiError(c, 500, "internal_error", "Internal Server Error");
 });
 
 // Global middleware: request id first (so every later log line has it),
@@ -62,6 +67,8 @@ app.onError((err, c) => {
 app.use("*", requestIdMiddleware);
 app.use("*", corsMiddleware);
 app.use("*", authMiddleware);
+// Error codes, body limits and CSRF for every API route (middleware/api-contract.ts).
+applyApiContract(app);
 
 // Health check: probes KV, D1 and R2 (lib/health.ts). 503 when any fails.
 const health = cachedHealth();
@@ -200,10 +207,8 @@ app.route("/", viewer);
 // Cloudflare ASSETS binding handles routing to the correct file.
 app.notFound(async (c) => {
   // The API answers in JSON, including for paths it doesn't have.
-  const path = new URL(c.req.url).pathname;
-  if (path === "/api" || path.startsWith("/api/") || path.startsWith("/oauth/")) {
-    return c.json({ error: "Not found" }, 404);
-  }
+  const apiMissing = apiNotFound(c);
+  if (apiMissing !== null) return apiMissing;
   if (c.env.ASSETS) {
     return withAssetCache(await c.env.ASSETS.fetch(c.req.raw), new URL(c.req.url).pathname);
   }
