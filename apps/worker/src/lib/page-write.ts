@@ -181,7 +181,12 @@ export async function updatePage(
     await removeContent(env, row.id);
     throw new Error("page was deleted during the update");
   }
-  if (after.ownerId !== updated.ownerId || after.tokenHash !== updated.tokenHash) await refreshCache(env.PAGES_KV, after, now);
+  // A claim, or a settings change (PIN, "only these people") that landed
+  // while this update ran: the record follows the row as it is now, so a
+  // page made private meanwhile can't be left public in KV.
+  if (after.ownerId !== updated.ownerId || after.tokenHash !== updated.tokenHash || after.access !== updated.access || after.pin !== updated.pin) {
+    await refreshCache(env.PAGES_KV, after, now);
+  }
   // The oldest versions past the plan's count go; housekeeping retries a failure.
   try {
     await trimVersions(env, row.id, VERSION_LIMITS[plan].versions);

@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import type { AppBindings } from "../types.js";
 import { parseMetadata, serializeMetadata } from "@aired/core";
-import { updatePagePin } from "../lib/pages-store.ts";
+import { getPageRow, updatePagePin } from "../lib/pages-store.ts";
 import { applyPageHeaders } from "../middleware/security.js";
 import { countCountryView, countPageView } from "../lib/view-counts.ts";
 import { viewEvent, viewerCountry } from "../lib/view-event.ts";
@@ -20,6 +20,7 @@ import { releasePinAttempt, reservePinAttempt } from "../lib/pin-failures.js";
 import { hashToHex } from "@aired/core";
 import { dataLayerFor, VIEWER_COOKIE } from "../lib/collect-page.ts";
 import { accessGate, logVisit } from "./access.ts";
+import { gateMaterial } from "../lib/access-list.ts";
 
 /** A page that has used up its view limit. */
 function viewLimitReached(): Response {
@@ -84,11 +85,13 @@ viewer.get("/p/:id", async (c) => {
   // cookie for an email still on the list. Everyone else gets the gate,
   // which says nothing about the page. A D1 error fails closed.
   let visitor: string | null = null;
+  let entries: string[] = [];
   const restricted = metadata.access === "people";
   if (restricted) {
     const gate = await accessGate(c, id, metadata.ownerId);
     if (gate instanceof Response) return gate;
     visitor = gate.email;
+    entries = gate.entries;
   }
 
   // Count the view while R2 fetches the HTML: one D1 write (lib/view-counts.ts),
@@ -154,7 +157,7 @@ viewer.get("/p/:id", async (c) => {
   // window.aired for pages that use the data layer (lib/collect-page.ts):
   // a per-viewer token, so the response is never cached.
   const dataLayer = await dataLayerFor({
-    secret: c.env.SESSION_SECRET, origin: siteOrigin(c.env), id, ownerId: metadata.ownerId, pin: metadata.pin, html, cookie: getCookie(c, VIEWER_COOKIE), nowMs: now,
+    secret: c.env.SESSION_SECRET, origin: siteOrigin(c.env), id, ownerId: metadata.ownerId, pin: gateMaterial(metadata.pin, metadata.access, entries), html, cookie: getCookie(c, VIEWER_COOKIE), nowMs: now,
   });
   if (dataLayer !== null) {
     headers.set("Cache-Control", "private, no-store");
@@ -265,6 +268,10 @@ viewer.post("/p/:id/verify-pin", async (c) => {
         const freshRaw = await c.env.PAGES_KV.get(`page:${id}`);
         const fresh = freshRaw === null ? null : parseMetadata(freshRaw);
         if (fresh === null || fresh.pin !== metadata.pin || fresh.pin === null || isPinHash(fresh.pin)) return;
+        // The row decides: if the page changed meanwhile (made "only these
+        // people", or a new PIN), this KV copy is stale and must not go back.
+        const row = await getPageRow(c.env.DB, id);
+        if (row === null || row.access === "people" || row.pin !== fresh.pin) return;
         const write = viewWrite(fresh, Date.now());
         if (write.expired || write.options === null) return;
         await c.env.PAGES_KV.put(`page:${id}`, serializeMetadata({ ...fresh, pin: hashed }), write.options);

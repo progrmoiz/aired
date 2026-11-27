@@ -9,6 +9,9 @@ const { viewer } = await import("../src/routes/viewer.ts");
 const { access, BAD_CODE_MESSAGE, SENT_MESSAGE } = await import("../src/routes/access.ts");
 const { api } = await import("../src/routes/api.ts");
 const { og } = await import("../src/routes/og.ts");
+const { collect } = await import("../src/routes/collect.ts");
+const { loadPage, updatePage } = await import("../src/lib/page-write.ts");
+const { useCode, putCode, durableUsed } = await import("../src/lib/access-store.ts");
 const { insertPageRow, rowFromMetadata, getPageRow } = await import("../src/lib/pages-store.ts");
 const { serializeMetadata, parseMetadata, hashToken } = await import("@aired/core");
 const { onList, parseAccess, overLimit, normalizeDomain, isEmail, toEntries, fromEntries } = await import("../src/lib/access-list.ts");
@@ -190,6 +193,7 @@ function fakeKv(store: Map<string, string>) {
   };
 }
 
+const COLLECT_HTML = `<!doctype html><html><head><title>Poll</title></head><body><button onclick="aired.collect.save({v:1})">Vote</button></body></html>`;
 const PAGE_HTML = `<!doctype html><html><head><title>Q4 client report</title></head><body><h1>Secret numbers</h1></body></html>`;
 
 async function setup(opts: { email?: boolean } = {}) {
@@ -197,19 +201,20 @@ async function setup(opts: { email?: boolean } = {}) {
   const r2 = fakeR2();
   const kv = new Map<string, string>();
   const tokenHash = await hashToken(TOKEN);
-  const add = async (id: string, ownerId: number | null) => {
+  const add = async (id: string, ownerId: number | null, html = PAGE_HTML) => {
     const meta = {
-      id, title: "Q4 client report", size: PAGE_HTML.length, tokenHash, pin: null, reads: null, readCount: 0, permanent: true,
+      id, title: "Q4 client report", size: html.length, tokenHash, pin: null, reads: null, readCount: 0, permanent: true,
       createdAt: new Date(NOW - 1000).toISOString(), expiresAt: null, ownerId, project: null,
     };
     await insertPageRow(db, rowFromMetadata(meta as never, null, NOW));
     kv.set(`page:${id}`, serializeMetadata(meta as never));
-    await r2.put(`pages/${id}/index.html`, PAGE_HTML);
+    await r2.put(`pages/${id}/index.html`, html);
   };
   await add("report", 7);
   await add("other", 7);
   await add("theirs", 8);
   await add("anon", null);
+  await add("poll", 7, COLLECT_HTML);
   const mail: Array<{ to: string; subject: string; text: string }> = [];
   const env = {
     DB: db, PAGES_BUCKET: r2, PAGES_KV: fakeKv(kv), SESSION_SECRET: SECRET, SITE_ORIGIN: "https://aired.test",
@@ -223,6 +228,7 @@ async function setup(opts: { email?: boolean } = {}) {
     await next();
   });
   app.route("/", access);
+  app.route("/", collect);
   app.route("/api", api);
   app.route("/", og);
   app.route("/", viewer);
@@ -564,4 +570,96 @@ test("aired set --only splits emails and @domains", async () => {
   assert.deepEqual(accessFromOnly("alice@x.com, @client.com bob@x.com"), { access: { mode: "people", emails: ["alice@x.com", "bob@x.com"], domains: ["client.com"] } });
   assert.ok("error" in accessFromOnly(""));
   assert.match((accessFromOnly("client.com") as { error: string }).error, /@client\.com/);
+});
+
+// --- After the security review ---------------------------------------------------
+
+test("a wrong code and no code cost one query each; only a right code is used up", async () => {
+  const t = await setup();
+  const key = "k".repeat(32);
+  await putCode(t.db, "report", key, "a".repeat(64), Date.now() + 60_000, Date.now());
+  assert.equal(await useCode(t.db, "report", "other-key", "a".repeat(64), Date.now(), 5), "none");
+  assert.equal(await useCode(t.db, "report", key, "b".repeat(64), Date.now(), 5), "wrong");
+  assert.equal(await useCode(t.db, "report", key, "a".repeat(64), Date.now(), 5), "ok");
+  assert.equal(await useCode(t.db, "report", key, "a".repeat(64), Date.now(), 5), "none");
+});
+
+test("wrong guesses at live codes use up the page's daily budget; junk guesses don't", async () => {
+  const t = await setup();
+  await t.share("report", { mode: "people", emails: ["alice@client.com"] });
+  // Guesses for emails with no code don't count, whatever they are.
+  for (let i = 0; i < 5; i++) await t.verify("report", `nobody${i}@client.com`, "123456");
+  assert.equal(await durableUsed(t.db, "acc:vf:report", Date.now()), 0);
+  // A wrong guess at a real code counts.
+  await t.send("report", "alice@client.com");
+  const code = t.lastCode()!;
+  const wrong = code === "000000" ? "111111" : "000000";
+  assert.equal((await t.verify("report", "alice@client.com", wrong)).status, 400);
+  assert.equal(await durableUsed(t.db, "acc:vf:report", Date.now()), 1);
+  // Used up: code entry on the page waits, even with the right code.
+  t.raw.exec(`UPDATE rate_limits SET count = ${ACCESS_RATE_LIMITS.verifyFailures.limit} WHERE bucket = 'acc:vf:report'`);
+  const locked = await t.verify("report", "alice@client.com", code);
+  assert.equal(locked.status, 429);
+  assert.match((await body(locked)).error, /wrong codes/);
+  // Another page isn't affected.
+  await t.share("other", { mode: "people", emails: ["alice@client.com"] });
+  assert.equal((await t.verify("other", "alice@client.com", "000000")).status, 400);
+});
+
+test("the per-inbox cap counts only codes sent, so strangers can't use it up", async () => {
+  const t = await setup();
+  await t.share("report", { mode: "people", emails: ["alice@client.com"] });
+  const key = await emailKey(SECRET, "alice@client.com");
+  // Requests for alice on pages she isn't on send nothing and count nothing.
+  for (const id of ["theirs", "other", "anon"]) await t.send(id, "alice@client.com");
+  assert.equal(await durableUsed(t.db, `acc:e:${key}`, Date.now()), 0);
+  await t.send("report", "alice@client.com");
+  assert.equal(await durableUsed(t.db, `acc:e:${key}`, Date.now()), 1);
+});
+
+test("codes for made-up addresses at a listed domain are capped per page", async () => {
+  const t = await setup();
+  (t.env as Record<string, unknown>).BILLING_ENABLED = "1";
+  t.kv.set("ent:7", JSON.stringify({ status: "active", currentPeriodEnd: new Date(NOW + 86_400_000).toISOString() }));
+  await t.share("report", { mode: "people", emails: ["boss@client.com"], domains: ["client.com"] });
+  t.raw.exec(`INSERT INTO rate_limits (bucket, window_start, count, expires_at) VALUES ('acc:dom:report', ${Date.now()}, ${ACCESS_RATE_LIMITS.domainCodes.limit}, ${Date.now() + 86_400_000})`);
+  const res = await t.send("report", "madeup@client.com");
+  assert.equal(res.status, 200, "same answer");
+  assert.equal(t.mail.length, 0, "but no code went out");
+  // A listed email still gets one.
+  await t.send("report", "boss@client.com");
+  assert.equal(t.mail.length, 1);
+});
+
+test("data-layer tokens stop working when the page goes private, and when someone is taken off the list", async () => {
+  const t = await setup();
+  const tokenOf = (html: string) => (/var C=(\{[^;]*\}),F=/.exec(html)?.[1] ? JSON.parse(/var C=(\{[^;]*\}),F=/.exec(html)![1]!).token : null) as string | null;
+  const mine = (token: string) => t.fetch("/c/poll/mine", { method: "POST", headers: { "Content-Type": "text/plain", Origin: "null" }, body: JSON.stringify({ token }) });
+  // While public: a token that works.
+  const publicToken = tokenOf(await (await t.fetch("/p/poll")).text())!;
+  assert.ok(publicToken);
+  assert.equal((await mine(publicToken)).status, 200);
+  // Private now: that token is refused.
+  await t.share("poll", { mode: "people", emails: ["alice@client.com", "bob@client.com"] });
+  const refused = await mine(publicToken);
+  assert.equal(refused.status, 403);
+  assert.equal((await body(refused)).code, "expired");
+  // A listed person gets a working token.
+  const cookie = await t.signInAs("poll", "alice@client.com");
+  const aliceToken = tokenOf(await (await t.fetch("/p/poll", { headers: { Cookie: cookie } })).text())!;
+  assert.equal((await mine(aliceToken)).status, 200);
+  // Taken off the list: her token stops working too.
+  await t.share("poll", { mode: "people", emails: ["bob@client.com"] });
+  assert.equal((await mine(aliceToken)).status, 403);
+});
+
+test("a content update racing a switch to people-only can't leave the page public in KV", async () => {
+  const t = await setup();
+  const stale = (await loadPage(t.env as never, "report"))!;
+  assert.equal(stale.row.access, null);
+  // The owner's switch lands while the update is in flight.
+  await t.share("report", { mode: "people", emails: ["alice@client.com"] });
+  await updatePage(t.env as never, stale, "<h1>v2</h1>", null);
+  assert.equal(parseMetadata(t.kv.get("page:report")!)!.access, "people");
+  assert.match(await (await t.fetch("/p/report")).text(), /This page is private/);
 });

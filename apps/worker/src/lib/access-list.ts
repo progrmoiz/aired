@@ -63,6 +63,19 @@ export function onList(email: string, entries: readonly string[]): boolean {
   return entries.some((x) => x === e || x === domain);
 }
 
+/**
+ * What a data-layer token's gate is made from (lib/collect-token.ts
+ * pageGate): the PIN alone, as before, for public and PIN pages; for an
+ * "only these people" page also the list. So a token minted while the page
+ * was public, or before someone was taken off the list, stops working when
+ * the mode or the list changes. People still on it get a fresh token the
+ * next time the page loads.
+ */
+export function gateMaterial(pin: string | null, access: "people" | null | undefined, entries: readonly string[]): string | null {
+  if (access !== "people") return pin;
+  return `${pin ?? ""}\npeople\n${entries.join(",")}`;
+}
+
 /** The stored entries for a list: emails as they are, domains with a leading @. */
 export function toEntries(input: { emails: readonly string[]; domains: readonly string[] }): string[] {
   return [...input.emails, ...input.domains.map((d) => "@" + d)];

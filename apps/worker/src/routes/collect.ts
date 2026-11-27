@@ -2,6 +2,9 @@ import { Hono, type Context } from "hono";
 import type { AppBindings } from "../types.js";
 import { hashToHex } from "@aired/core";
 import { pageGate, usableSecret, verifyViewerToken } from "../lib/collect-token.ts";
+import { gateMaterial } from "../lib/access-list.ts";
+import { getAccessEntries } from "../lib/access-store.ts";
+
 import { bodyLimit } from "hono/body-limit";
 import { parseMetadata } from "@aired/core";
 import { validateEntryKey, validateRecord } from "../lib/collect-validate.ts";
@@ -21,6 +24,16 @@ import { loadPage } from "../lib/page-write.ts";
 import { visitorNetwork } from "../lib/pin-guess.js";
 import { log } from "../lib/log.ts";
 import { underBurstLimit } from "../lib/burst-limit.js";
+
+/**
+ * The page's gate as tokens are tied to it: the PIN, and for an "only these
+ * people" page the list too (lib/access-list.ts gateMaterial), so a token
+ * from before a mode or list change stops working. Throws on a D1 error.
+ */
+async function currentGate(c: Context<AppBindings>, id: string, pin: string | null, access: "people" | null | undefined): Promise<string> {
+  const entries = access === "people" ? await getAccessEntries(c.env.DB, id) : [];
+  return pageGate(c.env.SESSION_SECRET, id, gateMaterial(pin, access, entries));
+}
 
 /**
  * The calls a published page makes through window.aired
@@ -116,7 +129,13 @@ async function ownedPage(c: Context<AppBindings>, who: Caller): Promise<{ ownerI
     return problem(c, { status: 403, code: "sign_in_required", error: "Only pages published from an aired account can save data." });
   }
   if (page.row.reads !== null && (page.kv?.readCount ?? 0) >= page.row.reads) return problem(c, { status: 410, code: "gone", error: "This page is gone." });
-  if ((await pageGate(c.env.SESSION_SECRET, id, page.row.pin)) !== who.gate) return problem(c, PIN_CHANGED);
+  let gate: string;
+  try {
+    gate = await currentGate(c, id, page.row.pin, page.row.access);
+  } catch {
+    return problem(c, { status: 503, code: "unavailable", error: "Couldn't reach storage. Try again." });
+  }
+  if (gate !== who.gate) return problem(c, PIN_CHANGED);
   return { ownerId: page.row.ownerId };
 }
 
@@ -234,7 +253,13 @@ collect.post("/c/:id/data", async (c) => {
   const raw = await c.env.PAGES_KV.get(`page:${who.id}`);
   const live = raw === null ? null : parseMetadata(raw);
   if (live === null || (live.reads !== null && live.readCount >= live.reads)) return problem(c, { status: 410, code: "gone", error: "This page is gone." });
-  if ((await pageGate(c.env.SESSION_SECRET, who.id, live.pin)) !== who.gate) return problem(c, PIN_CHANGED);
+  let gate: string;
+  try {
+    gate = await currentGate(c, who.id, live.pin, live.access);
+  } catch {
+    return problem(c, { status: 503, code: "unavailable", error: "Couldn't reach storage. Try again." });
+  }
+  if (gate !== who.gate) return problem(c, PIN_CHANGED);
   const since = typeof who.body.since === "number" ? who.body.since : -1;
   try {
     if (since >= 0 && (await liveDataVersion(c.env.DB, who.id)) === since) return c.json({ version: since, changed: false });
