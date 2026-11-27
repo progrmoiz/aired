@@ -259,7 +259,7 @@ function VersionTile({ pageId, v, onOpen, onRestore }: { pageId: string; v: Vers
       <div className="mt-3 flex items-start gap-2 px-0.5">
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-body font-medium text-foreground">{v.message ?? v.title ?? `Version ${v.version}`}</h3>
-          <p className="mt-0.5 truncate text-sm text-subtle" title={exact}>
+          <p className="mt-0.5 line-clamp-2 text-sm text-subtle" title={exact}>
             {when} · {byLine(v)} · {sizeWords(v.size)}{v.restored_from !== null ? ` · restored from v${v.restored_from}` : ''}
           </p>
         </div>
