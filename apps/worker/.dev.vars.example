@@ -46,5 +46,5 @@ STRIPE_AUTOMATIC_TAX=
 # set, so it can never run in production). For real sending, see the
 # [[send_email]] block in wrangler.toml, or set RESEND_API_KEY as a fallback.
 # EMAIL_MODE=log
-# EMAIL_FROM=aired <access@mail.aired.sh>
+# EMAIL_FROM=aired <access@aired.sh>
 # RESEND_API_KEY=re_...

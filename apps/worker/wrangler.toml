@@ -174,7 +174,7 @@ simple = { limit = 120, period = 60 }
 # dev: EMAIL_MODE=log in .dev.vars prints the code instead of sending it.
 # [[send_email]]
 # name = "ACCESS_EMAIL"
-# allowed_sender_addresses = ["access@mail.aired.sh"]
+# allowed_sender_addresses = ["access@aired.sh"]
 
 # Custom domain
 [[routes]]

@@ -145,8 +145,8 @@ test("the code email: the code, no page title, plain words", () => {
   assert.match(m.text, /10 minutes, once/);
   assert.match(m.text, /ignore this email/);
   assert.ok(!/!/.test(m.text), "no exclamation marks");
-  assert.deepEqual(parseFrom("aired <access@mail.aired.sh>"), { email: "access@mail.aired.sh", name: "aired" });
-  assert.equal(parseFrom("access@mail.aired.sh"), "access@mail.aired.sh");
+  assert.deepEqual(parseFrom("aired <access@aired.sh>"), { email: "access@aired.sh", name: "aired" });
+  assert.equal(parseFrom("access@aired.sh"), "access@aired.sh");
 });
 
 test("email sending: log mode only off production, the binding, Resend, or nothing", async () => {
@@ -154,10 +154,10 @@ test("email sending: log mode only off production, the binding, Resend, or nothi
   assert.equal(emailSenderFor({ EMAIL_MODE: "log" }), null, "no SITE_ORIGIN: production, so no codes in logs");
   assert.equal(emailSenderFor({ EMAIL_MODE: "log", SITE_ORIGIN: "http://localhost:8787" })?.kind, "log");
   const sent: unknown[] = [];
-  const cf = emailSenderFor({ ACCESS_EMAIL: { async send(m) { sent.push(m); return {}; } }, EMAIL_FROM: "aired <access@mail.aired.sh>" });
+  const cf = emailSenderFor({ ACCESS_EMAIL: { async send(m) { sent.push(m); return {}; } }, EMAIL_FROM: "aired <access@aired.sh>" });
   assert.equal(cf?.kind, "cloudflare");
   await cf!.send({ to: "a@client.com", subject: "s", text: "t", html: "h" });
-  assert.deepEqual(sent, [{ to: "a@client.com", from: { email: "access@mail.aired.sh", name: "aired" }, subject: "s", text: "t", html: "h" }]);
+  assert.deepEqual(sent, [{ to: "a@client.com", from: { email: "access@aired.sh", name: "aired" }, subject: "s", text: "t", html: "h" }]);
   const calls: Array<[string, RequestInit]> = [];
   const resend = emailSenderFor({ RESEND_API_KEY: "re_x" }, (async (url: string, init: RequestInit) => { calls.push([url, init]); return new Response("{}", { status: 200 }); }) as never);
   await resend!.send({ to: "a@client.com", subject: "s", text: "t", html: "h" });

@@ -12,7 +12,7 @@
  *   none of these        Not set up: null. The owner can't turn on
  *                        "only these people" then (the PATCH says so).
  *
- * EMAIL_FROM is the sender, e.g. `aired <access@mail.aired.sh>`; the domain
+ * EMAIL_FROM is the sender, e.g. `aired <access@aired.sh>`; the domain
  * must be onboarded with the provider. No runtime imports, so tests load it.
  */
 
@@ -38,7 +38,7 @@ export type EmailEnv = {
   SITE_ORIGIN?: string;
 };
 
-const DEFAULT_FROM = "aired <access@mail.aired.sh>";
+const DEFAULT_FROM = "aired <access@aired.sh>";
 
 /** `Name <address>` or a bare address, as the Email Service binding wants it. */
 export function parseFrom(from: string): { email: string; name: string } | string {
