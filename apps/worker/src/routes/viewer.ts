@@ -18,6 +18,7 @@ import { underBurstLimit } from "../lib/burst-limit.js";
 import { pinGuessKeys, visitorNetwork } from "../lib/pin-guess.js";
 import { releasePinAttempt, reservePinAttempt } from "../lib/pin-failures.js";
 import { hashToHex } from "@aired/core";
+import { dataLayerFor, VIEWER_COOKIE } from "../lib/collect-page.ts";
 
 /** A page that has used up its view limit. */
 function viewLimitReached(): Response {
@@ -133,6 +134,16 @@ viewer.get("/p/:id", async (c) => {
     }
   }
 
+  // window.aired for pages that use the data layer (lib/collect-page.ts):
+  // a per-viewer token, so the response is never cached.
+  const dataLayer = await dataLayerFor({
+    secret: c.env.SESSION_SECRET, origin: siteOrigin(c.env), id, ownerId: metadata.ownerId, html, cookie: getCookie(c, VIEWER_COOKIE), nowMs: now,
+  });
+  if (dataLayer !== null) {
+    headers.set("Cache-Control", "private, no-store");
+    if (dataLayer.setCookie !== null) headers.append("Set-Cookie", dataLayer.setCookie);
+  }
+
   // The shim must run before page scripts, so it goes in after the bar's
   // own <head> injection.
   const wrappedHtml = injectEarlyScript(
@@ -145,7 +156,7 @@ viewer.get("/p/:id", async (c) => {
       // Changes with every update, so previews fetch the new screenshot.
       imageVersion: versionFromEtag(obj.etag),
     }),
-    SANDBOX_SHIM,
+    SANDBOX_SHIM + (dataLayer?.script ?? ""),
   );
 
   return new Response(wrappedHtml, { status: 200, headers });

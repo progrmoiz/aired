@@ -7,7 +7,7 @@ import { apiError } from "../lib/errors.ts";
 import { BODY_LIMIT_BYTES, PAGE_BODY_LIMIT_BYTES } from "../lib/input-limits.ts";
 
 /** Paths whose bodies carry page HTML. */
-const PAGE_BODY = /^\/(api\/publish|api\/pages\/[^/]+|mcp(\/account)?)$/;
+const PAGE_BODY = /^\/(api\/publish|api\/pages\/[^/]+(?:\/data)?|mcp(\/account)?)$/;
 
 const tooLarge = (max: number) => (c: Context) =>
   apiError(c, 413, "payload_too_large", `Request body too large: the limit is ${Math.floor(max / 1_000_000)} MB.`);

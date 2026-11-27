@@ -3,6 +3,9 @@ import { HTTPException } from "hono/http-exception";
 import type { AppBindings } from "./types.js";
 import { api } from "./routes/api.js";
 import { pageTools } from "./routes/page-tools.ts";
+import { responses } from "./routes/responses.ts";
+import { collect } from "./routes/collect.ts";
+import { pruneCollectData } from "./lib/collect-store.ts";
 import { me } from "./routes/me.js";
 import { viewer } from "./routes/viewer.js";
 import { report } from "./routes/report.js";
@@ -190,6 +193,7 @@ app.route("/api/me", me);
 
 // Mount API routes
 app.route("/api", pageTools);
+app.route("/api", responses);
 app.route("/api", api);
 app.route("/api", report);
 
@@ -200,6 +204,9 @@ app.route("/", upgrade);
 app.route("/", dashboard);
 // The CLI device sign-in page (served with no-framing headers)
 app.get("/device", devicePage);
+
+// The data layer's calls from published pages (POST /c/:id/*)
+app.route("/", collect);
 
 // Mount viewer routes
 app.route("/", viewer);
@@ -294,15 +301,18 @@ async function runExpiredSweep(env: Env): Promise<void> {
 }
 
 /**
- * Old rows out of D1: rate-limit windows no request reads any more, and
- * webhook dedupe ids past 30 days (lib/durable-limit.ts). Once an hour, in
+ * Old rows out of D1: rate-limit windows no request reads any more,
+ * webhook dedupe ids past 30 days (lib/durable-limit.ts), and data-layer
+ * entries past retention or left by deleted pages (lib/collect-store.ts). Once an hour, in
  * the first cron run after the hour.
  */
 async function runHousekeeping(env: Env, now = Date.now()): Promise<void> {
   if (new Date(now).getUTCMinutes() >= 5) return;
   const rateLimits = await pruneRateLimits(env.DB, now);
   const billingEvents = await pruneBillingEvents(env.DB, now);
-  log("info", "housekeeping", { rateLimits, billingEvents });
+  // Data-layer entries past their plan's retention, or of pages that are gone.
+  const responses = await pruneCollectData(env.DB, now);
+  log("info", "housekeeping", { rateLimits, billingEvents, responses });
 }
 
 /**

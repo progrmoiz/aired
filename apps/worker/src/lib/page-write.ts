@@ -15,6 +15,7 @@ import {
 } from "./pages-store.ts";
 import { forgetShots } from "./og-render.js";
 import { isPinHash } from "./pin-hash.js";
+import { deletePageCollectData } from "./collect-store.ts";
 
 /**
  * The one way every route creates, updates, deletes or looks up a page
@@ -220,6 +221,13 @@ export async function deletePage(env: PageEnv, page: LoadedPage, later: (work: P
     await forgetShots(env, row.id);
   } catch (err) {
     console.error("screenshot cleanup failed on delete", { id: row.id, err });
+  }
+  // What viewers saved and the live data go too. If this fails, hourly
+  // housekeeping deletes them (lib/collect-store.ts pruneCollectData).
+  try {
+    await deletePageCollectData(env.DB, row.id);
+  } catch (err) {
+    console.error("collect data cleanup failed on delete", { id: row.id, err });
   }
 }
 
