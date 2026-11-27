@@ -1,13 +1,14 @@
 # A Tiiny Host alternative for quick HTML links
 
-Tiiny Host is a solid host for small sites. If what you mostly do is send one HTML page, from Claude, ChatGPT or your own files, aired gets you a link without an email sign-up, and password protection is free.
+**For quick HTML links, aired needs no sign-up and includes a free PIN.** Tiiny Host is the better pick if you want your own domain, PDF or zip hosting, or files over 2 MB.
 
 Source: https://aired.sh/tiiny-host-alternative
 
-## The short answer
+## At a glance
 
-- **Pick aired** to share single pages fast: reports, AI-made pages, games and previews, with no account and a free PIN.
-- **Pick Tiiny Host** if you need your own domain, PDF or zip hosting, or files bigger than 2 MB.
+- **No sign-up** Paste and publish. Tiiny asks for an email first.
+- **PIN on the free plan** On Tiiny Host a password needs a paid plan.
+- **Publish from AI agents** Free here; Tiiny's API starts on its Solo plan.
 
 ## aired vs Tiiny Host
 
@@ -67,5 +68,3 @@ Yes. Copy the HTML from the chat and paste it in, or connect your AI tool so it 
 ### Do aired pages expire?
 
 Only if you want them to. The default is 7 days, and you can choose 1 hour, 1 day, 30 days or permanent.
-
-Updated November 2026.

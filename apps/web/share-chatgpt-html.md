@@ -1,8 +1,14 @@
 # Share HTML that ChatGPT made
 
-ChatGPT writes the page in a code block and shows it with Preview, but that preview stays inside your chat. Copy the code, paste it in the box below and you get a link that opens for anyone, on any device, without a ChatGPT account.
+**Copy the code ChatGPT wrote, paste it here, and send the link.** It opens as a working page, not a wall of code.
 
 Source: https://aired.sh/share-chatgpt-html
+
+## How to do it
+
+1. **Ask for one file** With the CSS and JavaScript inside.
+2. **Paste it here** Use the copy button on ChatGPT's code block.
+3. **Send the link** Games and tools work, not just pages.
 
 ## How to share a ChatGPT page as a link
 
@@ -65,5 +71,3 @@ Yes. Type a PIN before you publish. Visitors enter it before the page loads.
 ### Is it free?
 
 Yes. Publishing and viewing are free, with no account and no view limit.
-
-Updated November 2026.

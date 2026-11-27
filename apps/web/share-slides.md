@@ -1,8 +1,14 @@
 # Share your slides as a link
 
-Write a deck in Markdown, or let Claude or ChatGPT make one in HTML. Publish it here and send one link: people click through it on any device, you present it full screen, and your speaker notes stay private.
+**Write your slides in Markdown, publish them, and present from the link.** Your speaker notes stay private.
 
 Source: https://aired.sh/share-slides
+
+## How to do it
+
+1. **Write it in Markdown** Three dashes between slides, or use HTML.
+2. **Publish and share** Every slide has its own link.
+3. **Present anywhere** Arrow keys, a clicker, or swipe on a phone.
 
 ## Write it in Markdown
 
@@ -80,5 +86,3 @@ Yes. Ask for a Markdown deck with --- between slides and Note: lines for what yo
 ### Is it free?
 
 Yes. Publishing, presenting and viewing are free. Speaker notes need a free account, so aired knows the deck is yours.
-
-Updated November 2026.

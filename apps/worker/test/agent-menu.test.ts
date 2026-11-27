@@ -22,8 +22,8 @@ test("a guide's Markdown keeps its headings, steps, tables, code and FAQ, with a
   const md = guideMarkdown(web("password-protect-html.html"), "password-protect-html");
   assert.match(md, /^# Password-protect an HTML page\n/);
   assert.match(md, /\nSource: https:\/\/aired\.sh\/password-protect-html\n/);
-  assert.match(md, /\n## How to put a password on an HTML page\n/);
-  assert.match(md, /\n1\. \*\*Add the page\.\*\* /);
+  assert.match(md, /\n## How to do it\n\n1\. \*\*Drop your page\*\* The file/);
+  assert.match(md, /\n## Why a JavaScript password doesn't protect anything\n/);
   assert.match(md, /\n\| Method \| Really hides the page \| Setup \| Cost \|\n\| --- \| --- \| --- \| --- \|\n/);
   assert.match(md, /\n## Questions\n\n### [^\n]+\?\n\n[^\n]+/);
   assert.doesNotMatch(md, /<[a-z][^>]*>/i, "no HTML tags left");
