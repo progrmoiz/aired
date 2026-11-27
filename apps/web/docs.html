@@ -50,6 +50,7 @@
       <a href="#mcp">MCP server</a>
       <a href="#api">HTTP API</a>
       <a href="#history">History</a>
+      <a href="#keep-working">Keep working on a page</a>
       <a href="#data">Saving data</a>
       <p>Reference</p>
       <a href="#endpoints">Endpoints</a>
@@ -115,7 +116,10 @@ cp -R "$(npm root -g)/aired/skills/." ~/.claude/skills/</code></pre>
             <tr><td><code>aired ./dir/</code></td><td>Bundle a directory into one HTML</td></tr>
             <tr><td><code>aired notes.md</code></td><td>Publish Markdown as a clean, readable page (or a deck, with <code>type: deck</code> front matter)</td></tr>
             <tr><td><code>aired new [template]</code></td><td>Write a starter to fill in: <code>deck</code>, <code>deck-html</code>, <code>report</code> or <code>one-pager</code>. No name lists them</td></tr>
-            <tr><td><code>aired update &lt;id&gt; &lt;file&gt;</code></td><td>Update an existing page. <code>-m "note"</code> labels the version it makes</td></tr>
+            <tr><td><code>aired update &lt;id&gt; &lt;file&gt;</code></td><td>Update an existing page. <code>-m "note"</code> labels the version it makes. Anyone with the page open sees the new version within seconds (see <a href="#keep-working">Keep working on a page</a>)</td></tr>
+            <tr><td><code>aired list</code></td><td>Your pages, newest first: id, title, link, last update and views. <code>--project &lt;name&gt;</code> filters, <code>--limit &lt;n&gt;</code> shows more (up to 1000), <code>--json</code> for scripts. Signed out, it lists the pages you have update tokens for on this machine</td></tr>
+            <tr><td><code>aired pull &lt;id&gt;</code></td><td>Download a page's current source to edit and update it: the Markdown if it was published from Markdown (<code>&lt;id&gt;.md</code>), else the HTML (<code>&lt;id&gt;.html</code>). <code>-o &lt;file&gt;</code> picks the file, <code>-o -</code> prints it, <code>--force</code> overwrites. Your own pages, or pages you hold the update token for</td></tr>
+            <tr><td><code>aired watch &lt;path&gt;</code></td><td>Publish a file or folder, then update the page every time you save it. <code>--id &lt;id&gt;</code> updates an existing page instead. Each save is kept as a version</td></tr>
             <tr><td><code>aired versions &lt;id&gt;</code></td><td>List the page's <a href="#history">history</a>: every version kept, newest first, with who made it, when, size and note</td></tr>
             <tr><td><code>aired restore &lt;id&gt; &lt;version&gt;</code></td><td>Put an earlier version back. It goes live as a new version, so <code>aired restore</code> undoes it the same way</td></tr>
             <tr><td><code>aired delete &lt;id&gt;</code></td><td>Delete a page</td></tr>
@@ -201,7 +205,7 @@ url = "https://aired.sh/mcp"</code></pre>
           <thead><tr><th>Tool</th><th>Who can use it</th><th>What it does</th></tr></thead>
           <tbody>
             <tr><td><code>publish_html</code></td><td>Anyone</td><td>Publish <code>html</code> or <code>markdown</code> (with <code>deck: true</code> for slides) and get <code>{ id, url, update_token, expires_at, claim_url }</code>, plus <code>kind</code>, <code>slides</code> and <code>presenter_url</code> for a doc or deck. Pass <code>id</code> and <code>update_token</code> to replace a page's content; the content it replaces is kept (see <code>list_versions</code>), and <code>message</code> labels the new version.</td></tr>
-            <tr><td><code>get_page</code></td><td>The owner, or anyone with the page's <code>update_token</code></td><td>Title, URL, size, views, view limit, expiry, project, whether a PIN is on (never the PIN), and <code>kind</code>. <code>include_source</code> adds the Markdown or HTML as published and a deck's speaker notes. <code>version</code> is the live version and <code>versions</code> how many the history holds. <code>allow_pdf</code> says whether viewers can download a PDF.</td></tr>
+            <tr><td><code>get_page</code></td><td>The owner, or anyone with the page's <code>update_token</code></td><td>Title, URL, size, views, view limit, expiry, project, whether a PIN is on (never the PIN), and <code>kind</code>. <code>include_source</code> adds the Markdown or HTML as published and a deck's speaker notes. <code>version</code> is the live version and <code>versions</code> how many the history holds; <code>updated_at</code> when it last changed. <code>allow_pdf</code> says whether viewers can download a PDF.</td></tr>
             <tr><td><code>get_template</code></td><td>Anyone</td><td>Starters with rules for filling them in: <code>deck</code>, <code>deck-html</code>, <code>report</code>, <code>one-pager</code>. No name lists them.</td></tr>
             <tr><td><code>set_options</code></td><td>The owner, or anyone with the page's <code>update_token</code></td><td>Change the PIN (<code>null</code> removes it), <code>ttl_seconds</code> or <code>permanent</code>, <code>view_limit</code>, <code>title</code> and <code>allow_pdf</code> (viewers get a Download PDF button) without sending the HTML again. Send only what should change. Signed in, also <code>public_results</code> and <code>accept_responses</code> for pages that <a href="#data">save data</a>.</td></tr>
             <tr><td><code>list_versions</code></td><td>The owner, or anyone with the page's <code>update_token</code></td><td>The page's <a href="#history">history</a>, newest first, live version first: <code>{ current, versions: [{ version, current, size, title, kind, actor, client, message, restored_from, created_at, replaced_at, kept_until }], kept }</code>. <code>actor</code> is <code>owner</code>, <code>token</code>, <code>agent</code> or <code>unknown</code>.</td></tr>
@@ -273,6 +277,19 @@ aired restore abc123 2       # v2's content goes live as v5</code></pre>
           </tbody>
         </table></div>
         <p>The live version doesn't count. The oldest go when an update goes past the count, and hourly housekeeping removes those past their days. Deleting a page deletes its history; deleting your account deletes the history of all your pages.</p>
+      </section>
+
+      <!-- ─── Keep working ─── -->
+      <section id="keep-working">
+        <h2>Keep working on a page</h2>
+        <p>You, or an agent on another machine, can pick a page up where it was left: find it, download what was published, edit it and update it at the same link.</p>
+<pre><code>aired list                        # your pages, with when each last changed
+aired pull abc123                 # abc123.md (or .html), as last published
+# edit it
+aired update abc123 abc123.md     # a deck: add --deck</code></pre>
+        <p>Over MCP it's <code>list_pages</code> (signed in), then <code>get_page</code> with <code>include_source: true</code>, then <code>update_page</code> or <code>publish_html</code> with the <code>id</code>. Only the page's owner, signed in, or someone with its update token can read the source; for anyone else a PIN page or an "only these people" page gives nothing away. <code>aired pull --json</code> and <code>GET /api/pages/:id/source</code> say which <code>version</code> you got, so you can tell from <a href="#history">the history</a> whether someone changed it since.</p>
+        <p><b>Open tabs update by themselves.</b> When a page's content is replaced (an update from the CLI, the API or an agent, or a restore), anyone who has it open sees the new version within about 5 seconds, without reloading. A deck stays on the slide they were on and a long page keeps its scroll position. If they've typed into the page, they get a small <b>Reload</b> button instead, so nothing they typed is lost, and someone presenting full screen gets the new version when they leave full screen. Settings changes (title, PIN, expiry) don't reload anyone; a new PIN or a change to who can open the page ends the check, so a tab never learns more than it was let in for.</p>
+        <p><code>aired watch report.md</code> publishes once and then updates the page on every save, so a page you have open next to your editor follows along. Each save is a version, and Free keeps the last 5.</p>
       </section>
 
       <!-- ─── Saving data ─── -->
@@ -380,7 +397,7 @@ aired.data.subscribe((d) =&gt; { if (d) mrr.textContent = "$" + d.mrr.toLocaleSt
             <tr><td><code>GET</code></td><td><code>/api/pages/:id/versions</code></td><td>The page's <a href="#history">history</a>: <code>{ id, url, current, versions: [...], kept: { plan, versions, days, always_keep, summary } }</code>, newest first. Same credentials as <code>/details</code>. 300 an hour.</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/pages/:id/versions/:n</code></td><td>One version with its content: the fields above plus <code>html</code>, <code>format</code> and <code>source</code> (the Markdown, for a doc). Same credentials. <code>404</code> <code>version_not_found</code>, <code>410</code> <code>version_gone</code>.</td></tr>
             <tr><td><code>POST</code></td><td><code>/api/pages/:id/versions/:n/restore</code></td><td>Body <code>{ update_token?, message? }</code>. Version <code>n</code>'s content goes live as a new version: <code>{ id, url, version, restored_from, expiresAt }</code>. Same credentials as PUT, and a page that has collected responses needs its owner signed in (<code>403</code> <code>owner_required</code>). <code>409</code> <code>already_current</code> for the live version.</td></tr>
-            <tr><td><code>GET</code></td><td><code>/api/pages/:id/source</code></td><td>The owner's copy: <code>{ id, url, title, size, html, kind, format, source }</code>, plus <code>slides</code> and <code>notes</code> for a deck. <code>html</code> is the page as served; <code>source</code> is what was published (the Markdown, or a deck's HTML with its notes). Same credentials as <code>/details</code>. Never counts a view.</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/pages/:id/source</code></td><td>The owner's copy: <code>{ id, url, title, size, html, kind, format, source }</code>, plus <code>slides</code> and <code>notes</code> for a deck and the live <code>version</code>. <code>html</code> is the page as served; <code>source</code> is what was published (the Markdown, or a deck's HTML with its notes). Same credentials as <code>/details</code>. Never counts a view.</td></tr>
             <tr><td><code>POST</code></td><td><code>/api/feedback</code></td><td>Body <code>{ kind, message, impact?, page_id?, tool? }</code>. Feedback about aired itself; works without signing in, 10 an hour. Returns <code>{ id, message }</code>.</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/pages/:id/access</code></td><td>Who can open the page and who opened it: <code>{ mode, emails, domains, visitors: [{ email, first_opened_at, last_opened_at, views }] }</code>. Signed in as the owner only: the update token isn't enough.</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/pages/:id/responses</code></td><td>The owner's entries from <a href="#data"><code>aired.collect</code></a>, newest first, <code>?limit=</code> (up to 200) and <code>&amp;cursor=</code>. Signed in as the owner only: the update token isn't enough.</td></tr>

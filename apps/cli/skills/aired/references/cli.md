@@ -8,7 +8,10 @@ Run it with `npx aired` (no install) or install it with `npm install -g aired`.
 |---|---|
 | `aired [file]` | Publish an HTML or Markdown file, a folder with `index.html`, or stdin (the default command) |
 | `aired new [template]` | Write a starter to fill in: `deck`, `deck-html`, `report`, `one-pager` (no name lists them) |
-| `aired update <id> <file>` | Replace a page's content at the same link (`-m "note"` labels the version) |
+| `aired update <id> <file>` | Replace a page's content at the same link (`-m "note"` labels the version). Open tabs reload by themselves |
+| `aired list` | Your pages: id, title, link, last update, views (`--project`, `--limit`, `--json`; signed out: pages you have tokens for) |
+| `aired pull <id>` | Download a page's current source to edit: `<id>.md` for Markdown pages, else `<id>.html` (`-o file`, `-o -` prints it) |
+| `aired watch <path>` | Publish a file or folder, then update the page on every save (`--id` to update an existing page) |
 | `aired versions <id>` | A page's history: every version kept, newest first |
 | `aired restore <id> <version>` | Put an earlier version back (it goes live as a new version) |
 | `aired set <id>` | Change who can open it, its expiry, view limit or title without uploading again |
@@ -38,6 +41,21 @@ Run it with `npx aired` (no install) or install it with `npm install -g aired`.
 | `--markdown` | Treat the input as Markdown (automatic for `.md` files; use it for stdin) |
 
 `aired update` takes `-t`, `--deck`, `--markdown` and `-m, --message`.
+
+## Pick up where you left off
+
+```bash
+aired list                         # find the page
+aired pull abc123                  # abc123.md (or .html), as it was last published
+# edit abc123.md
+aired update abc123 abc123.md      # a deck: add --deck
+```
+
+`aired pull` works for your own pages (signed in or `AIRED_API_KEY`) and pages you have the update token for on this machine; nobody else can read a page's source, PIN or not. It won't overwrite a file unless you pass `--force`. Its `--json` says the `version` you pulled: if `aired versions <id>` shows a newer one before you update, someone changed it since.
+
+Anyone who has the page open sees the update within about 5 seconds, without reloading: a deck stays on its slide and a long page keeps its scroll position. If they've typed into the page, they get a "Reload" button instead, so nothing they typed is lost.
+
+`aired watch page.html` publishes once and then updates the page every time you save (a folder is bundled again each time). Each save is kept as a version, so Free's last 5 turn over quickly. With `--json` it prints one line per publish or update.
 
 ## aired set
 

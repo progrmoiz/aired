@@ -244,11 +244,13 @@ Limits: new PDFs share 20 minutes of browser time a day across all callers (a fr
 
 ### Page history: GET /api/pages/:id/versions, GET /api/pages/:id/versions/:n, POST /api/pages/:id/versions/:n/restore
 
+Open tabs follow updates: after any of these, a viewer who has the page open gets the new version within about 5 seconds without reloading (the page asks `POST /c/:id/live` with a signed token while its tab is showing). A deck keeps its slide and a long page its scroll position; a viewer who has typed into the page gets a "Reload" button instead; full screen waits until they leave it. A new PIN or a change to who can open the page ends the check. CLI loop: `aired list`, `aired pull <id>`, edit, `aired update <id> <file>`; `aired watch <file>` updates on every save.
+
 Every update (publish with a token, PUT, update_page, a restore) keeps the content it replaces, with its Markdown or deck source. `GET /versions` lists them as `list_versions` does; `GET /versions/:n` adds that version's `html`, `format` and `source`; `POST /versions/:n/restore` (body `{ update_token?, message? }`) makes version n's content live as a new version and answers `{ id, url, version, restored_from, expiresAt }`. Credentials as for /details; restoring a page that has collected responses needs its signed-in owner (403 `owner_required`). Errors: 404 `version_not_found`, 409 `already_current`, 410 `version_gone`. Reads count against 300 an hour, restores against the 60 an hour of PATCH. Kept: the last 5 earlier versions on Free; the last 50 on Pro, each for 90 days (the newest 5 stay however old). Deleting the page deletes its history; deleting the account deletes the history of its pages. CLI: `aired versions <id>`, `aired restore <id> <version>`, `aired update <id> <file> -m "note"`.
 
 ### GET /api/pages/:id/source
 
-The owner's copy: `{ id, url, title, size, html, kind, format, source }`, plus `slides` and `notes` for a deck. `html` is the page as served; `source` is what was published (the Markdown, or a deck's HTML with its notes). Same credentials as /details. Never counts a view.
+The owner's copy: `{ id, url, title, size, html, kind, format, source, version }`, plus `slides` and `notes` for a deck (`version` is the live version, so you can tell later whether someone updated it since). CLI: `aired pull <id>` saves `source` to `<id>.md` or `<id>.html`. `html` is the page as served; `source` is what was published (the Markdown, or a deck's HTML with its notes). Same credentials as /details. Never counts a view.
 
 ### GET /p/:id/presenter
 

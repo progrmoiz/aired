@@ -60,7 +60,8 @@ aired update abc123 dashboard-v2.html
 | Command | Description |
 |---------|-------------|
 | `publish [file]` | Publish an HTML file (or pipe via stdin) |
-| `update <id> <file>` | Update an existing page using the stored token |
+| `update <id> <file>` | Update an existing page using the stored token (open tabs reload by themselves) |
+| `watch <path>` | Publish a file or folder, then update the page every time you save it (`--id <id>` for an existing page) |
 | `delete <id>` | Delete a page using the stored token |
 | `info <id>` | Show page metadata (title, size, reads, expiry) |
 | `pdf <id>` | Download a page as a PDF (`-o, --out <file>`, `--paper a4\|letter`, `--notes` for a deck's speaker notes) |
@@ -69,6 +70,8 @@ aired update abc123 dashboard-v2.html
 
 | Command | Description |
 |---------|-------------|
+| `list` | Your pages: id, title, link, last update, views (`--project`, `--limit`; signed out: the pages you have tokens for) |
+| `pull <id>` | Download a page's current source to edit and update: `<id>.md` or `<id>.html` (`-o <file>`, `--force`) |
 | `tokens` | List stored tokens |
 | `tokens prune` | Remove tokens for pages that no longer exist |
 | `doctor` | Run diagnostic checks |

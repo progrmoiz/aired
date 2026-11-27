@@ -16,7 +16,7 @@
 |---|---|---|
 | `publish_html` | nothing | Publish `html` or `markdown`, with `deck`, `title`, `pin`, `ttl_seconds`, `permanent`; `id` + `update_token` to update (owner: `id` alone); `message` labels the version; `file_path` and `project` on the local server |
 | `get_template` | nothing | Starters: `deck`, `deck-html`, `report`, `one-pager` (no name lists them) |
-| `get_page` | owner, or the `update_token` | Title, URL, size, views, view limit, expiry, project, PIN on or off, doc or deck, live `version`; `include_source` adds the Markdown or HTML as published and a deck's notes |
+| `get_page` | owner, or the `update_token` | Title, URL, size, views, view limit, expiry, project, PIN on or off, doc or deck, live `version`, `updated_at`; `include_source` adds the Markdown or HTML as published and a deck's notes, so you can edit it and update the page from anywhere |
 | `set_options` | owner, or the `update_token` | Change `pin` (null removes), `ttl_seconds` or `permanent`, `view_limit` (null removes), `title`, `allow_pdf` (viewers can download a PDF); signed in: `access`, `public_results`, `accept_responses` |
 | `list_versions` | owner, or the `update_token` | Every version kept, newest first, with who made it, when, size and note |
 | `restore_version` | owner, or the `update_token` | Put `version` back as a new version; a page with responses needs the owner |
@@ -28,6 +28,8 @@
 | `list_pages`, `update_page`, `delete_page`, `get_account` | signed in, remote server only | Your pages and account |
 
 Every tool returns `structuredContent` that matches its `outputSchema`, next to the text. Read `url`, `id`, `update_token` and `expires_at` from there.
+
+To pick up a page where you left off: `list_pages` (signed in; each has `updated_at`), then `get_page` with `include_source: true`, edit `source`, and send it back with `update_page` or `publish_html` (`id` + `update_token`), with `deck: true` for a deck. Anyone who has the page open sees the new version within about 5 seconds without reloading.
 
 `set_options` with `access`:
 

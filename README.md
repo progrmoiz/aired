@@ -34,8 +34,16 @@ cat page.html | npx aired --title "My Page"
 # JSON output
 npx aired file.html --json
 
-# Update same URL
+# Update same URL (anyone with the page open sees the new version within seconds)
 npx aired update <id> new-version.html
+
+# Your pages, and pick one up where you left off on any machine
+npx aired list
+npx aired pull <id>            # saves <id>.md or <id>.html
+npx aired update <id> <id>.md
+
+# Publish once, then update on every save
+npx aired watch page.html
 
 # Page info
 npx aired info <id>
@@ -248,6 +256,17 @@ GET /p/:id
 
 Serves the raw HTML. If PIN-protected, serves a PIN entry page first.
 
+An open page reloads itself within a few seconds when its content is replaced (a publish update, `PUT`, `update_page` or a restore): it asks `POST /c/:id/live` every 5 seconds while the tab is showing. A deck keeps its slide and a long page its scroll position; a viewer who has typed into the page gets a "Reload" button instead.
+
+### Get a page's source
+
+```
+GET /api/pages/:id/source
+X-Update-Token: at_...        (or sign in as the owner)
+```
+
+What was published: `format` (`markdown` or `html`), `source`, `kind`, a deck's `notes`, and the live `version`. Owner or update token only (`aired pull`).
+
 ---
 
 ## Accounts (optional)
@@ -302,7 +321,7 @@ wrangler secret put GITHUB_CLIENT_SECRET
 npm run deploy
 ```
 
-- The `[[ratelimits]]` bindings in `wrangler.toml` (`PUBLISH_BURST`, `REPORT_BURST`, `PIN_GUESS`, `PIN_GUESS_PAGE`, `DEVICE_BURST`, `OAUTH_BURST`, `SIGNIN_BURST`, `FAVICON_BURST`, `CHECK_BURST`, `PDF_BURST`, `COLLECT_BURST`) need no setup; give them your own `namespace_id`s if you run more than one deployment in an account.
+- The `[[ratelimits]]` bindings in `wrangler.toml` (`PUBLISH_BURST`, `REPORT_BURST`, `PIN_GUESS`, `PIN_GUESS_PAGE`, `DEVICE_BURST`, `OAUTH_BURST`, `SIGNIN_BURST`, `FAVICON_BURST`, `CHECK_BURST`, `PDF_BURST`, `COLLECT_BURST`, `LIVE_BURST`) need no setup; give them your own `namespace_id`s if you run more than one deployment in an account.
 - Set `SITE_ORIGIN` if you're not serving from aired.sh, and change the `[[routes]]` to your domain. Every link the Worker writes follows it (`src/lib/origin.ts`); the static pages in `apps/web/` still say aired.sh.
 - Optional, off until set: billing (`BILLING_ENABLED`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_MONTHLY`, `STRIPE_PRICE_YEARLY`, `STRIPE_MANAGED_PAYMENTS`) and WorkOS sign-in (`WORKOS_CLIENT_ID`, `WORKOS_API_KEY`).
 - The `[browser]` binding (`BROWSER`, Cloudflare Browser Rendering) takes each page's link-preview screenshot, which `/og/:id` serves; it needs no setup. All browser work stops for the day after 40 minutes of browser time (Workers Paid includes 10 hours a month, then $0.09 an hour; Workers Free allows only 10 minutes a day, so set it lower there); set `OG_SHOT_DAILY_SECONDS` to change that, or `0` to keep the generated card for every page. The same binding runs `check_page` / `aired check`, which may use up to 10 of those minutes a day (`CHECK_DAILY_SECONDS`, `0` turns checks off), and PDF export (`export_pdf` / `aired pdf`), which may use up to 20 for new PDFs (`PDF_DAILY_SECONDS`, `0` stops new PDFs; ones already made still download), so neither takes the time link previews need.
