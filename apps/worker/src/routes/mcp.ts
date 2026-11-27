@@ -42,6 +42,16 @@ import {
   CHECK_DESCRIPTION,
   FEEDBACK_DESCRIPTION,
   contentOut,
+  RESPONSES_DESCRIPTION,
+  UPDATE_DATA_DESCRIPTION,
+  changesPageSettings,
+  collectPatchBody,
+  responsesInput,
+  responsesOut,
+  responsesText,
+  updateDataInput,
+  updateDataOut,
+  updateDataText,
   checkContent,
   checkInput,
   checkOut,
@@ -391,7 +401,21 @@ function createAiredMcpServer(
       if (signedIn === null && args.update_token === undefined) {
         return errorText(`Pass the page's update_token, or sign in. ${signInRequiredText(origin)}`);
       }
-      const res = await callApi("PATCH", `/api/pages/${encodeURIComponent(args.id)}`, patchBody(args));
+      const page = `/api/pages/${encodeURIComponent(args.id)}`;
+      // The data-layer settings (public_results, accept_responses) go to their own endpoint, signed in only.
+      const collect = collectPatchBody(args);
+      if (collect !== null) {
+        if (signedIn === null) return signInRequired(origin);
+        const res = await callApi("PATCH", `${page}/responses`, collect);
+        if (res.status !== 200) return apiErrorResult(res.status, res.body, origin);
+        if (!changesPageSettings(args)) {
+          const details = await callApi("GET", `${page}/details`);
+          if (details.status !== 200) return apiErrorResult(details.status, details.body, origin);
+          const changed = [...(args.public_results !== undefined ? ["public_results"] : []), ...(args.accept_responses !== undefined ? ["accept_responses"] : [])];
+          return setOptionsResult({ ...(details.body as object), changed }, origin);
+        }
+      }
+      const res = await callApi("PATCH", page, patchBody(args));
       return res.status === 200 ? setOptionsResult(res.body, origin) : apiErrorResult(res.status, res.body, origin);
     },
   );
@@ -504,6 +528,47 @@ function createAiredMcpServer(
       if (!PAGE_ID.test(id)) return badId();
       const res = await callApi("DELETE", `/api/pages/${encodeURIComponent(id)}`);
       return res.status === 200 ? deleteResult(id) : apiErrorResult(res.status, res.body, origin);
+    },
+  );
+
+  server.registerTool(
+    "get_responses",
+    {
+      title: "Read a page's responses",
+      description: RESPONSES_DESCRIPTION,
+      inputSchema: responsesInput,
+      outputSchema: outputShapes.get_responses,
+      annotations: { title: "Read a page's responses", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ id, limit, cursor, format }) => {
+      if (signedIn === null) return signInRequired(origin);
+      if (!PAGE_ID.test(id)) return badId();
+      const q = new URLSearchParams();
+      if (limit !== undefined) q.set("limit", String(limit));
+      if (cursor) q.set("cursor", cursor);
+      const res = await callApi("GET", `/api/pages/${encodeURIComponent(id)}/responses${q.size ? `?${q}` : ""}`);
+      if (res.status !== 200) return apiErrorResult(res.status, res.body, origin);
+      const out = responsesOut(res.body, { csv: format === "csv" });
+      return { content: [{ type: "text" as const, text: responsesText(out) }], structuredContent: out };
+    },
+  );
+
+  server.registerTool(
+    "update_data",
+    {
+      title: "Push live data to a page",
+      description: UPDATE_DATA_DESCRIPTION,
+      inputSchema: updateDataInput,
+      outputSchema: outputShapes.update_data,
+      annotations: { title: "Push live data to a page", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+    },
+    async ({ id, data }) => {
+      if (signedIn === null) return signInRequired(origin);
+      if (!PAGE_ID.test(id)) return badId();
+      const res = await callApi("PUT", `/api/pages/${encodeURIComponent(id)}/data`, { data });
+      if (res.status !== 200) return apiErrorResult(res.status, res.body, origin);
+      const out = updateDataOut(res.body);
+      return { content: [{ type: "text" as const, text: updateDataText(out) }], structuredContent: out };
     },
   );
 

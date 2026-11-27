@@ -157,6 +157,15 @@ name = "CHECK_BURST"
 namespace_id = "1009"
 simple = { limit = 3, period = 60 }
 
+# Data-layer calls from published pages (routes/collect.ts): every save,
+# read and live-data poll, per network (an IPv6 visitor by /64). A page
+# polling live data every 15 seconds uses 4 a minute; the durable write
+# limits are in lib/collect-limits.ts. 1020 leaves room for other limits.
+[[ratelimits]]
+name = "COLLECT_BURST"
+namespace_id = "1020"
+simple = { limit = 120, period = 60 }
+
 # Custom domain
 [[routes]]
 pattern = "aired.sh/*"

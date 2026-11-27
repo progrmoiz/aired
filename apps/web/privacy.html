@@ -62,12 +62,13 @@
       <li>If you sign in, we keep your GitHub id, username, name and email.</li>
       <li>If you pay, Link (Stripe) handles your card. We never see the card number.</li>
       <li>People who open your pages don't need an account. We count views, with the country they came from and the website that sent them. We don't store their IP address.</li>
+      <li>If a page saves what you type into it, the page's publisher gets what you typed. We store it for them and use it for nothing else.</li>
       <li>We don't put ads or trackers on your pages, and we don't sell or rent anyone's data.</li>
     </ul>
 
     <h2>Who we are</h2>
     <p>aired is run by M&amp;S CapitalSoft LLC, 312 W 2nd St, Unit #A3467, Casper, Wyoming 82601, United States. We decide how the data on this page is used, which makes us its "controller" under data protection law. Reach us at <a href="mailto:support@aired.sh">support@aired.sh</a>.</p>
-    <p>One exception: publishers decide what goes on their own pages. If a page contains personal data, the person who published it is responsible for it.</p>
+    <p>One exception: publishers decide what goes on their own pages. If a page contains personal data, the person who published it is responsible for it. The same goes for what visitors enter on a page that saves it: the publisher decides what to collect and why, and aired stores it on their behalf.</p>
 
     <h2>What we collect and why</h2>
 
@@ -109,8 +110,17 @@
       <li>Record the view for the publisher's analytics: which page, the day, your country, and the website that sent you, as its name only (for example "slack.com", never the full link). If you typed the link or came from an app that doesn't say, there's no website. Publishers on Pro see totals per day, country and website, never single visits.</li>
     </ul>
     <p>To show publishers which site sent their visitors, aired may fetch the small icon (favicon) of a site that sent visitors and keep a copy, so your browser never has to ask that site for it.</p>
-    <p>We don't store your IP address, your browser or device, or the full address you came from. We don't set a cookie unless you enter a PIN. The analytics record is kept in Cloudflare Analytics Engine for three months, then deleted automatically.</p>
+    <p>We don't store your IP address, your browser or device, or the full address you came from. We don't set a cookie unless you enter a PIN or open a page that saves what you enter (below). The analytics record is kept in Cloudflare Analytics Engine for three months, then deleted automatically.</p>
     <p>A publisher's page can contain its own scripts, including its own analytics. Those belong to the publisher, not us. We don't add ads or trackers. The only thing we add, on Free pages, is the aired badge.</p>
+
+    <h3>When a page saves what you enter</h3>
+    <p>A publisher can make a page that saves what you type or pick, like quiz answers, a vote, a sign-up or the workouts you ticked off. Such a page can show a notice that says so. When you save something on it, we keep:</p>
+    <ul>
+      <li><strong>What you entered</strong>, and when. The page's publisher can see it and download it. Other visitors see it only if the publisher made the results public, as for a poll, and even then never who entered what.</li>
+      <li><strong>A visitor id for that page</strong>, so the page can show you your own entries next time. It comes from a random <code>aired_v</code> cookie in your browser, scrambled with the page's id, so you have a different id on every page and no publisher can match you across pages. It isn't your name, email or IP address.</li>
+      <li><strong>A one-way hash of your network address</strong>, to limit how often you can save. It's kept for up to an hour.</li>
+    </ul>
+    <p>aired refuses entries that look like passwords or payment card numbers. If you want an entry removed, ask the page's publisher. If you can't reach them, or the page is abusive, use <a href="/abuse">/abuse</a>.</p>
 
     <h3>When you report a page</h3>
     <p>The form on <a href="/abuse">/abuse</a> sends us the page link, the reason you picked, your description, and your email if you choose to give it. We use it to review the page and, if you asked, to reply. We delete reports after 30 days.</p>
@@ -128,7 +138,7 @@
     <p>We don't make automated decisions about you that have legal or similar effects.</p>
 
     <h2>Where it's stored</h2>
-    <p>Everything runs on Cloudflare. Pages, and the screenshots of them shown in link previews and on your dashboard, live in Cloudflare R2. Page settings, account records, abuse reports and the records of apps you connect live in Cloudflare KV. Account and sign-in records (including the email you signed in with), API key hashes, billing records and view counts live in Cloudflare D1. The analytics record of each view lives in Cloudflare Analytics Engine. So does a tiny blurred copy of each page's screenshot, shown on your dashboard while the screenshot loads. Cloudflare runs a global network, so your data is processed in many countries, including the United States. Link (Stripe), GitHub and WorkOS are in the United States too. The person who runs aired works from outside the US and the EU, and reaches this data from there. When your data leaves the EU or UK, we rely on the EU-U.S. Data Privacy Framework where the company is certified, and on the European Commission's standard contractual clauses where it isn't.</p>
+    <p>Everything runs on Cloudflare. Pages, and the screenshots of them shown in link previews and on your dashboard, live in Cloudflare R2. Page settings, account records, abuse reports and the records of apps you connect live in Cloudflare KV. Account and sign-in records (including the email you signed in with), API key hashes, billing records and view counts live in Cloudflare D1. What visitors save on pages, and the data publishers push to their pages, live in Cloudflare D1 too. The analytics record of each view lives in Cloudflare Analytics Engine. So does a tiny blurred copy of each page's screenshot, shown on your dashboard while the screenshot loads. Cloudflare runs a global network, so your data is processed in many countries, including the United States. Link (Stripe), GitHub and WorkOS are in the United States too. The person who runs aired works from outside the US and the EU, and reaches this data from there. When your data leaves the EU or UK, we rely on the EU-U.S. Data Privacy Framework where the company is certified, and on the European Commission's standard contractual clauses where it isn't.</p>
 
     <h2>Who handles your data</h2>
     <p>These companies handle personal data for aired. Link and GitHub also use it for their own purposes, under their own policies.</p>
@@ -155,6 +165,7 @@
           <tr><td><code>aired_oauth_state</code></td><td>Protects the sign-in step from forgery.</td><td>10 minutes</td></tr>
           <tr><td><code>aired_workos_sid</code></td><td>Lets signing out of aired sign you out of WorkOS too.</td><td>30 days</td></tr>
           <tr><td><code>__Host-oauth-consent-…</code></td><td>Only while you connect an app over MCP: ties the Allow button to your browser so another site can't press it for you.</td><td>10 minutes</td></tr>
+          <tr><td><code>aired_v</code></td><td>Only on pages that save what visitors enter: a random id that lets the page show you your own entries when you come back. Your browser's scripts can't read it, and pages get a different id from it on every page.</td><td>1 year</td></tr>
           <tr><td><code>pin_&lt;page id&gt;</code></td><td>Shows you entered that page's PIN, so you don't have to type it again. It doesn't contain the PIN. Only sent to that page.</td><td>1 hour</td></tr>
         </tbody>
       </table>
@@ -165,12 +176,13 @@
     <ul>
       <li><strong>Pages</strong>: until they expire or you delete them. When a page expires, we stop serving it right away and delete its file within 30 days. A page that reaches its view limit stops being served, but we keep it until it expires or you delete it.</li>
       <li><strong>Deleted pages</strong>: removed from storage right away.</li>
-      <li><strong>Your account</strong>: until you delete it. Deleting it ends every session (other browsers and CLI logins too), disconnects every app you connected, deletes your API keys, and removes your account record, sign-in records and email. Other sessions stop within about a minute. Your pages stay up as anonymous pages without your name. Delete them first if you want them gone.</li>
+      <li><strong>Your account</strong>: until you delete it. Deleting it ends every session (other browsers and CLI logins too), disconnects every app you connected, deletes your API keys, and removes your account record, sign-in records and email. Other sessions stop within about a minute. Your pages stay up as anonymous pages without your name. Delete them first if you want them gone. Everything visitors saved on your pages is deleted.</li>
+      <li><strong>What visitors save on a page</strong>: until the publisher deletes it, the page is deleted or expires, or the publisher's account is deleted. On the Free plan, each entry is also deleted 90 days after it was saved.</li>
       <li><strong>Billing records</strong>: until you delete your account. Then we delete your Stripe ids and plan history too. Link keeps its own record of each sale, under its own policy.</li>
       <li><strong>API keys</strong>: until you delete your account, revoked ones included.</li>
       <li><strong>Abuse reports</strong>: 30 days.</li>
       <li><strong>Backups</strong>: we keep a nightly backup of page and account records for 30 days, and a copy of each expired page's file for 14 days after we delete it, only to recover from an outage or mistake. So something you delete can stay in a backup for up to 30 days before it's gone for good.</li>
-      <li><strong>IP hashes for publishing limits</strong>: in memory only, gone within a day at most.</li>
+      <li><strong>IP hashes for publishing limits</strong>: in memory only, gone within a day at most. Network hashes for limiting saves on a page: an hour.</li>
       <li><strong>View counts</strong>: as long as the page exists. The site-wide country tally holds no personal data.</li>
       <li><strong>View analytics</strong> (page, day, country, referring website): three months, then deleted automatically.</li>
     </ul>

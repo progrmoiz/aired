@@ -1,6 +1,6 @@
 /**
  * Account deletion: remove everything D1 holds about the user's billing and
- * sign-in. Link (Stripe) keeps its own record of each sale. No imports, so
+ * sign-in, and the data-layer entries on their pages. Link (Stripe) keeps its own record of each sale. No imports, so
  * tests run it against the real migrations on node:sqlite.
  */
 export async function deleteAccountRows(
@@ -16,6 +16,10 @@ export async function deleteAccountRows(
   // Children before the users row they reference.
   return db.batch([
     ...alongside,
+    // What viewers saved on the account's pages, and their live data: the
+    // pages become anonymous, and anonymous pages hold no responses.
+    db.prepare('DELETE FROM responses WHERE owner_id = ?').bind(uid),
+    db.prepare('DELETE FROM page_data WHERE owner_id = ?').bind(uid),
     // API keys stop working with the account.
     db.prepare('DELETE FROM api_keys WHERE user_id = ?').bind(uid),
     db.prepare('DELETE FROM subscriptions WHERE user_id = ?').bind(uid),

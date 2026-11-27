@@ -54,10 +54,27 @@ Agents should read the live docs at https://github.com/progrmoiz/aired before an
 - POST /api/pages/:id/check — body `{ update_token?, viewport?: "desktop"|"mobile", inline_screenshot? }`. Same credentials as PATCH. Returns `{ id, url, ok, viewport, checked_at, load_ms, issues: [{ severity, code, message }], console, failed_requests, page: { title, html_bytes, text_chars, visible_media, width, height, transfer_bytes, requests }, blank, screenshot_url, screenshot_expires_at }`. A shared 3 minutes of browser time a day; each caller gets 2 minutes of it signed in, 1 minute per IP without an account; also 20 an hour and 3 a minute. 429 with `code: "check_budget"` and Retry-After until 00:00 UTC when a share is spent; 503 `check_busy` means try again after Retry-After. Each check gets its own screenshot URL, valid 24 hours or until the page changes.
 - GET /api/pages/:id/source — the owner's copy: `{ id, url, title, size, html, kind, format, source }` plus `slides` and `notes` for a deck (`source` is the Markdown, or a deck's HTML with its notes). Same credentials as /details; never counts a view.
 - GET /p/:id/presenter — a deck's speaker view with its notes, for the signed-in owner only (everyone else: 403).
+- GET /api/pages/:id/responses — what viewers saved with `aired.collect` on your page (signed-in owner only; the update token isn't enough). `.csv` for CSV. PATCH with `{ public_results?, closed? }`; DELETE with `{ ids }` or `{ all: true }`.
+- PUT /api/pages/:id/data — body `{ data }`, any JSON: the live data the page reads with `aired.data`, no republish (MCP: `update_data`).
 - POST /api/feedback — body `{ kind: "bug"|"friction"|"idea", message (10–2000 characters), impact?: "blocked"|"worked_around"|"minor", page_id?, tool? }`. No auth needed; 10 an hour per caller. Returns `{ id, message }`. Not a support channel.
 - GET /api/stats — aggregate counts (publishes, views, views per country). No page titles or URLs.
 - POST /api/report — body `{ id, reason }`, no auth, flags an artifact for review.
 - POST /p/:id/verify-pin — body `{ pin }`, sets a 1-hour cookie scoped to the page.
+
+## Saving data from a page
+A page published from an aired account can save what viewers enter and show live data, with no backend. Its HTML must say `aired.collect` or `aired.data` literally.
+
+```html
+<!-- A page published from an aired account can save what viewers enter. -->
+<p data-aired-notice></p>  <!-- aired fills in: "This page saves what you enter here. Its owner can see it." -->
+<label><input type="checkbox" id="w1"> Mon: squats 5x5</label>
+<script>
+  aired.collect.mine().then((entries) => { w1.checked = entries.some((e) => e.key === "w1" && e.data.done); });
+  w1.onchange = () => aired.collect.save({ workout: "Mon: squats", done: w1.checked }, { key: "w1" });
+</script>
+```
+
+`aired.collect.save(record, { key })`, `aired.collect.mine()`, `aired.collect.all()` (when the owner sets `public_results`), `aired.collect.remove(idOrKey)`, `aired.data.subscribe(fn)`. Read entries with the `get_responses` MCP tool; push dashboard numbers with `update_data`. Free: 300 new entries per page a month, kept 90 days. Pro: 10,000, kept while the page lives. Passwords and card numbers are refused. Full reference: https://aired.sh/docs#data
 
 ## Pricing and limits
 - Free, no account needed. Signing in adds a dashboard of your pages; Pro ($12/month or $108/year) removes the aired badge and raises the limits.
@@ -67,7 +84,7 @@ Agents should read the live docs at https://github.com/progrmoiz/aired before an
 - Request bodies: 21 MB for publish, PUT and MCP; 1 MB for other API calls (413 `payload_too_large`).
 
 ## Limitations and non-goals
-- Static HTML only. No server-side compute, no databases, no long-running jobs.
+- Static HTML only. No server-side compute and no long-running jobs. Pages can save small JSON entries with `aired.collect` (see above), not run a database.
 - No file types other than HTML at the entry point. CSS, JS, images get inlined into the HTML at publish time.
 - Code-split builds (Vite, most React apps) break when published as a directory: chunks loaded later with import() are not inlined. Build a single file with vite-plugin-singlefile, use hash routing, then publish dist-single/index.html. See https://aired.sh/share-vite-app.
 - No editing in-browser after publish — update via the API with the update_token, or change the PIN, expiry, view limit or title with PATCH /api/pages/:id.

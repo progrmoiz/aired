@@ -12,6 +12,16 @@ import {
   checkInput,
   checkOut,
   FEEDBACK_DESCRIPTION,
+  RESPONSES_DESCRIPTION,
+  UPDATE_DATA_DESCRIPTION,
+  changesPageSettings,
+  collectPatchBody,
+  responsesInput,
+  responsesOut,
+  responsesText,
+  updateDataInput,
+  updateDataOut,
+  updateDataText,
   feedbackInput,
   feedbackOut,
   outputShapes,
@@ -336,7 +346,17 @@ server.registerTool(
   async (args) => {
     if (!PAGE_ID.test(args.id)) return toolError("That isn't a page id.");
     try {
-      const body = await api<unknown>("PATCH", `/api/pages/${encodeURIComponent(args.id)}`, patchBody(args));
+      const path = `/api/pages/${encodeURIComponent(args.id)}`;
+      // The data-layer settings go to their own endpoint, signed in only.
+      const collect = collectPatchBody(args);
+      if (collect !== null) await api<unknown>("PATCH", `${path}/responses`, collect);
+      const body =
+        collect !== null && !changesPageSettings(args)
+          ? {
+              ...((await api<Record<string, unknown>>("GET", `${path}/details`))),
+              changed: [...(args.public_results !== undefined ? ["public_results"] : []), ...(args.accept_responses !== undefined ? ["accept_responses"] : [])],
+            }
+          : await api<unknown>("PATCH", path, patchBody(args));
       const page = setOptionsOut(body, apiBase());
       const lead = page.changed.length > 0 ? `Changed ${page.changed.join(", ")} of` : "Settings of";
       return { content: [{ type: "text" as const, text: pageText(page, lead) }], structuredContent: page };
@@ -391,6 +411,51 @@ server.registerTool(
 );
 
 registerTemplateTool(server);
+server.registerTool(
+  "get_responses",
+  {
+    title: "Read a page's responses",
+    description: RESPONSES_DESCRIPTION,
+    inputSchema: responsesInput,
+    outputSchema: outputShapes.get_responses,
+    annotations: { title: "Read a page's responses", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ id, limit, cursor, format }) => {
+    if (!PAGE_ID.test(id)) return toolError("That isn't a page id.");
+    if (!signedIn()) return toolError("Sign in first: run `aired login`, or set AIRED_API_KEY.");
+    const q = new URLSearchParams();
+    if (limit !== undefined) q.set("limit", String(limit));
+    if (cursor) q.set("cursor", cursor);
+    try {
+      const out = responsesOut(await api<unknown>("GET", `/api/pages/${encodeURIComponent(id)}/responses${q.size ? `?${q}` : ""}`), { csv: format === "csv" });
+      return { content: [{ type: "text" as const, text: responsesText(out) }], structuredContent: out };
+    } catch (err) {
+      return toolError(`Error: ${errorMessage(err)}`);
+    }
+  },
+);
+
+server.registerTool(
+  "update_data",
+  {
+    title: "Push live data to a page",
+    description: UPDATE_DATA_DESCRIPTION,
+    inputSchema: updateDataInput,
+    outputSchema: outputShapes.update_data,
+    annotations: { title: "Push live data to a page", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  },
+  async ({ id, data }) => {
+    if (!PAGE_ID.test(id)) return toolError("That isn't a page id.");
+    if (!signedIn()) return toolError("Sign in first: run `aired login`, or set AIRED_API_KEY.");
+    try {
+      const out = updateDataOut(await api<unknown>("PUT", `/api/pages/${encodeURIComponent(id)}/data`, { data }));
+      return { content: [{ type: "text" as const, text: updateDataText(out) }], structuredContent: out };
+    } catch (err) {
+      return toolError(`Error: ${errorMessage(err)}`);
+    }
+  },
+);
+
 registerPrompts(server);
 // Signed in or not is read on each call, so `aired login` mid-session counts.
 registerResources(server, {

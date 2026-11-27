@@ -81,6 +81,8 @@ export type Env = {
   OG_SHOT_DAILY_SECONDS?: string;
   /** Daily browser time for check_page, in seconds, inside OG_SHOT_DAILY_SECONDS (lib/page-check.ts). Default 180; "0" turns checks off. */
   CHECK_DAILY_SECONDS?: string;
+  /** Workers Rate Limiting binding: data-layer calls per network per minute (routes/collect.ts). */
+  COLLECT_BURST?: RateLimit;
   /** Workers Rate Limiting binding: page checks per caller per minute (routes/page-tools.ts). */
   CHECK_BURST?: { limit(options: { key: string }): Promise<{ success: boolean }> };
   /**
