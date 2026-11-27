@@ -157,7 +157,7 @@
     <div>
       <div class="crumbrow"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">aired</a><span aria-hidden="true">/</span><a href="/guides">Guides</a><span aria-hidden="true">/</span><span>Share a Vite app</span></nav><div class="aimenu" data-agent="share-vite-app" data-task="build my Vite app as one HTML file and share it as an aired link"><button type="button" class="aimenu-copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy page</span></button><button type="button" class="aimenu-more" aria-haspopup="menu" aria-expanded="false" aria-label="More ways to use this page with AI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div></div>
       <h1>Share a Vite or React app as one link</h1>
-      <p class="lede">You built a tool with Vite, <a href="https://toolcraft.sh" target="_blank" rel="noopener">Toolcraft</a>, Claude Code or Cursor, and it only runs on your localhost. Build it as one HTML file, publish it, and send your client a link that opens the working app. No deploy and no hosting account.</p>
+      <p class="lede">You built a tool with Vite, <a href="https://toolcraft.sh" target="_blank" rel="noopener">Toolcraft</a> (an open-source kit for building design apps), Claude Code or Cursor, and it only runs on your localhost. Build it as one HTML file, publish it, and send your client a link that opens the working app. No deploy and no hosting account.</p>
       <form id="air-form" class="form" aria-label="Publish HTML">
         <div class="paste-area">
           <div id="empty-hint" class="hint" aria-hidden="true">Drop your single-file build<small>dist-single/index.html · 2 MB max</small></div>
@@ -228,7 +228,7 @@ up inside the file. Build it, check dist-single/index.html works, then run
 npx aired dist-single/index.html --permanent and give me the link.</code></pre>
 
       <h2 id="toolcraft">Toolcraft apps</h2>
-      <p><a href="https://toolcraft.sh" target="_blank" rel="noopener">Toolcraft</a> apps need two more changes: it loads the app lazily, which trips a bug in Vite 8's bundler when everything goes into one file, and its router expects to live at <code>/</code>. This config handles both without editing the app's own code. It's what built the <a href="#example">live example below</a>.</p>
+      <p><a href="https://toolcraft.sh" target="_blank" rel="noopener">Toolcraft</a> apps need two more changes: it loads parts of the app only when they're needed, which trips a bug in Vite 8's bundler (the step that packs your code into files) when everything goes into one file, and its router expects to live at <code>/</code>. This config handles both without editing the app's own code. It's what built the <a href="#example">live example below</a>.</p>
 <pre data-lang="ts"><code>// vite.singlefile.config.ts for a Toolcraft app
 import { mergeConfig, type Plugin } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
@@ -263,9 +263,9 @@ export default mergeConfig(base, {
 
       <h2 id="gotchas">If the page is blank</h2>
       <ul>
-        <li><strong>"Not Found" or an empty screen with a router.</strong> React Router, TanStack Router and others read the URL path. Your app is built for <code>/</code>, but the link is <code>/p/&lt;id&gt;</code>. Switch to hash routing (<code>createHashRouter</code> in React Router, <code>createHashHistory</code> in TanStack Router).</li>
+        <li><strong>"Not Found" or an empty screen with a router.</strong> React Router, TanStack Router and others read the URL path. Your app is built for <code>/</code>, but the link is <code>/p/&lt;id&gt;</code>. Switch to hash routing, where the app's own address goes after a <code>#</code> (like <code>/p/abc#/settings</code>) so it never clashes with the link (<code>createHashRouter</code> in React Router, <code>createHashHistory</code> in TanStack Router).</li>
         <li><strong>Missing images or a default file.</strong> Files in <code>public/</code> that the app loads by URL aren't put into the single file. Import them in code instead (<code>import cover from "./cover.jpg"</code>) and shrink large ones first. A 7 MB PNG becomes 9.6 MB once it's inlined.</li>
-        <li><strong>An error in the console like "X is not defined".</strong> Usually a lazy <code>import()</code> that broke when everything was put in one file. Load that module normally, as the Toolcraft config above does.</li>
+        <li><strong>An error in the console like "X is not defined".</strong> Usually a lazy <code>import()</code> (code that loads part of the app later) that broke when everything was put in one file. Load that module normally, as the Toolcraft config above does.</li>
       </ul>
       <p>Test it the way your client will see it: publish with a short expiry, open the link, and check the browser console.</p>
 

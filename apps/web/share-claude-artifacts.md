@@ -12,7 +12,7 @@ Source: https://aired.sh/share-claude-artifacts
 2. Click **Share** and choose who can open it.
 3. Copy the link and send it.
 
-Use this when the people you're sharing with also use Claude, or when you want them to remix the artifact in their own chat.
+Use this when the people you're sharing with also use Claude, or when you want them to make their own copy of the artifact and change it in their own chat.
 
 ### 2. Publish the HTML as a link
 
@@ -27,7 +27,7 @@ Using Claude Code? Add aired once with `npx skills add progrmoiz/aired -g` and t
 
 - **It depends on your plan.** Sharing a new artifact by link needs a paid plan. On Team and Enterprise, artifacts stay inside the organization unless an owner allows outside sharing.
 - **Some artifacts can't get a public link.** Claude won't share an artifact that connects to other websites with "Anyone with the link".
-- **It isn't there outside the Claude apps.** Pages made through the API, Amazon Bedrock, Google Vertex, the Agent SDK or a CI job have no Share button.
+- **It isn't there outside the Claude apps.** Pages made through the API, Amazon Bedrock, Google Vertex, the Agent SDK (Anthropic's kit for building your own agents) or an automated build have no Share button.
 - **Viewers see less.** For people opening the link, the parts that use Claude or connected apps don't work, some content waits for them to sign in, and they can see a notice that the content is user-generated and unverified. That is awkward in front of a client.
 - **There's no control over the page.** You can't set an expiry, add a password or put it on your own domain.
 
@@ -64,7 +64,7 @@ Interactive artifacts are often React components, which need a build step to run
 
 ### Can Claude publish the artifact for me?
 
-Yes. In Claude Code, install the aired skill with `npx skills add progrmoiz/aired -g`. In apps that support MCP, add `https://aired.sh/mcp`. Then ask Claude to publish to aired.
+Yes. In Claude Code, install the aired skill with `npx skills add progrmoiz/aired -g`. In apps that support MCP (the standard way to plug tools into AI apps), add `https://aired.sh/mcp`. Then ask Claude to publish to aired.
 
 ### Can I password-protect a shared artifact?
 

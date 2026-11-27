@@ -11,7 +11,7 @@ Source: https://aired.sh/html-to-link
 3. **Add a PIN if it's private.** Visitors then type the PIN before they see the page.
 4. **Publish and send.** Copy the link and share it. It opens on any phone or computer.
 
-Keep the update token shown after you publish. It lets you replace or delete the page later. If you [sign in with GitHub](https://aired.sh/auth/login?return=/dashboard), your pages are also listed in a dashboard where you can see views and delete them.
+Keep the update token shown after you publish. It's a private key for that page: with it you can replace or delete the page later. If you [sign in with GitHub](https://aired.sh/auth/login?return=/dashboard), your pages are also listed in a dashboard where you can see views and delete them.
 
 ## Why emailing the .html file doesn't work
 
@@ -67,6 +67,6 @@ Yes. It is a normal web page, so it opens in any browser on any phone, tablet or
 
 ### My page uses separate CSS, JavaScript or image files. Will it work?
 
-Put everything in one HTML file, or publish the folder with `npx aired ./folder`, which inlines the files for you.
+Put everything in one HTML file, or publish the folder with `npx aired ./folder`, which puts the styles, scripts and images inside the page for you.
 
 Updated November 2026.

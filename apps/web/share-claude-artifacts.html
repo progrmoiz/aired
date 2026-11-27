@@ -105,7 +105,7 @@
             "name": "Can Claude publish the artifact for me?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Yes. In Claude Code, install the aired skill with npx skills add progrmoiz/aired -g. In apps that support MCP, add https://aired.sh/mcp. Then ask Claude to publish to aired."
+              "text": "Yes. In Claude Code, install the aired skill with npx skills add progrmoiz/aired -g. In apps that support MCP (the standard way to plug tools into AI apps), add https://aired.sh/mcp. Then ask Claude to publish to aired."
             }
           },
           {
@@ -205,7 +205,7 @@
         <li>Click <strong>Share</strong> and choose who can open it.</li>
         <li>Copy the link and send it.</li>
       </ol>
-      <p>Use this when the people you're sharing with also use Claude, or when you want them to remix the artifact in their own chat.</p>
+      <p>Use this when the people you're sharing with also use Claude, or when you want them to make their own copy of the artifact and change it in their own chat.</p>
 
       <h3>2. Publish the HTML as a link</h3>
       <ol class="steps">
@@ -220,7 +220,7 @@
       <ul>
         <li><strong>It depends on your plan.</strong> Sharing a new artifact by link needs a paid plan. On Team and Enterprise, artifacts stay inside the organization unless an owner allows outside sharing.</li>
         <li><strong>Some artifacts can't get a public link.</strong> Claude won't share an artifact that connects to other websites with "Anyone with the link".</li>
-        <li><strong>It isn't there outside the Claude apps.</strong> Pages made through the API, Amazon Bedrock, Google Vertex, the Agent SDK or a CI job have no Share button.</li>
+        <li><strong>It isn't there outside the Claude apps.</strong> Pages made through the API, Amazon Bedrock, Google Vertex, the Agent SDK (Anthropic's kit for building your own agents) or an automated build have no Share button.</li>
         <li><strong>Viewers see less.</strong> For people opening the link, the parts that use Claude or connected apps don't work, some content waits for them to sign in, and they can see a notice that the content is user-generated and unverified. That is awkward in front of a client.</li>
         <li><strong>There's no control over the page.</strong> You can't set an expiry, add a password or put it on your own domain.</li>
       </ul>
@@ -253,7 +253,7 @@
       <div class="acc">
         <details open><summary>Can I share a Claude artifact with someone who doesn&#x27;t use Claude?<i></i></summary><p>Yes. Ask Claude for the artifact as a single HTML file, publish it on aired and send the link. It opens in any browser without a Claude account.</p></details>
         <details><summary>Why is my copied artifact a blank page?<i></i></summary><p>Interactive artifacts are often React components, which need a build step to run. Ask Claude to "rewrite this as one self-contained HTML file" and publish that instead.</p></details>
-        <details><summary>Can Claude publish the artifact for me?<i></i></summary><p>Yes. In Claude Code, install the aired skill with <code>npx skills add progrmoiz/aired -g</code>. In apps that support MCP, add <code>https://aired.sh/mcp</code>. Then ask Claude to publish to aired.</p></details>
+        <details><summary>Can Claude publish the artifact for me?<i></i></summary><p>Yes. In Claude Code, install the aired skill with <code>npx skills add progrmoiz/aired -g</code>. In apps that support MCP (the standard way to plug tools into AI apps), add <code>https://aired.sh/mcp</code>. Then ask Claude to publish to aired.</p></details>
         <details><summary>Can I password-protect a shared artifact?<i></i></summary><p>Yes. Add a PIN before you publish. Visitors type it before the page loads.</p></details>
         <details><summary>How long does the link last?<i></i></summary><p>Seven days by default. You can choose 1 hour, 1 day, 30 days or permanent.</p></details>
         <details><summary>Is it free?<i></i></summary><p>Yes. aired is free and open source.</p></details>

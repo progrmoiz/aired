@@ -1,6 +1,6 @@
 # Share a Vite or React app as one link
 
-You built a tool with Vite, [Toolcraft](https://toolcraft.sh), Claude Code or Cursor, and it only runs on your localhost. Build it as one HTML file, publish it, and send your client a link that opens the working app. No deploy and no hosting account.
+You built a tool with Vite, [Toolcraft](https://toolcraft.sh) (an open-source kit for building design apps), Claude Code or Cursor, and it only runs on your localhost. Build it as one HTML file, publish it, and send your client a link that opens the working app. No deploy and no hosting account.
 
 Source: https://aired.sh/share-vite-app
 
@@ -42,7 +42,7 @@ npx aired dist-single/index.html --permanent and give me the link.
 
 ## Toolcraft apps
 
-[Toolcraft](https://toolcraft.sh) apps need two more changes: it loads the app lazily, which trips a bug in Vite 8's bundler when everything goes into one file, and its router expects to live at `/`. This config handles both without editing the app's own code. It's what built the [live example below](https://aired.sh/share-vite-app#example).
+[Toolcraft](https://toolcraft.sh) apps need two more changes: it loads parts of the app only when they're needed, which trips a bug in Vite 8's bundler (the step that packs your code into files) when everything goes into one file, and its router expects to live at `/`. This config handles both without editing the app's own code. It's what built the [live example below](https://aired.sh/share-vite-app#example).
 
 ```
 // vite.singlefile.config.ts for a Toolcraft app
@@ -81,9 +81,9 @@ Toolcraft apps are built for desktop. On a phone or a window under 1024 px wide,
 
 ## If the page is blank
 
-- **"Not Found" or an empty screen with a router.** React Router, TanStack Router and others read the URL path. Your app is built for `/`, but the link is `/p/<id>`. Switch to hash routing (`createHashRouter` in React Router, `createHashHistory` in TanStack Router).
+- **"Not Found" or an empty screen with a router.** React Router, TanStack Router and others read the URL path. Your app is built for `/`, but the link is `/p/<id>`. Switch to hash routing, where the app's own address goes after a `#` (like `/p/abc#/settings`) so it never clashes with the link (`createHashRouter` in React Router, `createHashHistory` in TanStack Router).
 - **Missing images or a default file.** Files in `public/` that the app loads by URL aren't put into the single file. Import them in code instead (`import cover from "./cover.jpg"`) and shrink large ones first. A 7 MB PNG becomes 9.6 MB once it's inlined.
-- **An error in the console like "X is not defined".** Usually a lazy `import()` that broke when everything was put in one file. Load that module normally, as the Toolcraft config above does.
+- **An error in the console like "X is not defined".** Usually a lazy `import()` (code that loads part of the app later) that broke when everything was put in one file. Load that module normally, as the Toolcraft config above does.
 
 Test it the way your client will see it: publish with a short expiry, open the link, and check the browser console.
 

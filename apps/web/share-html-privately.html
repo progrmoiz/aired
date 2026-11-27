@@ -105,7 +105,7 @@
             "name": "Can someone find my page on Google?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Pages published without an account are marked noindex, and pages with a PIN can't be read by search engines. aired doesn't list pages publicly."
+              "text": "Pages published without an account tell search engines not to list them, and search engines can't get past a PIN. aired doesn't list pages publicly."
             }
           },
           {
@@ -194,13 +194,13 @@
         <li><strong>A PIN.</strong> Type one before you publish. The page doesn't load until it's entered, and the check happens on the server. See <a href="/password-protect-html">password-protect an HTML page</a>.</li>
         <li><strong>A short life.</strong> Pick 1 hour or 1 day for something quick. The link stops working when the time is up.</li>
         <li><strong>A view limit.</strong> With the CLI or the API, add <code>--reads 5</code> or <code>"reads": 5</code> and the page is gone after five opens.</li>
-        <li><strong>Delete it yourself.</strong> Keep the update token from the result, or sign in so your pages are listed in a dashboard where you can delete them.</li>
+        <li><strong>Delete it yourself.</strong> Keep the update token from the result (a private key for that page), or sign in so your pages are listed in a dashboard where you can delete them.</li>
       </ol>
 
       <h2 id="what-is-public">What is and isn't public</h2>
       <ul>
         <li><strong>The link is random.</strong> Each page gets an unguessable address like <code>aired.sh/p/k3J9xQ2mTa</code>. aired doesn't list pages anywhere for people to browse.</li>
-        <li><strong>Search engines are kept out.</strong> Pages published without an account are marked noindex, and pages with a PIN can't be read by crawlers at all.</li>
+        <li><strong>Search engines are kept out.</strong> Pages published without an account tell search engines not to list them, and search engines can't get past a PIN at all.</li>
         <li><strong>Anyone with the link and PIN can open it.</strong> If it's forwarded, the new person gets in too. That's the trade-off for viewers not needing an account.</li>
         <li><strong>Without a PIN, the title shows in link previews.</strong> Slack, WhatsApp and iMessage show the page title when the link is pasted. With a PIN, they only see the PIN screen.</li>
       </ul>
@@ -221,13 +221,13 @@
       </div>
 
       <h2 id="named">Sharing with named people</h2>
-      <p>Today a page on aired is open to anyone with the link (and the PIN, if you set one). Sharing with specific email addresses, where each person confirms their email once and doesn't need an account, is part of the paid plans being built. The <a href="/pricing">pricing page</a> shows what's coming.</p>
+      <p>A page on aired opens for anyone with the link, and the PIN if you set one. aired can't yet limit a page to certain email addresses. If each viewer must sign in, use Google Drive or Claude's email invites from the table above.</p>
 
       <h2 id="faq">Questions</h2>
       <div class="acc">
         <details open><summary>Can I share an HTML file so only certain people can see it?<i></i></summary><p>Add a PIN and send it only to those people. The page won't open without it. Sharing by email address is planned for the paid plans.</p></details>
         <details><summary>Do the people I share with need an aired account?<i></i></summary><p>No. They open the link in any browser and type the PIN if there is one.</p></details>
-        <details><summary>Can someone find my page on Google?<i></i></summary><p>Pages published without an account are marked noindex, and pages with a PIN can't be read by search engines. aired doesn't list pages publicly.</p></details>
+        <details><summary>Can someone find my page on Google?<i></i></summary><p>Pages published without an account tell search engines not to list them, and search engines can't get past a PIN. aired doesn't list pages publicly.</p></details>
         <details><summary>How do I stop people opening a link I already sent?<i></i></summary><p>Delete the page with its update token, or from your dashboard if you published while signed in. The link stops working at once.</p></details>
         <details><summary>Can I see who opened it?<i></i></summary><p>Signed-in users see a view count for each page. Who opened it, and when, is part of the planned Pro plan.</p></details>
       </div>

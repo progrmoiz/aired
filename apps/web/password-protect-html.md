@@ -25,8 +25,8 @@ On aired the check happens on the server. Until the PIN is right, the browser ne
 | --- | --- | --- | --- |
 | aired PIN | Yes, checked on the server | Type a PIN, publish | Free |
 | JavaScript prompt in the page | No, the content is in the source | Paste a script | Free |
-| StatiCrypt | Yes, the file is encrypted | Run a command, then host the file somewhere | Free, open source |
-| .htaccess on your own server | Yes | A web server you manage | Your hosting |
+| StatiCrypt, a free tool that encrypts the file | Yes, the file is encrypted | Run a command, then host the file somewhere | Free, open source |
+| A password on your own web server (.htaccess) | Yes | A web server you manage | Your hosting |
 | [Tiiny Host](https://aired.sh/tiiny-host-alternative) | Yes | Sign up, upload | Solo plan, $13/mo billed yearly |
 
 Tiiny Host price from tiiny.host/pricing, November 2026.
@@ -64,10 +64,10 @@ No. aired checks the PIN on the server and only sends the page after it's right.
 
 ### Can I change the PIN later?
 
-Publish the page again with a new PIN and send the new link. Delete the old page with its update token, or from your dashboard if you were signed in.
+Publish the page again with a new PIN and send the new link. Delete the old page with its update token (the private key you got when you published), or from your dashboard if you were signed in.
 
 ### Will Google index a password-protected page?
 
-No. Search engines can't type the PIN, so they never see the page. Pages published without an account are also marked noindex.
+No. Search engines can't type the PIN, so they never see the page. Pages published without an account also tell search engines not to list them.
 
 Updated November 2026.

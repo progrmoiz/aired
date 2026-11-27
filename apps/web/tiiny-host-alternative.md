@@ -22,7 +22,7 @@ Source: https://aired.sh/tiiny-host-alternative
 | How long free links last | While you log in every 3 months | 1 hour to permanent, you choose |
 | Custom domain | Solo plan: $13/mo billed yearly, $18 monthly | Not yet |
 | Visitor analytics | Tiny plan: $5/mo billed yearly, $9 monthly | View count on every page |
-| Publish from AI agents | API on Solo and up; MCP connector | Free CLI, MCP server and HTTP API |
+| Publish from AI agents | API on Solo and up; MCP connector | Free: command line, MCP server for AI apps, and HTTP API |
 | File types | HTML, zip, PDF and more | HTML (folders bundled by the CLI) |
 | Open source | No | Yes |
 

@@ -36,7 +36,7 @@ Change a slide later with `npx aired update <id> deck.md`. The link stays the sa
 
 ## Or use HTML slides
 
-For your own layouts, charts or brand colours, write HTML where each top-level `<section>` is a slide designed at 1280 × 720, and add `<meta name="aired" content="deck">` to the head. aired scales each slide to fit the screen and adds the controls. `npx aired new deck-html` gives you a starting point. Decks made for reveal.js keep their notes the same way.
+For your own layouts, charts or brand colours, write HTML where each top-level `<section>` is a slide designed at 1280 × 720, and add `<meta name="aired" content="deck">` to the head. aired scales each slide to fit the screen and adds the controls. `npx aired new deck-html` gives you a starting point. Decks made for reveal.js, a popular HTML slide tool, keep their notes the same way.
 
 ## Present it
 
@@ -53,7 +53,7 @@ Publish while signed in, then press S on the slides (or open `/p/<id>/presenter`
 
 ## Let your AI make the deck
 
-Claude, ChatGPT and coding agents write good Markdown decks. Ask for "a Markdown slide deck with --- between slides and Note: lines for what I'll say", then drop it above. With aired's [MCP server](https://aired.sh/docs#mcp) connected, the `make_slide_deck` prompt does the whole thing: it fetches the deck template, writes the slides and notes, publishes them and checks the result in a browser. The agent can fix a slide later at the same link.
+Claude, ChatGPT and coding agents write good Markdown decks. Ask for "a Markdown slide deck with --- between slides and Note: lines for what I'll say", then drop it above. If you've [connected aired to your AI app](https://aired.sh/docs#mcp), ask it to use aired's `make_slide_deck` prompt, a ready-made instruction that does the whole thing: it fetches the deck template, writes the slides and notes, publishes them and checks the result in a browser. The agent can fix a slide later at the same link.
 
 ## Questions
 
@@ -75,7 +75,7 @@ Yes. Print the page and choose Save as PDF: each slide goes on its own page.
 
 ### Can Claude or ChatGPT write the deck?
 
-Yes. Ask for a Markdown deck with --- between slides and Note: lines for what you'll say, or use the make_slide_deck prompt in aired's MCP server, which starts from aired's deck template.
+Yes. Ask for a Markdown deck with --- between slides and Note: lines for what you'll say, or, if you've connected aired to your AI app, use aired's ready-made make_slide_deck prompt, which starts from aired's deck template.
 
 ### Is it free?
 

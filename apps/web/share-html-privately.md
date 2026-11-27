@@ -9,12 +9,12 @@ Source: https://aired.sh/share-html-privately
 1. **A PIN.** Type one before you publish. The page doesn't load until it's entered, and the check happens on the server. See [password-protect an HTML page](https://aired.sh/password-protect-html).
 2. **A short life.** Pick 1 hour or 1 day for something quick. The link stops working when the time is up.
 3. **A view limit.** With the CLI or the API, add `--reads 5` or `"reads": 5` and the page is gone after five opens.
-4. **Delete it yourself.** Keep the update token from the result, or sign in so your pages are listed in a dashboard where you can delete them.
+4. **Delete it yourself.** Keep the update token from the result (a private key for that page), or sign in so your pages are listed in a dashboard where you can delete them.
 
 ## What is and isn't public
 
 - **The link is random.** Each page gets an unguessable address like `aired.sh/p/k3J9xQ2mTa`. aired doesn't list pages anywhere for people to browse.
-- **Search engines are kept out.** Pages published without an account are marked noindex, and pages with a PIN can't be read by crawlers at all.
+- **Search engines are kept out.** Pages published without an account tell search engines not to list them, and search engines can't get past a PIN at all.
 - **Anyone with the link and PIN can open it.** If it's forwarded, the new person gets in too. That's the trade-off for viewers not needing an account.
 - **Without a PIN, the title shows in link previews.** Slack, WhatsApp and iMessage show the page title when the link is pasted. With a PIN, they only see the PIN screen.
 
@@ -29,7 +29,7 @@ Source: https://aired.sh/share-html-privately
 
 ## Sharing with named people
 
-Today a page on aired is open to anyone with the link (and the PIN, if you set one). Sharing with specific email addresses, where each person confirms their email once and doesn't need an account, is part of the paid plans being built. The [pricing page](https://aired.sh/pricing) shows what's coming.
+A page on aired opens for anyone with the link, and the PIN if you set one. aired can't yet limit a page to certain email addresses. If each viewer must sign in, use Google Drive or Claude's email invites from the table above.
 
 ## Questions
 
@@ -43,7 +43,7 @@ No. They open the link in any browser and type the PIN if there is one.
 
 ### Can someone find my page on Google?
 
-Pages published without an account are marked noindex, and pages with a PIN can't be read by search engines. aired doesn't list pages publicly.
+Pages published without an account tell search engines not to list them, and search engines can't get past a PIN. aired doesn't list pages publicly.
 
 ### How do I stop people opening a link I already sent?
 

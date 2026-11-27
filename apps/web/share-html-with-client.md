@@ -20,7 +20,7 @@ Source: https://aired.sh/share-html-with-client
 
 ## Change it after you send it
 
-Keep the update token shown after you publish. With it, the CLI, the API or your AI agent can replace the page and the link stays the same:
+Keep the update token shown after you publish: it's a private key for that page. With it, the CLI, the API or your AI agent can replace the page and the link stays the same:
 
 - CLI: `npx aired update <id> report.html`. The CLI saves the token when you publish, so you don't have to paste it.
 - Claude Code or Cursor: in the same conversation, ask it to "update the aired page with these changes". See the [docs](https://aired.sh/docs) to connect your agent.
