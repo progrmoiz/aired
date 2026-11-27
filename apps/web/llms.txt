@@ -112,6 +112,7 @@ A page published from an aired account can save what viewers enter and show live
 
 ## Discovery and reference URLs
 - https://aired.sh — homepage with a paste-and-publish form.
+- https://aired.sh/connect — connect aired to Claude, Gemini, Perplexity or Le Chat (custom connector at https://aired.sh/mcp/account).
 - https://aired.sh/guides — all guides, grouped.
 - https://aired.sh/html-to-link — guide: turn an HTML file into a shareable link.
 - https://aired.sh/share-claude-artifacts — guide: share a Claude artifact with people who do not use Claude.
