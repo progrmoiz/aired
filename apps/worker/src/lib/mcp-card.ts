@@ -208,10 +208,10 @@ const STYLE = `
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:transparent}
 body{font:400 var(--aired-text-sm)/1.45 var(--aired-font-sans);color:var(--aired-text-1);-webkit-font-smoothing:antialiased}
-.card{display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);gap:14px;align-items:start;padding:12px;background:var(--aired-surface);border:1px solid var(--aired-border);border-radius:var(--aired-radius-xl)}
+.card{display:grid;grid-template-columns:minmax(0,196px) minmax(0,1fr);gap:14px;align-items:start;padding:12px;background:var(--aired-surface);border:1px solid var(--aired-border);border-radius:var(--aired-radius-xl)}
 @media (max-width:480px){.card{grid-template-columns:minmax(0,1fr)}}
-.shot{display:block;position:relative;width:100%;aspect-ratio:1200/630;border-radius:var(--aired-radius-md);overflow:hidden;background:var(--aired-surface-2);border:1px solid var(--aired-hairline);padding:0;cursor:pointer}
-.shot img{display:block;width:100%;height:100%;object-fit:cover;object-position:top}
+.shot{display:block;position:relative;width:100%;height:0;padding:0 0 52.5%;margin:0;border-radius:var(--aired-radius-md);overflow:hidden;background:var(--aired-surface-2);border:1px solid var(--aired-hairline);cursor:pointer}
+.shot img{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;object-position:top}
 .shot:focus-visible,button:focus-visible{outline:2px solid var(--aired-ring);outline-offset:2px}
 .body{min-width:0;display:grid;gap:2px}
 .eyebrow{display:flex;align-items:center;gap:6px;font-size:var(--aired-text-xs);color:var(--aired-text-3)}
@@ -222,7 +222,7 @@ h1{margin:2px 0 0;font-size:var(--aired-text-md);font-weight:500;letter-spacing:
 .facts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;padding:0;list-style:none}
 .facts li{font-size:var(--aired-text-xs);line-height:20px;padding:0 8px;border-radius:var(--aired-radius-full);background:var(--aired-chip-bg);color:var(--aired-chip-text);border:1px solid var(--aired-hairline);white-space:nowrap}
 .actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
-button{font:inherit;font-weight:500;height:30px;padding:0 12px;border-radius:var(--aired-radius-md);border:1px solid var(--aired-border-strong);background:var(--aired-surface-2);color:var(--aired-text-1);cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:background var(--aired-dur-fast) var(--aired-ease),border-color var(--aired-dur-fast) var(--aired-ease)}
+button{font:inherit;font-weight:500;height:30px;padding:0 10px;border-radius:var(--aired-radius-md);border:1px solid var(--aired-border-strong);background:var(--aired-surface-2);color:var(--aired-text-1);cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:background var(--aired-dur-fast) var(--aired-ease),border-color var(--aired-dur-fast) var(--aired-ease)}
 button:hover{border-color:var(--aired-text-3)}
 button.primary{background:var(--aired-primary);color:var(--aired-on-primary);border-color:transparent}
 button.primary:hover{background:var(--aired-primary-hover)}
@@ -388,7 +388,7 @@ const SCRIPT = String.raw`
   }
 
   function size() {
-    var h = Math.ceil(document.documentElement.getBoundingClientRect().height);
+    var h = Math.ceil(root.getBoundingClientRect().height);
     notify("ui/notifications/size-changed", { width: Math.ceil(window.innerWidth), height: h });
     if (window.openai && typeof window.openai.notifyIntrinsicHeight === "function") window.openai.notifyIntrinsicHeight(h);
   }
