@@ -25,11 +25,13 @@ import {
   readBudget,
   addSpent,
   setBlocked,
+  BUDGET_ROW,
   type ShotPage,
   type ShotRow,
 } from "./og-shot.js";
 import {
   CheckUnavailable,
+  CHECK_BUDGET_ROW,
   CHECK_LOAD_TIMEOUT_MS,
   CHECK_SETTLE_MS,
   CHECK_SHOT_QUALITY,
@@ -39,8 +41,11 @@ import {
   MAX_CONSOLE,
   MAX_REQUESTS,
   checkGate,
-  checkShotKey,
-  recordCheckTime,
+  checkShotPrefix,
+  relativeFileMiss,
+  reserveCheckTime,
+  settleCheckTime,
+  type CheckCaller,
   type CheckObservations,
   type CheckViewport,
 } from "./page-check.ts";
@@ -97,12 +102,20 @@ export async function refreshShot(
   await renderShots(env, [{ id, page, html, htmlEtag }]);
 }
 
-/** Remove a page's images and its page_shots row (update, delete). */
+/** Remove a page's images, its check screenshots and its page_shots row (update, delete). */
 export async function forgetShots(env: Pick<ShotEnv, "PAGES_BUCKET" | "DB">, id: string): Promise<void> {
   await Promise.all([
-    env.PAGES_BUCKET.delete([shotKey(id), tileKey(id), checkShotKey(id)]),
+    env.PAGES_BUCKET.delete([shotKey(id), tileKey(id)]),
+    deleteCheckShots(env.PAGES_BUCKET, id, () => true),
     env.DB.prepare("DELETE FROM page_shots WHERE id = ?").bind(id).run(),
   ]);
+}
+
+/** Delete a page's check screenshots that `drop` picks (all on update or delete; old ones after a check). */
+export async function deleteCheckShots(bucket: R2Bucket, id: string, drop: (o: { uploaded: Date }) => boolean): Promise<void> {
+  const listed = await bucket.list({ prefix: checkShotPrefix(id), limit: 1000 });
+  const keys = listed.objects.filter(drop).map((o) => o.key);
+  if (keys.length > 0) await bucket.delete(keys);
 }
 
 /**
@@ -232,10 +245,15 @@ async function serveStoredPage(
   origin: string,
   id: string,
   html: string,
-  onBlocked?: (url: string, navigation: boolean) => void,
+  onBlocked?: (url: string, navigation: boolean, type: string) => void,
+  extraHosts: string[] = [],
 ): Promise<string> {
   page.on("dialog", (d) => {
     d.dismiss().catch(() => {});
+  });
+  // window.open gets a tab with no interception: close it at once.
+  page.on("popup", (p) => {
+    p?.close().catch(() => {});
   });
   const url = `${origin}/p/${encodeURIComponent(id)}`;
   const body = injectEarlyScript(html, SANDBOX_SHIM);
@@ -257,8 +275,8 @@ async function serveStoredPage(
       return;
     }
     const leaving = req.isNavigationRequest() && req.frame() === page.mainFrame();
-    if (leaving || isAired(target)) {
-      onBlocked?.(target, leaving);
+    if (leaving || isAired(target, extraHosts)) {
+      onBlocked?.(target, leaving, req.resourceType());
       req.abort().catch(() => {});
       return;
     }
@@ -270,37 +288,62 @@ async function serveStoredPage(
 export type CheckEnv = ShotEnv & { CHECK_DAILY_SECONDS?: string };
 
 /**
- * check_page: render a page and report what a visitor would hit (rules and
- * report in page-check.ts). Spends the shared browser budget and the checks'
- * own share of it; throws CheckUnavailable when either is used up. Returns
- * what the browser saw and a JPEG of the first screen.
+ * check_page: render a page and report what a visitor would hit (rules,
+ * report and budget in page-check.ts). Gates on the budget, reserves the
+ * longest a check can take before launching, and settles to the real time
+ * after, so a request cut off mid-check stays charged. Returns what the
+ * browser saw and a JPEG of the first screen.
  */
 export async function checkPage(
   env: CheckEnv,
   id: string,
   html: string,
   viewport: CheckViewport,
+  caller: CheckCaller,
 ): Promise<{ obs: CheckObservations; screenshot: Uint8Array | null }> {
   if (env.BROWSER === undefined) throw new CheckUnavailable("no_browser", null);
-  await checkGate(env.DB, env, Date.now());
+  await checkGate(env.DB, env, Date.now(), caller);
+  let reserved: number;
+  try {
+    reserved = await reserveCheckTime(env.DB, caller, Date.now());
+  } catch (err) {
+    console.error("page check budget write failed", { err: String(err) });
+    throw new CheckUnavailable("storage", 30);
+  }
 
   const started = Date.now();
+  const settle = () =>
+    settleCheckTime(env.DB, caller, reserved, Date.now() - started, Date.now()).catch((err) =>
+      console.error("page check budget write failed", { err: String(err) }),
+    );
   let browser: Browser;
   try {
     browser = await puppeteer.launch(env.BROWSER);
   } catch (err) {
+    await settle();
     const until = blockAfterError(String(err), Date.now());
-    if (until !== null) await setBlocked(env.DB, until).catch(() => {});
-    console.log({ event: "page_check_skipped", id, reason: until !== null ? "limit" : "launch", err: String(err) });
-    throw new CheckUnavailable("busy", until !== null ? Math.max(1, Math.ceil((until - Date.now()) / 1000)) : 60);
+    const daily = /time limit exceeded/i.test(String(err));
+    // The account's daily limit stops screenshots too; "too many browsers" only holds back checks.
+    if (until !== null) await setBlocked(env.DB, until, daily ? BUDGET_ROW : CHECK_BUDGET_ROW).catch(() => {});
+    console.log({ event: "page_check_skipped", id, reason: daily ? "daily_limit" : until !== null ? "limit" : "launch", err: String(err) });
+    const wait = until !== null ? Math.max(1, Math.ceil((until - Date.now()) / 1000)) : 60;
+    throw new CheckUnavailable(daily ? "budget" : "busy", wait);
   }
+  const origin = renderOrigin(siteOrigin(env));
   try {
-    return await withTimeout(observe(browser, renderOrigin(siteOrigin(env)), id, html, viewport), CHECK_TIMEOUT_MS);
+    return await withTimeout(observe(browser, origin, id, html, viewport, blockedHosts(env)), CHECK_TIMEOUT_MS);
   } finally {
     await browser.close().catch(() => {});
-    await recordCheckTime(env.DB, Date.now() - started, Date.now()).catch((err) =>
-      console.error("page check budget write failed", { err: String(err) }),
-    );
+    await settle();
+  }
+}
+
+/** Hosts a rendered page may not reach besides aired.sh: this deploy's own host and its workers.dev name. */
+function blockedHosts(env: { SITE_ORIGIN?: string }): string[] {
+  try {
+    return [new URL(siteOrigin(env)).hostname];
+  } catch {
+    return [];
   }
 }
 
@@ -310,6 +353,7 @@ async function observe(
   id: string,
   html: string,
   viewport: CheckViewport,
+  extraHosts: string[],
 ): Promise<{ obs: CheckObservations; screenshot: Uint8Array | null }> {
   const page = await browser.newPage();
   const obs: CheckObservations = { loadMs: 0, loaded: false, loadError: null, console: [], pageErrors: [], failedRequests: [], navigationsBlocked: [], dom: null };
@@ -339,10 +383,18 @@ async function observe(
       const req = res.request();
       obs.failedRequests.push({ url: res.url(), status: res.status(), error: null, type: req.resourceType() });
     });
-    const url = await serveStoredPage(page, origin, id, html, (target, navigation) => {
-      ours.add(target);
-      if (navigation && obs.navigationsBlocked.length < 5) obs.navigationsBlocked.push(target);
-    });
+    const url = await serveStoredPage(page, origin, id, html, (target, navigation, type) => {
+      if (navigation) {
+        ours.add(target);
+        if (obs.navigationsBlocked.length < 5) obs.navigationsBlocked.push(target);
+      } else if (relativeFileMiss(target, origin)) {
+        // A visitor loses this file too: it's a relative path, and a page is one file.
+        if (obs.failedRequests.length < MAX_REQUESTS) obs.failedRequests.push({ url: target, status: 404, error: "not on aired: a page is one file, so inline it or use an absolute URL", type });
+        ours.add(target);
+      } else {
+        ours.add(target);
+      }
+    }, extraHosts);
 
     const t0 = Date.now();
     // A timeout is a slow page; any other failure means the document itself never loaded.
@@ -383,10 +435,11 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function isAired(target: string): boolean {
+/** aired.sh, this deploy's own host, and the Worker's workers.dev name (aired.<account>.workers.dev). */
+function isAired(target: string, extraHosts: string[] = []): boolean {
   try {
     const host = new URL(target).hostname;
-    return host === "aired.sh" || host.endsWith(".aired.sh");
+    return host === "aired.sh" || host.endsWith(".aired.sh") || extraHosts.includes(host) || (host.startsWith("aired.") && host.endsWith(".workers.dev"));
   } catch {
     return false;
   }

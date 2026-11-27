@@ -116,7 +116,8 @@ async function handleResponse<T>(resp: Response, action: string): Promise<T> {
     } catch {
       // ignore
     }
-    throw new Error(message)
+    // The status lets a command tell "try later" (502/503) from "no access" (401/403/404).
+    throw Object.assign(new Error(message), { status: resp.status })
   }
 
   try {

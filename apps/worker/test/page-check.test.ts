@@ -5,16 +5,23 @@ import { fakeD1 } from "./helpers/d1.ts";
 import {
   buildReport,
   checkBudgetMs,
+  CALLER_BUDGET_MS,
+  callerRow,
+  CHECK_RESERVE_MS,
   checkGate,
   CheckUnavailable,
   checkShotKey,
+  checkShotPrefix,
+  relativeFileMiss,
+  reserveCheckTime,
+  settleCheckTime,
+  SHOT_URL_KEY,
+  shotUnexpired,
   DEFAULT_CHECK_BUDGET_MS,
   MAX_CONSOLE,
   parseViewport,
-  recordCheckTime,
   reportText,
   secondsToNextUtcDay,
-  shotKeyValid,
   type CheckObservations,
 } from "../src/lib/page-check.ts";
 import { addSpent, readBudget, setBlocked, utcDay } from "../src/lib/og-shot.ts";
@@ -144,9 +151,11 @@ test("the checks' budget: 3 minutes by default, never more than the whole browse
   assert.equal(checkBudgetMs(undefined, 0), 0, "screenshots off means checks off");
 });
 
-const gateFails = async (db: D1Database, vars = {}, now = NOW) => {
+const ANON = { key: "ip:abc", signedIn: false };
+const KIM = { key: "u:7", signedIn: true };
+const gateFails = async (db: D1Database, vars = {}, now = NOW, caller = KIM) => {
   try {
-    await checkGate(db as never, vars, now);
+    await checkGate(db as never, vars, now, caller);
     return null;
   } catch (err) {
     assert.ok(err instanceof CheckUnavailable);
@@ -176,34 +185,73 @@ test("gate: screenshots using up the shared budget stop checks too", async () =>
   assert.equal((await gateFails(fakeD1().db, { CHECK_DAILY_SECONDS: "0" }))?.reason, "budget", "0 turns checks off");
 });
 
-test("gate: a Browser Rendering block stops checks until it lifts", async () => {
+test("gate: each caller has a daily share, smaller without an account", async () => {
+  const { db } = fakeD1();
+  await addSpent(db as never, CALLER_BUDGET_MS.anonymous, NOW, callerRow(ANON));
+  assert.equal((await gateFails(db, {}, NOW, ANON))?.reason, "budget", "this IP's share is spent");
+  assert.equal(await gateFails(db, {}, NOW, KIM), null, "everyone else can still check");
+  await addSpent(db as never, CALLER_BUDGET_MS.signedIn - 1, NOW, callerRow(KIM));
+  assert.equal(await gateFails(db, {}, NOW, KIM), null);
+  await addSpent(db as never, 1, NOW, callerRow(KIM));
+  assert.equal((await gateFails(db, {}, NOW, KIM))?.reason, "budget");
+});
+
+test("gate: a short Browser Rendering block is 'busy' with its seconds, a spent cap is 'budget' until midnight", async () => {
   const { db } = fakeD1();
   await setBlocked(db as never, NOW + 60_000);
-  const err = await gateFails(db);
-  assert.equal(err?.reason, "budget");
+  let err = await gateFails(db);
+  assert.equal(err?.reason, "busy");
   assert.equal(err?.waitSeconds, 60);
   assert.equal(await gateFails(db, {}, NOW + 61_000), null);
+  await setBlocked(db as never, NOW + 30_000, "check");
+  assert.equal((await gateFails(db))?.reason, "busy", "a block on the checks' row holds back checks");
+  await addSpent(db as never, DEFAULT_CHECK_BUDGET_MS, NOW, "check");
+  err = await gateFails(db);
+  assert.equal(err?.reason, "budget", "spent wins over a short block");
+  assert.equal(err?.waitSeconds, 9 * 3600);
 });
 
-test("a check's time counts against both rows", async () => {
+test("gate: a D1 error is 'storage', not a broken page", async () => {
+  const d = fakeD1();
+  d.fail(/og_shot_budget/);
+  assert.equal((await gateFails(d.db))?.reason, "storage");
+});
+
+test("reserve then settle: time is charged before the browser starts, and only the real time stays", async () => {
   const { db } = fakeD1();
-  await recordCheckTime(db as never, 12_000, NOW);
-  await recordCheckTime(db as never, 8_000, NOW);
-  assert.deepEqual(await readBudget(db as never), { day: utcDay(NOW), spentMs: 20_000, blockedUntil: 0 });
-  assert.deepEqual(await readBudget(db as never, "check"), { day: utcDay(NOW), spentMs: 20_000, blockedUntil: 0 });
+  const reserved = await reserveCheckTime(db as never, KIM, NOW);
+  assert.equal(reserved, CHECK_RESERVE_MS);
+  for (const name of ["browser", "check", callerRow(KIM)]) assert.equal((await readBudget(db as never, name))?.spentMs, CHECK_RESERVE_MS, name);
+  // A second check started now sees the first one's reservation.
+  await addSpent(db as never, DEFAULT_CHECK_BUDGET_MS - 2 * CHECK_RESERVE_MS, NOW, "check");
+  await reserveCheckTime(db as never, ANON, NOW);
+  assert.equal((await gateFails(db, {}, NOW, { key: "u:9", signedIn: true }))?.reason, "budget", "two in-flight checks fill the share");
+  await settleCheckTime(db as never, KIM, reserved, 9_000, NOW);
+  assert.equal((await readBudget(db as never, callerRow(KIM)))?.spentMs, 9_000);
+  assert.equal((await readBudget(db as never))?.spentMs, CHECK_RESERVE_MS * 2 - reserved + 9_000);
+  // Settling never takes a row below zero, and callers' rows from earlier days are dropped.
+  await settleCheckTime(db as never, ANON, 999_999, 0, NOW);
+  assert.equal((await readBudget(db as never, callerRow(ANON)))?.spentMs, 0);
+  await addSpent(db as never, 5_000, NOW - 2 * 86_400_000, "check:ip:old");
+  await settleCheckTime(db as never, KIM, 0, 0, NOW);
+  assert.equal(await readBudget(db as never, "check:ip:old"), null);
 });
 
-test("screenshot keys: only the exact, unexpired key opens it", () => {
-  const key = "0123456789abcdef0123456789abcdef";
-  const exp = String(NOW + 1000);
-  assert.equal(shotKeyValid(key, key, exp, NOW), true);
-  assert.equal(shotKeyValid(key.replace("0", "1"), key, exp, NOW), false);
-  assert.equal(shotKeyValid(key, key, exp, NOW + 1000), false, "expired");
-  assert.equal(shotKeyValid(key, key, undefined, NOW), false);
-  assert.equal(shotKeyValid("", "", exp, NOW), false);
-  assert.equal(shotKeyValid(null, key, exp, NOW), false);
-  assert.equal(shotKeyValid("short", "short", exp, NOW), false);
-  assert.equal(checkShotKey("abc"), "pages/abc/check.jpg");
+test("screenshots: one object per check under the page, named by the key's hash, for 24 hours", () => {
+  assert.equal(checkShotKey("abc", "f00d"), "pages/abc/checks/f00d.jpg");
+  assert.ok(checkShotKey("abc", "x").startsWith(checkShotPrefix("abc")));
+  assert.ok(SHOT_URL_KEY.test("0123456789abcdef0123456789abcdef"));
+  assert.ok(!SHOT_URL_KEY.test("0123456789abcdef"));
+  assert.ok(!SHOT_URL_KEY.test("../../pages/abc/index.html"));
+  assert.equal(shotUnexpired(String(NOW + 1000), NOW), true);
+  assert.equal(shotUnexpired(String(NOW), NOW), false);
+  assert.equal(shotUnexpired(undefined, NOW), false);
+});
+
+test("relative files a visitor would also lose are told apart from aired requests blocked on purpose", () => {
+  const o = "https://aired.sh";
+  for (const t of ["https://aired.sh/p/app.js", "https://aired.sh/p/data.json", "https://aired.sh/p/img/x.png"]) assert.equal(relativeFileMiss(t, o), true, t);
+  for (const t of ["https://aired.sh/p/AbC123", "https://aired.sh/favicon.ico", "https://aired.sh/api/stats", "https://cdn.example/p/app.js"]) assert.equal(relativeFileMiss(t, o), false, t);
 });
 
 test("wiring: the check route asks for the owner, rate-limits, and spends the budget only after that", () => {
@@ -212,23 +260,31 @@ test("wiring: the check route asks for the owner, rate-limits, and spends the bu
   assert.match(check, /pageTools\.post\("\/pages\/:id\/check", requireCsrfHeader, rateLimit\(TIERS\.page_check\), async/);
   const access = check.indexOf("const access = await ownerAccess(c, page, sentUpdateToken(c, body.update_token));");
   const refused = check.indexOf("if (!access.ok) return c.json({ error: access.error }, access.status);");
-  const burst = check.indexOf("underBurstLimit(c.env.CHECK_BURST, await callerKey(c))");
-  const render = check.indexOf("await checkPage(c.env, id, html, viewport)");
+  const burst = check.indexOf("underBurstLimit(c.env.CHECK_BURST, caller.key)");
+  const render = check.indexOf("await checkPage(c.env, id, html, viewport, caller)");
   assert.ok(access > 0 && refused > access && burst > refused && render > burst, "owner check, then the burst guard, then the browser");
-  assert.match(check, /err\.reason === "budget" \? 429 : 503/);
-  // The screenshot is served only for a live page, with its key, never cached by a shared cache.
+  // A page changed mid-check gets no screenshot of its old version.
+  assert.match(check, /if \(current !== null && current\.etag === obj\.etag\) \{/);
+  // The screenshot needs its key (looked up by hash), a live page, and is never cached.
   const shot = route.slice(route.indexOf('pageTools.get("/pages/:id/check.jpg"'), route.indexOf('pageTools.get("/pages/:id/source"'));
+  assert.match(shot, /checkShotKey\(id, await hashToHex\(sent, 32\)\)/);
   assert.match(shot, /live = await loadPage\(c\.env, id\)/);
-  assert.match(shot, /shotKeyValid\(sent, obj\.customMetadata\?\.key, obj\.customMetadata\?\.expires, Date\.now\(\)\)/);
-  assert.match(shot, /"Cache-Control": "private, max-age=3600"/);
+  assert.match(shot, /"Cache-Control": "private, no-store"/);
   // Source is owner-only too.
   const source = route.slice(route.indexOf('pageTools.get("/pages/:id/source"'));
   assert.match(source, /const access = await ownerAccess\(c, page, sentUpdateToken\(c\)\);\s*if \(!access\.ok\) return/);
-  // checkPage gates on the budget before launching, and always records the time and closes the browser.
+  // checkPage gates and reserves before launching, and always settles and closes the browser.
   const render2 = src("src/lib/og-render.ts");
   const fn = render2.slice(render2.indexOf("export async function checkPage"), render2.indexOf("async function observe("));
-  assert.ok(fn.indexOf("await checkGate(env.DB, env, Date.now());") < fn.indexOf("puppeteer.launch(env.BROWSER)"));
-  assert.match(fn, /finally \{\s*await browser\.close\(\)\.catch\(\(\) => \{\}\);\s*await recordCheckTime\(/);
+  const gate = fn.indexOf("await checkGate(env.DB, env, Date.now(), caller);");
+  const reserve = fn.indexOf("reserved = await reserveCheckTime(env.DB, caller, Date.now());");
+  assert.ok(gate > 0 && reserve > gate && fn.indexOf("puppeteer.launch(env.BROWSER)") > reserve);
+  assert.match(fn, /finally \{\s*await browser\.close\(\)\.catch\(\(\) => \{\}\);\s*await settle\(\);/);
+  // Only the account's daily limit blocks screenshots; "too many browsers" blocks checks.
+  assert.match(fn, /setBlocked\(env\.DB, until, daily \? BUDGET_ROW : CHECK_BUDGET_ROW\)/);
+  // Popups are closed, and aired's own hosts stay blocked.
+  assert.match(render2, /page\.on\("popup", \(p\) => \{\s*p\?\.close\(\)/);
+  assert.match(render2, /host\.startsWith\("aired\."\) && host\.endsWith\("\.workers\.dev"\)/);
   assert.match(src("src/lib/rate-limit-tiers.ts"), /page_check: +\{ bucketPrefix: 'rl:check', +limit: 20, windowSeconds: 3600 \}/);
   assert.match(src("wrangler.toml"), /name = "CHECK_BURST"\s*\nnamespace_id = "1009"\s*\nsimple = \{ limit = 3, period = 60 \}/);
   // Mounted before api.ts, so /api/pages/:id/check isn't taken by another route.

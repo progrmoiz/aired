@@ -210,20 +210,21 @@ export async function readBudget(db: Db, name: string = BUDGET_ROW): Promise<Bud
 export async function addSpent(db: Db, ms: number, nowMs: number, name: string = BUDGET_ROW): Promise<void> {
   await db
     .prepare(
-      "INSERT INTO og_shot_budget (name, day, spent_ms, blocked_until) VALUES (?, ?, ?, 0) " +
+      // ms may be negative (a check settling its reservation); spent time never goes below 0.
+      "INSERT INTO og_shot_budget (name, day, spent_ms, blocked_until) VALUES (?, ?, MAX(0, ?), 0) " +
         "ON CONFLICT (name) DO UPDATE SET spent_ms = CASE WHEN og_shot_budget.day = excluded.day " +
-        "THEN og_shot_budget.spent_ms + excluded.spent_ms ELSE excluded.spent_ms END, day = excluded.day",
+        "THEN MAX(0, og_shot_budget.spent_ms + ?) ELSE excluded.spent_ms END, day = excluded.day",
     )
-    .bind(name, utcDay(nowMs), ms)
+    .bind(name, utcDay(nowMs), ms, ms)
     .run();
 }
 
-export async function setBlocked(db: Db, until: number): Promise<void> {
+export async function setBlocked(db: Db, until: number, name: string = BUDGET_ROW): Promise<void> {
   await db
     .prepare(
       "INSERT INTO og_shot_budget (name, day, spent_ms, blocked_until) VALUES (?, ?, 0, ?) " +
         "ON CONFLICT (name) DO UPDATE SET blocked_until = MAX(og_shot_budget.blocked_until, excluded.blocked_until)",
     )
-    .bind(BUDGET_ROW, utcDay(Date.now()), until)
+    .bind(name, utcDay(Date.now()), until)
     .run();
 }

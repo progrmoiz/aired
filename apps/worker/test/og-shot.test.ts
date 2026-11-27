@@ -129,7 +129,8 @@ test("api.ts: deleting a page deletes its screenshots and placeholder", () => {
   const fn = write.slice(write.indexOf("export async function deletePage"));
   assert.match(fn.slice(0, fn.indexOf("\n}\n")), /await forgetShots\(env, row\.id\)/);
   const render = src("../src/lib/og-render.ts");
-  assert.match(render, /PAGES_BUCKET\.delete\(\[shotKey\(id\), tileKey\(id\), checkShotKey\(id\)\]\)/);
+  assert.match(render, /PAGES_BUCKET\.delete\(\[shotKey\(id\), tileKey\(id\)\]\)/);
+  assert.match(render, /deleteCheckShots\(env\.PAGES_BUCKET, id, \(\) => true\)/);
   assert.match(render, /DELETE FROM page_shots WHERE id = \?/);
 });
 
@@ -158,7 +159,7 @@ test("og-render.ts: renders the stored HTML in the sandbox, never through /p/:id
   assert.match(code, /"Content-Security-Policy": PAGE_CSP/);
   assert.match(code, /injectEarlyScript\(html, SANDBOX_SHIM\)/);
   // Nothing else reaches aired.sh, and the page can't navigate away.
-  assert.match(code, /if \(leaving \|\| isAired\(target\)\)/);
+  assert.match(code, /if \(leaving \|\| isAired\(target, extraHosts\)\)/);
   // It never touches KV, so no view count or page record is written.
   assert.doesNotMatch(code, /PAGES_KV/);
   // The browser always closes, and a 429 sets the block rather than retrying.

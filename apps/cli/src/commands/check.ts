@@ -18,7 +18,11 @@ interface CheckOpts {
   screenshot?: string
 }
 
-/** Exit code for a finished check: 0 works, 1 broken (or any warning with --strict). */
+/**
+ * Exit codes: 0 works, 1 the page is broken (or has warnings, with --strict),
+ * 2 bad input or no access to the page, 3 the check didn't run (rate limit,
+ * daily budget, browser busy): try again later. 1 means only "broken".
+ */
 export function checkExitCode(report: Pick<CheckReport, 'ok' | 'issues'>, strict: boolean): number {
   if (!report.ok) return ExitCode.API_ERROR
   if (strict && report.issues.length > 0) return ExitCode.API_ERROR
@@ -65,16 +69,19 @@ export function makeCheckCommand(globalOpts: () => GlobalOpts): Command {
         report = await withSpinner('Checking in a browser...', () =>
           checkPage(baseUrl, id, { token: token ?? '', jwt: session?.jwt, viewport: cmdOpts.mobile ? 'mobile' : 'desktop' }), opts)
       } catch (err) {
-        const error = err as NodeJS.ErrnoException & Error
-        if (error.code === 'RATE_LIMITED') {
-          outputError({ code: 'RATE_LIMIT', message: error.message }, opts)
+        const error = err as NodeJS.ErrnoException & Error & { status?: number }
+        if (error.code === 'RATE_LIMITED' || error.status === 502 || error.status === 503) {
+          outputError({ code: error.code === 'RATE_LIMITED' ? 'RATE_LIMIT' : 'UNAVAILABLE', message: error.message }, opts)
           process.exit(ExitCode.RATE_LIMITED)
         }
+        // No access or no such page: not a broken page, so not exit 1.
         outputError({ code: 'API', message: error.message }, opts)
-        process.exit(ExitCode.API_ERROR)
+        process.exit(ExitCode.VALIDATION_ERROR)
       }
 
-      if (cmdOpts.screenshot !== undefined && report.screenshot_url !== null) {
+      if (cmdOpts.screenshot !== undefined && report.screenshot_url === null) {
+        process.stderr.write(pc.yellow('No screenshot this time, so nothing was saved.\n'))
+      } else if (cmdOpts.screenshot !== undefined && report.screenshot_url !== null) {
         try {
           const resp = await fetch(report.screenshot_url, { headers: { 'User-Agent': USER_AGENT } })
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`)

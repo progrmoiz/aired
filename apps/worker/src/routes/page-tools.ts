@@ -6,8 +6,8 @@ import { TIERS } from "../lib/rate-limit-tiers.js";
 import { underBurstLimit } from "../lib/burst-limit.js";
 import { siteOrigin } from "../lib/origin.ts";
 import { loadPage } from "../lib/page-write.ts";
-import { checkPage } from "../lib/og-render.js";
-import { buildReport, CheckUnavailable, CHECK_SHOT_TTL_MS, checkShotKey, parseViewport, shotKeyValid } from "../lib/page-check.ts";
+import { checkPage, deleteCheckShots } from "../lib/og-render.js";
+import { buildReport, CheckUnavailable, CHECK_SHOT_TTL_MS, checkShotKey, parseViewport, SHOT_URL_KEY, shotUnexpired, type CheckCaller } from "../lib/page-check.ts";
 import { ownerAccess, pageFor, sentUpdateToken } from "./api.ts";
 import { hashToHex } from "@aired/core";
 
@@ -23,12 +23,19 @@ const pageTools = new Hono<AppBindings>();
 
 const PAGE_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
-/** Who a check counts against for the per-minute guard: the account, else the IP. */
-async function callerKey(c: Context<AppBindings>): Promise<string> {
+/** Who a check counts against (per-minute guard and daily share): the account, else the IP. */
+async function checkCaller(c: Context<AppBindings>): Promise<CheckCaller> {
   const user = c.get("user");
-  if (user) return `u:${user.id}`;
-  return `ip:${await hashToHex(c.req.header("CF-Connecting-IP") ?? "unknown", 16)}`;
+  if (user) return { key: `u:${user.id}`, signedIn: true };
+  return { key: `ip:${await hashToHex(c.req.header("CF-Connecting-IP") ?? "unknown", 16)}`, signedIn: false };
 }
+
+const UNAVAILABLE: Record<CheckUnavailable["reason"], { status: 429 | 503; code: string; error: string }> = {
+  budget: { status: 429, code: "check_budget", error: "Page checks have used today's browser time (yours or everyone's). They start again at 00:00 UTC." },
+  busy: { status: 503, code: "check_busy", error: "The browser is busy. Try again after Retry-After seconds." },
+  storage: { status: 503, code: "check_unavailable", error: "Couldn't read the check budget. Try again shortly." },
+  no_browser: { status: 503, code: "check_unavailable", error: "Page checks aren't available on this server." },
+};
 
 function base64(bytes: Uint8Array): string {
   let s = "";
@@ -68,7 +75,8 @@ pageTools.post("/pages/:id/check", requireCsrfHeader, rateLimit(TIERS.page_check
   if (!access.ok) return c.json({ error: access.error }, access.status);
 
   // Browser Rendering allows one new browser every few seconds: a few checks a minute per caller.
-  if (!(await underBurstLimit(c.env.CHECK_BURST, await callerKey(c)))) {
+  const caller = await checkCaller(c);
+  if (!(await underBurstLimit(c.env.CHECK_BURST, caller.key))) {
     c.header("Retry-After", "60");
     return c.json({ error: "Too many checks. Wait a minute and try again." }, 429);
   }
@@ -79,17 +87,12 @@ pageTools.post("/pages/:id/check", requireCsrfHeader, rateLimit(TIERS.page_check
 
   let result: Awaited<ReturnType<typeof checkPage>>;
   try {
-    result = await checkPage(c.env, id, html, viewport);
+    result = await checkPage(c.env, id, html, viewport, caller);
   } catch (err) {
     if (err instanceof CheckUnavailable) {
       if (err.waitSeconds !== null) c.header("Retry-After", String(err.waitSeconds));
-      const error =
-        err.reason === "budget"
-          ? "Page checks have used today's browser time. They start again at 00:00 UTC."
-          : err.reason === "busy"
-            ? "The browser is busy. Try again in a minute."
-            : "Page checks aren't available on this server.";
-      return c.json({ error, code: err.reason === "budget" ? "check_budget" : err.reason === "busy" ? "check_busy" : "check_unavailable" }, err.reason === "budget" ? 429 : 503);
+      const u = UNAVAILABLE[err.reason];
+      return c.json({ error: u.error, code: u.code }, u.status);
     }
     console.error("page check failed", { id, err: String(err) });
     return c.json({ error: "The check didn't finish. Try again; if it keeps failing, the page may hang the browser." }, 502);
@@ -99,13 +102,19 @@ pageTools.post("/pages/:id/check", requireCsrfHeader, rateLimit(TIERS.page_check
   const origin = siteOrigin(c.env);
   let screenshotUrl: string | null = null;
   if (result.screenshot !== null) {
-    const key = randomKey();
     try {
-      await c.env.PAGES_BUCKET.put(checkShotKey(id), result.screenshot, {
-        httpMetadata: { contentType: "image/jpeg" },
-        customMetadata: { key, expires: String(now + CHECK_SHOT_TTL_MS) },
-      });
-      screenshotUrl = `${origin}/api/pages/${encodeURIComponent(id)}/check.jpg?k=${key}`;
+      // The page may have been updated while the browser ran: don't keep a picture of the old version.
+      const current = await c.env.PAGES_BUCKET.head(`pages/${id}/index.html`);
+      if (current !== null && current.etag === obj.etag) {
+        const key = randomKey();
+        // One object per check, named by a hash of the URL key: earlier links keep working, and storage never holds the key.
+        await c.env.PAGES_BUCKET.put(checkShotKey(id, await hashToHex(key, 32)), result.screenshot, {
+          httpMetadata: { contentType: "image/jpeg" },
+          customMetadata: { expires: String(now + CHECK_SHOT_TTL_MS) },
+        });
+        screenshotUrl = `${origin}/api/pages/${encodeURIComponent(id)}/check.jpg?k=${key}`;
+        await deleteCheckShots(c.env.PAGES_BUCKET, id, (o) => now - o.uploaded.getTime() > CHECK_SHOT_TTL_MS);
+      }
     } catch (err) {
       console.error("page check screenshot write failed", { id, err: String(err) });
     }
@@ -125,15 +134,17 @@ pageTools.post("/pages/:id/check", requireCsrfHeader, rateLimit(TIERS.page_check
   return c.json({ ...report, ...inline });
 });
 
-// GET /api/pages/:id/check.jpg?k=… — the last check's screenshot. The key in
-// the URL is the credential (only the owner got it), so it works in a
-// browser or an agent's image fetch; it stops working after 24 hours, when
-// the page is checked again, updated or deleted.
+// GET /api/pages/:id/check.jpg?k=… — a check's screenshot. The key in the
+// URL is the credential (only the owner got it), so it works in a browser
+// or an agent's image fetch. It stops working after 24 hours, or when the
+// page is updated or deleted. The key is looked up by its hash, so a wrong
+// one costs one R2 read and no D1 read.
 pageTools.get("/pages/:id/check.jpg", async (c) => {
   const id = c.req.param("id") ?? "";
-  if (!PAGE_ID.test(id)) return c.json({ error: "Not found" }, 404);
-  const sent = c.req.query("k");
-  if (typeof sent !== "string" || sent.length < 16) return c.json({ error: "Not found" }, 404);
+  const sent = c.req.query("k") ?? "";
+  if (!PAGE_ID.test(id) || !SHOT_URL_KEY.test(sent)) return c.json({ error: "Not found" }, 404);
+  const obj = await c.env.PAGES_BUCKET.get(checkShotKey(id, await hashToHex(sent, 32)));
+  if (obj === null || !shotUnexpired(obj.customMetadata?.expires, Date.now())) return c.json({ error: "Not found" }, 404);
   let live: Awaited<ReturnType<typeof loadPage>>;
   try {
     live = await loadPage(c.env, id);
@@ -141,14 +152,11 @@ pageTools.get("/pages/:id/check.jpg", async (c) => {
     return c.json({ error: "Try again" }, 503);
   }
   if (live === null) return c.json({ error: "Not found" }, 404);
-  const obj = await c.env.PAGES_BUCKET.get(checkShotKey(id));
-  if (obj === null || !shotKeyValid(sent, obj.customMetadata?.key, obj.customMetadata?.expires, Date.now())) {
-    return c.json({ error: "Not found" }, 404);
-  }
   return new Response(obj.body, {
     headers: {
       "Content-Type": "image/jpeg",
-      "Cache-Control": "private, max-age=3600",
+      // Never kept: the link must stop working when the page is updated or deleted.
+      "Cache-Control": "private, no-store",
       "X-Robots-Tag": "noindex",
       "Referrer-Policy": "no-referrer",
     },

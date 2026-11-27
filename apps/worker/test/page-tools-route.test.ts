@@ -7,7 +7,7 @@ import { fakeD1 } from "./helpers/d1.ts";
 const { Hono } = await import("hono");
 const { pageTools } = await import("../src/routes/page-tools.ts");
 const { insertPageRow, rowFromMetadata } = await import("../src/lib/pages-store.ts");
-const { hashToken } = await import("@aired/core");
+const { hashToken, hashToHex } = await import("@aired/core");
 const { addSpent, readBudget } = await import("../src/lib/og-shot.ts");
 
 type User = { id: number; login: string; email: null; name: null };
@@ -31,7 +31,10 @@ function fakeR2() {
       objects.set(key, { body: typeof v === "string" ? new TextEncoder().encode(v) : v, customMetadata: opts?.customMetadata });
       return { etag: "e1" };
     },
-    async delete() {},
+    async delete(keys: string | string[]) { for (const k of [keys].flat()) objects.delete(k); },
+    async list({ prefix = "" }: { prefix?: string } = {}) {
+      return { objects: [...objects.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({ key, uploaded: new Date() })), truncated: false };
+    },
   };
 }
 const fakeKv = () => ({ async get() { return null; }, async put() {}, async delete() {} });
@@ -121,15 +124,27 @@ test("check: a spent daily budget answers 429 with Retry-After and never launche
   assert.equal(launched, 0);
 });
 
-test("check: Browser Rendering saying 429 blocks later checks and screenshots for a minute", async () => {
+test("check: Browser Rendering saying 'too many' holds back checks for a minute, not link previews", async () => {
   const { call, db } = await setup({ user: kim, browser: { launch: async () => { throw new Error("Unable to create new browser: code: 429: message: Too many browsers"); } } });
   const res = await call("POST", "/api/pages/mine/check", {}, ip());
   assert.equal(res.status, 503);
   assert.equal(((await res.json()) as { code: string }).code, "check_busy");
-  const row = await readBudget(db as never);
-  assert.ok(row !== null && row.blockedUntil > Date.now(), "the shared row is blocked, so link previews wait too");
+  const shared = await readBudget(db as never);
+  assert.ok(shared === null || shared.blockedUntil <= Date.now(), "screenshots aren't blocked by a check's launch");
+  assert.ok((await readBudget(db as never, "check"))!.blockedUntil > Date.now());
   const again = await call("POST", "/api/pages/mine/check", {}, ip());
-  assert.equal(again.status, 429, "the block now stops the check before launching");
+  assert.equal(again.status, 503, "still busy, not 'used today's time'");
+  assert.ok(Number(again.headers.get("Retry-After")) <= 60);
+  // The failed launch gave its reservation back.
+  assert.ok((await readBudget(db as never, "check:u:7"))!.spentMs < 5_000);
+});
+
+test("check: the account's daily Browser Rendering limit is 'budget' until midnight and stops screenshots too", async () => {
+  const { call, db } = await setup({ user: kim, browser: { launch: async () => { throw new Error("Browser time limit exceeded for today"); } } });
+  const res = await call("POST", "/api/pages/mine/check", {}, ip());
+  assert.equal(res.status, 429);
+  assert.equal(((await res.json()) as { code: string }).code, "check_budget");
+  assert.ok((await readBudget(db as never))!.blockedUntil > Date.now() + 60_000);
 });
 
 test("check: the per-minute guard counts per caller", async () => {
@@ -156,17 +171,109 @@ test("source: only the owner gets the HTML; the PIN never shields it from them, 
   assert.equal((await nobody.call("GET", "/api/pages/mine/source", undefined, ip())).status, 401);
 });
 
-test("check.jpg: served only with the key from the report, and not after it expires", async () => {
+test("check.jpg: served only with the key from the report, never cached, and not after it expires", async () => {
   const { call, r2 } = await setup({});
   const key = "0123456789abcdef0123456789abcdef";
-  await r2.put("pages/mine/check.jpg", new Uint8Array([0xff, 0xd8, 0xff]), { customMetadata: { key, expires: String(Date.now() + 60_000) } });
+  const at = `pages/mine/checks/${await hashToHex(key, 32)}.jpg`;
+  await r2.put(at, new Uint8Array([0xff, 0xd8, 0xff]), { customMetadata: { expires: String(Date.now() + 60_000) } });
+  assert.ok(![...r2.objects.values()].some((o) => JSON.stringify(o.customMetadata ?? {}).includes(key)), "storage holds only the key's hash");
   const ok = await call("GET", `/api/pages/mine/check.jpg?k=${key}`, undefined, ip());
   assert.equal(ok.status, 200);
   assert.equal(ok.headers.get("Content-Type"), "image/jpeg");
-  assert.equal(ok.headers.get("Cache-Control"), "private, max-age=3600");
+  assert.equal(ok.headers.get("Cache-Control"), "private, no-store");
   assert.equal((await call("GET", "/api/pages/mine/check.jpg", undefined, ip())).status, 404);
   assert.equal((await call("GET", `/api/pages/mine/check.jpg?k=${key.replace("0", "f")}`, undefined, ip())).status, 404);
   assert.equal((await call("GET", `/api/pages/theirs/check.jpg?k=${key}`, undefined, ip())).status, 404, "a key is for its own page");
-  await r2.put("pages/mine/check.jpg", new Uint8Array([0xff]), { customMetadata: { key, expires: String(Date.now() - 1) } });
+  await r2.put(at, new Uint8Array([0xff]), { customMetadata: { expires: String(Date.now() - 1) } });
   assert.equal((await call("GET", `/api/pages/mine/check.jpg?k=${key}`, undefined, ip())).status, 404);
+});
+
+/**
+ * A stand-in for a Browser Rendering browser: goto fires the page's
+ * requests through the real interception code, then the page's own events.
+ */
+function fakeBrowser(opts: { requests?: { url: string; type: string }[]; onLoad?: (emit: (ev: string, arg: unknown) => void) => void; dom?: Record<string, unknown> }) {
+  const popups: string[] = [];
+  const makePage = () => {
+    const handlers: Record<string, ((a: unknown) => void)[]> = {};
+    const emit = (ev: string, arg: unknown) => (handlers[ev] ?? []).forEach((f) => f(arg));
+    const frame = {};
+    const req = (url: string, type: string, nav = false) => {
+      const r = {
+        responded: false, aborted: false,
+        url: () => url, isNavigationRequest: () => nav, frame: () => frame, resourceType: () => type,
+        respond: async () => { r.responded = true; }, abort: async () => { r.aborted = true; }, continue: async () => {},
+        failure: () => ({ errorText: "net::ERR_FAILED" }),
+      };
+      return r;
+    };
+    return {
+      on: (ev: string, f: (a: unknown) => void) => { (handlers[ev] ??= []).push(f); },
+      setViewport: async () => {}, setRequestInterception: async () => {}, mainFrame: () => frame,
+      async goto(url: string) {
+        const doc = req(url, "document", true);
+        emit("request", doc);
+        if (!doc.responded) throw new Error("net::ERR_FAILED");
+        for (const q of opts.requests ?? []) {
+          const r = req(q.url, q.type);
+          emit("request", r);
+          if (r.aborted) emit("requestfailed", r);
+        }
+        emit("popup", { close: async () => { popups.push("closed"); } });
+        opts.onLoad?.(emit);
+      },
+      evaluate: async (expr: string) => (expr.includes("innerText") ? { title: "T", textChars: 20, visibleMedia: 0, brokenImages: 0, scrollWidth: 1280, scrollHeight: 900, viewportWidth: 1280, hasViewportMeta: true, transferBytes: 900, resourceCount: 1, ...opts.dom } : true),
+      screenshot: async () => new Uint8Array([0xff, 0xd8, 0xff, 0xd9]),
+      close: async () => {},
+    };
+  };
+  return { popups, binding: { launch: async () => ({ newPage: async () => makePage(), close: async () => {} }) } };
+}
+
+test("check, end to end: a relative script is reported, a popup is closed, and aired's favicon isn't blamed", async () => {
+  const b = fakeBrowser({
+    requests: [
+      { url: "https://aired.test/p/app.js", type: "script" },
+      { url: "https://aired.sh/favicon.ico", type: "other" },
+      { url: "https://aired.abc123.workers.dev/api/pages/mine/check", type: "fetch" },
+    ],
+    onLoad: (emit) => emit("pageerror", new Error("boot is not defined")),
+  });
+  const { call, db, r2 } = await setup({ user: kim, browser: b.binding });
+  const res = await call("POST", "/api/pages/mine/check", { inline_screenshot: true }, ip());
+  assert.equal(res.status, 200);
+  const r = (await res.json()) as { ok: boolean; issues: { code: string }[]; failed_requests: { url: string; error: string }[]; screenshot_url: string; screenshot_base64?: string };
+  assert.equal(r.ok, false);
+  assert.deepEqual(r.issues.map((i) => i.code), ["script_error", "failed_request"]);
+  assert.deepEqual(r.failed_requests.map((f) => f.url), ["https://aired.test/p/app.js"], "only the file a visitor would lose too");
+  assert.match(r.failed_requests[0]!.error, /a page is one file/);
+  assert.deepEqual(b.popups, ["closed"]);
+  assert.equal(r.screenshot_base64, "/9j/2Q==");
+  // The screenshot is stored once per check, by the key's hash, and its URL opens it.
+  const key = new URL(r.screenshot_url).searchParams.get("k")!;
+  assert.ok([...r2.objects.keys()].includes(`pages/mine/checks/${await hashToHex(key, 32)}.jpg`));
+  assert.equal((await call("GET", new URL(r.screenshot_url).pathname + `?k=${key}`, undefined, ip())).status, 200);
+  // The reservation was settled to the real (short) time.
+  assert.ok((await readBudget(db as never, "check:u:7"))!.spentMs < 10_000);
+
+  // A second check (say, at mobile size) doesn't break the first link.
+  const second = (await (await call("POST", "/api/pages/mine/check", { viewport: "mobile" }, ip())).json()) as { screenshot_url: string };
+  assert.notEqual(second.screenshot_url, r.screenshot_url);
+  assert.equal((await call("GET", new URL(r.screenshot_url).pathname + `?k=${key}`, undefined, ip())).status, 200);
+});
+
+test("check, end to end: a page updated while the browser ran gets no screenshot of its old version", async () => {
+  let r2ref: ReturnType<typeof fakeR2> | null = null;
+  const b = fakeBrowser({ onLoad: () => { r2ref!.objects.set("pages/mine/index.html", { body: new TextEncoder().encode("<h1>v2</h1>") }); } });
+  const s = await setup({ user: kim, browser: b.binding });
+  r2ref = s.r2;
+  // The fake R2 gives every object etag e1; make the update visible as a new etag.
+  const head = s.r2.head.bind(s.r2);
+  let updated = false;
+  s.r2.head = async (k: string) => (updated && k === "pages/mine/index.html" ? { etag: "e2" } : head(k));
+  const realSet = s.r2.objects.set.bind(s.r2.objects);
+  s.r2.objects.set = (k, v) => { if (k === "pages/mine/index.html") updated = true; return realSet(k, v); };
+  const r = (await (await s.call("POST", "/api/pages/mine/check", {}, ip())).json()) as { screenshot_url: string | null };
+  assert.equal(r.screenshot_url, null);
+  assert.ok(![...s.r2.objects.keys()].some((k) => k.includes("/checks/")));
 });

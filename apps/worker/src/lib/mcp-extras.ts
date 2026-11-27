@@ -70,7 +70,13 @@ export async function readPageResource(deps: Pick<ExtrasDeps, "signedIn" | "get"
 /** resources/list: the caller's newest pages, or none when not signed in. */
 export async function listPageResources(deps: Pick<ExtrasDeps, "signedIn" | "get">) {
   if (!deps.signedIn) return { resources: [] };
-  const res = await deps.get(`/api/me/pages?limit=${RESOURCE_LIST_MAX}`);
+  let res: { status: number; body: unknown };
+  try {
+    res = await deps.get(`/api/me/pages?limit=${RESOURCE_LIST_MAX}`);
+  } catch {
+    // Offline, or a bad AIRED_API_KEY on stdio: list no pages, but still list the skill.
+    return { resources: [] };
+  }
   if (res.status !== 200) return { resources: [] };
   const pages = Array.isArray(obj(res.body).pages) ? (obj(res.body).pages as unknown[]) : [];
   return {

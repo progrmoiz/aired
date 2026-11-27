@@ -140,3 +140,14 @@ test("both servers register the same prompts and resources, and serve SKILL.md a
   assert.match(read("apps/cli/build.mjs"), /loader: \{ '\.md': 'text' \}/);
   assert.match(read("apps/mcp/tsup.config.ts"), /loader: \{ "\.md": "text" \}/);
 });
+
+test("resources/list still lists the skill when fetching the caller's pages throws (offline, bad key)", async () => {
+  const server = new McpServer({ name: "aired", version: "test" });
+  registerResources(server, { origin: "https://aired.test", signedIn: true, get: async () => { throw new Error("fetch failed"); }, skill: SKILL, ResourceTemplate });
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await server.connect(a);
+  const client = new Client({ name: "test", version: "1" });
+  await client.connect(b);
+  assert.deepEqual((await client.listResources()).resources.map((r) => r.uri), [SKILL_URI]);
+  await client.close();
+});

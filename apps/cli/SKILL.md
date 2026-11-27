@@ -67,9 +67,9 @@ JSON output is automatic when stdout is piped — no flag needed.
 | Code | Meaning |
 |------|---------|
 | 0 | Success |
-| 1 | API error, or `aired check` found the page broken |
-| 2 | Validation error (bad input, missing file, no token) |
-| 3 | Rate limited (see Limits) |
+| 1 | API error; for `aired check`, only "the page is broken" |
+| 2 | Validation error (bad input, missing file, no token); for `aired check`, also no access to the page |
+| 3 | Rate limited (see Limits); for `aired check`, also "the check didn't run, try later" (daily budget, browser busy) |
 
 ## Accounts, API keys and limits
 
@@ -105,9 +105,9 @@ aired check abc123 --mobile        # phone, 390×844
 aired check abc123 --screenshot shot.jpg --json
 ```
 
-It reports script and console errors, files that didn't load (404s, blocked CDNs), broken images, a blank screen, and warnings for slow, heavy (over 1 MB of HTML or 5 MB of files), very tall or sideways-scrolling pages, with a screenshot URL that works for 24 hours. `ok` is true when nothing is broken; warnings don't count (`--strict` fails on them too). It exits 1 when broken, so it fits in CI. Over MCP it's `check_page`, which also attaches the screenshot as an image.
+It reports script and console errors, files that didn't load (404s, blocked CDNs), broken images, a blank screen, and warnings for slow, heavy (over 1 MB of HTML or 5 MB of files), very tall or sideways-scrolling pages, with a screenshot URL that works for 24 hours (or until the page is updated or deleted). Relative files (`app.js`, `data.json`) show up as failed: a page is one file. `ok` is true when nothing is broken; warnings don't count (`--strict` fails on them too). It exits 1 only when the page is broken, 3 when the check couldn't run, so it fits in CI. Over MCP it's `check_page`, which also attaches the screenshot as an image.
 
-The loop: publish → check → fix what it reports → update the same id → check once more. Checks share a small daily browser budget (3 minutes a day across everyone, 20 an hour and 3 a minute per caller): check once per change, not in a loop. When the budget is spent you get HTTP 429 (exit 3) until 00:00 UTC. Same owner rule as `aired set`.
+The loop: publish → check → fix what it reports → update the same id → check once more. Checks share a small daily browser budget: 3 minutes a day across everyone, and each caller's share is 2 minutes signed in or 1 minute per IP without an account (a check takes about 10–15 seconds), plus 20 an hour and 3 a minute: check once per change, not in a loop. When the budget is spent you get HTTP 429 (exit 3) until 00:00 UTC. Same owner rule as `aired set`.
 
 ## Feedback
 
