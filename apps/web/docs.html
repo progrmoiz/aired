@@ -340,7 +340,7 @@ aired.data.subscribe((d) =&gt; { if (d) mrr.textContent = "$" + d.mrr.toLocaleSt
             <tr><td><code>PUT</code></td><td><code>/api/pages/:id</code></td><td>Update by <code>update_token</code> in the JSON body. The content it replaces is kept in the page's <a href="#history">history</a>; an optional <code>message</code> (up to 200 characters) labels the new version, and the answer has its <code>version</code>.</td></tr>
             <tr><td><code>DELETE</code></td><td><code>/api/pages/:id</code></td><td>Delete by <code>Authorization: Bearer &lt;token&gt;</code> header.</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/pages/:id</code></td><td>Public metadata: <code>{ id, title, size, readCount, expiresAt, pinProtected }</code>. No auth. A PIN-protected page answers <code>title: null</code> and <code>readCount: 0</code> (its owner sees both in <code>/details</code>).</td></tr>
-            <tr><td><code>GET</code></td><td><code>/api/pages/:id/details</code></td><td>The owner's view: <code>{ id, url, title, size, readCount, reads, hasPin, permanent, createdAt, expiresAt, project }</code>. Never the PIN. Signed in as the owner, or the page's token in <code>X-Update-Token</code> (or <code>Authorization: Bearer</code>).</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/pages/:id/details</code></td><td>The owner's view: <code>{ id, url, title, size, readCount, reads, hasPin, access, permanent, createdAt, expiresAt, project }</code>, plus <code>allowed: { emails, domains }</code> for an <a href="#sharing">only-these-people</a> page when you're the signed-in owner. Never the PIN. Signed in as the owner, or the page's token in <code>X-Update-Token</code> (or <code>Authorization: Bearer</code>).</td></tr>
             <tr><td><code>PATCH</code></td><td><code>/api/pages/:id</code></td><td>Change settings without the HTML: <code>title</code>, <code>pin</code>, <code>ttl</code> or <code>permanent</code>, <code>reads</code>. Same credentials as PUT. Returns the details plus <code>changed</code>.</td></tr>
             <tr><td><code>POST</code></td><td><code>/api/pages/:id/check</code></td><td>Body <code>{ update_token?, viewport?: "desktop" | "mobile", inline_screenshot? }</code>. Render the page in a browser and return the report <code>check_page</code> gives (<code>ok</code>, <code>issues</code>, <code>console</code>, <code>failed_requests</code>, <code>blank</code>, <code>page</code>, <code>screenshot_url</code>). Same credentials as PATCH. <code>429</code> with <code>code: "check_budget"</code> when today's browser time is spent.</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/pages/:id/versions</code></td><td>The page's <a href="#history">history</a>: <code>{ id, url, current, versions: [...], kept: { plan, versions, days, always_keep, summary } }</code>, newest first. Same credentials as <code>/details</code>. 300 an hour.</td></tr>
@@ -348,6 +348,7 @@ aired.data.subscribe((d) =&gt; { if (d) mrr.textContent = "$" + d.mrr.toLocaleSt
             <tr><td><code>POST</code></td><td><code>/api/pages/:id/versions/:n/restore</code></td><td>Body <code>{ update_token?, message? }</code>. Version <code>n</code>'s content goes live as a new version: <code>{ id, url, version, restored_from, expiresAt }</code>. Same credentials as PUT, and a page that has collected responses needs its owner signed in (<code>403</code> <code>owner_required</code>). <code>409</code> <code>already_current</code> for the live version.</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/pages/:id/source</code></td><td>The owner's copy: <code>{ id, url, title, size, html, kind, format, source }</code>, plus <code>slides</code> and <code>notes</code> for a deck. <code>html</code> is the page as served; <code>source</code> is what was published (the Markdown, or a deck's HTML with its notes). Same credentials as <code>/details</code>. Never counts a view.</td></tr>
             <tr><td><code>POST</code></td><td><code>/api/feedback</code></td><td>Body <code>{ kind, message, impact?, page_id?, tool? }</code>. Feedback about aired itself; works without signing in, 10 an hour. Returns <code>{ id, message }</code>.</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/pages/:id/access</code></td><td>Who can open the page and who opened it: <code>{ mode, emails, domains, visitors: [{ email, first_opened_at, last_opened_at, views }] }</code>. Signed in as the owner only: the update token isn't enough.</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/pages/:id/responses</code></td><td>The owner's entries from <a href="#data"><code>aired.collect</code></a>, newest first, <code>?limit=</code> (up to 200) and <code>&amp;cursor=</code>. Signed in as the owner only: the update token isn't enough.</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/pages/:id/responses.csv</code></td><td>Every entry as CSV, one column per field.</td></tr>
             <tr><td><code>PATCH</code></td><td><code>/api/pages/:id/responses</code></td><td>Body <code>{ public_results?, closed? }</code>: let every viewer read all entries (a poll), or stop new ones.</td></tr>
@@ -396,6 +397,11 @@ aired.data.subscribe((d) =&gt; { if (d) mrr.textContent = "$" + d.mrr.toLocaleSt
   "ttl": 86400,                   // seconds from now, 60 to 31536000 (a year)
   "permanent": true,              // or false: expires 7 days from now. Not with ttl
   "reads": 50,                    // view limit, 1 to 1000000, or null to remove it
+  "access": {                     // who can open it (see "Sharing with named people")
+    "mode": "people",             // "public", "pin" (with "pin") or "people"
+    "emails": ["alice@client.com"],
+    "domains": ["client.com"]     // everyone at that domain; Pro
+  },
   "update_token": "at_..."        // unless you're signed in as the owner
 }</code></pre>
         <p>Send only the fields that should change. Unknown fields are refused, so a typo fails loudly instead of doing nothing.</p>
@@ -471,6 +477,18 @@ aired.data.subscribe((d) =&gt; { if (d) mrr.textContent = "$" + d.mrr.toLocaleSt
   -H "Content-Type: application/json" \
   -d '{"pin":"1234"}'</code></pre>
         <p>On success, the server sets an <code>HttpOnly</code>, <code>SameSite=Strict</code> cookie scoped to <code>/p/:id</code> with a 1-hour TTL — subsequent loads are pass-through until it expires.</p>
+      </section>
+
+      <!-- ─── Sharing with named people ─── -->
+      <section id="sharing">
+        <h2>Sharing with named people</h2>
+        <p>A page in your account can be opened by only the people you list: emails, and on Pro whole domains like <code>@client.com</code> (exactly that domain, not its subdomains). Set it with <code>aired set &lt;id&gt; --only alice@client.com,@client.com</code>, <code>set_options</code> with <code>access</code>, the dashboard's Share view, or <code>PATCH /api/pages/:id</code>. Signed in as the owner only. Sending a list replaces the old one; <code>"mode": "public"</code> or <code>--public</code> opens the page to anyone with the link again.</p>
+        <p>A visitor types their email at <code>/p/:id</code> and gets a 6-digit code by email. The code works once, for 10 minutes, with five tries. A right code sets an <code>HttpOnly</code>, <code>SameSite=Lax</code> cookie scoped to <code>/p/:id</code> for 30 days; it stops working when you take that person off the list. You, signed in, always get straight in.</p>
+<pre><code>curl -X POST https://aired.sh/p/a1b2c3d4e5/access/send \
+  -H "Content-Type: application/json" -d '{"email":"alice@client.com"}'
+curl -X POST https://aired.sh/p/a1b2c3d4e5/access/verify \
+  -H "Content-Type: application/json" -d '{"email":"alice@client.com","code":"042117"}'</code></pre>
+        <p>The page never says who's on the list: <code>/send</code> answers the same for every email, and a wrong code, an expired code and an unlisted email get the same <code>invalid_code</code> error. Codes are rate-limited per email, address and page. Like a PIN page, a private page's public metadata and link preview hide its title and views. Free lists 3 people per page; Pro 500 people and 25 domains.</p>
       </section>
 
       <!-- ─── Limits ─── -->

@@ -10,6 +10,7 @@ import { getSession } from '../core/session.js'
 import { apiKeyConfigured } from '../lib/api-key-env.js'
 import { parseTtl } from '../lib/duration.js'
 import { printPageDetails } from '../lib/page-details.js'
+import { accessFromOnly } from '../lib/access-flags.js'
 
 interface SetOpts {
   title?: string
@@ -20,7 +21,10 @@ interface SetOpts {
   permanent?: boolean
   reads?: string
   clearReads?: boolean
+  only?: string
+  public?: boolean
 }
+
 
 /**
  * The PATCH body for the flags given, or an error message. Bounds are
@@ -32,6 +36,10 @@ export function changeFromFlags(o: SetOpts): { change: Record<string, unknown> }
   if (o.pin !== undefined && o.clearPin) return { error: 'Use --pin or --clear-pin, not both.' }
   if (o.reads !== undefined && o.clearReads) return { error: 'Use --reads or --clear-reads, not both.' }
   if (o.ttl !== undefined && o.permanent) return { error: 'Use --ttl or --permanent, not both.' }
+  if (o.only !== undefined && o.public) return { error: 'Use --only or --public, not both.' }
+  if ((o.only !== undefined || o.public) && (o.pin !== undefined || o.clearPin)) {
+    return { error: '--only and --public replace the PIN. Use them without --pin or --clear-pin.' }
+  }
   if (o.title !== undefined) change['title'] = o.title
   if (o.clearTitle) change['title'] = null
   if (o.pin !== undefined) change['pin'] = o.pin
@@ -48,20 +56,28 @@ export function changeFromFlags(o: SetOpts): { change: Record<string, unknown> }
     change['reads'] = n
   }
   if (o.clearReads) change['reads'] = null
+  if (o.only !== undefined) {
+    const parsed = accessFromOnly(o.only)
+    if ('error' in parsed) return parsed
+    change['access'] = parsed.access
+  }
+  if (o.public) change['access'] = { mode: 'public' }
   if (Object.keys(change).length === 0) {
-    return { error: 'Nothing to change. Pass --title, --pin, --clear-pin, --ttl, --permanent, --reads or --clear-reads.' }
+    return { error: 'Nothing to change. Pass --title, --pin, --clear-pin, --only, --public, --ttl, --permanent, --reads or --clear-reads.' }
   }
   return { change }
 }
 
 export function makeSetCommand(globalOpts: () => GlobalOpts): Command {
   return new Command('set')
-    .description("Change a page's PIN, expiry, view limit or title without re-uploading it")
+    .description("Change who can open a page, its expiry, view limit or title without re-uploading it")
     .argument('<id>', 'Page ID')
     .option('-t, --title <title>', 'New title')
     .option('--clear-title', 'Remove the title')
     .option('-p, --pin <pin>', 'Set or change the PIN (4 to 64 characters)')
     .option('--clear-pin', 'Remove the PIN')
+    .option('--only <people>', 'Only these people can open it: emails and @domains, comma-separated. Each gets a code by email. Replaces the list')
+    .option('--public', 'Anyone with the link can open it (removes the PIN and the list)')
     .option('--ttl <duration>', 'Expire this long from now: 30m, 24h, 7d (up to a year)')
     .option('--permanent', 'Never expire')
     .option('--reads <n>', 'Gone after this many views')
@@ -77,8 +93,14 @@ export function makeSetCommand(globalOpts: () => GlobalOpts): Command {
       }
 
       // As update and delete: a stored update token wins; else the session or API key must own the page.
+      // Who can open it (--only, --public) is for the signed-in owner only.
+      const changesAccess = 'access' in parsed.change
       const token = getToken(id)
       const session = getSession()
+      if (changesAccess && session === null && !apiKeyConfigured(opts)) {
+        outputError({ code: 'VALIDATION', message: "Changing who can open a page needs sign-in. Run 'aired login' first." }, opts)
+        process.exit(ExitCode.VALIDATION_ERROR)
+      }
       if (token === null && session === null && !apiKeyConfigured(opts)) {
         outputError({ code: 'VALIDATION', message: `No token found for page '${id}'. Run 'aired tokens' to list stored tokens, or sign in with 'aired login'.` }, opts)
         process.exit(ExitCode.VALIDATION_ERROR)

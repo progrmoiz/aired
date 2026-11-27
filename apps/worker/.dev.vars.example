@@ -40,3 +40,11 @@ STRIPE_AUTOMATIC_TAX=
 # secrets. Local Analytics Engine keeps nothing, so set ANALYTICS_DEMO=1 to
 # get made-up numbers on /api/me/analytics instead.
 # ANALYTICS_DEMO=1
+
+# "Only these people" (private sharing by email code). EMAIL_MODE=log prints each
+# code email to the wrangler dev console instead of sending it (needs SITE_ORIGIN
+# set, so it can never run in production). For real sending, see the
+# [[send_email]] block in wrangler.toml, or set RESEND_API_KEY as a fallback.
+# EMAIL_MODE=log
+# EMAIL_FROM=aired <access@aired.sh>
+# RESEND_API_KEY=re_...

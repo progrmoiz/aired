@@ -38,11 +38,12 @@ export function makeInfoCommand(globalOpts: () => GlobalOpts): Command {
           process.stdout.write(pc.dim('ID:      ') + pc.bold(page.id) + '\n')
           // A PIN page's title and views stay hidden from public metadata;
           // its owner sees them in the dashboard or with the get_page tool.
-          const hidden = page.pinProtected === true
-          process.stdout.write(pc.dim('Title:   ') + (hidden ? pc.dim('(hidden: PIN-protected)') : page.title ?? '(untitled)') + '\n')
+          const hidden = page.pinProtected === true || page.restricted === true
+          const why = page.restricted === true ? '(hidden: private page)' : '(hidden: PIN-protected)'
+          process.stdout.write(pc.dim('Title:   ') + (hidden ? pc.dim(why) : page.title ?? '(untitled)') + '\n')
           process.stdout.write(pc.dim('URL:     ') + url + '\n')
           process.stdout.write(pc.dim('Size:    ') + formatSize(page.size) + '\n')
-          process.stdout.write(pc.dim('Reads:   ') + (hidden ? pc.dim('(hidden: PIN-protected)') : String(page.readCount)) + '\n')
+          process.stdout.write(pc.dim('Reads:   ') + (hidden ? pc.dim(why) : String(page.readCount)) + '\n')
           process.stdout.write(pc.dim('Expires: ') + formatExpiry(page.expiresAt) + '\n')
         }
       } catch (err) {

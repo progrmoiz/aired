@@ -19,6 +19,7 @@ import { pinGuessKeys, visitorNetwork } from "../lib/pin-guess.js";
 import { releasePinAttempt, reservePinAttempt } from "../lib/pin-failures.js";
 import { hashToHex } from "@aired/core";
 import { dataLayerFor, VIEWER_COOKIE } from "../lib/collect-page.ts";
+import { accessGate, logVisit } from "./access.ts";
 
 /** A page that has used up its view limit. */
 function viewLimitReached(): Response {
@@ -79,6 +80,17 @@ viewer.get("/p/:id", async (c) => {
     }
   }
 
+  // "Only these people" (routes/access.ts): the signed-in owner, or a
+  // cookie for an email still on the list. Everyone else gets the gate,
+  // which says nothing about the page. A D1 error fails closed.
+  let visitor: string | null = null;
+  const restricted = metadata.access === "people";
+  if (restricted) {
+    const gate = await accessGate(c, id, metadata.ownerId);
+    if (gate instanceof Response) return gate;
+    visitor = gate.email;
+  }
+
   // Count the view while R2 fetches the HTML: one D1 write (lib/view-counts.ts),
   // atomic, so a view limit holds. No KV write. If D1 fails, the page still
   // opens and the view goes uncounted.
@@ -116,8 +128,13 @@ viewer.get("/p/:id", async (c) => {
     );
   }
 
+  // Which listed person opened it, for the owner (never the owner themself).
+  if (visitor !== null && metadata.ownerId !== null) logVisit(c, id, metadata.ownerId, visitor);
+
   const headers = new Headers();
-  applyPageHeaders(headers, { indexable: metadata.ownerId !== null });
+  applyPageHeaders(headers, { indexable: metadata.ownerId !== null && !restricted });
+  // A private page is for this browser only: no shared cache keeps a copy.
+  if (restricted) headers.set("Cache-Control", "private, no-store");
 
   // Extract title from HTML for OG tags
   const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);

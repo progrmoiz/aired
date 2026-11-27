@@ -184,6 +184,8 @@ me.get('/pages', async (c) => {
     createdAt: string;
     expiresAt: string | null;
     hasPin: boolean;
+    /** Who can open it (lib/page-options.ts accessMode). */
+    access: "public" | "pin" | "people";
     ownerId: number | null;
     project: string | null;
     /** The dashboard tile's version and blurred placeholder (lib/og-shot.ts), or null. */
@@ -200,6 +202,7 @@ me.get('/pages', async (c) => {
       createdAt: m.createdAt,
       expiresAt: m.expiresAt,
       hasPin: m.pin !== null,
+      access: m.access === "people" ? "people" : m.pin !== null ? "pin" : "public",
       ownerId: m.ownerId,
       project: m.project,
       tile: null,

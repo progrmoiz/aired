@@ -63,6 +63,7 @@
       <li>If you pay, Link (Stripe) handles your card. We never see the card number.</li>
       <li>People who open your pages don't need an account. We count views, with the country they came from and the website that sent them. We don't store their IP address.</li>
       <li>If a page saves what you type into it, the page's publisher gets what you typed. We store it for them and use it for nothing else.</li>
+      <li>If someone shares a page only with named people, we email you a one-time code when you ask for one, and the publisher can see that you opened the page and when. Nobody else can.</li>
       <li>We don't put ads or trackers on your pages, and we don't sell or rent anyone's data.</li>
     </ul>
 
@@ -110,7 +111,7 @@
       <li>Record the view for the publisher's analytics: which page, the day, your country, and the website that sent you, as its name only (for example "slack.com", never the full link). If you typed the link or came from an app that doesn't say, there's no website. Publishers on Pro see totals per day, country and website, never single visits.</li>
     </ul>
     <p>To show publishers which site sent their visitors, aired may fetch the small icon (favicon) of a site that sent visitors and keep a copy, so your browser never has to ask that site for it.</p>
-    <p>We don't store your IP address, your browser or device, or the full address you came from. We don't set a cookie unless you enter a PIN or open a page that saves what you enter (below). The analytics record is kept in Cloudflare Analytics Engine for three months, then deleted automatically.</p>
+    <p>We don't store your IP address, your browser or device, or the full address you came from. We don't set a cookie unless you enter a PIN or an email code, or open a page that saves what you enter (below). The analytics record is kept in Cloudflare Analytics Engine for three months, then deleted automatically.</p>
     <p>A publisher's page can contain its own scripts, including its own analytics. Those belong to the publisher, not us. We don't add ads or trackers. The only thing we add, on Free pages, is the aired badge.</p>
 
     <h3>When a page saves what you enter</h3>
@@ -121,6 +122,18 @@
       <li><strong>A one-way hash of your network address</strong>, to limit how often you can save. It's kept for up to an hour.</li>
     </ul>
     <p>aired refuses entries that look like passwords or payment card numbers. If you want an entry removed, ask the page's publisher. If you can't reach them, or the page is abusive, use <a href="/abuse">/abuse</a>.</p>
+
+    <h3>When a page is shared only with named people</h3>
+    <p>A publisher signed in to aired can make a page that only the people they list can open: email addresses, or everyone at a company's domain (like <code>@client.com</code>). To open it, you type your email and enter the 6-digit code we send you. We keep:</p>
+    <ul>
+      <li><strong>The publisher's list</strong>: the addresses and domains they typed. Only the publisher sees it. We use it only to decide who may open the page and who to send a code to. Visitors aren't told who else is on it, and the page answers the same whether or not your email is on it.</li>
+      <li><strong>The code email</strong>. If your email is on the list, we send one email with the code, from aired, through our email provider (below). It doesn't name the page's title. We never send anything else to that address: no newsletters, no reminders, no tracking pixels. If your email isn't on the list, we send nothing and keep nothing beyond the rate-limit hashes below.</li>
+      <li><strong>The code itself</strong>, only as a one-way hash, tied to a scrambled form of your email (not the address). It works once and for 10 minutes, then it's deleted.</li>
+      <li><strong>An <code>acc_&lt;page id&gt;</code> cookie</strong> once your code is right, holding your email and a signature, so you don't need a new code each visit. It's only sent to that page and lasts 30 days. If the publisher takes you off the list, it stops working.</li>
+      <li><strong>Who opened it</strong>: for the publisher, which listed email opened the page, when first and last, and how many times. That's the only place your email shows up for them beyond their own list. It isn't shared with other visitors or anyone else.</li>
+      <li><strong>One-way hashes of your email and network address</strong>, to limit how often codes can be asked for and tried. They're kept for up to a day.</li>
+    </ul>
+    <p>The publisher decides who is on the list and why, so they're responsible for it. aired stores it for them. To be taken off a list, ask the publisher, or write to us.</p>
 
     <h3>When you report a page</h3>
     <p>The form on <a href="/abuse">/abuse</a> sends us the page link, the reason you picked, your description, and your email if you choose to give it. We use it to review the page and, if you asked, to reply. We delete reports after 30 days.</p>
@@ -138,7 +151,7 @@
     <p>We don't make automated decisions about you that have legal or similar effects.</p>
 
     <h2>Where it's stored</h2>
-    <p>Everything runs on Cloudflare. Pages, and the screenshots of them shown in link previews and on your dashboard, live in Cloudflare R2. Page settings, account records, abuse reports and the records of apps you connect live in Cloudflare KV. Account and sign-in records (including the email you signed in with), API key hashes, billing records and view counts live in Cloudflare D1. What visitors save on pages, and the data publishers push to their pages, live in Cloudflare D1 too. The analytics record of each view lives in Cloudflare Analytics Engine. So does a tiny blurred copy of each page's screenshot, shown on your dashboard while the screenshot loads. Cloudflare runs a global network, so your data is processed in many countries, including the United States. Link (Stripe), GitHub and WorkOS are in the United States too. The person who runs aired works from outside the US and the EU, and reaches this data from there. When your data leaves the EU or UK, we rely on the EU-U.S. Data Privacy Framework where the company is certified, and on the European Commission's standard contractual clauses where it isn't.</p>
+    <p>Everything runs on Cloudflare. Pages, and the screenshots of them shown in link previews and on your dashboard, live in Cloudflare R2. Page settings, account records, abuse reports and the records of apps you connect live in Cloudflare KV. Account and sign-in records (including the email you signed in with), API key hashes, billing records and view counts live in Cloudflare D1. What visitors save on pages, the data publishers push to their pages, and the lists, codes and visit records of pages shared with named people, live in Cloudflare D1 too. The analytics record of each view lives in Cloudflare Analytics Engine. So does a tiny blurred copy of each page's screenshot, shown on your dashboard while the screenshot loads. Cloudflare runs a global network, so your data is processed in many countries, including the United States. Link (Stripe), GitHub and WorkOS are in the United States too. The person who runs aired works from outside the US and the EU, and reaches this data from there. When your data leaves the EU or UK, we rely on the EU-U.S. Data Privacy Framework where the company is certified, and on the European Commission's standard contractual clauses where it isn't.</p>
 
     <h2>Who handles your data</h2>
     <p>These companies handle personal data for aired. Link and GitHub also use it for their own purposes, under their own policies.</p>
@@ -146,7 +159,7 @@
       <table>
         <thead><tr><th>Company</th><th>What for</th><th>Privacy policy</th></tr></thead>
         <tbody>
-          <tr><td>Cloudflare</td><td>Hosting, storage and delivery of every page, and cookieless visit counts on aired.sh's own pages (Cloudflare Web Analytics). Like any host, it sees visitors' IP addresses to deliver pages and block attacks.</td><td><a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener">cloudflare.com/privacypolicy</a></td></tr>
+          <tr><td>Cloudflare</td><td>Hosting, storage and delivery of every page, cookieless visit counts on aired.sh's own pages (Cloudflare Web Analytics), and sending the code emails for pages shared with named people (Cloudflare Email Service), which receives the address and the code. Like any host, it sees visitors' IP addresses to deliver pages and block attacks.</td><td><a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener">cloudflare.com/privacypolicy</a></td></tr>
           <tr><td>Link (Stripe)</td><td>Sells Pro to you as the merchant of record: checkout, payment, tax, receipts, refunds and disputes. Link decides how it uses that data, under its own privacy policy.</td><td><a href="https://link.com/privacy" target="_blank" rel="noopener">Link's privacy policy</a>, also linked at checkout</td></tr>
           <tr><td>GitHub</td><td>Sign-in, if you choose GitHub</td><td><a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener">GitHub privacy statement</a></td></tr>
           <tr><td>WorkOS</td><td>Runs sign-in: email codes, Google and GitHub. Receives your email address and name.</td><td><a href="https://workos.com/privacy" target="_blank" rel="noopener">workos.com/privacy</a></td></tr>
@@ -167,6 +180,7 @@
           <tr><td><code>__Host-oauth-consent-…</code></td><td>Only while you connect an app over MCP: ties the Allow button to your browser so another site can't press it for you.</td><td>10 minutes</td></tr>
           <tr><td><code>aired_v</code></td><td>Only on pages that save what visitors enter: a random id that lets the page show you your own entries when you come back. Your browser's scripts can't read it, and pages get a different id from it on every page.</td><td>1 year</td></tr>
           <tr><td><code>pin_&lt;page id&gt;</code></td><td>Shows you entered that page's PIN, so you don't have to type it again. It doesn't contain the PIN. Only sent to that page.</td><td>1 hour</td></tr>
+          <tr><td><code>acc_&lt;page id&gt;</code></td><td>Only on pages shared with named people: shows you entered a right code for your email, so you don't need a new one each visit. It holds your email and a signature, your browser's scripts can't read it, and it's only sent to that page.</td><td>30 days</td></tr>
         </tbody>
       </table>
     </div>
@@ -177,8 +191,9 @@
       <li><strong>Pages</strong>: until they expire or you delete them. When a page expires, we stop serving it right away and delete its file within 30 days. A page that reaches its view limit stops being served, but we keep it until it expires or you delete it.</li>
       <li><strong>Deleted pages</strong>: removed from storage right away, with every earlier version of them.</li>
       <li><strong>Earlier versions of a page</strong>: when a page is updated, we keep what it replaced so it can be restored. On the Free plan we keep the last 5; on Pro the last 50, each for 90 days (the newest 5 stay however old). They go when the page is deleted or expires, or when you delete your account.</li>
-      <li><strong>Your account</strong>: until you delete it. Deleting it ends every session (other browsers and CLI logins too), disconnects every app you connected, deletes your API keys, and removes your account record, sign-in records and email. Other sessions stop within about a minute. Your pages stay up as anonymous pages without your name. Delete them first if you want them gone. Everything visitors saved on your pages is deleted, and so are the earlier versions of your pages.</li>
+      <li><strong>Your account</strong>: until you delete it. Deleting it ends every session (other browsers and CLI logins too), disconnects every app you connected, deletes your API keys, and removes your account record, sign-in records and email. Other sessions stop within about a minute. Your pages stay up as anonymous pages without your name. Delete them first if you want them gone. Everything visitors saved on your pages is deleted, and so are the earlier versions of your pages, the lists of people you shared pages with and the record of who opened them. Those pages then open for nobody until they expire or are deleted.</li>
       <li><strong>What visitors save on a page</strong>: until the publisher deletes it, the page is deleted or expires, or the publisher's account is deleted. On the Free plan, each entry is also deleted 90 days after it was saved.</li>
+      <li><strong>Pages shared with named people</strong>: the list until the publisher changes it, makes the page public, deletes it, or deletes their account. The record of who opened it until the page or the publisher's account is deleted. Codes: 10 minutes, or until used.</li>
       <li><strong>Billing records</strong>: until you delete your account. Then we delete your Stripe ids and plan history too. Link keeps its own record of each sale, under its own policy.</li>
       <li><strong>API keys</strong>: until you delete your account, revoked ones included.</li>
       <li><strong>Abuse reports</strong>: 30 days.</li>
@@ -203,7 +218,7 @@
     <p>aired isn't meant for anyone under 16. If you think someone under 16 has given us personal data, email <a href="mailto:support@aired.sh">support@aired.sh</a> and we'll delete it.</p>
 
     <h2>Security</h2>
-    <p>Every connection to aired uses HTTPS. Session cookies are HttpOnly and Secure. Update tokens are stored only as hashes. Page PINs are stored as salted hashes (older ones once they're next used), and PIN guesses are rate-limited. Sign-in asks for the smallest set of permissions. The code is open source, so anyone can check how it handles data. If we ever have a breach that puts your data at risk, we'll tell affected users and the authorities as the law requires.</p>
+    <p>Every connection to aired uses HTTPS. Session cookies are HttpOnly and Secure. Update tokens are stored only as hashes. Page PINs are stored as salted hashes (older ones once they're next used), and PIN guesses are rate-limited. Email codes work once, for 10 minutes, five tries at most, and asking for and trying them is rate-limited. Sign-in asks for the smallest set of permissions. The code is open source, so anyone can check how it handles data. If we ever have a breach that puts your data at risk, we'll tell affected users and the authorities as the law requires.</p>
 
     <h2>Changes and questions</h2>
     <p>When we change this policy, we update this page and the date at the top. The full history is in the <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">public repository</a>. If a change affects how we use data you already gave us, we tell signed-in users before it takes effect. Questions? Email <a href="mailto:support@aired.sh">support@aired.sh</a>. See also our <a href="/terms">terms</a> and <a href="/refunds">refund policy</a>.</p>

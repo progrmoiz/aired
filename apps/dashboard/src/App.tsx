@@ -13,6 +13,7 @@ import { BillingView } from '@/views/billing-view'
 import { AccountView } from '@/views/account-view'
 import { ResponsesView } from '@/views/responses-view'
 import { HistoryView } from '@/views/history-view'
+import { ShareView } from '@/views/share-view'
 
 // The Views page (charts, flags, brand icons) loads only when it's opened.
 const ViewsView = lazy(() => import('@/views/views-view').then((m) => ({ default: m.ViewsView })))
@@ -83,6 +84,7 @@ export default function App() {
         {view === 'views' && <Suspense fallback={<div aria-busy="true" className="min-h-[60vh]" />}><ViewsView pageId={sub} pages={pages} /></Suspense>}
         {view === 'responses' && <ResponsesView pageId={sub} pages={pages} />}
         {view === 'history' && <HistoryView pageId={sub} pages={pages} onRestored={reloadPages} />}
+        {view === 'share' && <ShareView pageId={sub} pages={pages} isPro={plan.loaded && plan.isPro} />}
         {view === 'connect' && <ConnectView />}
         {view === 'billing' && <BillingView {...planApi} />}
         {view === 'account' && <AccountView user={user} />}

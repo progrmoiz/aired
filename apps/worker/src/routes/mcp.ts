@@ -426,7 +426,7 @@ export function createAiredMcpServer(
     {
       title: "Change page settings",
       description:
-        "Change a page's PIN (or remove it), expiry (a TTL, or permanent), view limit or title after publishing, without sending its HTML again. Send only what should change. For your own pages, or any page whose update_token you pass.",
+        "Change who can open a page (anyone, a PIN, or only named people who confirm their email with a code), its expiry (a TTL, or permanent), view limit or title after publishing, without sending its HTML again. Send only what should change. For your own pages, or any page whose update_token you pass; sharing with named people needs sign-in.",
       inputSchema: setOptionsInput,
       outputSchema: outputShapes.set_options,
       annotations: { title: "Change page settings", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },

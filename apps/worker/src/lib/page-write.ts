@@ -11,6 +11,7 @@ import {
   rowFromMetadata,
   updatePageContent,
   updatePageOptions,
+  type PageOptionsColumns,
   type PageRow,
 } from "./pages-store.ts";
 import { forgetShots } from "./og-render.js";
@@ -20,6 +21,7 @@ import { deletePageCollectData } from "./collect-store.ts";
 import { deletePageVersions, recordFirstVersion, saveVersion, trimVersions, UNKNOWN_AUTHOR, type VersionAuthor } from "./page-versions.ts";
 import { VERSION_LIMITS } from "./version-limits.ts";
 import { getEntitlements } from "./entitlements.js";
+import { deletePageAccessData } from "./access-store.ts";
 
 /**
  * The one way every route creates, updates, deletes or looks up a page
@@ -207,7 +209,7 @@ export class PageGone extends Error {}
 export async function setPageOptions(
   env: PageEnv,
   page: LoadedPage,
-  change: { title?: string | null; pin?: string | null; reads?: number | null; permanent?: boolean; expiresAt?: number | null },
+  change: PageOptionsColumns,
   now = Date.now(),
 ): Promise<{ row: PageRow; metadata: PageMetadata }> {
   const { row, kv } = page;
@@ -285,6 +287,12 @@ export async function deletePage(env: PageEnv, page: LoadedPage, later: (work: P
     await deletePageVersions(env, row.id);
   } catch (err) {
     console.error("version cleanup failed on delete", { id: row.id, err });
+  }
+  // Its "only these people" list, codes and visit log. Housekeeping catches a failure here too.
+  try {
+    await deletePageAccessData(env.DB, row.id);
+  } catch (err) {
+    console.error("access data cleanup failed on delete", { id: row.id, err });
   }
 }
 

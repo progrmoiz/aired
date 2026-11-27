@@ -5,7 +5,7 @@ import {
 import { toast } from 'sonner'
 import {
   ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon, ChartColumnIcon, ChevronDownIcon, ChevronRightIcon, ClockIcon, DownloadIcon, EllipsisIcon,
-  ExternalLinkIcon, EyeIcon, FileTextIcon, FlagIcon, FolderIcon, GlobeIcon, HistoryIcon, InboxIcon, LayoutGridIcon, ListIcon, LockIcon, SearchIcon, Trash2Icon,
+  ExternalLinkIcon, EyeIcon, FileTextIcon, FlagIcon, FolderIcon, GlobeIcon, HistoryIcon, InboxIcon, LayoutGridIcon, ListIcon, LockIcon, SearchIcon, Share2Icon, Trash2Icon, UsersIcon,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -194,7 +194,7 @@ function RealTile({ page: p, onDelete }: { page: Page; onDelete: (p: Page) => vo
     <PageTile
       origin={origin}
       href={`/p/${p.id}`}
-      page={{ id: p.id, title, expires: e.text, soon: isExpiringSoon(p), pin: p.hasPin, views: viewsOf(p), published: relativeAge(p.createdAt), dim: expired }}
+      page={{ id: p.id, title, expires: e.text, soon: isExpiringSoon(p), pin: p.hasPin, private: p.access === 'people', views: viewsOf(p), published: relativeAge(p.createdAt), dim: expired }}
       cover={<PageThumb id={p.id} title={title} tile={p.tile} enabled={!expired || limitReached(p)} fallback={<PageCover kind={kindOf(p)} title={title} link={`${host}/p/${p.id}`} />} />}
       meta={
         <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-sm text-subtle">
@@ -218,6 +218,7 @@ function PageMenu({ page, onDelete }: { page: Page; onDelete: (p: Page) => void 
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-48 rounded-xl p-1.5 shadow-pop">
         <DropdownMenuItem render={<a href={`/p/${page.id}`} target="_blank" rel="noopener noreferrer" />}><ExternalLinkIcon /> Open in a new tab</DropdownMenuItem>
+        <DropdownMenuItem render={<a href={`#share/${page.id}`} />}><Share2Icon /> Share</DropdownMenuItem>
         <DropdownMenuItem render={<a href={`#views/${page.id}`} />}><ChartColumnIcon /> See views</DropdownMenuItem>
         <DropdownMenuItem render={<a href={`#responses/${page.id}`} />}><InboxIcon /> See responses</DropdownMenuItem>
         <DropdownMenuItem render={<a href={`#history/${page.id}`} />}><HistoryIcon /> See history</DropdownMenuItem>
@@ -268,7 +269,7 @@ function StatusBadges({ page }: { page: Page }) {
       {s === 'live' && <Badge variant="outline" className="border-ok/30 text-ok"><span className="size-1.5 rounded-full bg-ok" />Live</Badge>}
       {s === 'soon' && <Badge variant="outline" className="border-input">Expiring</Badge>}
       {s === 'expired' && <Badge variant="secondary" className="text-subtle">Expired</Badge>}
-      {page.hasPin && <Badge variant="outline" className="border-input"><LockIcon />PIN</Badge>}
+      {page.access === 'people' ? <Badge variant="outline" className="border-input"><UsersIcon />Private</Badge> : page.hasPin && <Badge variant="outline" className="border-input"><LockIcon />PIN</Badge>}
     </span>
   )
 }
@@ -372,7 +373,7 @@ function PageList({ pages, projects, onDelete }: { pages: Page[]; projects: stri
                         <p className="truncate text-xs text-subtle"><span className="font-mono">{host}/p/{p.id}</span> · {relativeAge(p.createdAt)}</p>
                         <div className="mt-2.5 flex flex-wrap gap-1.5 text-xs text-muted-foreground">
                           <Fact icon={ClockIcon} className={e.tone === 'good' ? 'text-ok' : ''}>{e.text}</Fact>
-                          <Fact icon={p.hasPin ? LockIcon : GlobeIcon}>{p.hasPin ? 'Needs a PIN' : 'Anyone with the link'}</Fact>
+                          <Fact icon={p.access === 'people' ? UsersIcon : p.hasPin ? LockIcon : GlobeIcon}>{p.access === 'people' ? 'Only people you choose' : p.hasPin ? 'Needs a PIN' : 'Anyone with the link'}</Fact>
                           <Fact icon={EyeIcon}>{plural(viewsOf(p), 'view')}{p.reads ? ` of ${p.reads.toLocaleString()}` : ''}</Fact>
                           <Fact icon={FileTextIcon}>{sizeWords(p.size)}</Fact>
                         </div>

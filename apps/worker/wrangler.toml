@@ -166,6 +166,16 @@ name = "COLLECT_BURST"
 namespace_id = "1020"
 simple = { limit = 120, period = 60 }
 
+# Email for "only these people" codes (lib/email-sender.ts): Cloudflare Email
+# Service. Off until the sending domain is onboarded (Compute > Email Service >
+# Email Sending > Onboard Domain, then the DNS records it adds). Then uncomment
+# this and set EMAIL_FROM (a var below, or `wrangler secret put`). Until then a
+# page can't be made people-only (the PATCH answers email_unavailable). Local
+# dev: EMAIL_MODE=log in .dev.vars prints the code instead of sending it.
+# [[send_email]]
+# name = "ACCESS_EMAIL"
+# allowed_sender_addresses = ["access@aired.sh"]
+
 # Custom domain
 [[routes]]
 pattern = "aired.sh/*"

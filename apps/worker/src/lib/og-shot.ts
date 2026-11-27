@@ -81,6 +81,8 @@ export function tileKey(id: string): string {
 
 export type ShotPage = {
   pin: string | null;
+  /** "people": only listed people may open it, so no public screenshot. */
+  access?: "people" | null;
   reads: number | null;
   size: number;
   permanent: boolean;
@@ -99,10 +101,10 @@ export function renderAllowed(page: ShotPage, nowMs: number): boolean {
 
 /**
  * Whether this page may have a public link-preview screenshot, both when
- * taking and when serving it: never with a PIN or a view limit.
+ * taking and when serving it: never with a PIN, a list of people or a view limit.
  */
 export function shotAllowed(page: ShotPage, nowMs: number): boolean {
-  if (page.pin !== null || page.reads !== null) return false;
+  if (page.pin !== null || page.access === "people" || page.reads !== null) return false;
   return renderAllowed(page, nowMs);
 }
 

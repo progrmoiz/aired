@@ -13,6 +13,12 @@ export type PageMetadata = {
   /** Source project this page was published from. Null for old records (pre-tagging),
    *  anonymous publishes, or MCP publishes without an explicit project. */
   project: string | null;
+  /**
+   * "people": only the emails and domains on the page's list may open it
+   * (the worker's lib/access-list.ts). Absent or null: public, or PIN-only.
+   * Copied from the D1 row whenever the record is rebuilt.
+   */
+  access?: "people" | null;
 };
 
 export function serializeMetadata(meta: PageMetadata): string {
@@ -49,6 +55,7 @@ export function parseMetadata(raw: string): PageMetadata | null {
       expiresAt: typeof obj["expiresAt"] === "string" ? obj["expiresAt"] : null,
       ownerId: typeof obj["ownerId"] === "number" ? obj["ownerId"] : null,
       project: typeof obj["project"] === "string" ? obj["project"] : null,
+      access: obj["access"] === "people" ? "people" : null,
     };
   } catch {
     return null;

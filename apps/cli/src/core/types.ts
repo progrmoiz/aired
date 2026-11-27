@@ -23,6 +23,8 @@ export interface PageInfo {
   project?: string | null
   /** A PIN is on: the API hides title and readCount (null and 0) then. Older APIs leave it out. */
   pinProtected?: boolean
+  /** Only listed people may open it: title and readCount hidden the same way. */
+  restricted?: boolean
 }
 
 export interface TokenRecord {
@@ -41,6 +43,10 @@ export interface PageDetails {
   readCount: number
   reads: number | null
   hasPin: boolean
+  /** Who can open it. Absent from servers before private sharing. */
+  access?: 'public' | 'pin' | 'people'
+  /** access "people", for the signed-in owner: who may open it (domains without the @). */
+  allowed?: { emails: string[]; domains: string[] }
   permanent: boolean
   createdAt: string
   expiresAt: string | null

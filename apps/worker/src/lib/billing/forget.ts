@@ -20,6 +20,12 @@ export async function deleteAccountRows(
     // pages become anonymous, and anonymous pages hold no responses.
     db.prepare('DELETE FROM responses WHERE owner_id = ?').bind(uid),
     db.prepare('DELETE FROM page_data WHERE owner_id = ?').bind(uid),
+    // "Only these people" lists and who opened those pages: other people's
+    // addresses go with the account. The pages keep access = 'people', so
+    // with no list they open for nobody rather than for everyone.
+    db.prepare('DELETE FROM access_codes WHERE page_id IN (SELECT page_id FROM page_access WHERE owner_id = ?)').bind(uid),
+    db.prepare('DELETE FROM page_access WHERE owner_id = ?').bind(uid),
+    db.prepare('DELETE FROM access_log WHERE owner_id = ?').bind(uid),
     // API keys stop working with the account.
     db.prepare('DELETE FROM api_keys WHERE user_id = ?').bind(uid),
     db.prepare('DELETE FROM subscriptions WHERE user_id = ?').bind(uid),
