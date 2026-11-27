@@ -88,8 +88,10 @@ test("verify-pin limits guesses, and the rehash and view-count writes don't undo
   // Rehash re-reads and skips gone, changed or already-hashed records.
   assert.match(viewer, /if \(fresh === null \|\| fresh\.pin !== metadata\.pin \|\| fresh\.pin === null \|\| isPinHash\(fresh\.pin\)\) return;/);
   assert.match(viewer, /serializeMetadata\(\{ \.\.\.fresh, pin: hashed \}\)/);
-  // The view-count write keeps a fresh PIN for pages still holding a plain one.
-  assert.match(viewer, /if \(updated\.pin !== null && !isPinHash\(updated\.pin\)\) \{/);
+  // A view writes no KV at all (lib/view-counts.ts), so it can't undo a rehash.
+  const view = viewer.slice(viewer.indexOf('viewer.get("/p/:id"'), viewer.indexOf('viewer.post("/p/:id/verify-pin"'));
+  assert.ok(view.length > 0);
+  assert.doesNotMatch(view, /PAGES_KV\.put/);
   const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
   assert.match(toml, /name = "PIN_GUESS"\s*\nnamespace_id = "1003"\s*\nsimple = \{ limit = 10, period = 60 \}/);
   assert.match(toml, /name = "PIN_GUESS_PAGE"\s*\nnamespace_id = "1004"\s*\nsimple = \{ limit = 60, period = 60 \}/);

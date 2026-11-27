@@ -1,12 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseStats, publicStats, recordView } from "../src/lib/stats.ts";
+import { parseStats, publicStats } from "../src/lib/stats.ts";
+import { mergeViewTotals } from "../src/lib/view-counts.ts";
 
-test("a view records the count and country, nothing about the page", () => {
-  const stats = recordView(parseStats(null), "DE");
-  assert.deepEqual(stats, { publishes: 0, views: 1, geo: { DE: 1 } });
-  recordView(stats, "DE");
-  assert.deepEqual(stats.geo, { DE: 2 });
+test("public views are the frozen stats:live totals plus D1's per-country counts", () => {
+  const frozen = parseStats(JSON.stringify({ publishes: 4, views: 10, geo: { DE: 6, US: 4 } }));
+  assert.deepEqual(mergeViewTotals(frozen, { DE: 1, FR: 2 }), { publishes: 4, views: 13, geo: { DE: 7, US: 4, FR: 2 } });
+  assert.deepEqual(mergeViewTotals(frozen, {}), { publishes: 4, views: 10, geo: { DE: 6, US: 4 } });
+  // The frozen blob isn't changed.
+  assert.deepEqual(frozen.geo, { DE: 6, US: 4 });
 });
 
 test("titles left in an old stats blob are dropped on load", () => {
@@ -18,8 +20,8 @@ test("titles left in an old stats blob are dropped on load", () => {
   });
   const stats = parseStats(old);
   assert.deepEqual(stats, { publishes: 5, views: 9, geo: { US: 9 } });
-  // Saving the parsed blob writes it back without the titles.
-  assert.ok(!JSON.stringify(recordView(stats, "US")).includes("Acme"));
+  // Saving the parsed blob (a publish does) writes it back without the titles.
+  assert.ok(!JSON.stringify(stats).includes("Acme"));
 });
 
 test("the public stats body has no page list", () => {
@@ -34,6 +36,6 @@ test("the public stats body has no page list", () => {
 });
 
 test("an empty blob starts fresh each time instead of sharing state", () => {
-  recordView(parseStats(null), "GB");
+  parseStats(null).geo.GB = 1;
   assert.deepEqual(parseStats(null), { publishes: 0, views: 0, geo: {} });
 });

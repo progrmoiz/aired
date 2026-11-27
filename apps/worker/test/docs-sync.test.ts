@@ -47,7 +47,7 @@ test("self-hosting docs name D1, the rate-limit bindings and the required secret
 
 test("the privacy policy covers D1 sign-in records, API keys, connected apps and WorkOS", () => {
   const p = web("privacy.html");
-  assert.match(p, /Account and sign-in records \(including the email you signed in with\), API key hashes and billing records live in Cloudflare D1\./);
+  assert.match(p, /Account and sign-in records \(including the email you signed in with\), API key hashes, billing records and view counts live in Cloudflare D1\./);
   // Sign-in runs on WorkOS now, so the row names it as live.
   assert.match(p, /<tr><td>WorkOS<\/td><td>Runs sign-in[^<]*Receives your email address and name\./);
   assert.ok(!p.includes("Not used yet"), "privacy policy still says WorkOS is not used");
@@ -62,4 +62,17 @@ test("sign out everywhere has a control on the website, and identity rows keep o
   assert.ok(!/userId: user\.id, email, emailVerified/.test(resolve), "identity rows store the verified email only");
   const auth = readFileSync(new URL("../src/routes/auth.ts", import.meta.url), "utf8");
   assert.ok(!auth.includes("'https://aired.sh/auth/callback'"), "the GitHub callback follows SITE_ORIGIN");
+});
+
+test("the privacy policy describes Pro view analytics: what's kept, no IP, three months", () => {
+  const p = readFileSync(new URL("../../web/privacy.html", import.meta.url), "utf8");
+  assert.ok(!p.includes("aren't built yet"), "privacy policy still says analytics aren't built");
+  assert.match(p, /which page, the day, your country, and the website that sent you, as its name only/);
+  assert.match(p, /We don't store your IP address, your browser or device, or the full address you came from\./);
+  assert.match(p, /kept in Cloudflare Analytics Engine for three months/);
+  assert.match(p, /<strong>View analytics<\/strong> \(page, day, country, referring website\): three months/);
+  // It matches what the viewer writes (lib/view-event.ts).
+  const event = readFileSync(new URL("../src/lib/view-event.ts", import.meta.url), "utf8");
+  assert.match(event, /blob3   viewer country/);
+  assert.match(event, /blob4   referrer host only/);
 });

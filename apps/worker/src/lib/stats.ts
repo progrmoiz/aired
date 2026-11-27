@@ -1,6 +1,9 @@
 import type { StatsLive } from "../types.js";
 
 /**
+ * `stats:live`: publishes, and the view totals from before views moved to
+ * D1 (lib/view-counts.ts adds those on for GET /api/stats).
+ *
  * Keep only the aggregate counters. Older blobs also carried a `recent`
  * list of page titles; dropping unknown fields here means the next save
  * removes those titles from KV.
@@ -12,16 +15,6 @@ export function parseStats(raw: string | null): StatsLive {
     views: data.views ?? 0,
     geo: { ...(data.geo ?? {}) },
   };
-}
-
-/**
- * Count one page view. Only the total and the viewer's country are
- * recorded, never anything about the page itself.
- */
-export function recordView(stats: StatsLive, country: string): StatsLive {
-  stats.views += 1;
-  stats.geo[country] = (stats.geo[country] ?? 0) + 1;
-  return stats;
 }
 
 /** The body of the public GET /api/stats endpoint. */

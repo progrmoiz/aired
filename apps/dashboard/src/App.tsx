@@ -5,12 +5,13 @@ import { SiteFooter } from '@/components/site-chrome'
 import { TopBar } from '@/components/top-bar'
 import { type Page, type User, SIGN_IN, initialOf, loadAllPages, signOut } from '@/lib/api'
 import { useTheme } from '@/lib/theme'
-import { useHashView } from '@/hooks/use-hash-view'
+import { useHashSub, useHashView } from '@/hooks/use-hash-view'
 import { usePlan } from '@/hooks/use-plan'
 import { PagesView } from '@/views/pages-view'
 import { ConnectView } from '@/views/connect-view'
 import { BillingView } from '@/views/billing-view'
 import { AccountView } from '@/views/account-view'
+import { ViewsView } from '@/views/views-view'
 
 export type PagesState =
   | { status: 'loading' }
@@ -19,6 +20,7 @@ export type PagesState =
 
 export default function App() {
   const view = useHashView()
+  const sub = useHashSub()
   const [theme, setTheme] = useTheme()
   const [user, setUser] = useState<User | null>(null)
   const [pages, setPages] = useState<PagesState>({ status: 'loading' })
@@ -46,6 +48,7 @@ export default function App() {
 
   const links = [
     { label: 'Pages', href: '#pages', current: view === 'pages' },
+    { label: 'Views', href: '#views', current: view === 'views' },
     { label: 'AI tools', href: '#connect', current: view === 'connect' },
     { label: 'Plan', href: '#billing', current: view === 'billing' },
   ]
@@ -72,7 +75,8 @@ export default function App() {
         </>}
       />
       <main id="main" className="mx-auto w-full max-w-(--aired-page-max) min-w-0 flex-1 px-5 pt-8 pb-20 sm:px-8 sm:pt-10">
-        {view === 'pages' && <PagesView pages={pages} reload={reloadPages} removePage={removePage} />}
+        {view === 'pages' && <PagesView pages={pages} reload={reloadPages} removePage={removePage} isPro={plan.loaded && plan.isPro} />}
+        {view === 'views' && <ViewsView pageId={sub} pages={pages} />}
         {view === 'connect' && <ConnectView />}
         {view === 'billing' && <BillingView {...planApi} />}
         {view === 'account' && <AccountView user={user} />}

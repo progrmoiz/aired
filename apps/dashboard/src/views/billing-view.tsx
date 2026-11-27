@@ -11,7 +11,7 @@ const ROWS: [string, string, string][] = [
   ['Biggest page', '2 MB', '10 MB'],
   ['How long pages last', '1 hour to never', 'Never expire'],
   ['Your own domain', '—', 'Soon'],
-  ['Views over time and countries', 'View count', 'Soon'],
+  ['Views by day, country and source', 'Total views', 'Yes'],
   ['Price', '$0', '$108 a year, or $12 a month'],
 ]
 

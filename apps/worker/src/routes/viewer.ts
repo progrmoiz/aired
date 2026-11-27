@@ -4,7 +4,8 @@ import type { AppBindings } from "../types.js";
 import { parseMetadata, serializeMetadata } from "@aired/core";
 import { updatePagePin } from "../lib/pages-store.ts";
 import { applyPageHeaders } from "../middleware/security.js";
-import { loadStats, recordView, saveStats } from "../lib/stats.js";
+import { countCountryView, countPageView } from "../lib/view-counts.ts";
+import { viewEvent, viewerCountry } from "../lib/view-event.ts";
 import { SANDBOX_SHIM, injectEarlyScript } from "../lib/sandbox-shim.js";
 import { injectAiredBar } from "../lib/aired-bar.js";
 import { siteOrigin } from "../lib/origin.ts";
@@ -17,6 +18,17 @@ import { underBurstLimit } from "../lib/burst-limit.js";
 import { pinGuessKeys, visitorNetwork } from "../lib/pin-guess.js";
 import { releasePinAttempt, reservePinAttempt } from "../lib/pin-failures.js";
 import { hashToHex } from "@aired/core";
+
+/** A page that has used up its view limit. */
+function viewLimitReached(): Response {
+  return new Response(
+    `<!DOCTYPE html><html><head><title>Gone</title></head><body>
+      <h1>410 Gone</h1>
+      <p>This page has reached its maximum view limit and is no longer available.</p>
+      </body></html>`,
+    { status: 410, headers: { "Content-Type": "text/html; charset=utf-8" } },
+  );
+}
 
 /** How long a correct PIN entry lets the browser in. */
 const PIN_COOKIE_SECONDS = 3600;
@@ -43,18 +55,10 @@ viewer.get("/p/:id", async (c) => {
     return notFoundPage(c.env.ASSETS, c.req.url);
   }
 
-  // Check read limit
+  // View limit, from the count frozen in the KV record. The D1 count below
+  // is the one that decides; this only skips the work for a page long gone.
   if (metadata.reads !== null && metadata.readCount >= metadata.reads) {
-    return new Response(
-      `<!DOCTYPE html><html><head><title>Gone</title></head><body>
-      <h1>410 Gone</h1>
-      <p>This page has reached its maximum view limit and is no longer available.</p>
-      </body></html>`,
-      {
-        status: 410,
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      },
-    );
+    return viewLimitReached();
   }
 
   // Check PIN protection
@@ -74,43 +78,42 @@ viewer.get("/p/:id", async (c) => {
     }
   }
 
-  // Fetch HTML from R2
+  // Count the view while R2 fetches the HTML: one D1 write (lib/view-counts.ts),
+  // atomic, so a view limit holds. No KV write. If D1 fails, the page still
+  // opens and the view goes uncounted.
+  const counting = countPageView(c.env.DB, id, metadata.readCount, metadata.reads).catch((err) => {
+    console.error("view count failed", { id, err });
+    return null;
+  });
   const obj = await c.env.PAGES_BUCKET.get(`pages/${id}/index.html`);
+  const counted = await counting;
   if (obj === null) {
     return notFoundPage(c.env.ASSETS, c.req.url, "Page content not found");
   }
+  if (counted !== null && !counted.counted) {
+    return viewLimitReached();
+  }
+  const newReadCount = counted !== null ? counted.count : metadata.readCount + 1;
 
   const html = await obj.text();
 
-  // Increment read count (eventually consistent — slight inaccuracy is acceptable)
-  const newReadCount = metadata.readCount + 1;
-  const updated = { ...metadata, readCount: newReadCount };
-  // Keep the page's expiry exactly (lib/view-write.ts); skip the count in its last minute.
-  const kvOptions: KVNamespacePutOptions | null = write.options;
-  // Fire-and-forget — don't block response
-  // Two KV writes: page metadata (readCount) + merged stats blob
-  const country = (c.req.header("CF-IPCountry") ?? "XX").toUpperCase();
-  c.executionCtx.waitUntil(
-    Promise.all([
-      kvOptions !== null
-        ? (async () => {
-            // A page whose PIN is still stored as typed may have just been
-            // rehashed by verify-pin: keep the fresh PIN rather than undo it.
-            let toWrite = updated;
-            if (updated.pin !== null && !isPinHash(updated.pin)) {
-              const freshRaw = await c.env.PAGES_KV.get(`page:${id}`);
-              const fresh = freshRaw === null ? null : parseMetadata(freshRaw);
-              if (fresh !== null && fresh.pin !== null) toWrite = { ...updated, pin: fresh.pin };
-            }
-            await c.env.PAGES_KV.put(`page:${id}`, serializeMetadata(toWrite), kvOptions);
-          })()
-        : Promise.resolve(),
-      (async () => {
-        const stats = recordView(await loadStats(c.env.PAGES_KV), country);
-        await saveStats(c.env.PAGES_KV, stats);
-      })(),
-    ]).catch(() => {}),
-  );
+  // The details Pro owners see (lib/view-event.ts): page, owner, country,
+  // referrer host and day. Never the IP. writeDataPoint doesn't block.
+  const now = Date.now();
+  try {
+    c.env.VIEWS?.writeDataPoint(
+      viewEvent({ pageId: id, ownerId: metadata.ownerId, headers: c.req.raw.headers, siteHost: new URL(siteOrigin(c.env)).host, nowMs: now }),
+    );
+  } catch (err) {
+    console.error("view event write failed", { id, err });
+  }
+  // The public per-country totals (GET /api/stats), in the background.
+  if (counted !== null) {
+    const country = viewerCountry(c.req.raw.headers);
+    c.executionCtx.waitUntil(
+      countCountryView(c.env.DB, country).catch((err) => console.error("country view count failed", { id, err })),
+    );
+  }
 
   const headers = new Headers();
   applyPageHeaders(headers, { indexable: metadata.ownerId !== null });
