@@ -402,7 +402,17 @@ async function ownerAccess(c: Context<AppBindings>, page: LoadedPage, token: str
 }
 
 /** The page's view count, from its KV record (where views are counted). */
-const viewCount = (page: LoadedPage) => page.kv?.readCount ?? 0;
+// Views live in D1 page_views; the KV readCount is the fallback for pages
+// viewed before view counting moved there, or if the lookup fails.
+async function viewCount(c: Context<AppBindings>, page: LoadedPage): Promise<number> {
+  const kvCount = page.kv?.readCount ?? 0;
+  try {
+    return viewCountOf(await pageViewCounts(c.env.DB, [page.row.id]), page.row.id, kvCount);
+  } catch (err) {
+    console.error("page_views lookup failed", { id: page.row.id, err });
+    return kvCount;
+  }
+}
 
 // GET /api/pages/:id/details — the owner's view of a page (get_page): title,
 // URL, size, views, view limit, expiry, whether it has a PIN (never the PIN)
@@ -413,7 +423,7 @@ api.get("/pages/:id/details", rateLimit(TIERS.page_options), async (c) => {
   if (page instanceof Response) return page;
   const access = await ownerAccess(c, page, sentUpdateToken(c));
   if (!access.ok) return c.json({ error: access.error }, access.status);
-  return c.json(pageDetails(page.row, viewCount(page), siteOrigin(c.env)));
+  return c.json(pageDetails(page.row, await viewCount(c, page), siteOrigin(c.env)));
 });
 
 // PATCH /api/pages/:id — change a page's settings without sending its HTML
@@ -458,7 +468,7 @@ api.patch("/pages/:id", requireCsrfHeader, rateLimit(TIERS.page_options), async 
     console.error("page options write failed", { id, err });
     return c.json({ error: "Could not change this page's settings. Please try again." }, 503);
   }
-  return c.json({ ...pageDetails(row, viewCount(page), siteOrigin(c.env)), changed: changedSettings(change) });
+  return c.json({ ...pageDetails(row, await viewCount(c, page), siteOrigin(c.env)), changed: changedSettings(change) });
 });
 
 // POST /api/feedback — feedback from agents and people about aired itself
