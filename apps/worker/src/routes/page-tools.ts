@@ -11,12 +11,14 @@ import { buildReport, CheckUnavailable, CHECK_SHOT_TTL_MS, checkShotKey, parseVi
 import { ownerAccess, pageFor, sentUpdateToken } from "./api.ts";
 import { hashToHex } from "@aired/core";
 import { apiError } from "../lib/errors.ts";
+import { kindOf, readSidecar } from "../lib/page-content.ts";
 
 /**
  * Owner tools for one page, beside the page routes in api.ts:
  * - POST /api/pages/:id/check: check_page and `aired check` (lib/page-check.ts).
  * - GET /api/pages/:id/check.jpg?k=…: that check's screenshot, for 24 hours.
- * - GET /api/pages/:id/source: the page's HTML, for its owner (MCP resources).
+ * - GET /api/pages/:id/source: the page's HTML and what was published
+ *   (Markdown, a deck's notes), for its owner (MCP resources, get_page).
  * Owner means the page's update token or its signed-in owner (session, API
  * key or OAuth), as for get_page; anyone else is refused.
  */
@@ -174,10 +176,22 @@ pageTools.get("/pages/:id/source", rateLimit(TIERS.page_options), async (c) => {
   if (page instanceof Response) return page;
   const access = await ownerAccess(c, page, sentUpdateToken(c));
   if (!access.ok) return apiError(c, access.status, access.code, access.error);
-  const obj = await c.env.PAGES_BUCKET.get(`pages/${id}/index.html`);
+  const [obj, sidecar] = await Promise.all([c.env.PAGES_BUCKET.get(`pages/${id}/index.html`), readSidecar(c.env.PAGES_BUCKET, id).catch(() => null)]);
   if (obj === null) return apiError(c, 404, "not_found", "Page not found");
   const html = await obj.text();
-  return c.json({ id, url: `${siteOrigin(c.env)}/p/${id}`, title: page.row.title, size: page.row.size, html });
+  // `html` is the page as served; `source` what was published (Markdown, or a
+  // deck's HTML with its speaker notes), with the notes on their own.
+  return c.json({
+    id,
+    url: `${siteOrigin(c.env)}/p/${id}`,
+    title: page.row.title,
+    size: page.row.size,
+    html,
+    kind: kindOf(sidecar),
+    format: sidecar?.format ?? "html",
+    source: sidecar?.source ?? html,
+    ...(sidecar?.kind === "deck" ? { slides: sidecar.slides, notes: sidecar.notes } : {}),
+  });
 });
 
 export { pageTools };

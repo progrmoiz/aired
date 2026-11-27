@@ -164,7 +164,8 @@ test("source: only the owner gets the HTML; the PIN never shields it from them, 
   const res = await owner.call("GET", "/api/pages/mine/source", undefined, ip());
   assert.equal(res.status, 200);
   const body = (await res.json()) as Record<string, unknown>;
-  assert.deepEqual(body, { id: "mine", url: "https://aired.test/p/mine", title: "Page mine", size: 40, html: "<h1>mine</h1>" });
+  // A plain HTML page: its source is the HTML itself.
+  assert.deepEqual(body, { id: "mine", url: "https://aired.test/p/mine", title: "Page mine", size: 40, html: "<h1>mine</h1>", kind: "page", format: "html", source: "<h1>mine</h1>" });
   assert.equal((await owner.call("GET", "/api/pages/theirs/source", undefined, ip())).status, 403);
   assert.equal((await owner.call("GET", "/api/pages/anon/source", undefined, ip())).status, 403, "an anonymous page needs its token");
   const nobody = await setup({});

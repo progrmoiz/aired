@@ -15,6 +15,7 @@ import { makeClaimCommand } from './commands/claim.js'
 import { makeSetCommand } from './commands/set.js'
 import { makeFeedbackCommand } from './commands/feedback.js'
 import { makeCheckCommand } from './commands/check.js'
+import { makeNewCommand } from './commands/new.js'
 
 // Handle --mcp flag before Commander parses
 if (process.argv.includes('--mcp')) {
@@ -47,7 +48,7 @@ if (process.argv.includes('--mcp')) {
   const program = new Command()
     .name(CLI_NAME)
     .version(VERSION, '-v, --version')
-    .description('Publish HTML artifacts to shareable URLs instantly')
+    .description('Publish HTML, Markdown docs and slide decks to shareable URLs instantly')
     .option('--api-url <url>', 'Custom API URL (default: https://aired.sh)')
     .option('--json', 'Force JSON output')
     .option('-q, --quiet', 'Suppress stderr, implies --json')
@@ -77,6 +78,7 @@ if (process.argv.includes('--mcp')) {
   program.addCommand(makeSetCommand(getGlobalOpts))
   program.addCommand(makeCheckCommand(getGlobalOpts))
   program.addCommand(makeFeedbackCommand(getGlobalOpts))
+  program.addCommand(makeNewCommand(getGlobalOpts))
 
   if (process.argv.length <= 2) {
     process.stderr.write(banner(getGlobalOpts()) + '\n')

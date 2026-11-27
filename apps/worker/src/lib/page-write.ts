@@ -15,6 +15,7 @@ import {
 } from "./pages-store.ts";
 import { forgetShots } from "./og-render.js";
 import { isPinHash } from "./pin-hash.js";
+import { sidecarKey, writeSidecar, type DocSidecar } from "./page-content.ts";
 
 /**
  * The one way every route creates, updates, deletes or looks up a page
@@ -72,7 +73,14 @@ const limitHit = (err: unknown) => (err instanceof Error ? err.message : String(
  * becomes StorageUnavailable (503). The row goes first so an id that is
  * somehow taken fails before anything of the other page is overwritten.
  */
-export async function createPage(env: PageEnv, page: PageMetadata, html: string, now = Date.now()): Promise<R2Object | null> {
+export async function createPage(
+  env: PageEnv,
+  page: PageMetadata,
+  html: string,
+  now = Date.now(),
+  /** Markdown source or deck notes, kept beside the HTML (lib/page-content.ts). */
+  sidecar: DocSidecar | null = null,
+): Promise<R2Object | null> {
   const row = rowFromMetadata(page, null, now);
   let inserted: boolean;
   try {
@@ -84,8 +92,12 @@ export async function createPage(env: PageEnv, page: PageMetadata, html: string,
   let htmlObj: R2Object | null;
   try {
     htmlObj = await env.PAGES_BUCKET.put(`pages/${page.id}/index.html`, html, HTML_TYPE);
+    if (sidecar !== null) await writeSidecar(env.PAGES_BUCKET, page.id, sidecar);
   } catch (err) {
-    await removePageRow(env.DB, page.id).catch(() => {});
+    await Promise.all([
+      env.PAGES_BUCKET.delete([`pages/${page.id}/index.html`, sidecarKey(page.id)]).catch(() => {}),
+      removePageRow(env.DB, page.id).catch(() => {}),
+    ]);
     if (limitHit(err)) throw new StorageUnavailable(String(err));
     throw err;
   }
@@ -93,7 +105,7 @@ export async function createPage(env: PageEnv, page: PageMetadata, html: string,
     await env.PAGES_KV.put(kvKeys.page(page.id), serializeMetadata(page), kvOptions(row.expiresAt, now));
   } catch (err) {
     await Promise.all([
-      env.PAGES_BUCKET.delete(`pages/${page.id}/index.html`).catch(() => {}),
+      env.PAGES_BUCKET.delete([`pages/${page.id}/index.html`, sidecarKey(page.id)]).catch(() => {}),
       removePageRow(env.DB, page.id).catch(() => {}),
     ]);
     if (limitHit(err)) throw new StorageUnavailable(String(err));
@@ -119,6 +131,8 @@ export async function updatePage(
   html: string,
   title: string | null,
   now = Date.now(),
+  /** The new content's sidecar; null removes an old one (lib/page-content.ts). */
+  sidecar: DocSidecar | null = null,
 ): Promise<{ metadata: PageMetadata; expiresAt: string | null; htmlEtag: string | null }> {
   const { row, kv } = page;
   const expiresAt = row.permanent ? null : now + DEFAULT_TTL * 1000;
@@ -127,6 +141,7 @@ export async function updatePage(
     throw new Error("page was deleted during the update");
   }
   const htmlObj = await env.PAGES_BUCKET.put(`pages/${row.id}/index.html`, html, HTML_TYPE);
+  await writeSidecar(env.PAGES_BUCKET, row.id, sidecar);
   const metadata = cacheRecord(updated, kv);
   await env.PAGES_KV.put(kvKeys.page(row.id), serializeMetadata(metadata), kvOptions(expiresAt, now));
 
@@ -182,11 +197,11 @@ export async function setPageOptions(
   return { row: after, metadata };
 }
 
-/** A page's HTML and KV record, a few tries before giving up. */
+/** A page's HTML, its sidecar and KV record, a few tries before giving up. */
 async function removeContent(env: PageEnv, id: string): Promise<void> {
   for (let attempt = 1; ; attempt++) {
     try {
-      await Promise.all([env.PAGES_BUCKET.delete(`pages/${id}/index.html`), env.PAGES_KV.delete(kvKeys.page(id))]);
+      await Promise.all([env.PAGES_BUCKET.delete([`pages/${id}/index.html`, sidecarKey(id)]), env.PAGES_KV.delete(kvKeys.page(id))]);
       return;
     } catch (err) {
       if (attempt >= 3) throw err;

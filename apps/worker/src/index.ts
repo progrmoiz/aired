@@ -5,6 +5,7 @@ import { api } from "./routes/api.js";
 import { pageTools } from "./routes/page-tools.ts";
 import { me } from "./routes/me.js";
 import { viewer } from "./routes/viewer.js";
+import { presenter } from "./routes/presenter.ts";
 import { report } from "./routes/report.js";
 import { handleMcp } from "./routes/mcp.js";
 import { og } from "./routes/og.js";
@@ -201,7 +202,8 @@ app.route("/", dashboard);
 // The CLI device sign-in page (served with no-framing headers)
 app.get("/device", devicePage);
 
-// Mount viewer routes
+// A deck's speaker view, for its owner (routes/presenter.ts), then the viewer routes
+app.route("/", presenter);
 app.route("/", viewer);
 
 // Static assets fallback — serve web/ files (index.html, style.css, app.js)

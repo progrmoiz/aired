@@ -10,6 +10,8 @@ import { updatePage } from '../core/client.js'
 import { getToken, saveToken } from '../core/store.js'
 import { getSession } from '../core/session.js'
 import { apiKeyConfigured } from '../lib/api-key-env.js'
+import { inlineLocalImages, isMarkdownPath, type PageContent } from '../core/markdown.js'
+import { contentLines } from '../lib/content-lines.js'
 
 function formatExpiry(expiresAt: string | null): string {
   if (expiresAt === null) return 'Never (permanent)'
@@ -21,8 +23,10 @@ export function makeUpdateCommand(globalOpts: () => GlobalOpts): Command {
   return new Command('update')
     .description('Update an existing page using the stored token')
     .argument('<id>', 'Page ID')
-    .argument('<file>', 'Path to new HTML file')
+    .argument('<file>', 'Path to the new HTML or Markdown (.md) file')
     .option('-t, --title <title>', 'New title')
+    .option('--deck', 'Show as slides: Markdown split on --- lines, or HTML <section> slides')
+    .option('--markdown', 'Treat the file as Markdown (automatic for .md files)')
     .action(async (id, file, cmdOpts) => {
       const opts = globalOpts()
       const baseUrl = resolveApiUrl(opts)
@@ -41,8 +45,10 @@ export function makeUpdateCommand(globalOpts: () => GlobalOpts): Command {
       const jwt = session?.jwt
 
       let html: string
+      const markdown = cmdOpts.markdown === true || isMarkdownPath(file)
       try {
         html = await readFile(resolve(file), 'utf-8')
+        if (markdown) html = inlineLocalImages(html, resolve(file))
       } catch (err) {
         outputError({ code: 'VALIDATION', message: `Cannot read file '${file}': ${(err as Error).message}` }, opts)
         process.exit(ExitCode.VALIDATION_ERROR)
@@ -51,7 +57,11 @@ export function makeUpdateCommand(globalOpts: () => GlobalOpts): Command {
       try {
         const result = await withSpinner(
           'Updating...',
-          () => updatePage(baseUrl, id, html, effectiveToken, { title: cmdOpts.title }, jwt),
+          () => {
+            const deck = cmdOpts.deck === true
+            const content: PageContent = markdown ? { markdown: html, ...(deck ? { deck } : {}) } : deck ? { html, deck } : { html }
+            return updatePage(baseUrl, id, content, effectiveToken, { title: cmdOpts.title }, jwt)
+          },
           opts,
         )
 
@@ -73,6 +83,7 @@ export function makeUpdateCommand(globalOpts: () => GlobalOpts): Command {
         } else {
           process.stdout.write(pc.green('Updated!') + ' ' + pc.bold(result.url) + '\n')
           process.stdout.write(pc.dim('Expires: ') + formatExpiry(result.expiresAt) + '\n')
+          for (const line of contentLines(result)) process.stdout.write(line + '\n')
         }
       } catch (err) {
         const error = err as NodeJS.ErrnoException & Error

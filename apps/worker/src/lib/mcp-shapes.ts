@@ -31,6 +31,20 @@ export const pageShape = {
   project: nullableString,
 };
 
+/** What a publish made, when it isn't a plain HTML page: a Markdown doc, or a deck. */
+const contentShape = {
+  kind: z.enum(["page", "doc", "deck"]).optional().describe("doc: rendered from Markdown; deck: slides. Absent for a plain HTML page"),
+  slides: z.number().optional().describe("Deck only: how many slides"),
+  presenter_url: z.string().optional().describe("Deck only: the speaker view with notes, for the signed-in owner. Notes never appear on the public page"),
+};
+
+/** get_page with include_source: what was published, before rendering. */
+const sourceShape = {
+  source_format: z.enum(["html", "markdown"]).optional().describe("The format of source"),
+  source: z.string().optional().describe("What was published: the Markdown, or the HTML as sent (a deck's with its speaker notes)"),
+  notes: z.array(z.string()).optional().describe("Deck only: speaker notes, one per slide (\"\" for none). Owner only"),
+};
+
 export const outputShapes = {
   publish_html: {
     id: z.string(),
@@ -41,12 +55,13 @@ export const outputShapes = {
     owner: nullableString.describe("Your account login when the page is yours; null for anonymous pages and token updates"),
     claim_url: nullableString.describe("A person can open this to keep an anonymous page in their account"),
     upgrade_url: nullableString.describe("A person can open this to upgrade; agents can't pay"),
+    ...contentShape,
   },
   list_pages: {
     pages: z.array(z.object(pageShape)),
     cursor: nullableString.describe("Pass to list_pages for the next page of results; null at the end"),
   },
-  get_page: pageShape,
+  get_page: { ...pageShape, kind: contentShape.kind, slides: contentShape.slides, ...sourceShape },
   set_options: {
     ...pageShape,
     changed: z.array(z.string()).describe("Settings this call changed: title, pin, expiry, reads"),
@@ -56,6 +71,7 @@ export const outputShapes = {
     url: z.string(),
     expires_at: nullableString,
     upgrade_url: nullableString,
+    ...contentShape,
   },
   delete_page: {
     id: z.string(),
@@ -107,6 +123,7 @@ export type ListOut = Shape<typeof outputShapes.list_pages>;
 export type SetOptionsOut = Shape<typeof outputShapes.set_options>;
 export type UpdateOut = Shape<typeof outputShapes.update_page>;
 export type DeleteOut = Shape<typeof outputShapes.delete_page>;
+export type GetPageOut = Shape<typeof outputShapes.get_page>;
 export type AccountOut = Shape<typeof outputShapes.get_account>;
 export type FeedbackOut = Shape<typeof outputShapes.send_feedback>;
 export type CheckOut = Shape<typeof outputShapes.check_page>;
@@ -135,6 +152,38 @@ export function pageOut(body: unknown, origin: string): PageOut {
   };
 }
 
+/**
+ * get_page: the details (GET /api/pages/:id/details), plus what was
+ * published when `source` (GET /api/pages/:id/source) is given.
+ */
+export function getPageOut(details: unknown, origin: string, source?: unknown): GetPageOut {
+  const d = obj(details);
+  const { kind, slides } = contentOut(d);
+  const out: GetPageOut = { ...pageOut(d, origin), ...(kind !== undefined ? { kind } : {}), ...(slides !== undefined ? { slides } : {}) };
+  if (source === undefined) return out;
+  const s = obj(source);
+  const notes = Array.isArray(s.notes) ? s.notes.map((n) => (typeof n === "string" ? n : "")) : null;
+  return {
+    ...out,
+    source_format: s.format === "markdown" ? "markdown" : "html",
+    source: typeof s.source === "string" ? s.source : typeof s.html === "string" ? s.html : "",
+    ...(notes !== null ? { notes } : {}),
+  };
+}
+
+/** The lines get_page adds for a doc or deck, and the source when it was asked for. */
+export function getPageText(p: GetPageOut): string {
+  const lines = [pageText(p, "Page")];
+  if (p.kind === "doc") lines.push("Kind: doc (rendered from Markdown)");
+  if (p.kind === "deck") lines.push(`Kind: deck, ${p.slides ?? 0} slides`);
+  if (p.notes !== undefined) {
+    const n = p.notes.map((t, i) => (t !== "" ? `Slide ${i + 1}: ${t}` : null)).filter((t) => t !== null);
+    lines.push("", n.length > 0 ? `Speaker notes (owner only):\n${n.join("\n")}` : "No speaker notes.");
+  }
+  if (p.source !== undefined) lines.push("", `Source (${p.source_format}):`, p.source);
+  return lines.join("\n");
+}
+
 export function setOptionsOut(body: unknown, origin: string): SetOptionsOut {
   const b = obj(body);
   return { ...pageOut(b, origin), changed: Array.isArray(b.changed) ? b.changed.filter((c): c is string => typeof c === "string") : [] };
@@ -148,9 +197,22 @@ export function listOut(body: unknown, origin: string): ListOut {
 }
 
 /** POST /api/publish (create or token update), or PUT /api/pages/:id. */
+/** kind, slides and presenter_url from an API answer, only those it has. */
+export function contentOut(body: unknown): { kind?: "page" | "doc" | "deck"; slides?: number; presenter_url?: string } {
+  const b = obj(body);
+  const kind = b.kind === "doc" || b.kind === "deck" || b.kind === "page" ? b.kind : undefined;
+  if (kind === undefined) return {};
+  return {
+    kind,
+    ...(num(b.slides) !== null ? { slides: num(b.slides)! } : {}),
+    ...(str(b.presenter_url) !== null ? { presenter_url: str(b.presenter_url)! } : {}),
+  };
+}
+
 export function publishOut(body: unknown, opts: { updated: boolean; owner: string | null }): PublishOut {
   const b = obj(body);
   return {
+    ...contentOut(b),
     id: String(b.id ?? ""),
     url: String(b.url ?? ""),
     updated: opts.updated,
@@ -165,7 +227,7 @@ export function publishOut(body: unknown, opts: { updated: boolean; owner: strin
 
 export function updateOut(body: unknown): UpdateOut {
   const b = obj(body);
-  return { id: String(b.id ?? ""), url: String(b.url ?? ""), expires_at: str(b.expiresAt), upgrade_url: str(obj(b.upgrade).url) };
+  return { id: String(b.id ?? ""), url: String(b.url ?? ""), expires_at: str(b.expiresAt), upgrade_url: str(obj(b.upgrade).url), ...contentOut(b) };
 }
 
 /** GET /api/me, with the limits the server words for it. */

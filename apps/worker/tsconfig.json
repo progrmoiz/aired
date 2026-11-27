@@ -15,7 +15,8 @@
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "paths": {
-      "@aired/core": ["../../packages/core/src/index.ts"]
+      "@aired/core": ["../../packages/core/src/index.ts"],
+      "highlight.js/lib/*": ["./src/types/hljs.d.ts"]
     }
   },
   "include": ["src"]

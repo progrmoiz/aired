@@ -11,3 +11,4 @@ export * from "./schemas.js";
 export * from "./token.js";
 export * from "./user.js";
 export * from "./validate.js";
+export * from "./templates.js";

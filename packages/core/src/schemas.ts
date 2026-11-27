@@ -43,6 +43,17 @@ export function capTitle(title: string | null | undefined): string | null {
 }
 
 const html = z.string({ required_error: HTML_REQUIRED, invalid_type_error: HTML_REQUIRED });
+/** Markdown to render instead of HTML (a doc, or a deck); sent in place of html. */
+const markdown = ifType("string", z.string());
+/** Show the content as slides: Markdown split on `---`, or HTML's top-level <section>s. */
+const deck = ifType("boolean", z.boolean());
+
+/** html is required unless markdown is sent instead. */
+const htmlOrMarkdown = (b: { html?: unknown; markdown?: unknown }, ctx: z.RefinementCtx) => {
+  if (b.html === undefined && typeof b.markdown !== "string") {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["html"], message: HTML_REQUIRED });
+  }
+};
 const title = ifType("string", z.string());
 const pin = ifType("string", z.string().max(L.pinMax, `pin can be at most ${L.pinMax} characters`));
 const ttl = ifType(
@@ -51,10 +62,12 @@ const ttl = ifType(
 );
 const reads = ifType("number", z.number().max(L.readsMax, `reads can be at most ${L.readsMax}`));
 
-/** POST /api/publish: a new page, or an update with id + update_token. */
+/** POST /api/publish: a new page, or an update with id + update_token. html, or markdown instead. */
 export const publishBody = z
   .object({
-    html,
+    html: html.optional(),
+    markdown,
+    deck,
     title,
     pin,
     ttl,
@@ -64,16 +77,20 @@ export const publishBody = z
     update_token: ifType("string", z.string()),
     id: ifType("string", z.string()),
   })
-  .passthrough();
+  .passthrough()
+  .superRefine(htmlOrMarkdown);
 
-/** PUT /api/pages/:id: new HTML, by update token (or the Bearer header) or the signed-in owner. */
+/** PUT /api/pages/:id: new HTML (or markdown), by update token (or the Bearer header) or the signed-in owner. */
 export const updateBody = z
   .object({
-    html,
+    html: html.optional(),
+    markdown,
+    deck,
     title,
     update_token: ifType("string", z.string()),
   })
-  .passthrough();
+  .passthrough()
+  .superRefine(htmlOrMarkdown);
 
 export type PublishBody = z.infer<typeof publishBody>;
 export type UpdateBody = z.infer<typeof updateBody>;

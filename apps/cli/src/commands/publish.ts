@@ -13,6 +13,8 @@ import { getSession, clearSession } from '../core/session.js'
 import { isDirectory, bundleDirectory } from '../core/bundler.js'
 import { detectProject } from '../core/project.js'
 import { parseTtl } from '../lib/duration.js'
+import { inlineLocalImages, isMarkdownPath, type PageContent } from '../core/markdown.js'
+import { contentLines } from '../lib/content-lines.js'
 
 async function readStdin(): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -32,8 +34,8 @@ function formatExpiry(expiresAt: string | null): string {
 export function makePublishCommand(globalOpts: () => GlobalOpts): Command {
   return new Command('publish')
     .alias('p')
-    .description('Publish an HTML file or directory (or pipe via stdin)')
-    .argument('[file]', 'Path to HTML file or directory (omit to read stdin)')
+    .description('Publish an HTML or Markdown file, or a directory (or pipe via stdin)')
+    .argument('[file]', 'Path to an HTML or .md file, or a directory (omit to read stdin)')
     .option('-t, --title <title>', 'Custom title')
     .option('-p, --pin <pin>', 'PIN-protect the page')
     .option('--ttl <duration>', 'Expiry duration: 1h, 24h, 7d, 30d')
@@ -41,11 +43,14 @@ export function makePublishCommand(globalOpts: () => GlobalOpts): Command {
     .option('--reads <n>', 'Max read count before page is gone')
     .option('--project <name>', 'Tag with a project (auto-detected from git/dir by default)')
     .option('--no-project', 'Do not tag this publish with a project')
+    .option('--deck', 'Show as slides: Markdown split on --- lines, or HTML <section> slides')
+    .option('--markdown', 'Treat the input as Markdown (automatic for .md files)')
     .action(async (file, cmdOpts) => {
       const opts = globalOpts()
       const baseUrl = resolveApiUrl(opts)
 
       let html: string
+      let markdown = cmdOpts.markdown === true
       if (file === undefined || file === '-') {
         if (process.stdin.isTTY) {
           outputError({ code: 'VALIDATION', message: 'Provide a file path, directory, or pipe HTML via stdin' }, opts)
@@ -64,6 +69,9 @@ export function makePublishCommand(globalOpts: () => GlobalOpts): Command {
         } else {
           try {
             html = await readFile(resolved, 'utf-8')
+            if (isMarkdownPath(resolved)) markdown = true
+            // Local images in Markdown go into the page, so they show once published.
+            if (markdown) html = inlineLocalImages(html, resolved)
           } catch (err) {
             outputError({ code: 'VALIDATION', message: `Cannot read file '${file}': ${(err as Error).message}` }, opts)
             process.exit(ExitCode.VALIDATION_ERROR)
@@ -76,7 +84,7 @@ export function makePublishCommand(globalOpts: () => GlobalOpts): Command {
       const sizeMB = sizeBytes / (1024 * 1024)
       if (sizeMB > 2) {
         if (!shouldOutputJson(opts)) {
-          process.stderr.write(pc.yellow(`Warning: bundled HTML is ${sizeMB.toFixed(1)} MB (limit: 2 MB). Upload may fail.\n`))
+          process.stderr.write(pc.yellow(`Warning: the ${markdown ? 'Markdown' : 'bundled HTML'} is ${sizeMB.toFixed(1)} MB (limit: 2 MB). Upload may fail.\n`))
         }
       }
 
@@ -144,7 +152,9 @@ export function makePublishCommand(globalOpts: () => GlobalOpts): Command {
       }
 
       try {
-        const result = await withSpinner('Publishing...', () => publishHTML(baseUrl, html, publishOpts, jwt), opts)
+        const deck = cmdOpts.deck === true
+        const content: PageContent = markdown ? { markdown: html, ...(deck ? { deck } : {}) } : deck ? { html, deck } : { html }
+        const result = await withSpinner('Publishing...', () => publishHTML(baseUrl, content, publishOpts, jwt), opts)
 
         saveToken(result.id, result.update_token, {
           title: cmdOpts.title ?? null,
@@ -169,8 +179,9 @@ export function makePublishCommand(globalOpts: () => GlobalOpts): Command {
           if (resolvedProject !== null) {
             process.stdout.write(pc.dim('Project: ') + resolvedProject + '\n')
           }
+          for (const line of contentLines(result)) process.stdout.write(line + '\n')
           process.stdout.write('\n')
-          process.stdout.write(pc.dim('Update:  ') + `npx aired update ${result.id} new-file.html\n`)
+          process.stdout.write(pc.dim('Update:  ') + `npx aired update ${result.id} ${markdown ? 'new-file.md' : 'new-file.html'}\n`)
           process.stdout.write(pc.dim('Delete:  ') + `npx aired delete ${result.id}\n`)
         }
       } catch (err) {

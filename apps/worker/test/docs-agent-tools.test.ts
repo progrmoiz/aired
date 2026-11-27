@@ -43,10 +43,10 @@ test("the docs cover aired set, aired feedback and their endpoints", () => {
   assert.match(read("apps/web/llms.txt"), /10 an hour per caller/);
 });
 
-test("the CLI, its MCP server and the registry entry say 1.5.0", () => {
-  assert.equal(JSON.parse(read("apps/cli/package.json")).version, "1.5.0");
-  assert.equal(JSON.parse(read("server.json")).version, "1.5.0");
-  assert.match(read("apps/worker/src/routes/mcp.ts"), /name: "aired",\s*version: "1\.5\.0",/);
+test("the CLI, its MCP server and the registry entry say 1.6.0", () => {
+  assert.equal(JSON.parse(read("apps/cli/package.json")).version, "1.6.0");
+  assert.equal(JSON.parse(read("server.json")).version, "1.6.0");
+  assert.match(read("apps/worker/src/routes/mcp.ts"), /name: "aired",\s*version: "1\.6\.0",/);
 });
 
 test("the docs cover aired check, check_page, its endpoint, the prompts and the resources", async () => {
