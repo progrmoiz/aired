@@ -6,7 +6,10 @@
  * takes page HTML: a message that looks like a page is refused.
  *
  * Rate limits are counted in D1 (rows per caller in the last hour, and all
- * rows in the last day), so they hold across isolates and locations.
+ * rows in the last day) inside the insert itself, so they hold across
+ * isolates and locations and a burst can't slip past them. The route also
+ * puts the in-memory limiter in front (TIERS.feedback), so a flood stops
+ * before it reaches D1.
  *
  * No runtime imports, so tests run the real SQL over node:sqlite.
  */
@@ -43,6 +46,9 @@ const PAGE_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const LOOKS_LIKE_HTML = /<\s*(!doctype|html|head|body|script|style|iframe)\b/i;
 // eslint-disable-next-line no-control-regex
 const CONTROL = /[\u0000-\u001f\u007f]/;
+/** Control characters other than tab and line breaks: terminal escapes and the like. */
+// eslint-disable-next-line no-control-regex
+const MESSAGE_CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/;
 
 const oneOf = <T extends readonly string[]>(list: T, v: unknown): v is T[number] =>
   typeof v === "string" && (list as readonly string[]).includes(v);
@@ -60,6 +66,7 @@ export function parseFeedback(body: unknown): { ok: true; input: FeedbackInput }
   if (message.length < MESSAGE_MIN || message.length > MESSAGE_MAX) {
     return { ok: false, error: `message must be ${MESSAGE_MIN} to ${MESSAGE_MAX} characters` };
   }
+  if (MESSAGE_CONTROL.test(message)) return { ok: false, error: "message can't contain control characters" };
   if (LOOKS_LIKE_HTML.test(message)) {
     return { ok: false, error: "Don't send page HTML in feedback. Describe what happened, and pass page_id if it's about a page." };
   }
@@ -106,7 +113,7 @@ export function feedbackId(): string {
 
 export type FeedbackLimit = { ok: true } | { ok: false; reason: "caller" | "global" };
 
-/** Whether this caller may send another now. */
+/** Which limit a refused send hit (for the error message). */
 export async function feedbackAllowed(db: D1Database, rateKey: string, now: number): Promise<FeedbackLimit> {
   const hour = await db
     .prepare("SELECT COUNT(*) AS n FROM agent_feedback WHERE rate_key = ? AND created_at > ?")
@@ -121,20 +128,33 @@ export async function feedbackAllowed(db: D1Database, rateKey: string, now: numb
   return { ok: true };
 }
 
+/**
+ * Store one piece of feedback, unless the caller has sent FEEDBACK_PER_HOUR
+ * in the last hour or everyone FEEDBACK_PER_DAY in the last day. The check
+ * and the insert are one statement, so parallel sends can't go past either.
+ * False when a limit refused it.
+ */
 export async function insertFeedback(
   db: D1Database,
   id: string,
   input: FeedbackInput,
   who: { userId: number | null; rateKey: string },
   now: number,
-): Promise<void> {
-  await db
+): Promise<boolean> {
+  const result = await db
     .prepare(
       `INSERT INTO agent_feedback (id, kind, impact, message, page_id, tool, source, client, actor, user_id, rate_key, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+       WHERE (SELECT COUNT(*) FROM agent_feedback WHERE rate_key = ? AND created_at > ?) < ?
+         AND (SELECT COUNT(*) FROM agent_feedback WHERE created_at > ?) < ?`,
     )
-    .bind(id, input.kind, input.impact, input.message, input.pageId, input.tool, input.source, input.client, input.actor, who.userId, who.rateKey, now)
+    .bind(
+      id, input.kind, input.impact, input.message, input.pageId, input.tool, input.source, input.client, input.actor, who.userId, who.rateKey, now,
+      who.rateKey, now - 3600_000, FEEDBACK_PER_HOUR,
+      now - 86400_000, FEEDBACK_PER_DAY,
+    )
     .run();
+  return result.meta.changes === 1;
 }
 
 export type FeedbackRow = {

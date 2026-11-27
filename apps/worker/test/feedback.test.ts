@@ -58,6 +58,10 @@ test("bad feedback is refused with a reason", () => {
   no({ ...good, source: "email" }, /source must be/);
   no({ ...good, actor: "robot" }, /actor must be/);
   no(null, /JSON object/);
+  // Terminal escapes would reach the owner's terminal through scripts/feedback.mjs.
+  no({ ...good, message: "looks fine \u001b]52;c;aGk=\u0007 here" }, /control characters/);
+  no({ ...good, message: "bell \u0007 in the middle of it" }, /control characters/);
+  assert.ok(parseFeedback({ ...good, message: "line one\nline two\ttabbed" }).ok, "line breaks and tabs are fine");
 });
 
 test("page HTML is never taken as feedback", () => {
@@ -78,8 +82,8 @@ test("ids are fb_ and 10 characters", () => {
 
 test("feedback is stored, signed in or anonymous, and read back newest first", async () => {
   const { db } = fakeD1();
-  await insertFeedback(db, "fb_1", input({ pageId: "p1" }), { userId: null, rateKey: "ip1" }, NOW - 2000);
-  await insertFeedback(db, "fb_2", input({ kind: "bug", impact: "blocked" }), { userId: 7, rateKey: "u7" }, NOW - 1000);
+  assert.equal(await insertFeedback(db, "fb_1", input({ pageId: "p1" }), { userId: null, rateKey: "ip1" }, NOW - 2000), true);
+  assert.equal(await insertFeedback(db, "fb_2", input({ kind: "bug", impact: "blocked" }), { userId: 7, rateKey: "u7" }, NOW - 1000), true);
   const rows = await listFeedback(db, { limit: 10 });
   assert.deepEqual(rows.map((r) => r.id), ["fb_2", "fb_1"]);
   assert.equal(rows[0]!.user_id, 7);
@@ -90,12 +94,13 @@ test("feedback is stored, signed in or anonymous, and read back newest first", a
   assert.deepEqual((await listFeedback(db, { limit: 10, before: NOW - 1000 })).map((r) => r.id), ["fb_1"]);
 });
 
-test("each caller gets 10 an hour; the next hour opens again", async () => {
+test("each caller gets 10 an hour, enforced by the insert itself; the next hour opens again", async () => {
   const { db } = fakeD1();
   for (let i = 0; i < FEEDBACK_PER_HOUR; i++) {
-    assert.deepEqual(await feedbackAllowed(db, "ip1", NOW), { ok: true }, `send ${i + 1}`);
-    await insertFeedback(db, `fb_${i}`, input(), { userId: null, rateKey: "ip1" }, NOW - 1000 * i);
+    assert.equal(await insertFeedback(db, `fb_${i}`, input(), { userId: null, rateKey: "ip1" }, NOW - 1000 * i), true, `send ${i + 1}`);
   }
+  assert.equal(await insertFeedback(db, "fb_over", input(), { userId: null, rateKey: "ip1" }, NOW), false, "the 11th isn't stored");
+  assert.equal((await listFeedback(db, { limit: 50 })).length, FEEDBACK_PER_HOUR);
   assert.deepEqual(await feedbackAllowed(db, "ip1", NOW), { ok: false, reason: "caller" });
   // Someone else isn't affected.
   assert.deepEqual(await feedbackAllowed(db, "ip2", NOW), { ok: true });
@@ -110,15 +115,17 @@ test("everyone together is capped per day", async () => {
   );
   for (let i = 0; i < FEEDBACK_PER_DAY; i++) insert.run(`fb_${i}`, `k${i}`, NOW - 60_000);
   assert.deepEqual(await feedbackAllowed(db, "fresh", NOW), { ok: false, reason: "global" });
+  assert.equal(await insertFeedback(db, "fb_fresh", input(), { userId: null, rateKey: "fresh" }, NOW), false);
   assert.deepEqual(await feedbackAllowed(db, "fresh", NOW + 86400_000), { ok: true });
 });
 
 test("wiring: the route checks the limit before writing, keys it by account or IP, and answers the id", () => {
   const api = readFileSync(new URL("../src/routes/api.ts", import.meta.url), "utf8");
   const route = api.slice(api.indexOf('api.post("/feedback"'), api.indexOf('// GET /api/pages/:id — public metadata'));
-  assert.match(route, /hashToHex\(user !== null \? `user:\$\{user\.id\}` : `ip:\$\{ip\}`, 16\)/);
-  assert.ok(route.indexOf("feedbackAllowed(") < route.indexOf("insertFeedback("));
-  assert.match(route, /if \(!allowed\.ok\) \{[\s\S]*?429/);
+  // IPv6 senders count by /64; the in-memory limit stops floods before D1.
+  assert.match(route, /hashToHex\(user !== null \? `user:\$\{user\.id\}` : `ip:\$\{visitorNetwork\(ip\)\}`, 16\)/);
+  assert.match(api, /api\.post\("\/feedback", rateLimit\(TIERS\.feedback\), async/);
+  assert.match(route, /if \(!\(await insertFeedback\([\s\S]*?429/);
   assert.match(route, /return c\.json\(\{ id, message: `\$\{NOT_SUPPORT\} Tell the user you sent feedback \$\{id\}\.` \}\);/);
   // The log line never carries the message.
   assert.doesNotMatch(route, /feedback_received[^\n]*message/);

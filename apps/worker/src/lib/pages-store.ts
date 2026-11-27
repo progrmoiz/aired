@@ -218,22 +218,32 @@ export async function updatePageContent(
 }
 
 /**
- * New settings for a live page (set_options): title, PIN hash, view limit,
- * expiry. False if the page is deleted or has expired in the meantime, so a
- * dead page can't be brought back by giving it a new expiry.
+ * New settings for a live page (set_options): only the columns given, so
+ * concurrent changes to different settings don't undo each other. False if
+ * the page is deleted or has expired in the meantime, so a dead page can't
+ * be brought back by giving it a new expiry.
  */
 export async function updatePageOptions(
   db: D1Database,
   id: string,
-  change: { title: string | null; pin: string | null; reads: number | null; permanent: boolean; expiresAt: number | null },
+  change: { title?: string | null; pin?: string | null; reads?: number | null; permanent?: boolean; expiresAt?: number | null },
   now: number,
 ): Promise<boolean> {
+  const sets: string[] = [];
+  const args: unknown[] = [];
+  const col = (name: string, v: unknown) => {
+    sets.push(`${name} = ?`);
+    args.push(v);
+  };
+  if (change.title !== undefined) col('title', change.title);
+  if (change.pin !== undefined) col('pin', change.pin);
+  if (change.reads !== undefined) col('reads', change.reads);
+  if (change.permanent !== undefined) col('permanent', change.permanent ? 1 : 0);
+  if (change.expiresAt !== undefined) col('expires_at', change.expiresAt);
+  col('updated_at', now);
   const result = await db
-    .prepare(
-      `UPDATE pages SET title = ?, pin = ?, reads = ?, permanent = ?, expires_at = ?, updated_at = ?
-       WHERE id = ? AND deleted_at IS NULL AND (expires_at IS NULL OR expires_at > ?)`,
-    )
-    .bind(change.title, change.pin, change.reads, change.permanent ? 1 : 0, change.expiresAt, now, id, now)
+    .prepare(`UPDATE pages SET ${sets.join(', ')} WHERE id = ? AND deleted_at IS NULL AND (expires_at IS NULL OR expires_at > ?)`)
+    .bind(...args, id, now)
     .run();
   return result.meta.changes === 1;
 }

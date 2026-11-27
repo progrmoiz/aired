@@ -97,7 +97,7 @@ export function parseOptions(body: unknown): ParsedOptions {
   return { ok: true, change };
 }
 
-/** The settings a page's row holds, before or after a change. */
+/** A page's settings as its row holds them. */
 export type PageSettings = {
   title: string | null;
   /** Stored PIN hash, or null. */
@@ -108,9 +108,14 @@ export type PageSettings = {
   expiresAt: number | null;
 };
 
-/** The settings after a change. `pinHash` is the hashed `change.pin` (unused when pin isn't set). */
-export function applyOptions(current: PageSettings, change: OptionsChange, pinHash: string | null, now: number): PageSettings {
-  const next = { ...current };
+/**
+ * The columns a change writes, and only those: two set_options calls at
+ * once that change different settings both stick. `pinHash` is the hashed
+ * `change.pin` (unused when pin isn't set). Expiry always writes permanent
+ * and expiresAt together.
+ */
+export function settingsChange(change: OptionsChange, pinHash: string | null, now: number): Partial<PageSettings> {
+  const next: Partial<PageSettings> = {};
   if (change.title !== undefined) next.title = change.title;
   if (change.pin !== undefined) next.pin = change.pin === null ? null : pinHash;
   if (change.reads !== undefined) next.reads = change.reads;

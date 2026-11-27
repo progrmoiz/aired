@@ -128,7 +128,8 @@ export function publishOut(body: unknown, opts: { updated: boolean; owner: strin
     id: String(b.id ?? ""),
     url: String(b.url ?? ""),
     updated: opts.updated,
-    update_token: str(b.update_token),
+    // An owned page is updated by id; its token would outlive a revoked key, so it stays out of transcripts.
+    update_token: opts.owner !== null ? null : str(b.update_token),
     expires_at: str(b.expiresAt),
     owner: opts.owner,
     claim_url: str(b.claim_url),

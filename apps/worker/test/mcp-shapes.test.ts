@@ -70,7 +70,8 @@ test("publish_html: create, by-id update and token update share one shape", () =
     id: "a",
     url: `${O}/p/a`,
     updated: false,
-    update_token: "at_x",
+    // An owned page is updated by id: its token stays out of the transcript, as in the text.
+    update_token: null,
     expires_at: null,
     owner: "kim",
     claim_url: null,

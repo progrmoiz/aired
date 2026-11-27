@@ -22,6 +22,7 @@ import {
 } from "./pages-store.ts";
 import { tombstoneClaim } from "./page-claims.ts";
 import { forgetShots } from "./og-render.js";
+import { isPinHash } from "./pin-hash.js";
 
 /**
  * The one way every route creates, updates, deletes or looks up a page
@@ -161,38 +162,45 @@ export async function updatePage(
 }
 
 /**
- * New settings for a live page (set_options, PATCH /api/pages/:id): D1
- * first, then the KV record rebuilt from the row, so the viewer sees the
- * new PIN, view limit, title and expiry straight away. The HTML in R2 is
- * left alone. `pinChanged` says whether `settings.pin` is new; when it
- * isn't, the record keeps the PIN it has (as cacheRecord does).
+ * New settings for a live page (set_options, PATCH /api/pages/:id). D1
+ * first, writing only the columns that change; then the row is read back
+ * and the KV record rebuilt from it, so the viewer sees the new PIN, view
+ * limit, title and expiry, and a concurrent change to another setting
+ * isn't undone. The PIN comes from the row too, never from a possibly
+ * stale KV copy, except a PIN still stored as typed in KV that the viewer
+ * hasn't rehashed yet. The HTML in R2 is left alone.
  *
- * As in updatePage, the row is read again afterwards: if a delete marked it
- * in between, the record is removed again. Throws PageGone when the page
- * was deleted or expired before the write.
+ * As in updatePage, the row is read again after the KV write: if a delete
+ * marked it in between, the record is removed again. Throws PageGone when
+ * the page was deleted or expired before the write.
  */
 export class PageGone extends Error {}
 
 export async function setPageOptions(
   env: PageEnv,
   page: LoadedPage,
-  settings: { title: string | null; pin: string | null; reads: number | null; permanent: boolean; expiresAt: number | null },
-  pinChanged: boolean,
+  change: { title?: string | null; pin?: string | null; reads?: number | null; permanent?: boolean; expiresAt?: number | null },
   now = Date.now(),
 ): Promise<{ row: PageRow; metadata: PageMetadata }> {
   const { row, kv } = page;
-  if (!(await updatePageOptions(env.DB, row.id, settings, now))) throw new PageGone("page was deleted or expired");
-  const updated: PageRow = { ...row, ...settings, updatedAt: now };
-  const base = cacheRecord(updated, kv);
-  const metadata: PageMetadata = pinChanged ? { ...base, pin: settings.pin } : base;
-  await env.PAGES_KV.put(kvKeys.page(row.id), serializeMetadata(metadata), kvOptions(updated.expiresAt, now));
+  if (!(await updatePageOptions(env.DB, row.id, change, now))) throw new PageGone("page was deleted or expired");
+  const written = await getPageRow(env.DB, row.id);
+  if (written === null || !isLive(written, now)) throw new PageGone("page was deleted during the change");
+  const legacyPin = change.pin === undefined && kv !== null && kv.pin !== null && !isPinHash(kv.pin) ? kv.pin : null;
+  const record = (r: PageRow): PageMetadata => ({ ...metadataFromRow(r, kv?.readCount ?? 0), ...(legacyPin !== null ? { pin: legacyPin } : {}) });
+  const metadata = record(written);
+  await env.PAGES_KV.put(kvKeys.page(row.id), serializeMetadata(metadata), kvOptions(written.expiresAt, now));
 
   const after = await getPageRow(env.DB, row.id);
   if (after === null || after.deletedAt !== null) {
     await env.PAGES_KV.delete(kvKeys.page(row.id)).catch(() => {});
     throw new PageGone("page was deleted during the change");
   }
-  if (after.ownerId !== updated.ownerId || after.tokenHash !== updated.tokenHash) await refreshCache(env.PAGES_KV, after, now);
+  // Something else changed the row meanwhile (another set_options, a claim):
+  // the record follows the row as it is now.
+  if (after.updatedAt !== written.updatedAt && isLive(after, now)) {
+    await env.PAGES_KV.put(kvKeys.page(row.id), serializeMetadata(record(after)), kvOptions(after.expiresAt, now));
+  }
   return { row: after, metadata };
 }
 

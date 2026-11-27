@@ -10,8 +10,9 @@ import { claimUrl } from "../lib/claim-url.js";
 import { hashPin } from "../lib/pin-hash.js";
 import { authorizePageWrite } from "../lib/claim-decision.js";
 import { createPage, deletePage, loadPage, PageGone, setPageOptions, StorageUnavailable, updatePage, type LoadedPage } from "../lib/page-write.ts";
-import { applyOptions, changedSettings, pageAccess, pageDetails, parseOptions } from "../lib/page-options.ts";
+import { changedSettings, pageAccess, pageDetails, parseOptions, settingsChange } from "../lib/page-options.ts";
 import { feedbackAllowed, feedbackId, insertFeedback, NOT_SUPPORT, parseFeedback } from "../lib/feedback.ts";
+import { visitorNetwork } from "../lib/pin-guess.ts";
 import { billingEnabled, getEntitlements, planLimitError, upgradeUrl } from "../lib/entitlements.js";
 import { siteOrigin } from "../lib/origin.ts";
 import { refreshShot } from "../lib/og-render.js";
@@ -448,10 +449,9 @@ api.patch("/pages/:id", requireCsrfHeader, rateLimit(TIERS.page_options), async 
 
   const now = Date.now();
   const pinHash = typeof change.pin === "string" ? await hashPin(change.pin) : null;
-  const settings = applyOptions(page.row, change, pinHash, now);
   let row;
   try {
-    ({ row } = await setPageOptions(c.env, page, settings, change.pin !== undefined, now));
+    ({ row } = await setPageOptions(c.env, page, settingsChange(change, pinHash, now), now));
   } catch (err) {
     if (err instanceof PageGone) return c.json({ error: "Page not found" }, 404);
     console.error("page options write failed", { id, err });
@@ -463,7 +463,7 @@ api.patch("/pages/:id", requireCsrfHeader, rateLimit(TIERS.page_options), async 
 // POST /api/feedback — feedback from agents and people about aired itself
 // (send_feedback, `aired feedback`; lib/feedback.ts). Works signed in or
 // not. Never page HTML. Answers an id to pass on to the user.
-api.post("/feedback", async (c) => {
+api.post("/feedback", rateLimit(TIERS.feedback), async (c) => {
   let body: unknown;
   try {
     body = await c.req.json();
@@ -481,18 +481,19 @@ api.post("/feedback", async (c) => {
 
   const user = c.get("user");
   const ip = c.req.header("CF-Connecting-IP") ?? c.req.header("X-Forwarded-For") ?? "unknown";
-  const rateKey = await hashToHex(user !== null ? `user:${user.id}` : `ip:${ip}`, 16);
+  // An IPv6 sender counts by their /64, which one connection usually controls.
+  const rateKey = await hashToHex(user !== null ? `user:${user.id}` : `ip:${visitorNetwork(ip)}`, 16);
   const now = Date.now();
   try {
-    const allowed = await feedbackAllowed(c.env.DB, rateKey, now);
-    if (!allowed.ok) {
+    const id = feedbackId();
+    if (!(await insertFeedback(c.env.DB, id, parsed.input, { userId: user?.id ?? null, rateKey }, now))) {
+      const limit = await feedbackAllowed(c.env.DB, rateKey, now);
+      const global = !limit.ok && limit.reason === "global";
       return c.json(
-        { error: allowed.reason === "caller" ? "Feedback limit reached: 10 an hour. Send it later, or not at all." : "aired isn't taking feedback right now. Try again tomorrow." },
+        { error: global ? "aired isn't taking feedback right now. Try again tomorrow." : "Feedback limit reached: 10 an hour. Send it later, or not at all." },
         429,
       );
     }
-    const id = feedbackId();
-    await insertFeedback(c.env.DB, id, parsed.input, { userId: user?.id ?? null, rateKey }, now);
     console.log({ event: "feedback_received", id, kind: parsed.input.kind, impact: parsed.input.impact, source: parsed.input.source });
     return c.json({ id, message: `${NOT_SUPPORT} Tell the user you sent feedback ${id}.` });
   } catch (err) {

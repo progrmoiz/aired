@@ -37,6 +37,10 @@ const out = execFileSync(
 );
 const rows = JSON.parse(out)[0]?.results ?? [];
 
+// Messages come from anyone: drop terminal control characters before printing.
+// eslint-disable-next-line no-control-regex
+const clean = (s) => String(s ?? "").replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, "?");
+
 if (flag("--json")) {
   process.stdout.write(JSON.stringify(rows, null, 2) + "\n");
 } else if (rows.length === 0) {
@@ -44,7 +48,7 @@ if (flag("--json")) {
 } else {
   for (const r of rows) {
     const when = new Date(r.created_at).toISOString().replace("T", " ").slice(0, 16);
-    const bits = [r.kind, r.impact, r.source, r.actor, r.tool, r.client, r.page_id && `page ${r.page_id}`, r.user_id && `user ${r.user_id}`].filter(Boolean);
-    process.stdout.write(`${r.id}  ${when}  ${bits.join(" · ")}\n  ${r.message.replace(/\n/g, "\n  ")}\n\n`);
+    const bits = [r.kind, r.impact, r.source, r.actor, r.tool, r.client, r.page_id && `page ${r.page_id}`, r.user_id && `user ${r.user_id}`].filter(Boolean).map(clean);
+    process.stdout.write(`${clean(r.id)}  ${when}  ${bits.join(" · ")}\n  ${clean(r.message).replace(/\n/g, "\n  ")}\n\n`);
   }
 }

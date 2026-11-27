@@ -4,8 +4,8 @@ import { readFileSync } from "node:fs";
 import type { PageMetadata } from "@aired/core";
 import { fakeD1 } from "./helpers/d1.ts";
 import {
-  applyOptions,
   changedSettings,
+  settingsChange,
   pageAccess,
   pageDetails,
   parseOptions,
@@ -137,15 +137,13 @@ test("bodies that change nothing, or name unknown fields, are refused", () => {
 
 // --- Applying a change --------------------------------------------------------
 
-test("a change moves only the settings it names", () => {
-  const current = { title: "Old", pin: "pbkdf2$old", reads: 3, permanent: false, expiresAt: NOW + HOUR };
-  assert.deepEqual(applyOptions(current, { title: "New" }, null, NOW), { ...current, title: "New" });
-  assert.deepEqual(applyOptions(current, { pin: "9999" }, "pbkdf2$new", NOW), { ...current, pin: "pbkdf2$new" });
-  assert.deepEqual(applyOptions(current, { pin: null }, null, NOW), { ...current, pin: null });
-  assert.deepEqual(applyOptions(current, { expiry: { permanent: true } }, null, NOW), { ...current, permanent: true, expiresAt: null });
-  const perm = { ...current, permanent: true, expiresAt: null };
-  assert.deepEqual(applyOptions(perm, { expiry: { ttlSeconds: 60 } }, null, NOW), { ...perm, permanent: false, expiresAt: NOW + 60_000 });
-  assert.deepEqual(applyOptions(current, { reads: null }, null, NOW), { ...current, reads: null });
+test("a change writes only the columns it names", () => {
+  assert.deepEqual(settingsChange({ title: "New" }, null, NOW), { title: "New" });
+  assert.deepEqual(settingsChange({ pin: "9999" }, "pbkdf2$new", NOW), { pin: "pbkdf2$new" });
+  assert.deepEqual(settingsChange({ pin: null }, null, NOW), { pin: null });
+  assert.deepEqual(settingsChange({ expiry: { permanent: true } }, null, NOW), { permanent: true, expiresAt: null });
+  assert.deepEqual(settingsChange({ expiry: { ttlSeconds: 60 } }, null, NOW), { permanent: false, expiresAt: NOW + 60_000 });
+  assert.deepEqual(settingsChange({ reads: null, title: null }, null, NOW), { reads: null, title: null });
   assert.deepEqual(changedSettings({ title: null, expiry: { permanent: true }, reads: 2, pin: "1234" }), ["title", "pin", "expiry", "reads"]);
 });
 
@@ -189,6 +187,20 @@ function meta(id: string, over: Partial<PageMetadata> = {}): PageMetadata {
   };
 }
 
+test("two changes to different settings at once both stick", async () => {
+  const { db } = fakeD1();
+  await insertPageRow(db, rowFromMetadata(meta("both"), null, NOW));
+  // Both calls read the row before either wrote (as parallel set_options calls do).
+  await Promise.all([
+    updatePageOptions(db, "both", settingsChange({ pin: "4821" }, "pbkdf2$pin", NOW), NOW + 1),
+    updatePageOptions(db, "both", settingsChange({ title: "Renamed" }, null, NOW), NOW + 2),
+  ]);
+  const row = (await getPageRow(db, "both"))!;
+  assert.equal(row.pin, "pbkdf2$pin", "the title change didn't clear the new PIN");
+  assert.equal(row.title, "Renamed");
+  assert.equal(row.expiresAt, NOW + 24 * HOUR, "untouched settings keep their value");
+});
+
 test("updatePageOptions writes the settings of a live page", async () => {
   const { db } = fakeD1();
   await insertPageRow(db, rowFromMetadata(meta("a"), null, NOW));
@@ -222,9 +234,14 @@ test("page-write: setPageOptions writes D1 first, rebuilds KV from the row and r
   const fn = code.slice(code.indexOf("export async function setPageOptions"));
   const body = fn.slice(0, fn.indexOf("\n}\n"));
   assert.ok(body.indexOf("updatePageOptions(env.DB") < body.indexOf("PAGES_KV.put"), "D1 before KV");
-  assert.match(body, /if \(!\(await updatePageOptions\(env\.DB, row\.id, settings, now\)\)\) throw new PageGone/);
-  assert.match(body, /const metadata: PageMetadata = pinChanged \? \{ \.\.\.base, pin: settings\.pin \} : base;/);
-  assert.match(body, /kvOptions\(updated\.expiresAt, now\)/);
+  assert.match(body, /if \(!\(await updatePageOptions\(env\.DB, row\.id, change, now\)\)\) throw new PageGone/);
+  // The KV record is built from the row as written, PIN included, never a stale KV copy
+  // (only a PIN still stored as typed, awaiting its rehash, is kept from KV).
+  assert.ok(body.indexOf("const written = await getPageRow(env.DB, row.id);") < body.indexOf("PAGES_KV.put"));
+  assert.match(body, /metadataFromRow\(r, kv\?\.readCount \?\? 0\)/);
+  assert.match(body, /change\.pin === undefined && kv !== null && kv\.pin !== null && !isPinHash\(kv\.pin\)/);
+  assert.doesNotMatch(body, /cacheRecord\(|refreshCache\(/);
+  assert.match(body, /kvOptions\(written\.expiresAt, now\)/);
   assert.match(body, /if \(after === null \|\| after\.deletedAt !== null\) \{\s*await env\.PAGES_KV\.delete/);
   assert.doesNotMatch(body, /PAGES_BUCKET/, "the HTML is left alone");
 });
