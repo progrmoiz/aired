@@ -89,7 +89,7 @@
             "name": "Can I share an HTML file so only certain people can see it?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Add a PIN and send it only to those people. The page won't open without it. Sharing by email address is planned for the paid plans."
+              "text": "Yes. Sign in, then list their email addresses: each person types their email on the page and gets a one-time code. Free allows 3 people per page; Pro allows 500 people and whole company domains like @client.com. Or add a PIN and send it only to those people."
             }
           },
           {
@@ -201,7 +201,7 @@
       <ul>
         <li><strong>The link is random.</strong> Each page gets an unguessable address like <code>aired.sh/p/k3J9xQ2mTa</code>. aired doesn't list pages anywhere for people to browse.</li>
         <li><strong>Search engines are kept out.</strong> Pages published without an account tell search engines not to list them, and search engines can't get past a PIN at all.</li>
-        <li><strong>Anyone with the link and PIN can open it.</strong> If it's forwarded, the new person gets in too. That's the trade-off for viewers not needing an account.</li>
+        <li><strong>Anyone with the link and PIN can open it.</strong> If it's forwarded, the new person gets in too. To stop that, share with named people instead (below).</li>
         <li><strong>Without a PIN, the title shows in link previews.</strong> Slack, WhatsApp and iMessage show the page title when the link is pasted. With a PIN, they only see the PIN screen.</li>
       </ul>
 
@@ -213,6 +213,7 @@
           </thead>
           <tbody>
             <tr><td>aired with a PIN</td><td>No</td><td>Yes</td></tr>
+            <tr><td>aired, named people only</td><td>No, a one-time code by email</td><td>Yes</td></tr>
             <tr><td>Google Drive, shared with named people</td><td>Yes, a Google account</td><td>No, Drive shows the code</td></tr>
             <tr><td>Email attachment</td><td>No</td><td>Often not; many mail filters block .html files</td></tr>
             <tr><td>Claude, shared by email invite</td><td>Yes, a Claude account</td><td>Yes</td></tr>
@@ -221,11 +222,12 @@
       </div>
 
       <h2 id="named">Sharing with named people</h2>
-      <p>A page on aired opens for anyone with the link, and the PIN if you set one. aired can't yet limit a page to certain email addresses. If each viewer must sign in, use Google Drive or Claude's email invites from the table above.</p>
+      <p>Sign in and list who may open a page: email addresses, and on Pro whole company domains like <code>@client.com</code>. Each person types their email on the page and gets a 6-digit code that works once. They don't need an account, and someone the link is forwarded to can't get in. Free allows 3 people per page; Pro allows 500 people and 25 domains.</p>
+      <p>Set it in your dashboard's Share view, or from the command line with <code>aired set &lt;id&gt; --only alice@client.com,@client.com</code>. Taking someone off the list locks them out. See the <a href="/docs">docs</a> for the details.</p>
 
       <h2 id="faq">Questions</h2>
       <div class="acc">
-        <details open><summary>Can I share an HTML file so only certain people can see it?<i></i></summary><p>Add a PIN and send it only to those people. The page won't open without it. Sharing by email address is planned for the paid plans.</p></details>
+        <details open><summary>Can I share an HTML file so only certain people can see it?<i></i></summary><p>Yes. Sign in, then list their email addresses: each person types their email on the page and gets a one-time code. Free allows 3 people per page; Pro allows 500 people and whole company domains like @client.com. Or add a PIN and send it only to those people.</p></details>
         <details><summary>Do the people I share with need an aired account?<i></i></summary><p>No. They open the link in any browser and type the PIN if there is one.</p></details>
         <details><summary>Can someone find my page on Google?<i></i></summary><p>Pages published without an account tell search engines not to list them, and search engines can't get past a PIN. aired doesn't list pages publicly.</p></details>
         <details><summary>How do I stop people opening a link I already sent?<i></i></summary><p>Delete the page with its update token, or from your dashboard if you published while signed in. The link stops working at once.</p></details>

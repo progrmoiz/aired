@@ -43,7 +43,7 @@ With the CLI or API you can also set a view limit, so the link stops working aft
 
 ## What a PIN doesn't do
 
-- **It's one PIN for everyone.** Anyone you forward it to can open the page. To cut off access, delete the page or publish a new one with a new PIN.
+- **It's one PIN for everyone.** Anyone you forward it to can open the page. To cut off access, delete the page or publish a new one with a new PIN. To let in only certain people, each with their own email code, [share with named people](https://aired.sh/share-html-privately) instead.
 - **It isn't for regulated data.** Don't publish medical, financial or personal records on any public link service, PIN or not.
 
 More options for keeping a page between you and a few people are in [share HTML privately](https://aired.sh/share-html-privately).
