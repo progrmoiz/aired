@@ -1,16 +1,30 @@
 import { useEffect, useState } from 'react'
 
-export const VIEWS = ['pages', 'connect', 'billing', 'account'] as const
+export const VIEWS = ['pages', 'views', 'connect', 'billing', 'account'] as const
 export type View = (typeof VIEWS)[number]
 
-const TITLES: Record<View, string> = { pages: 'your pages', connect: 'connect your AI tools', billing: 'plan & billing', account: 'account' }
+const TITLES: Record<View, string> = { pages: 'your pages', views: 'views', connect: 'connect your AI tools', billing: 'plan & billing', account: 'account' }
 
 const read = (): View => {
-  const h = window.location.hash.replace('#', '') as View
+  const h = window.location.hash.replace('#', '').split('/')[0] as View
   return VIEWS.includes(h) ? h : 'pages'
 }
 
-/** #pages, #connect, #billing, #account. Back from Stripe opens #billing. */
+/** The part after the view: `#views/abc` → "abc". Empty when there's none. */
+const readSub = () => decodeURIComponent(window.location.hash.replace('#', '').split('/').slice(1).join('/'))
+
+/** The hash's sub-path, kept in step with the hash (`#views/<page id>`). */
+export function useHashSub(): string {
+  const [sub, setSub] = useState(readSub)
+  useEffect(() => {
+    const on = () => setSub(readSub())
+    window.addEventListener('hashchange', on)
+    return () => window.removeEventListener('hashchange', on)
+  }, [])
+  return sub
+}
+
+/** #pages, #views (or #views/<page id>), #connect, #billing, #account. Back from Stripe opens #billing. */
 export function useHashView(): View {
   const [view, setView] = useState<View>(() => {
     const params = new URLSearchParams(window.location.search)

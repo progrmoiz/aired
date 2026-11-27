@@ -4,7 +4,7 @@ import {
 } from '@tanstack/react-table'
 import { toast } from 'sonner'
 import {
-  ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon, ChevronDownIcon, ChevronRightIcon, ClockIcon, DownloadIcon, EllipsisIcon,
+  ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon, ChartColumnIcon, ChevronDownIcon, ChevronRightIcon, ClockIcon, DownloadIcon, EllipsisIcon,
   ExternalLinkIcon, EyeIcon, FileTextIcon, FlagIcon, FolderIcon, GlobeIcon, LayoutGridIcon, ListIcon, LockIcon, SearchIcon, Trash2Icon,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
@@ -28,6 +28,7 @@ import { PageThumb, forgetTile } from '@/components/page-thumb'
 import { PageCover } from '@/components/page-cover'
 import { PageTile } from '@/components/page-tile'
 import { PublishZone } from '@/components/publish-zone'
+import { ViewsSummary } from '@/components/views-summary'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useClaim } from '@/hooks/use-claim'
 import type { PagesState } from '@/App'
@@ -57,8 +58,8 @@ const LAYOUT_KEY = 'aired-pages-layout'
 const host = typeof window !== 'undefined' ? window.location.host : 'aired.sh'
 const origin = typeof window !== 'undefined' ? window.location.origin : 'https://aired.sh'
 
-export function PagesView({ pages, reload, removePage }: {
-  pages: PagesState; reload: () => void; removePage: (id: string) => void
+export function PagesView({ pages, reload, removePage, isPro = false }: {
+  pages: PagesState; reload: () => void; removePage: (id: string) => void; isPro?: boolean
 }) {
   const claim = useClaim(reload)
   const [filter, setFilter] = useState<Filter>('all')
@@ -101,6 +102,7 @@ export function PagesView({ pages, reload, removePage }: {
       {ready && all.length > 0 && (
         <>
           <PublishZone title="Drop a file or paste HTML" description="You get a link anyone can open, on any phone or laptop." onPublished={reload} />
+          {isPro && <ViewsSummary />}
 
           <section aria-labelledby="pages-title" className="grid min-w-0 gap-6">
             <div className="flex min-w-0 flex-wrap items-center gap-3">
@@ -216,6 +218,7 @@ function PageMenu({ page, onDelete }: { page: Page; onDelete: (p: Page) => void 
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-48 rounded-xl p-1.5 shadow-pop">
         <DropdownMenuItem render={<a href={`/p/${page.id}`} target="_blank" rel="noopener noreferrer" />}><ExternalLinkIcon /> Open in a new tab</DropdownMenuItem>
+        <DropdownMenuItem render={<a href={`#views/${page.id}`} />}><ChartColumnIcon /> See views</DropdownMenuItem>
         <DropdownMenuItem render={<a href={`/abuse?id=${encodeURIComponent(page.id)}`} />}><FlagIcon /> Report a problem</DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onClick={() => onDelete(page)}><Trash2Icon /> Delete page</DropdownMenuItem>
