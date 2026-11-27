@@ -43,7 +43,7 @@ const NOW = Date.now();
 const TOKEN = "tok_owner_secret_value";
 
 async function setup(opts: { user?: User | null; browser?: unknown; vars?: Record<string, string> } = {}) {
-  const { db } = fakeD1();
+  const { db, raw } = fakeD1();
   const r2 = fakeR2();
   const page = (id: string, ownerId: number | null, tokenHash: string) => ({
     id, title: `Page ${id}`, size: 40, tokenHash, pin: "pbkdf2$hidden", reads: null, readCount: 0, permanent: true,
@@ -80,7 +80,7 @@ async function setup(opts: { user?: User | null; browser?: unknown; vars?: Recor
       env as never,
       { waitUntil() {}, passThroughOnException() {} } as never,
     );
-  return { call, db, r2, launches, env };
+  return { call, db, raw, app, r2, launches, env };
 }
 
 const kim: User = { id: 7, login: "kim", email: null, name: null };
@@ -165,11 +165,38 @@ test("source: only the owner gets the HTML; the PIN never shields it from them, 
   assert.equal(res.status, 200);
   const body = (await res.json()) as Record<string, unknown>;
   // A plain HTML page: its source is the HTML itself.
-  assert.deepEqual(body, { id: "mine", url: "https://aired.test/p/mine", title: "Page mine", size: 40, html: "<h1>mine</h1>", kind: "page", format: "html", source: "<h1>mine</h1>" });
+  assert.deepEqual(body, { id: "mine", url: "https://aired.test/p/mine", title: "Page mine", size: 40, html: "<h1>mine</h1>", kind: "page", format: "html", source: "<h1>mine</h1>", version: 1 });
   assert.equal((await owner.call("GET", "/api/pages/theirs/source", undefined, ip())).status, 403);
   assert.equal((await owner.call("GET", "/api/pages/anon/source", undefined, ip())).status, 403, "an anonymous page needs its token");
   const nobody = await setup({});
   assert.equal((await nobody.call("GET", "/api/pages/mine/source", undefined, ip())).status, 401);
+});
+
+test("source (aired pull): the update token works for a PIN or people-only page; a wrong token, another account or nobody gets nothing", async () => {
+  const nobody = await setup({});
+  const get = (id: string, headers: Record<string, string>) =>
+    nobody.app.fetch(new Request(`https://aired.test/api/pages/${id}/source`, { headers: { "CF-Connecting-IP": ip(), ...headers } }), nobody.env as never, { waitUntil() {}, passThroughOnException() {} } as never);
+  // Every page here has a PIN; the token is enough, and the PIN is never in the answer.
+  for (const id of ["mine", "anon"]) {
+    const res = await get(id, { "X-Update-Token": TOKEN });
+    assert.equal(res.status, 200, id);
+    const text = await res.text();
+    assert.ok(text.includes(`<h1>${id}</h1>`), id);
+    assert.ok(!text.includes("pbkdf2"), "no PIN hash");
+  }
+  // A Bearer token works the same way.
+  assert.equal((await get("anon", { Authorization: `Bearer ${TOKEN}` })).status, 200);
+  // Wrong token, or another page's token.
+  const wrong = await get("mine", { "X-Update-Token": "at_wrong" });
+  assert.equal(wrong.status, 403);
+  assert.ok(!(await wrong.text()).includes("<h1>"));
+  assert.equal((await get("theirs", { "X-Update-Token": TOKEN })).status, 403);
+  // "Only these people": a listed person's cookie isn't enough, nor another signed-in account.
+  nobody.raw.prepare("UPDATE pages SET access = 'people' WHERE id = 'mine'").run();
+  assert.equal((await get("mine", { Cookie: "acc_mine=1.x.y" })).status, 401);
+  const other = await setup({ user: { id: 8, login: "lee", email: null, name: null } });
+  assert.equal((await other.call("GET", "/api/pages/mine/source", undefined, ip())).status, 403);
+  assert.equal((await get("mine", { "X-Update-Token": TOKEN })).status, 200, "the token holder can already replace it");
 });
 
 test("check.jpg: served only with the key from the report, never cached, and not after it expires", async () => {

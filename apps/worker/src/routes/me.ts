@@ -182,6 +182,8 @@ me.get('/pages', async (c) => {
     reads: number | null;
     permanent: boolean;
     createdAt: string;
+    /** When its content or settings last changed. */
+    updatedAt: string;
     expiresAt: string | null;
     hasPin: boolean;
     /** Who can open it (lib/page-options.ts accessMode). */
@@ -200,6 +202,7 @@ me.get('/pages', async (c) => {
       reads: m.reads,
       permanent: m.permanent,
       createdAt: m.createdAt,
+      updatedAt: new Date(r.updatedAt).toISOString(),
       expiresAt: m.expiresAt,
       hasPin: m.pin !== null,
       access: m.access === "people" ? "people" : m.pin !== null ? "pin" : "public",

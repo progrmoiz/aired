@@ -18,6 +18,9 @@ import { makeCheckCommand } from './commands/check.js'
 import { makePdfCommand } from './commands/pdf.js'
 import { makeNewCommand } from './commands/new.js'
 import { makeRestoreCommand, makeVersionsCommand } from './commands/versions.js'
+import { makeListCommand } from './commands/list.js'
+import { makePullCommand } from './commands/pull.js'
+import { makeWatchCommand } from './commands/watch.js'
 
 // Handle --mcp flag before Commander parses
 if (process.argv.includes('--mcp')) {
@@ -71,6 +74,9 @@ if (process.argv.includes('--mcp')) {
   program.addCommand(makeUpdateCommand(getGlobalOpts))
   program.addCommand(makeDeleteCommand(getGlobalOpts))
   program.addCommand(makeInfoCommand(getGlobalOpts))
+  program.addCommand(makeListCommand(getGlobalOpts))
+  program.addCommand(makePullCommand(getGlobalOpts))
+  program.addCommand(makeWatchCommand(getGlobalOpts))
   program.addCommand(makeTokensCommand(getGlobalOpts))
   program.addCommand(makeDoctorCommand(getGlobalOpts))
   program.addCommand(makeLoginCommand(getGlobalOpts))

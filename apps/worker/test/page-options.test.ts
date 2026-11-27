@@ -163,6 +163,7 @@ test("details never include the PIN or token, only whether a PIN is on", () => {
     access: "pin",
     permanent: false,
     createdAt: new Date(NOW - HOUR).toISOString(),
+    updatedAt: new Date(row.updatedAt).toISOString(),
     expiresAt: new Date(NOW + 24 * HOUR).toISOString(),
     project: "q4",
     allowPdf: false,

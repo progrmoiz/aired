@@ -53,6 +53,8 @@ export interface PageDetails {
   project: string | null
   /** Viewers get a Download PDF button. Absent from servers before PDF export. */
   allowPdf?: boolean
+  /** When its content or settings last changed. Absent from older servers. */
+  updatedAt?: string
   /** PATCH only: the settings that changed. */
   changed?: string[]
 }
@@ -103,4 +105,40 @@ export interface CheckReport {
   blank: boolean
   screenshot_url: string | null
   screenshot_expires_at: string | null
+}
+
+/** One page in GET /api/me/pages: the signed-in owner's list. */
+export interface OwnPage {
+  id: string
+  title: string | null
+  size: number
+  readCount: number
+  reads: number | null
+  permanent: boolean
+  createdAt: string
+  /** Absent from older servers. */
+  updatedAt?: string
+  expiresAt: string | null
+  hasPin: boolean
+  access?: 'public' | 'pin' | 'people'
+  project: string | null
+}
+
+/** GET /api/pages/:id/source: what was published, for its owner or update token holder. */
+export interface PageSource {
+  id: string
+  url: string
+  title: string | null
+  size: number
+  /** The page as served. */
+  html: string
+  kind: 'page' | 'doc' | 'deck'
+  /** markdown when it was published from Markdown. */
+  format: 'html' | 'markdown'
+  /** What was published: the Markdown, or the HTML as sent (a deck's with its speaker notes). */
+  source: string
+  slides?: number
+  notes?: string[]
+  /** The live version this is. Absent from older servers. */
+  version?: number
 }

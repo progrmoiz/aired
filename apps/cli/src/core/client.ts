@@ -1,7 +1,7 @@
 import { USER_AGENT } from '../lib/constants.js'
 import { AUTH_HEADER, CSRF_HEADER } from '@aired/core'
 import type { User } from '@aired/core'
-import type { PublishResult, PageInfo, PageDetails, FeedbackResult, CheckReport, PdfExport } from './types.js'
+import type { PublishResult, PageInfo, PageDetails, FeedbackResult, CheckReport, PdfExport, OwnPage, PageSource } from './types.js'
 import type { PageContent } from './markdown.js'
 
 /**
@@ -599,4 +599,29 @@ export async function restoreVersion(
     body: JSON.stringify(body),
   })
   return handleResponse<RestoreResult>(resp, 'Restore')
+}
+
+/**
+ * The signed-in account's pages, newest first (GET /api/me/pages, what the
+ * dashboard lists): one page of at most 50. Signed in by `jwt`, else by
+ * AIRED_API_KEY.
+ */
+export async function listOwnPages(
+  baseUrl: string,
+  opts: { jwt?: string; project?: string; limit: number; cursor?: string },
+): Promise<{ pages: OwnPage[]; cursor: string | null }> {
+  const url = new URL(`${baseUrl}/api/me/pages`)
+  url.searchParams.set('limit', String(opts.limit))
+  if (opts.project !== undefined) url.searchParams.set('project', opts.project)
+  if (opts.cursor !== undefined) url.searchParams.set('cursor', opts.cursor)
+  const resp = await fetch(url.toString(), { headers: callerHeaders(opts.jwt) })
+  return handleResponse<{ pages: OwnPage[]; cursor: string | null }>(resp, 'List')
+}
+
+/** What was published (GET /api/pages/:id/source). `token` is the stored update token, '' when the session or API key owns the page. */
+export async function getPageSource(baseUrl: string, id: string, token: string, jwt?: string): Promise<PageSource> {
+  const headers = callerHeaders(jwt)
+  if (token !== '') headers['X-Update-Token'] = token
+  const resp = await fetch(`${baseUrl}/api/pages/${encodeURIComponent(id)}/source`, { headers })
+  return handleResponse<PageSource>(resp, 'Pull')
 }

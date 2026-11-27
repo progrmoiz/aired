@@ -217,6 +217,8 @@ export type PageDetails = {
   access: "public" | "pin" | "people";
   permanent: boolean;
   createdAt: string;
+  /** When its content or settings last changed. */
+  updatedAt?: string;
   expiresAt: string | null;
   project: string | null;
   /** Viewers may download a PDF (the owner always can). */
@@ -230,7 +232,7 @@ export function accessMode(row: { pin: string | null; access?: "people" | null }
 }
 
 export function pageDetails(
-  row: { id: string; title: string | null; size: number; pin: string | null; reads: number | null; permanent: boolean; createdAt: number; expiresAt: number | null; project: string | null; access?: "people" | null; allowPdf?: boolean },
+  row: { id: string; title: string | null; size: number; pin: string | null; reads: number | null; permanent: boolean; createdAt: number; expiresAt: number | null; project: string | null; access?: "people" | null; allowPdf?: boolean; updatedAt?: number },
   readCount: number,
   origin: string,
 ): PageDetails {
@@ -245,6 +247,7 @@ export function pageDetails(
     access: accessMode(row),
     permanent: row.permanent,
     createdAt: new Date(row.createdAt).toISOString(),
+    ...(typeof row.updatedAt === "number" ? { updatedAt: new Date(row.updatedAt).toISOString() } : {}),
     expiresAt: row.expiresAt === null ? null : new Date(row.expiresAt).toISOString(),
     project: row.project,
     allowPdf: row.allowPdf === true,

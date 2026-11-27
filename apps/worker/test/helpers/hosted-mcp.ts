@@ -40,6 +40,7 @@ type Context = import("hono").Context;
 const { api } = await import("../../src/routes/api.ts");
 const { versions } = await import("../../src/routes/versions.ts");
 const { pageTools } = await import("../../src/routes/page-tools.ts");
+const { me } = await import("../../src/routes/me.ts");
 const { applyApiContract } = await import("../../src/middleware/api-contract.ts");
 const { createAiredMcpServer } = await import("../../src/routes/mcp.ts");
 const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
@@ -92,6 +93,7 @@ function setup() {
     c.set("requestId", "test");
     await next();
   }) as never);
+  app.route("/api/me", me as never);
   app.route("/api", pageTools as never);
   app.route("/api", versions as never);
   app.route("/api", api as never);
