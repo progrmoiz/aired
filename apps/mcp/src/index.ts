@@ -44,8 +44,8 @@ import {
 } from "../../worker/src/lib/mcp-shapes.ts";
 import { registerPrompts, registerResources } from "../../worker/src/lib/mcp-extras.ts";
 import { CONTENT_INPUT, GET_PAGE_DESCRIPTION, getPageInput, MISSING_CONTENT, registerTemplateTool } from "../../worker/src/lib/mcp-templates.ts";
-// The aired skill, bundled as text (esbuild/tsup loader for .md).
-import skill from "../../cli/SKILL.md";
+// The aired skills, bundled as text (esbuild/tsup loader for .md).
+import { SKILL_FILES } from "../../worker/src/lib/skill-files.ts";
 
 declare const __AIRED_VERSION__: string | undefined;
 
@@ -523,7 +523,7 @@ registerResources(server, {
     return signedIn();
   },
   get: apiGet,
-  skill,
+  skills: SKILL_FILES,
   ResourceTemplate,
 });
 

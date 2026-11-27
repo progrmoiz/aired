@@ -9,14 +9,42 @@ import type { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/serv
  *
  * Prompts: ready-made requests that clients show as slash commands.
  * Resources:
- *   - skill://aired/SKILL.md: the aired skill, for any connected agent
- *     (the Skills over MCP layout, served as a plain resource).
+ *   - skill://aired/SKILL.md: the core aired skill, its reference files at
+ *     skill://aired/references/*.md, and the skills for each use case at
+ *     skill://aired/<name>/SKILL.md (aired-slides, aired-dashboard,
+ *     aired-report, aired-forms). For any connected agent, in the Skills
+ *     over MCP layout (the folder holding SKILL.md is the skill's name),
+ *     served as plain resources. The files come from apps/cli (skill-files.ts).
  *   - aired://page/{id}: the caller's own pages and their HTML. Signed-in
  *     callers only (API key, OAuth, or the CLI's sign-in on stdio); the API
  *     decides ownership, so nobody reads anyone else's page.
  */
 
 export const SKILL_URI = "skill://aired/SKILL.md";
+
+/** One file of the aired skills: its path in the npm package (apps/cli) and its text. */
+export type SkillFile = { path: string; text: string };
+
+/**
+ * A skill file's URI. The core skill is the package root, so its files keep
+ * their paths under skill://aired/; a skill under skills/<name>/ sits at
+ * skill://aired/<name>/.
+ */
+export function skillUri(path: string): string {
+  const rel = path.startsWith("skills/") ? path.slice("skills/".length) : path;
+  return `skill://aired/${rel}`;
+}
+
+/** A SKILL.md's frontmatter name and description, or null when it has none. */
+export function skillFrontmatter(text: string): { name: string; description: string } | null {
+  const block = /^---\n([\s\S]*?)\n---(?:\n|$)/.exec(text);
+  if (block === null) return null;
+  const field = (k: string) => new RegExp(`^${k}:[ \\t]*(.+)$`, "m").exec(block[1]!)?.[1]?.trim() ?? null;
+  const name = field("name");
+  const description = field("description");
+  return name !== null && description !== null ? { name, description } : null;
+}
+
 export const PAGE_URI_TEMPLATE = "aired://page/{id}";
 export const pageUri = (id: string): string => `aired://page/${id}`;
 
@@ -31,8 +59,8 @@ export type ExtrasDeps = {
   signedIn: boolean;
   /** A GET on the aired API as the caller: status and parsed JSON. */
   get: (path: string) => Promise<{ status: number; body: unknown }>;
-  /** The aired skill (apps/cli/SKILL.md). */
-  skill: string;
+  /** The aired skills' files (skill-files.ts), the core SKILL.md first. */
+  skills: readonly SkillFile[];
   /** The SDK's ResourceTemplate class, from the server's own copy of the SDK. */
   ResourceTemplate: typeof ResourceTemplate;
 };
@@ -43,8 +71,7 @@ const str = (v: unknown): string | null => (typeof v === "string" && v !== "" ? 
 
 /** The skill's frontmatter description, for the resource listing. */
 export function skillDescription(skill: string): string {
-  const m = /^---\n[\s\S]*?^description:\s*(.+)$[\s\S]*?^---/m.exec(skill);
-  return m?.[1]?.trim() ?? "How to publish and manage pages with aired.";
+  return skillFrontmatter(skill)?.description ?? "How to publish and manage pages with aired.";
 }
 
 export class ResourceError extends Error {}
@@ -93,13 +120,27 @@ export async function listPageResources(deps: Pick<ExtrasDeps, "signedIn" | "get
   };
 }
 
+/** How one skill file is listed: a SKILL.md by its frontmatter, a reference by its first heading. */
+export function skillResourceMeta(file: SkillFile): { name: string; title: string; description: string } {
+  const uri = skillUri(file.path);
+  const fm = file.path.endsWith("SKILL.md") ? skillFrontmatter(file.text) : null;
+  if (fm !== null) return { name: fm.name, title: `${fm.name} skill`, description: fm.description };
+  const heading = /^#\s+(.+)$/m.exec(file.text)?.[1]?.trim() ?? file.path;
+  const owner = /^skill:\/\/aired\/(aired-[a-z0-9-]+)\//.exec(uri)?.[1] ?? "aired";
+  return { name: uri.slice("skill://".length), title: heading, description: `Reference for the ${owner} skill: ${heading}.` };
+}
+
 export function registerResources(server: McpServer, deps: ExtrasDeps): void {
-  server.registerResource(
-    "aired",
-    SKILL_URI,
-    { title: "aired skill", description: skillDescription(deps.skill), mimeType: "text/markdown" },
-    async () => ({ contents: [{ uri: SKILL_URI, mimeType: "text/markdown", text: deps.skill }] }),
-  );
+  for (const file of deps.skills) {
+    const uri = skillUri(file.path);
+    const meta = skillResourceMeta(file);
+    server.registerResource(
+      meta.name,
+      uri,
+      { title: meta.title, description: meta.description, mimeType: "text/markdown" },
+      async () => ({ contents: [{ uri, mimeType: "text/markdown", text: file.text }] }),
+    );
+  }
   server.registerResource(
     "page",
     new deps.ResourceTemplate(PAGE_URI_TEMPLATE, { list: () => listPageResources(deps) }),
@@ -117,6 +158,10 @@ type PromptDef = {
   text: (a: Record<string, string | undefined>) => string;
 };
 
+/** The line a prompt opens its steps with: which skill has the full rules. */
+export const skillLine = (name: string): string =>
+  `Follow the ${name} skill (load it, or read the resource ${skillUri(`skills/${name}/SKILL.md`)}). It has the worked example, the exact calls and the gotchas.`;
+
 const CHECK_STEP =
   "After publishing, call check_page on the page. If ok is false, fix what it reports, update the same page (publish_html with its id and update_token, or update_page), and check once more. Then give me the link.";
 
@@ -132,6 +177,7 @@ export const PROMPTS: PromptDef[] = [
     text: (a) =>
       [
         `Write a report${a.about ? ` about ${a.about}` : " from what we've been working on"}${a.audience ? `, for ${a.audience}` : ""}, and publish it with aired.`,
+        skillLine("aired-report"),
         "",
         "1. Call get_template with name \"report\". Follow its rules and keep its shape: a # title with who it's for and the date, a short summary first, a table of key numbers, what was done, and next steps as a task list.",
         "2. Use only real figures from this conversation or files I've shared. Where one is missing, write [number] rather than guessing.",
@@ -152,6 +198,7 @@ export const PROMPTS: PromptDef[] = [
     text: (a) =>
       [
         `Make a slide deck${a.topic ? ` about ${a.topic}` : " from what we've discussed"}${a.slides ? `, about ${a.slides} slides` : ""}, and publish it with aired.`,
+        skillLine("aired-slides"),
         "",
         "1. Call get_template with name \"deck\" and follow its rules: front matter with type: deck and a title, slides split on --- lines, a # title slide first, then ## slides with one idea each and at most five short bullets.",
         "2. Add speaker notes to each slide after a line starting with Note:. They stay out of the public page; only I see them, in the speaker view.",
@@ -176,6 +223,7 @@ export const PROMPTS: PromptDef[] = [
     text: (a) =>
       [
         `Share ${a.what ? a.what : "the page we've been working on"} privately with aired.`,
+        skillLine("aired-report"),
         "",
         `- Publish it with publish_html and a PIN: ${a.pin ? "use the PIN I gave" : "make up a random 6-digit PIN"}. Never write the PIN into the page itself.`,
         `- Make it expire${a.expires ? ` after ${a.expires}` : " after 7 days"}: pass ttl_seconds for that long.`,

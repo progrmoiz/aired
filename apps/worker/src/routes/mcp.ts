@@ -75,8 +75,8 @@ import { pageHasResponses } from "../lib/collect-store.ts";
 import { CONTENT_INPUT, GET_PAGE_DESCRIPTION, getPageInput, MISSING_CONTENT, registerTemplateTool } from "../lib/mcp-templates.ts";
 import { buildContent, contentFields } from "../lib/page-content.ts";
 import { versionAuthor } from "../lib/page-versions.ts";
-// The aired skill, bundled as text (wrangler.toml [[rules]]), served as a resource.
-import skill from "../../../cli/SKILL.md";
+// The aired skills, bundled as text (wrangler.toml [[rules]]), served as resources.
+import { SKILL_FILES } from "../lib/skill-files.ts";
 
 /**
  * A tool call passed to the HTTP API in-process. A signed-in caller's (API
@@ -126,7 +126,7 @@ export function createAiredMcpServer(
 ) {
   const server = new McpServer({
     name: "aired",
-    version: "1.7.0",
+    version: "1.8.0",
   });
   const origin = siteOrigin(env);
 
@@ -683,7 +683,7 @@ export function createAiredMcpServer(
     origin,
     signedIn: signedIn !== null,
     get: (path) => callApi("GET", path),
-    skill,
+    skills: SKILL_FILES,
     ResourceTemplate,
   });
 

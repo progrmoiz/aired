@@ -3,6 +3,7 @@ import { register } from "node:module";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { skillsText } from "./helpers/skills.ts";
 import { fakeD1 } from "./helpers/d1.ts";
 
 // routes/mcp.ts bundles the skill as text (wrangler [[rules]]): load .md the
@@ -494,9 +495,10 @@ test("wiring: every content write goes through updatePage, and housekeeping and 
 });
 
 test("the docs cover history, and state the same retention as the config", () => {
-  const read = (f: string) => readFileSync(new URL(`../../../${f}`, import.meta.url), "utf8");
+  // "apps/cli skills": apps/cli/SKILL.md, its references and the skills under apps/cli/skills.
+  const read = (f: string) => (f === "apps/cli skills" ? skillsText() : readFileSync(new URL(`../../../${f}`, import.meta.url), "utf8"));
   const { free, pro } = VERSION_LIMITS;
-  for (const f of ["apps/cli/SKILL.md", "apps/web/docs.html", "apps/web/llms.txt", "apps/web/llms-full.txt"]) {
+  for (const f of ["apps/cli skills", "apps/web/docs.html", "apps/web/llms.txt", "apps/web/llms-full.txt"]) {
     const s = read(f);
     for (const want of ["aired versions", "aired restore", "list_versions", "restore_version"]) assert.ok(s.includes(want), `${f} misses ${want}`);
     assert.ok(s.includes(`last ${free.versions}`), `${f}: Free keeps the last ${free.versions}`);

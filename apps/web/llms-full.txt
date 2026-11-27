@@ -28,7 +28,15 @@ aired is the wrong tool when:
 npx skills add progrmoiz/aired -g
 ```
 
-Drops a `SKILL.md` into the project. Any AI agent that reads SKILL.md (Claude Code, Cursor, Windsurf, Continue, Cline) discovers aired and learns when to use it. The skill includes a paste-ready prompt explaining the API.
+Installs aired's skills, so any agent that reads skills (Claude Code, Cursor, Windsurf, Codex) learns when and how to use aired. Add `-a claude-code` to install for Claude Code without being asked. Five skills:
+
+- `aired`: the core skill. Publishing, updating, sign-in, limits, and which skill to load next, with reference files for every CLI command, every MCP tool, app builds and errors.
+- `aired-slides`: Markdown or HTML decks, speaker notes, slide links, the speaker view, a check before sharing.
+- `aired-dashboard`: live dashboards that read `aired.data`, `update_data`, the refresh pattern and data limits.
+- `aired-report`: client reports and one-pagers, sharing with a PIN or named people, versions and restore.
+- `aired-forms`: pages that save what visitors enter with `aired.collect`, the privacy notice, `get_responses` and CSV.
+
+They ship in the npm package (`SKILL.md`, `references/`, `skills/`), so `cp -R "$(npm root -g)/aired/skills/." ~/.claude/skills/` copies the four use-case skills after `npm install -g aired` (copy `SKILL.md` and `references/` into `~/.claude/skills/aired/` for the core one).
 
 ### 2. CLI
 
@@ -91,7 +99,7 @@ Markdown and decks: `markdown` renders as a reading page (highlighted code, tabl
 
 Prompts (slash commands in clients that show them): `publish_report(about?, audience?)`, `make_slide_deck(topic?, slides?)` (uses the deck template, with speaker notes), `share_privately(what?, expires?, pin?)`, `check_and_fix(page?)`.
 
-Resources: `skill://aired/SKILL.md` (text/markdown, the aired skill) for every caller. Signed in (API key, /mcp/account, or `aired login` for the local server): `aired://page/{id}` for each of your pages (the newest 50 are listed), whose content is the page's HTML (or its Markdown, for a Markdown page). Another account's page or an anonymous page is refused.
+Resources: the skills, as text/markdown, for every caller: `skill://aired/SKILL.md` (the core skill), `skill://aired/references/cli.md`, `mcp.md`, `bundling.md` and `troubleshooting.md` (its references), and `skill://aired/aired-slides/SKILL.md`, `skill://aired/aired-dashboard/SKILL.md`, `skill://aired/aired-report/SKILL.md`, `skill://aired/aired-forms/SKILL.md`. The `make_slide_deck` prompt points at aired-slides; `publish_report` and `share_privately` at aired-report. Signed in (API key, /mcp/account, or `aired login` for the local server): `aired://page/{id}` for each of your pages (the newest 50 are listed), whose content is the page's HTML (or its Markdown, for a Markdown page). Another account's page or an anonymous page is refused.
 
 ### 4. HTTP API
 

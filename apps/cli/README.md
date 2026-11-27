@@ -125,7 +125,19 @@ Spawn the MCP server for AI tool integration:
 aired --mcp
 ```
 
-This starts a stdio MCP server with a `publish_html` tool. Configure in your AI tool's MCP settings.
+This starts a stdio MCP server with `publish_html`, `get_page`, `set_options`, `list_versions`, `restore_version`, `check_page`, `get_template`, `get_responses`, `update_data` and `send_feedback`. Configure it in your AI tool's MCP settings, or `claude mcp add aired -- npx aired --mcp`.
+
+---
+
+## Skills
+
+This package ships five agent skills: `SKILL.md` (the core `aired` skill) with `references/`, and `skills/aired-slides`, `skills/aired-dashboard`, `skills/aired-report` and `skills/aired-forms`. Install them for Claude Code with:
+
+```bash
+npx skills add progrmoiz/aired -g -a claude-code
+```
+
+Or copy them from the package into `~/.claude/skills/` (the core skill goes in `~/.claude/skills/aired/`). The MCP server also serves each one as a resource: `skill://aired/SKILL.md` and `skill://aired/<name>/SKILL.md`.
 
 ---
 

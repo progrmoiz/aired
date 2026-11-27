@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { skillsText } from "./helpers/skills.ts";
 import { blockedFieldName, looksLikeCardNumber, validateEntryKey, validateLiveData, validateRecord } from "../src/lib/collect-validate.ts";
 import { csvCell, toCsv } from "../src/lib/collect-csv.ts";
 import { collectRuntime, usesDataLayer } from "../src/lib/collect-runtime.ts";
@@ -104,11 +105,12 @@ test("MCP shapes: get_responses output, CSV, and set_options' data-layer fields"
 });
 
 test("the docs give the limits the config has", () => {
-  const read = (f: string) => readFileSync(new URL(`../../../${f}`, import.meta.url), "utf8");
+  // "apps/cli skills": apps/cli/SKILL.md, its references and the skills under apps/cli/skills.
+  const read = (f: string) => (f === "apps/cli skills" ? skillsText() : readFileSync(new URL(`../../../${f}`, import.meta.url), "utf8"));
   const { free, pro } = COLLECT_LIMITS;
   assert.deepEqual([free.responsesPerMonth, free.retentionDays, free.liveDataBytes], [300, 90, 64 * 1024]);
   assert.deepEqual([pro.responsesPerMonth, pro.retentionDays, pro.liveDataBytes], [10_000, null, 1024 * 1024]);
-  for (const f of ["apps/web/docs.html", "apps/web/llms.txt", "apps/web/llms-full.txt", "apps/cli/SKILL.md"]) {
+  for (const f of ["apps/web/docs.html", "apps/web/llms.txt", "apps/web/llms-full.txt", "apps/cli skills"]) {
     const s = read(f);
     for (const want of ["aired.collect", "aired.data", "get_responses", "update_data", "300", "10,000", "90 days"]) assert.ok(s.includes(want), `${f} misses ${want}`);
   }
