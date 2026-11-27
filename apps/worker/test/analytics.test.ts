@@ -5,7 +5,7 @@ import { Hono } from "hono";
 import { fakeD1 } from "./helpers/d1.ts";
 import { countCountryView, countPageView, countryTotals, pageViewCounts, viewCountOf } from "../src/lib/view-counts.ts";
 import { referrerHost, viewEvent, viewerCountry } from "../src/lib/view-event.ts";
-import { buildQueries, dayList, parseRange, runQuery, scopeFilter, shapeReport } from "../src/lib/analytics.ts";
+import { buildQueries, dayList, parseOffset, parseRange, runQuery, scopeFilter, shapeReport, windowDays } from "../src/lib/analytics.ts";
 import { analytics } from "../src/routes/analytics.ts";
 import { insertPageRow, rowFromMetadata } from "../src/lib/pages-store.ts";
 
@@ -123,22 +123,25 @@ test("the dataset is bound in wrangler.toml", () => {
 
 // ─── Query building ───
 
-test("a page's queries filter on its index and the range", () => {
-  const q = buildQueries({ kind: "page", id: "Ab_9-x" }, 7);
-  for (const sql of [q.days, q.countries, q.referrers]) {
-    assert.match(sql, /FROM aired_views WHERE index1 = 'Ab_9-x' AND timestamp > NOW\(\) - INTERVAL '7' DAY/);
+test("a page's queries filter on its index and the window's exact UTC days", () => {
+  const q = buildQueries({ kind: "page", id: "Ab_9-x" }, { range: 7, offset: 0 }, NOW);
+  for (const sql of [q.dayHosts, q.countries, q.referrers]) {
+    assert.match(sql, /FROM aired_views WHERE index1 = 'Ab_9-x' AND timestamp > NOW\(\) - INTERVAL '8' DAY AND blob5 >= '2026-11-21' AND blob5 <= '2026-11-27'/);
     assert.match(sql, /SUM\(_sample_interval\) AS views/);
   }
-  assert.match(q.days, /SELECT blob5 AS bucket, .* GROUP BY bucket ORDER BY bucket ASC/);
-  assert.match(q.countries, /SELECT blob3 AS code, .* ORDER BY views DESC LIMIT 8/);
+  // The days query also reads the 7 days before, for the comparison.
+  assert.match(q.days, /SELECT blob5 AS bucket, SUM\(_sample_interval\) AS views FROM aired_views WHERE index1 = 'Ab_9-x' AND timestamp > NOW\(\) - INTERVAL '15' DAY AND blob5 >= '2026-11-14' AND blob5 <= '2026-11-27' GROUP BY bucket ORDER BY bucket ASC/);
+  assert.match(q.dayHosts, /SELECT blob5 AS bucket, blob4 AS host, .* GROUP BY bucket, host ORDER BY views DESC LIMIT 1000/);
+  assert.match(q.countries, /SELECT blob3 AS code, .* ORDER BY views DESC LIMIT 50/);
   assert.match(q.referrers, /SELECT blob4 AS host, /);
   assert.equal(q.pages, undefined);
 });
 
-test("an owner's queries filter on the owner blob and add top pages", () => {
-  const q = buildQueries({ kind: "owner", ownerId: 33980210 }, 90);
-  assert.match(q.days, /WHERE blob2 = '33980210' AND timestamp > NOW\(\) - INTERVAL '90' DAY/);
-  assert.match(q.pages!, /SELECT blob1 AS id, SUM\(_sample_interval\) AS views .* LIMIT 8/);
+test("an offset steps back whole windows", () => {
+  const q = buildQueries({ kind: "owner", ownerId: 33980210 }, { range: 30, offset: 2 }, NOW);
+  assert.match(q.countries, /WHERE blob2 = '33980210' AND timestamp > NOW\(\) - INTERVAL '91' DAY AND blob5 >= '2026-08-30' AND blob5 <= '2026-09-28'/);
+  assert.match(q.pages!, /SELECT blob1 AS id, SUM\(_sample_interval\) AS views .* LIMIT 50/);
+  assert.deepEqual(windowDays({ range: 7, offset: 1 }, NOW), ["2026-11-14", "2026-11-15", "2026-11-16", "2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20"]);
 });
 
 test("nothing from the request reaches the SQL unchecked", () => {
@@ -146,20 +149,30 @@ test("nothing from the request reaches the SQL unchecked", () => {
   assert.throws(() => scopeFilter({ kind: "page", id: "" }));
   assert.throws(() => scopeFilter({ kind: "owner", ownerId: 1.5 }));
   assert.throws(() => scopeFilter({ kind: "owner", ownerId: -3 }));
-  assert.throws(() => buildQueries({ kind: "owner", ownerId: 1 }, 15 as never));
+  assert.throws(() => buildQueries({ kind: "owner", ownerId: 1 }, { range: 15 as never, offset: 0 }, NOW));
+  assert.throws(() => buildQueries({ kind: "owner", ownerId: 1 }, { range: 30, offset: 3 }, NOW), "past three months");
+  assert.throws(() => buildQueries({ kind: "owner", ownerId: 1 }, { range: 7, offset: -1 }, NOW));
 });
 
-test("ranges are 7, 30 or 90 days, 30 by default", () => {
+test("ranges are 7, 30 or 90 days, 30 by default; offsets stay within 90 days", () => {
   assert.equal(parseRange(undefined), 30);
   assert.equal(parseRange(""), 30);
   assert.equal(parseRange("7"), 7);
   assert.equal(parseRange("90"), 90);
   assert.equal(parseRange("365"), null);
   assert.equal(parseRange("7; DROP"), null);
+  assert.equal(parseOffset(undefined, 30), 0);
+  assert.equal(parseOffset("2", 30), 2);
+  assert.equal(parseOffset("3", 30), null);
+  assert.equal(parseOffset("11", 7), 11);
+  assert.equal(parseOffset("12", 7), null);
+  assert.equal(parseOffset("1", 90), null);
+  assert.equal(parseOffset("-1", 7), null);
+  assert.equal(parseOffset("1.5", 7), null);
 });
 
-test("a report has every day in the range, zeros included, and numbers sent as strings", () => {
-  const r = shapeReport(7, {
+test("a report has every day in the window, zeros included, and numbers sent as strings", () => {
+  const r = shapeReport({ range: 7, offset: 0 }, {
     days: [{ bucket: "2026-11-27", views: "5" }, { bucket: "2026-11-25", views: 2 }, { bucket: "2026-10-01", views: 9 }],
     countries: [{ code: "US", views: "6" }, { code: "", views: 1 }, { code: "DE", views: 0 }],
     referrers: [{ host: "", views: 4 }, { host: "slack.com", views: 3 }],
@@ -167,9 +180,25 @@ test("a report has every day in the range, zeros included, and numbers sent as s
   assert.deepEqual(r.days.map((d) => d.day), dayList(7, NOW));
   assert.equal(r.days.length, 7);
   assert.deepEqual(r.days.map((d) => d.views), [0, 0, 0, 0, 2, 0, 5]);
-  assert.equal(r.total, 7, "days outside the range don't count");
+  assert.equal(r.total, 7, "days outside the window don't count");
+  assert.equal(r.previousTotal, null, "no views the week before: nothing to compare with");
   assert.deepEqual(r.countries, [{ code: "US", views: 6 }, { code: "XX", views: 1 }]);
   assert.deepEqual(r.referrers, [{ host: "", views: 4 }, { host: "slack.com", views: 3 }]);
+});
+
+test("the report compares with the window before and names the busiest day's top source", () => {
+  const r = shapeReport({ range: 7, offset: 0 }, {
+    days: [{ bucket: "2026-11-14", views: 3 }, { bucket: "2026-11-20", views: 7 }, { bucket: "2026-11-24", views: 9 }, { bucket: "2026-11-26", views: 4 }],
+    dayHosts: [{ bucket: "2026-11-24", host: "", views: 3 }, { bucket: "2026-11-24", host: "app.slack.com", views: 6 }, { bucket: "2026-11-26", host: "t.co", views: 4 }],
+    countries: [],
+    referrers: [],
+  }, NOW);
+  assert.equal(r.total, 13);
+  assert.equal(r.previousTotal, 10);
+  assert.deepEqual(r.peak, { day: "2026-11-24", views: 9, host: "app.slack.com" });
+  const empty = shapeReport({ range: 7, offset: 0 }, { days: [], countries: [], referrers: [] }, NOW);
+  assert.equal(empty.peak, null);
+  assert.equal(empty.total, 0);
 });
 
 test("runQuery posts the SQL with the token and reads the JSON rows", async () => {
@@ -271,16 +300,23 @@ test("with billing off everyone is Free, so analytics is locked", async () => {
 test("Pro sees their own page's numbers", async () => {
   const { env, db } = setup();
   await addPage(db, "mine", PRO_UID);
-  const f = stubFetch((sql) => (sql.includes("blob3") ? [{ code: "US", views: "4" }] : sql.includes("blob5") ? [{ bucket: new Date().toISOString().slice(0, 10), views: 4 }] : []));
+  const today = new Date().toISOString().slice(0, 10);
+  const f = stubFetch((sql) =>
+    sql.startsWith("SELECT blob3 AS code") ? [{ code: "US", views: "4" }]
+      : sql.startsWith("SELECT blob5 AS bucket, SUM") ? [{ bucket: today, views: 4 }]
+        : sql.startsWith("SELECT blob5 AS bucket, blob4") ? [{ bucket: today, host: "t.co", views: 4 }]
+          : []);
   try {
     const res = await appFor(PRO_UID).request("/api/me/analytics/pages/mine?range=7", {}, env, ctx);
     assert.equal(res.status, 200);
-    const body = (await res.json()) as { total: number; days: unknown[]; countries: unknown[]; page: { id: string } };
+    const body = (await res.json()) as { total: number; days: unknown[]; countries: unknown[]; page: { id: string }; peak: unknown; previousTotal: unknown };
     assert.equal(body.days.length, 7);
     assert.equal(body.total, 4);
+    assert.deepEqual(body.peak, { day: today, views: 4, host: "t.co" });
+    assert.equal(body.previousTotal, null);
     assert.deepEqual(body.countries, [{ code: "US", views: 4 }]);
     assert.equal(body.page.id, "mine");
-    assert.equal(f.sent.length, 3);
+    assert.equal(f.sent.length, 4);
     assert.ok(f.sent.every((sql) => sql.includes("index1 = 'mine'")));
     assert.equal(res.headers.get("Cache-Control"), "private, no-store");
   } finally {
@@ -325,6 +361,7 @@ test("the summary lists only pages the caller still owns, with titles", async ()
 test("a bad range is 400, and no token set up is 503", async () => {
   const { env } = setup();
   assert.equal((await appFor(PRO_UID).request("/api/me/analytics?range=365", {}, env, ctx)).status, 400);
+  assert.equal((await appFor(PRO_UID).request("/api/me/analytics?range=30&offset=3", {}, env, ctx)).status, 400);
   const res = await appFor(PRO_UID).request("/api/me/analytics", {}, setup({ CF_ANALYTICS_TOKEN: "" }).env, ctx);
   assert.equal(res.status, 503);
   assert.equal(((await res.json()) as { code: string }).code, "analytics_unavailable");

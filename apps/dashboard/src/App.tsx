@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { AccountMenu } from '@/components/account-menu'
 import { SiteFooter } from '@/components/site-chrome'
@@ -11,7 +11,9 @@ import { PagesView } from '@/views/pages-view'
 import { ConnectView } from '@/views/connect-view'
 import { BillingView } from '@/views/billing-view'
 import { AccountView } from '@/views/account-view'
-import { ViewsView } from '@/views/views-view'
+
+// The Views page (charts, flags, brand icons) loads only when it's opened.
+const ViewsView = lazy(() => import('@/views/views-view').then((m) => ({ default: m.ViewsView })))
 
 export type PagesState =
   | { status: 'loading' }
@@ -76,7 +78,7 @@ export default function App() {
       />
       <main id="main" className="mx-auto w-full max-w-(--aired-page-max) min-w-0 flex-1 px-5 pt-8 pb-20 sm:px-8 sm:pt-10">
         {view === 'pages' && <PagesView pages={pages} reload={reloadPages} removePage={removePage} isPro={plan.loaded && plan.isPro} />}
-        {view === 'views' && <ViewsView pageId={sub} pages={pages} />}
+        {view === 'views' && <Suspense fallback={<div aria-busy="true" className="min-h-[60vh]" />}><ViewsView pageId={sub} pages={pages} /></Suspense>}
         {view === 'connect' && <ConnectView />}
         {view === 'billing' && <BillingView {...planApi} />}
         {view === 'account' && <AccountView user={user} />}

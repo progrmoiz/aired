@@ -3,17 +3,20 @@ import type { AppBindings } from '../types.js';
 import { getEntitlements, planLimitError } from '../lib/entitlements.ts';
 import { siteOrigin } from '../lib/origin.ts';
 import { getPageRow } from '../lib/pages-store.ts';
-import { analyticsConfig, demoReport, loadReport, parseRange, type Range, type Report, type Scope } from '../lib/analytics.ts';
+import { MAX_DAYS, analyticsConfig, demoReport, loadReport, parseOffset, parseRange, type Report, type Scope, type Window } from '../lib/analytics.ts';
 
 /**
  * /api/me/analytics: Pro analytics from Analytics Engine (lib/analytics.ts).
  *
- *   GET /api/me/analytics?range=7|30|90            all the caller's pages
- *   GET /api/me/analytics/pages/:id?range=7|30|90  one page they own
+ *   GET /api/me/analytics?range=7|30|90&offset=N            all the caller's pages
+ *   GET /api/me/analytics/pages/:id?range=7|30|90&offset=N  one page they own
+ *
+ * `offset` steps back whole windows (0, the default, ends today), as far as
+ * Analytics Engine keeps data.
  *
  * Signed out: 401. Free: 402 plan_limit with an upgrade link. Someone
  * else's page or a deleted one: 404. No token set up: 503. Answers are
- * cached for five minutes per scope and range.
+ * cached for five minutes per scope and window.
  *
  * Only .ts imports (and types), so tests run it with app.request().
  */
@@ -33,10 +36,10 @@ analytics.use('*', async (c, next): Promise<Response | void> => {
 });
 
 analytics.get('/', async (c) => {
-  const range = parseRange(c.req.query('range'));
-  if (range === null) return c.json({ error: 'range must be 7, 30 or 90' }, 400);
+  const w = windowOf(c);
+  if (w instanceof Response) return w;
   const ownerId = c.get('user')!.id;
-  const report = await answer(c, { kind: 'owner', ownerId }, range);
+  const report = await answer(c, { kind: 'owner', ownerId }, w);
   if (report instanceof Response) return report;
   // Top pages get their titles, and pages no longer theirs are left out.
   const ids = (report.pages ?? []).map((p) => p.id);
@@ -60,8 +63,8 @@ analytics.get('/', async (c) => {
 });
 
 analytics.get('/pages/:id', async (c) => {
-  const range = parseRange(c.req.query('range'));
-  if (range === null) return c.json({ error: 'range must be 7, 30 or 90' }, 400);
+  const w = windowOf(c);
+  if (w instanceof Response) return w;
   const id = c.req.param('id');
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) return c.json({ error: 'Page not found' }, 404);
   let row;
@@ -75,7 +78,7 @@ analytics.get('/pages/:id', async (c) => {
   if (row === null || row.deletedAt !== null || row.ownerId !== c.get('user')!.id) {
     return c.json({ error: 'Page not found' }, 404);
   }
-  const report = await answer(c, { kind: 'page', id }, range);
+  const report = await answer(c, { kind: 'page', id }, w);
   if (report instanceof Response) return report;
   return c.json({ ...report, page: { id: row.id, title: row.title } });
 });
@@ -83,20 +86,29 @@ analytics.get('/pages/:id', async (c) => {
 type Ctx = Context<AppBindings>;
 
 /** The report from the cache, demo data, or Analytics Engine; or an error response. */
-async function answer(c: Ctx, scope: Scope, range: Range): Promise<Report | Response> {
+/** The window from ?range and ?offset, or a 400. */
+function windowOf(c: Ctx): Window | Response {
+  const range = parseRange(c.req.query('range'));
+  if (range === null) return c.json({ error: 'range must be 7, 30 or 90' }, 400);
+  const offset = parseOffset(c.req.query('offset'), range);
+  if (offset === null) return c.json({ error: `offset must be a whole number, within the last ${MAX_DAYS} days` }, 400);
+  return { range, offset };
+}
+
+async function answer(c: Ctx, scope: Scope, w: Window): Promise<Report | Response> {
   c.header('Cache-Control', 'private, no-store');
   const now = Date.now();
   if (c.env.ANALYTICS_DEMO === '1') {
     let ids: string[] = [];
     if (scope.kind === 'owner') {
       const { results } = await c.env.DB.prepare(
-        'SELECT id FROM pages WHERE owner_id = ? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 8',
+        'SELECT id FROM pages WHERE owner_id = ? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 20',
       )
         .bind(scope.ownerId)
         .all<{ id: string }>();
       ids = results.map((r) => r.id);
     }
-    return demoReport(scope, range, now, ids);
+    return demoReport(scope, w, now, ids);
   }
   const config = analyticsConfig(c.env);
   if (config === null) {
@@ -104,7 +116,7 @@ async function answer(c: Ctx, scope: Scope, range: Range): Promise<Report | Resp
   }
 
   const cacheKey = new Request(
-    `https://analytics.aired.internal/${scope.kind === 'page' ? `page/${scope.id}` : `owner/${scope.ownerId}`}?range=${range}`,
+    `https://analytics.aired.internal/${scope.kind === 'page' ? `page/${scope.id}` : `owner/${scope.ownerId}`}?range=${w.range}&offset=${w.offset}`,
   );
   const cache = typeof caches === 'undefined' ? null : caches.default;
   const hit = await cache?.match(cacheKey).catch(() => undefined);
@@ -112,7 +124,7 @@ async function answer(c: Ctx, scope: Scope, range: Range): Promise<Report | Resp
 
   let report: Report;
   try {
-    report = await loadReport((url, init) => fetch(url, init), config, scope, range, now);
+    report = await loadReport((url, init) => fetch(url, init), config, scope, w, now);
   } catch (err) {
     console.error({ event: 'analytics_query_failed', scope: scope.kind, error: err instanceof Error ? err.message : String(err) });
     return c.json({ error: 'Could not load the numbers. Please try again.' }, 503);
