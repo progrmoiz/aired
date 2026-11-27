@@ -61,6 +61,8 @@ import {
   setOptionsInput,
 } from "../lib/mcp-shapes.ts";
 import { registerPrompts, registerResources } from "../lib/mcp-extras.ts";
+import { OWNER_REQUIRED_MESSAGE, replaceAllowed } from "../lib/page-options.ts";
+import { pageHasResponses } from "../lib/collect-store.ts";
 import { CONTENT_INPUT, GET_PAGE_DESCRIPTION, getPageInput, MISSING_CONTENT, registerTemplateTool } from "../lib/mcp-templates.ts";
 import { buildContent, contentFields } from "../lib/page-content.ts";
 // The aired skill, bundled as text (wrangler.toml [[rules]]), served as a resource.
@@ -234,6 +236,20 @@ function createAiredMcpServer(
           };
         }
 
+        // A page that has collected responses needs its signed-in owner
+        // (lib/page-options.ts replaceAllowed); this path is token-only.
+        if (page.row.ownerId !== null) {
+          let hasResponses: boolean;
+          try {
+            hasResponses = await pageHasResponses(env.DB, page.row.id);
+          } catch (err) {
+            console.error("responses lookup failed on MCP update", { id: existingId, err });
+            return { content: [{ type: "text" as const, text: "Could not check this page. Please try again." }], isError: true };
+          }
+          if (!replaceAllowed({ ownerId: page.row.ownerId, userId: null, hasResponses })) {
+            return { content: [{ type: "text" as const, text: OWNER_REQUIRED_MESSAGE }], isError: true };
+          }
+        }
         // Same update as the API: title, size and expiry move with the HTML.
         const { metadata: updated, htmlEtag } = await updatePage(env, page, pageHtml, resolvedTitle, Date.now(), content.sidecar);
         // Link-preview screenshot, after the response (lib/og-render.ts).

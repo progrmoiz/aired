@@ -11,7 +11,8 @@ import { claimUrl } from "../lib/claim-url.js";
 import { hashPin } from "../lib/pin-hash.js";
 import { authorizePageWrite } from "../lib/claim-decision.js";
 import { createPage, deletePage, loadPage, PageGone, setPageOptions, StorageUnavailable, updatePage, type LoadedPage } from "../lib/page-write.ts";
-import { changedSettings, pageAccess, pageDetails, parseOptions, settingsChange } from "../lib/page-options.ts";
+import { changedSettings, OWNER_REQUIRED_MESSAGE, pageAccess, pageDetails, parseOptions, replaceAllowed, settingsChange } from "../lib/page-options.ts";
+import { pageHasResponses } from "../lib/collect-store.ts";
 import { feedbackAllowed, feedbackId, insertFeedback, NOT_SUPPORT, parseFeedback } from "../lib/feedback.ts";
 import { visitorNetwork } from "../lib/pin-guess.ts";
 import { billingEnabled, getEntitlements, planLimitError, upgradeUrl } from "../lib/entitlements.js";
@@ -170,6 +171,8 @@ api.post("/publish", publishRateLimit, async (c) => {
 
     const valid = await verifyToken(update_token, creds.tokenHash);
     if (!valid) return invalidToken(c);
+    const refusal = await replaceRefusal(c, page);
+    if (refusal !== null) return refusal;
 
     // An anonymous page is screened on update whoever sends it, so a clean
     // page can't be swapped for spam (as PUT does).
@@ -302,6 +305,8 @@ api.put("/pages/:id", requireCsrfHeader, async (c) => {
   });
 
   if (!auth.ok) return auth.reason === "bad_token" ? invalidToken(c) : noCredential(c);
+  const refusal = await replaceRefusal(c, page);
+  if (refusal !== null) return refusal;
 
   // Anonymous pages are screened on update too, so a clean page can't be
   // swapped for spam after publishing.
@@ -397,6 +402,20 @@ export function sentUpdateToken(c: Context<AppBindings>, bodyToken?: unknown): s
   if (typeof bodyToken === "string" && bodyToken !== "") return bodyToken;
   if (header !== undefined && header.trim() !== "") return header.trim();
   return readUpdateToken(undefined, c.req.header("Authorization"));
+}
+
+/** null when this caller may replace the page's content; else the refusal (see replaceAllowed). */
+async function replaceRefusal(c: Context<AppBindings>, page: LoadedPage): Promise<Response | null> {
+  if (page.row.ownerId === null) return null; // anonymous pages can't collect responses
+  let hasResponses: boolean;
+  try {
+    hasResponses = await pageHasResponses(c.env.DB, page.row.id);
+  } catch (err) {
+    console.error("responses lookup failed before replace", { id: page.row.id, err });
+    return apiError(c, 503, "unavailable", "Could not check this page. Please try again.");
+  }
+  const userId = c.get("user")?.id ?? null;
+  return replaceAllowed({ ownerId: page.row.ownerId, userId, hasResponses }) ? null : apiError(c, 403, "owner_required", OWNER_REQUIRED_MESSAGE);
 }
 
 /** The token or signed-in owner check shared by details and PATCH (lib/page-options.ts). */
