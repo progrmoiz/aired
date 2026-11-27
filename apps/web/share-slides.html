@@ -153,12 +153,22 @@
   <div class="right"><a class="login" id="nav-auth" href="/auth/login?return=/dashboard">Log in</a><a class="start" href="#publish" data-publish>Start free</a></div>
 </div></header>
 
-<main class="wrap">
-  <section class="hero inner" id="publish">
-    <div>
-      <div class="crumbrow"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">aired</a><span aria-hidden="true">/</span><a href="/guides">Guides</a><span aria-hidden="true">/</span><span>Share slides</span></nav><div class="aimenu" data-agent="share-slides" data-task="make a slide deck and share it as an aired link"><button type="button" class="aimenu-copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy page</span></button><button type="button" class="aimenu-more" aria-haspopup="menu" aria-expanded="false" aria-label="More ways to use this page with AI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div></div>
-      <h1>Share your slides as a link</h1>
-      <p class="lede">Write a deck in Markdown, or let Claude or ChatGPT make one in HTML. Publish it here and send one link: people click through it on any device, you present it full screen, and your speaker notes stay private.</p>
+<main class="wrap g2">
+  <header class="g2-top">
+    <div class="crumbrow"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">aired</a><span aria-hidden="true">/</span><a href="/guides">Guides</a><span aria-hidden="true">/</span><span>Share slides</span></nav><div class="aimenu" data-agent="share-slides" data-task="make a slide deck and share it as an aired link"><button type="button" class="aimenu-copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy page</span></button><button type="button" class="aimenu-more" aria-haspopup="menu" aria-expanded="false" aria-label="More ways to use this page with AI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div></div>
+    <h1 class="g2-title">Share your slides as a link</h1>
+    <p class="g2-lead"><b>Write your slides in Markdown, publish them, and present from the link.</b> Your speaker notes stay private.</p>
+    <p class="g2-meta"><span>5 min read</span><span>Updated November 2026</span></p>
+  </header>
+
+  <ol class="g2-steps">
+    <li><div class="g2-vis" aria-hidden="true"><span class="g2-file">deck.md</span></div><b>Write it in Markdown</b><p>Three dashes between slides, or use HTML.</p></li>
+    <li><div class="g2-vis" aria-hidden="true"><span class="g2-link">aired.sh/p/q3-update#/2</span></div><b>Publish and share</b><p>Every slide has its own link.</p></li>
+    <li><div class="g2-vis" aria-hidden="true"><span class="g2-send"><span>&rarr; <em>next slide</em></span><span>S <em>speaker view</em></span></span></div><b>Present anywhere</b><p>Arrow keys, a clicker, or swipe on a phone.</p></li>
+  </ol>
+
+  <section class="g2-try" id="publish" aria-labelledby="try-title">
+    <div class="g2-try-head"><h2 id="try-title">Do it here</h2><p>Drop a Markdown deck or HTML slides.</p></div>
       <form id="air-form" class="form" aria-label="Publish HTML">
         <div class="paste-area">
           <div id="empty-hint" class="hint" aria-hidden="true">Paste a Markdown deck or HTML, or drop a file<small>.md or .html · 2 MB max</small></div>
@@ -187,18 +197,9 @@
         <button type="button" id="new-btn" class="again">Publish another</button>
       </div>
       <p class="proof"><b data-stat="publishes">10,827</b> pages published · opened <b data-stat="views">102,156</b> times</p>
-    </div>
-    <div class="side-vis">
-      <div class="seen-cap"><span>What they open</span><span class="mono">aired.sh/p/q3-update#/<span data-deck-url>2</span></span></div>
-      <div class="deckvis" data-deck role="img" aria-label="Example slides: what we shipped, what it changed, next quarter"><section class="on" data-n="2"><b>What we shipped</b><span>• Faster checkout: two steps instead of five</span><span>• New dashboard for account managers</span></section><section data-n="3"><b>What it changed</b><span>• 18% fewer people leave at checkout</span><span>• 40% fewer support tickets</span></section><section data-n="4"><b>Next quarter</b><span>• Mobile app beta</span><span>• Team accounts</span></section><span class="n" data-deck-n>2</span></div>
-      <div class="deckbar" aria-hidden="true"><i>‹ <span data-deck-count>2</span> / 7 ›</i><i>Present</i><i>Copy slide link</i></div>
-      <ul class="ticklist side-ticks"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span><b>Present anywhere.</b> Arrow keys, a clicker, or swipe on a phone.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span><b>A link per slide.</b> Add #/3 to open slide 3.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span><b>Notes stay yours.</b> Viewers never get them.</span></li></ul>
-    </div>
   </section>
 
-  <div class="doc-grid">
-    <aside class="toc" aria-label="On this page"><p>On this page</p><a href="#markdown">Write it in Markdown</a><a href="#html">Or use HTML slides</a><a href="#present">Present it</a><a href="#notes">Speaker notes</a><a href="#agents">Let your AI make the deck</a><a href="#faq">Questions</a></aside>
-    <article class="prose">
+  <article class="prose g2-prose">
       <h2 id="markdown">Write it in Markdown</h2>
       <p>The quickest deck is a Markdown file. Put <code>type: deck</code> at the top and three dashes between slides:</p>
 <pre><code>---
@@ -267,10 +268,8 @@ Note: Welcome everyone. Ten minutes, then questions.
         <details><summary>Can Claude or ChatGPT write the deck?<i></i></summary><p>Yes. Ask for a Markdown deck with --- between slides and Note: lines for what you'll say, or, if you've connected aired to your AI app, use aired's ready-made make_slide_deck prompt, which starts from aired's deck template.</p></details>
         <details><summary>Is it free?<i></i></summary><p>Yes. Publishing, presenting and viewing are free. Speaker notes need a free account, so aired knows the deck is yours.</p></details>
       </div>
-
-      <p class="updated">Updated November 2026.</p>
-    </article>
-  </div>
+    
+  </article>
 
   <section class="more">
     <div class="sec-head"><p class="eyebrow">Guides</p><h2>More ways to share what you made</h2></div>

@@ -152,12 +152,22 @@
   <div class="right"><a class="login" id="nav-auth" href="/auth/login?return=/dashboard">Log in</a><a class="start" href="#publish" data-publish>Start free</a></div>
 </div></header>
 
-<main class="wrap">
-  <section class="hero inner" id="publish">
-    <div>
-      <div class="crumbrow"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">aired</a><span aria-hidden="true">/</span><a href="/guides">Guides</a><span aria-hidden="true">/</span><span>Share a Vite app</span></nav><div class="aimenu" data-agent="share-vite-app" data-task="build my Vite app as one HTML file and share it as an aired link"><button type="button" class="aimenu-copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy page</span></button><button type="button" class="aimenu-more" aria-haspopup="menu" aria-expanded="false" aria-label="More ways to use this page with AI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div></div>
-      <h1>Share a Vite or React app as one link</h1>
-      <p class="lede">You built a tool with Vite, <a href="https://toolcraft.sh" target="_blank" rel="noopener">Toolcraft</a> (an open-source kit for building design apps), Claude Code or Cursor, and it only runs on your localhost. Build it as one HTML file, publish it, and send your client a link that opens the working app. No deploy and no hosting account.</p>
+<main class="wrap g2">
+  <header class="g2-top">
+    <div class="crumbrow"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">aired</a><span aria-hidden="true">/</span><a href="/guides">Guides</a><span aria-hidden="true">/</span><span>Share a Vite app</span></nav><div class="aimenu" data-agent="share-vite-app" data-task="build my Vite app as one HTML file and share it as an aired link"><button type="button" class="aimenu-copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy page</span></button><button type="button" class="aimenu-more" aria-haspopup="menu" aria-expanded="false" aria-label="More ways to use this page with AI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div></div>
+    <h1 class="g2-title">Share a Vite or React app as one link</h1>
+    <p class="g2-lead"><b>Build your app as one HTML file and publish it.</b> Your client opens the working app from a link, with nothing to install and no hosting to set up.</p>
+    <p class="g2-meta"><span>5 min read</span><span>Updated November 2026</span></p>
+  </header>
+
+  <ol class="g2-steps">
+    <li><div class="g2-vis" aria-hidden="true"><span class="g2-file">vite-plugin-singlefile</span></div><b>Add one plugin</b><p>It puts every script, style and image in one file.</p></li>
+    <li><div class="g2-vis" aria-hidden="true"><span class="g2-file">dist-single/index.html</span></div><b>Build one file</b><p>A second build config; your normal build stays as it is.</p></li>
+    <li><div class="g2-vis" aria-hidden="true"><span class="g2-link">aired.sh/p/dither-lab</span></div><b>Send the link</b><p>The real app runs in their browser.</p></li>
+  </ol>
+
+  <section class="g2-try" id="publish" aria-labelledby="try-title">
+    <div class="g2-try-head"><h2 id="try-title">Do it here</h2><p>Drop your single-file build. 2 MB free, 10 MB on Pro.</p></div>
       <form id="air-form" class="form" aria-label="Publish HTML">
         <div class="paste-area">
           <div id="empty-hint" class="hint" aria-hidden="true">Drop your single-file build<small>dist-single/index.html · 2 MB max</small></div>
@@ -186,17 +196,9 @@
         <button type="button" id="new-btn" class="again">Publish another</button>
       </div>
       <p class="proof"><b data-stat="publishes">10,827</b> pages published · opened <b data-stat="views">102,156</b> times</p>
-    </div>
-    <div class="side-vis">
-      <div class="seen-cap"><span>What they open</span><span class="mono">aired.sh/p/dither-lab</span></div>
-      <div class="crop" aria-label="Example of a shared design tool: a canvas and a control panel"><div class="report tool"><div class="tool-canvas"></div><div class="tool-panel" aria-hidden="true"><b>Dither Lab</b><div class="tool-row"><span>Style</span><span>Dots</span></div><div class="tool-row"><span>Size</span><span>4</span></div><div class="tool-slider"><i style="width:34%"></i></div><div class="tool-row"><span>Fill</span><span>61%</span></div><div class="tool-slider"><i style="width:61%"></i></div><div class="tool-row"><span>Density</span><span>8</span></div><div class="tool-slider"><i style="width:78%"></i></div><span class="tool-btn">Export PNG</span></div></div></div>
-      <ul class="ticklist side-ticks"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span><b>The real app, not a video.</b> Controls, uploads and exports work.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span><b>Runs in their browser.</b> Nothing to install, no account.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span><b>Same link after changes.</b> Rebuild and update it in place.</span></li></ul>
-    </div>
   </section>
 
-  <div class="doc-grid">
-    <aside class="toc" aria-label="On this page"><p>On this page</p><a href="#steps">How to share it</a><a href="#agent">Or ask your AI agent</a><a href="#toolcraft">Toolcraft apps</a><a href="#gotchas">If the page is blank</a><a href="#size">How big it can be</a><a href="#example">A live example</a><a href="#faq">Questions</a></aside>
-    <article class="prose">
+  <article class="prose g2-prose">
       <h2 id="steps">How to share it</h2>
       <figure class="explain vitex" data-steps="3" data-step="3" aria-labelledby="vitex-t">
         <div class="ex-head"><p class="ex-title" id="vitex-t">What the single-file build does</p></div>
@@ -300,10 +302,8 @@ export default mergeConfig(base, {
         <details><summary>Can I send an update without a new link?<i></i></summary><p>Yes. Build again and run <code>npx aired update &lt;id&gt; dist-single/index.html</code>. The CLI saved the update token when you published, and the link stays the same.</p></details>
         <details><summary>Can the app call an API?<i></i></summary><p>It can call public APIs that allow requests from any origin. Because the page is sandboxed, requests come from a <code>null</code> origin, and APIs that check the origin or need cookies will refuse them. aired is for apps that run in the browser, not for apps with a backend.</p></details>
       </div>
-
-      <p class="updated">Updated November 2026.</p>
-    </article>
-  </div>
+    
+  </article>
 
   <section class="more">
     <div class="sec-head"><p class="eyebrow">Guides</p><h2>More ways to share what you made</h2></div>

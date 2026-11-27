@@ -1,8 +1,14 @@
 # Turn an HTML file into a link
 
-Paste the code or drop the `.html` file. You get a link to send by email, Slack or WhatsApp. The person who opens it sees the page, not the code, and they don't need an account.
+**Drop the file or paste the code, and you get a link.** Anyone can open it on any phone or computer, with no account and nothing to install.
 
 Source: https://aired.sh/html-to-link
+
+## How to do it
+
+1. **Drop your page** The file, or code from Claude, ChatGPT, Gemini or your editor.
+2. **Pick how long it lasts** An hour, a week or for good. Add a PIN if it's private.
+3. **Send the link** By email, Slack or WhatsApp. It opens as a page, not code.
 
 ## How to share an HTML file as a link
 
@@ -68,5 +74,3 @@ Yes. It is a normal web page, so it opens in any browser on any phone, tablet or
 ### My page uses separate CSS, JavaScript or image files. Will it work?
 
 Put everything in one HTML file, or publish the folder with `npx aired ./folder`, which puts the styles, scripts and images inside the page for you.
-
-Updated November 2026.

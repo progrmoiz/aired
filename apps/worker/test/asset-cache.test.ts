@@ -16,14 +16,14 @@ test("versioned font files are cached for a year; nothing else is", () => {
 test("every font file is versioned (so the year-long cache is safe) and has its license", () => {
   const files = readdirSync(new URL("fonts/", web));
   const fonts = files.filter((f) => f.endsWith(".woff2"));
-  assert.deepEqual(fonts.sort(), ["inter-latin-v20.woff2", "jetbrains-mono-latin-v24.woff2"]);
+  assert.deepEqual(fonts.sort(), ["instrument-serif-latin-v5.woff2", "inter-latin-v20.woff2", "jetbrains-mono-latin-v24.woff2"]);
   for (const f of fonts) assert.ok(assetCacheControl(`/fonts/${f}`), f);
-  for (const lic of ["OFL-Inter.txt", "OFL-JetBrainsMono.txt"]) {
+  for (const lic of ["OFL-Inter.txt", "OFL-JetBrainsMono.txt", "OFL-InstrumentSerif.txt"]) {
     assert.match(readFileSync(new URL(`fonts/${lic}`, web), "utf8"), /SIL Open Font License, Version 1\.1/);
   }
   const css = readFileSync(new URL("fonts/fonts.css", web), "utf8");
   for (const f of fonts) assert.ok(css.includes(`/fonts/${f}`), f);
-  assert.equal((css.match(/font-display: swap/g) ?? []).length, 2);
+  assert.equal((css.match(/font-display: swap/g) ?? []).length, 3);
 });
 
 test("no page loads anything from Google Fonts, and every page that used it links the local fonts", () => {
