@@ -1,5 +1,5 @@
 /**
- * View counts in D1 (migrations/0011_view_counts.sql): one row per page and
+ * View counts in D1 (migrations/0012_view_counts.sql): one row per page and
  * one per viewer country. A view costs one D1 write for the page (awaited, so
  * view limits hold) and one for the country (in the background), and no KV
  * writes.
