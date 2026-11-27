@@ -16,7 +16,7 @@ function d1() {
   db.exec(migration("0006_api_keys.sql"));
   db.exec(migration("0010_pages.sql"));
   db.exec(migration("0014_collect.sql"));
-  db.exec(migration("0016_page_access.sql"));
+  db.exec(migration("0017_page_access.sql"));
   const prepare = (sql: string) => {
     let args: unknown[] = [];
     const stmt = {

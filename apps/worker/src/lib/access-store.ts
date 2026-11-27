@@ -1,5 +1,5 @@
 /**
- * D1 for "only these people" (migrations/0016_page_access.sql): the list,
+ * D1 for "only these people" (migrations/0017_page_access.sql): the list,
  * the one-time codes and the owner's visit log. No imports, so tests run the
  * real SQL over node:sqlite.
  */

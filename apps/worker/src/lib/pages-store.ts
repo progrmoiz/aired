@@ -38,7 +38,7 @@ export type PageRow = {
   expiresAt: number | null;
   deletedAt: number | null;
   updatedAt: number;
-  /** 'people': only the listed people may open it (migrations/0016_page_access.sql). Null: public or PIN. */
+  /** 'people': only the listed people may open it (migrations/0017_page_access.sql). Null: public or PIN. */
   access: 'people' | null;
 };
 
