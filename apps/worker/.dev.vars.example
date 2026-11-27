@@ -34,3 +34,9 @@ STRIPE_AUTOMATIC_TAX=
 # WORKOS_API_KEY=sk_test_...
 # Optional, local tests: point at a mock.
 # WORKOS_API_BASE=http://localhost:12141
+
+# Pro analytics (src/lib/analytics.ts). Production sets CF_ANALYTICS_TOKEN (a
+# Cloudflare API token with Account Analytics Read) and CF_ACCOUNT_ID as
+# secrets. Local Analytics Engine keeps nothing, so set ANALYTICS_DEMO=1 to
+# get made-up numbers on /api/me/analytics instead.
+# ANALYTICS_DEMO=1
