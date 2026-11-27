@@ -198,3 +198,17 @@ export function pageDetails(
     project: row.project,
   };
 }
+
+/**
+ * Whether a caller may replace a page's content. A page that has collected
+ * responses (aired.collect) can only be replaced by its signed-in owner:
+ * an update token alone isn't enough, so whoever holds the token can't swap
+ * in a script that sends returning viewers' own entries somewhere else.
+ */
+export function replaceAllowed(input: { ownerId: number | null; userId: number | null; hasResponses: boolean }): boolean {
+  if (!input.hasResponses) return true;
+  return input.ownerId !== null && input.userId !== null && input.ownerId === input.userId;
+}
+
+export const OWNER_REQUIRED_MESSAGE =
+  "This page has collected responses, so only its owner, signed in (aired login, an API key or the dashboard), can replace its content.";

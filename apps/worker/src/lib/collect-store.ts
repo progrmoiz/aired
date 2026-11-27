@@ -410,3 +410,9 @@ export async function pruneCollectData(db: D1Database, nowMs: number, max = 2_00
   }
   return (expired.results ?? []).length;
 }
+
+/** True if the page has any stored responses. Throws on a D1 error (callers fail closed). */
+export async function pageHasResponses(db: D1Database, pageId: string): Promise<boolean> {
+  const row = await db.prepare("SELECT 1 AS x FROM responses WHERE page_id = ? LIMIT 1").bind(pageId).first<{ x: number }>();
+  return row !== null;
+}
