@@ -65,14 +65,11 @@ npx skills add progrmoiz/aired -g -a claude-code
 
 Five skills teach an agent when and how to use aired. `aired` is the core one (publishing, sign-in, limits, and which skill to load next); `aired-slides`, `aired-dashboard`, `aired-report` and `aired-forms` cover decks, live dashboards, private client reports and pages that collect answers. Leave out `-a claude-code` to pick other agents, or `-g` to install into this project only.
 
-They also ship in the npm package (`SKILL.md`, `references/`, `skills/`). To copy them into Claude Code by hand:
+They also ship in the npm package, one folder each under `skills/`. To copy them into Claude Code by hand:
 
 ```bash
 npm install -g aired
-AIRED="$(npm root -g)/aired"
-mkdir -p ~/.claude/skills/aired
-cp -R "$AIRED/SKILL.md" "$AIRED/references" ~/.claude/skills/aired/
-cp -R "$AIRED/skills/." ~/.claude/skills/
+cp -R "$(npm root -g)/aired/skills/." ~/.claude/skills/
 ```
 
 Connected to the MCP server? Nothing to install: each skill is a resource at `skill://aired/SKILL.md` and `skill://aired/<name>/SKILL.md`.

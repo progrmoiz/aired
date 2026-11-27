@@ -36,7 +36,7 @@ Installs aired's skills, so any agent that reads skills (Claude Code, Cursor, Wi
 - `aired-report`: client reports and one-pagers, sharing with a PIN or named people, versions and restore.
 - `aired-forms`: pages that save what visitors enter with `aired.collect`, the privacy notice, `get_responses` and CSV.
 
-They ship in the npm package (`SKILL.md`, `references/`, `skills/`), so `cp -R "$(npm root -g)/aired/skills/." ~/.claude/skills/` copies the four use-case skills after `npm install -g aired` (copy `SKILL.md` and `references/` into `~/.claude/skills/aired/` for the core one).
+They ship in the npm package, one folder each under `skills/`, so after `npm install -g aired`, `cp -R "$(npm root -g)/aired/skills/." ~/.claude/skills/` copies all five into Claude Code.
 
 ### 2. CLI
 

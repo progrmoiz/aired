@@ -105,7 +105,7 @@ test("MCP shapes: get_responses output, CSV, and set_options' data-layer fields"
 });
 
 test("the docs give the limits the config has", () => {
-  // "apps/cli skills": apps/cli/SKILL.md, its references and the skills under apps/cli/skills.
+  // "apps/cli skills": every file under apps/cli/skills.
   const read = (f: string) => (f === "apps/cli skills" ? skillsText() : readFileSync(new URL(`../../../${f}`, import.meta.url), "utf8"));
   const { free, pro } = COLLECT_LIMITS;
   assert.deepEqual([free.responsesPerMonth, free.retentionDays, free.liveDataBytes], [300, 90, 64 * 1024]);

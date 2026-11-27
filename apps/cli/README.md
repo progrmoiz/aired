@@ -131,13 +131,13 @@ This starts a stdio MCP server with `publish_html`, `get_page`, `set_options`, `
 
 ## Skills
 
-This package ships five agent skills: `SKILL.md` (the core `aired` skill) with `references/`, and `skills/aired-slides`, `skills/aired-dashboard`, `skills/aired-report` and `skills/aired-forms`. Install them for Claude Code with:
+This package ships five agent skills, one folder each under `skills/`: `aired` (the core skill, with its `references/`), `aired-slides`, `aired-dashboard`, `aired-report` and `aired-forms`. Install them for Claude Code with:
 
 ```bash
 npx skills add progrmoiz/aired -g -a claude-code
 ```
 
-Or copy them from the package into `~/.claude/skills/` (the core skill goes in `~/.claude/skills/aired/`). The MCP server also serves each one as a resource: `skill://aired/SKILL.md` and `skill://aired/<name>/SKILL.md`.
+Or copy them from the package: `cp -R "$(npm root -g)/aired/skills/." ~/.claude/skills/` after `npm install -g aired`. The MCP server also serves each one as a resource: `skill://aired/SKILL.md` and `skill://aired/<name>/SKILL.md`.
 
 ---
 

@@ -15,7 +15,7 @@ import { COLLECT_LIMITS, COLLECT_WRITE_LIMITS, LIVE_DATA_POLL_SECONDS, LIVE_DATA
 import { ACCESS_COOKIE_SECONDS, ACCESS_LIMITS, CODE_TTL_MS } from "../src/lib/access-limits.ts";
 import { ALWAYS_KEEP, VERSION_LIMITS } from "../src/lib/version-limits.ts";
 import { blockedFieldName } from "../src/lib/collect-validate.ts";
-import { CLI_DIR, skillFiles, skillsText } from "./helpers/skills.ts";
+import { CLI_DIR, CORE_SKILL, skillFiles, skillsText } from "./helpers/skills.ts";
 
 // skill-files.ts imports the .md files as text, as wrangler and esbuild do.
 register(
@@ -32,7 +32,7 @@ export async function load(url, ctx, next) {
 const repo = (f: string) => readFileSync(new URL(`../../../${f}`, import.meta.url), "utf8");
 const FILES = skillFiles();
 const SKILLS = FILES.filter((f) => f.path.endsWith("SKILL.md"));
-const byName = (name: string) => FILES.find((f) => f.path === (name === "aired" ? "SKILL.md" : `skills/${name}/SKILL.md`))!.text;
+const byName = (name: string) => FILES.find((f) => f.path === `skills/${name}/SKILL.md`)!.text;
 const USE_CASES = ["aired-slides", "aired-dashboard", "aired-report", "aired-forms"];
 const n = (x: number) => x.toLocaleString("en-US");
 
@@ -68,8 +68,8 @@ test("every skill has valid frontmatter: name and description, in the Agent Skil
     assert.ok(fm, `${f.path} has a name and description`);
     assert.match(fm.name, /^[a-z0-9]+(-[a-z0-9]+)*$/, `${f.path}: lowercase letters, digits and hyphens`);
     assert.ok(fm.name.length <= 64, `${f.path}: name at most 64 characters`);
-    // The folder holding SKILL.md is the skill's name (the core one is the package root).
-    assert.equal(fm.name, f.path === "SKILL.md" ? "aired" : f.path.split("/")[1], `${f.path}: name matches its folder`);
+    // The folder holding SKILL.md is the skill's name.
+    assert.equal(f.path, `skills/${fm.name}/SKILL.md`, `${f.path}: name matches its folder`);
     assert.ok(fm.description.length > 0 && fm.description.length <= 1024, `${f.path}: description is 1 to 1024 characters`);
     assert.ok(!/[<>]/.test(fm.description), `${f.path}: no angle brackets in the description`);
     assert.match(fm.description, /Use when/, `${f.path}: the description says when to load it`);
@@ -86,10 +86,12 @@ test("the core skill says which skill to load for each job, at its resource URI,
     assert.ok(desc.includes(name), `the core description names ${name}`);
     assert.ok(core.includes(`\`${skillUri(`skills/${name}/SKILL.md`)}\``), `the core skill gives ${name}'s URI`);
   }
-  const refs = [...core.matchAll(/`(references\/[a-z-]+\.md)`/g)].map((m) => m[1]!);
+  const refs = [...core.matchAll(/`(references\/[a-z-]+\.md)`/g)].map((m) => `skills/aired/${m[1]!}`);
   assert.ok(refs.length >= 4);
   for (const r of refs) assert.ok(FILES.some((f) => f.path === r), `${r} exists`);
-  for (const f of FILES.filter((x) => x.path.startsWith("references/"))) assert.ok(refs.includes(f.path), `the core skill lists ${f.path}`);
+  for (const f of FILES.filter((x) => x.path.startsWith("skills/aired/references/"))) assert.ok(refs.includes(f.path), `the core skill lists ${f.path}`);
+  // Every file sits in a skill's folder, so installing a skill copies only that skill.
+  for (const f of FILES) assert.match(f.path, /^skills\/aired(-[a-z]+)?\//, f.path);
   // Each use-case skill builds on the core one rather than repeating it.
   for (const name of USE_CASES) assert.match(skillFrontmatter(byName(name))!.description, /Builds on the aired skill/);
 });
@@ -97,7 +99,7 @@ test("the core skill says which skill to load for each job, at its resource URI,
 test("both servers bundle exactly the skill files on disk, with their text", async () => {
   const { SKILL_FILES } = await import("../src/lib/skill-files.ts");
   assert.deepEqual(SKILL_FILES.map((f) => f.path).sort(), FILES.map((f) => f.path).sort());
-  assert.equal(SKILL_FILES[0]!.path, "SKILL.md");
+  assert.equal(SKILL_FILES[0]!.path, CORE_SKILL);
   for (const f of SKILL_FILES) assert.equal(f.text, FILES.find((x) => x.path === f.path)!.text, f.path);
   for (const code of [repo("apps/worker/src/routes/mcp.ts"), repo("apps/mcp/src/index.ts")]) {
     assert.match(code, /import \{ SKILL_FILES \} from "\.\.\/(\.\.\/worker\/src\/)?lib\/skill-files\.ts";/);
@@ -114,7 +116,7 @@ test("every skill file is an MCP resource at skill://aired/..., and reads back a
   await client.connect(b);
   const listed = (await client.listResources()).resources;
   assert.deepEqual(listed.map((r) => r.uri).sort(), FILES.map((f) => skillUri(f.path)).sort());
-  assert.equal(skillUri("SKILL.md"), SKILL_URI);
+  assert.equal(skillUri(CORE_SKILL), SKILL_URI);
   for (const f of FILES) {
     const uri = skillUri(f.path);
     const r = listed.find((x) => x.uri === uri)!;
@@ -132,6 +134,7 @@ test("every skill file is an MCP resource at skill://aired/..., and reads back a
   }
   assert.ok(FILES.some((f) => skillUri(f.path) === "skill://aired/aired-slides/SKILL.md"));
   assert.ok(FILES.some((f) => skillUri(f.path) === "skill://aired/references/cli.md"));
+  assert.equal(skillUri("skills/aired-forms/SKILL.md"), "skill://aired/aired-forms/SKILL.md");
   await client.close();
 });
 
@@ -143,9 +146,17 @@ test("the deck and report prompts point at their skills", () => {
   }
 });
 
+test("skills.sh.json points npx skills at apps/cli/skills, where every skill is its own folder", () => {
+  const cfg = JSON.parse(repo("skills.sh.json")) as { paths: string[] };
+  assert.deepEqual(cfg.paths, ["./apps/cli/skills"]);
+  // A SKILL.md outside it would be a second copy, or make npx skills copy a whole folder of code.
+  assert.throws(() => repo("apps/cli/SKILL.md"), /ENOENT/);
+  assert.throws(() => repo("SKILL.md"), /ENOENT/);
+});
+
 test("npm pack includes every skill file", () => {
   const pkg = JSON.parse(repo("apps/cli/package.json")) as { files: string[] };
-  for (const f of ["SKILL.md", "references/", "skills/"]) assert.ok(pkg.files.includes(f), `package.json files has ${f}`);
+  assert.ok(pkg.files.includes("skills/"), "package.json files has skills/");
   const out = execFileSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], { cwd: CLI_DIR, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
   const packed = new Set((JSON.parse(out) as { files: { path: string }[] }[])[0]!.files.map((f) => f.path));
   for (const f of FILES) assert.ok(packed.has(f.path), `npm pack misses ${f.path}`);
@@ -183,15 +194,15 @@ test("the limits the skills give are the ones in the config", () => {
   const mb = (b: number) => `${b / 1024 / 1024} MB`;
   const { free, pro } = COLLECT_LIMITS;
   const want: Record<string, string[]> = {
-    "SKILL.md": [
+    "skills/aired/SKILL.md": [
       `${TIERS.anonymous.limit} an hour per IP`,
       `${TIERS.authenticated.limit} an hour`,
       `${TIERS.pro.limit} a day`,
       `| ${mb(FREE_MAX_BYTES)} |`,
       `| ${mb(PRO_MAX_BYTES)} |`,
     ],
-    "references/cli.md": ["3 minutes", "2 minutes signed in", `${TIERS.page_check.limit} an hour`],
-    "references/bundling.md": [mb(FREE_MAX_BYTES), mb(PRO_MAX_BYTES)],
+    "skills/aired/references/cli.md": ["3 minutes", "2 minutes signed in", `${TIERS.page_check.limit} an hour`],
+    "skills/aired/references/bundling.md": [mb(FREE_MAX_BYTES), mb(PRO_MAX_BYTES)],
     "skills/aired-slides/SKILL.md": [`${mb(FREE_MAX_BYTES)} on Free (${mb(PRO_MAX_BYTES)} on Pro)`],
     "skills/aired-dashboard/SKILL.md": [
       `| Live data per page | ${free.liveDataBytes / 1024} KB | ${mb(pro.liveDataBytes)} |`,

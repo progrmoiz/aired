@@ -15,17 +15,17 @@ function mdFiles(dir: string): string[] {
   return out;
 }
 
+/** The core skill's main file, inside the npm package. */
+export const CORE_SKILL = "skills/aired/SKILL.md";
+
 /**
  * Every file of the aired skills, as the servers bundle them
- * (src/lib/skill-files.ts): the core SKILL.md first, its references, then
- * the skills under skills/. `path` is the path inside the npm package.
+ * (src/lib/skill-files.ts): the core SKILL.md first, then the rest of
+ * apps/cli/skills. `path` is the path inside the npm package.
  */
 export function skillFiles(): { path: string; text: string }[] {
-  const paths = [
-    "SKILL.md",
-    ...mdFiles(join(CLI_DIR, "references")).map((p) => relative(CLI_DIR, p)).sort(),
-    ...mdFiles(join(CLI_DIR, "skills")).map((p) => relative(CLI_DIR, p)).sort(),
-  ];
+  const rest = mdFiles(join(CLI_DIR, "skills")).map((p) => relative(CLI_DIR, p)).filter((p) => p !== CORE_SKILL).sort();
+  const paths = [CORE_SKILL, ...rest];
   return paths.map((path) => ({ path, text: readFileSync(join(CLI_DIR, path), "utf8") }));
 }
 

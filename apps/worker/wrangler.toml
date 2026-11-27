@@ -7,8 +7,8 @@ compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 workers_dev = true
 
-# Markdown imports are bundled as text: routes/mcp.ts serves apps/cli/SKILL.md
-# as an MCP resource, so the skill has one source.
+# Markdown imports are bundled as text: routes/mcp.ts serves apps/cli/skills
+# as MCP resources, so each skill has one source.
 [[rules]]
 type = "Text"
 globs = ["**/*.md"]

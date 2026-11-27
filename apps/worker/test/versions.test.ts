@@ -495,7 +495,7 @@ test("wiring: every content write goes through updatePage, and housekeeping and 
 });
 
 test("the docs cover history, and state the same retention as the config", () => {
-  // "apps/cli skills": apps/cli/SKILL.md, its references and the skills under apps/cli/skills.
+  // "apps/cli skills": every file under apps/cli/skills.
   const read = (f: string) => (f === "apps/cli skills" ? skillsText() : readFileSync(new URL(`../../../${f}`, import.meta.url), "utf8"));
   const { free, pro } = VERSION_LIMITS;
   for (const f of ["apps/cli skills", "apps/web/docs.html", "apps/web/llms.txt", "apps/web/llms-full.txt"]) {

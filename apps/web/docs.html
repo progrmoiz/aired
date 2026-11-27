@@ -83,12 +83,9 @@
           <li><code>--skill aired-slides</code> installs one skill; <code>--list</code> shows them without installing.</li>
           <li>Powered by <a href="https://skills.sh" target="_blank" rel="noopener">skills.sh</a>.</li>
         </ul>
-        <p>The skills also ship in the <code>aired</code> npm package (<code>SKILL.md</code>, <code>references/</code> and <code>skills/</code>). To copy them into Claude Code by hand:</p>
+        <p>The skills also ship in the <code>aired</code> npm package, one folder each under <code>skills/</code>. To copy them into Claude Code by hand:</p>
 <pre><code>npm install -g aired
-AIRED="$(npm root -g)/aired"
-mkdir -p ~/.claude/skills/aired
-cp -R "$AIRED/SKILL.md" "$AIRED/references" ~/.claude/skills/aired/
-cp -R "$AIRED/skills/." ~/.claude/skills/</code></pre>
+cp -R "$(npm root -g)/aired/skills/." ~/.claude/skills/</code></pre>
         <p>Connected to aired's <a href="#mcp">MCP server</a>? Nothing to install: every skill is also a resource, at <code>skill://aired/SKILL.md</code> and <code>skill://aired/&lt;name&gt;/SKILL.md</code>.</p>
       </section>
 

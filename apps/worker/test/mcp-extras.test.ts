@@ -9,7 +9,7 @@ import { skillFiles } from "./helpers/skills.ts";
 import { pageAccess } from "../src/lib/page-options.ts";
 
 const read = (f: string) => readFileSync(new URL(`../../../${f}`, import.meta.url), "utf8");
-const SKILL = read("apps/cli/SKILL.md");
+const SKILL = read("apps/cli/skills/aired/SKILL.md");
 const SKILLS = skillFiles();
 const SKILL_URIS = SKILLS.map((f) => skillUri(f.path));
 
@@ -137,7 +137,7 @@ test("both servers register the same prompts and resources, and serve the skills
   }
   assert.match(hosted, /import \{ SKILL_FILES \} from "\.\.\/lib\/skill-files\.ts";/);
   assert.match(stdio, /import \{ SKILL_FILES \} from "\.\.\/\.\.\/worker\/src\/lib\/skill-files\.ts";/);
-  assert.match(read("apps/worker/src/lib/skill-files.ts"), /import core from "\.\.\/\.\.\/\.\.\/cli\/SKILL\.md";/);
+  assert.match(read("apps/worker/src/lib/skill-files.ts"), /import core from "\.\.\/\.\.\/\.\.\/cli\/skills\/aired\/SKILL\.md";/);
   // Hosted: signed in means an API key or OAuth, never a cookie (handleMcp's signedIn).
   assert.match(hosted, /signedIn: signedIn !== null,/);
   assert.match(read("apps/worker/wrangler.toml"), /\[\[rules\]\]\ntype = "Text"\nglobs = \["\*\*\/\*\.md"\]/);

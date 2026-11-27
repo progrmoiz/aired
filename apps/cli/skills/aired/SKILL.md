@@ -89,7 +89,7 @@ Read these only when you need them:
 
 ## Install the skills
 
-These five skills ship in the npm package (`SKILL.md`, `references/` and `skills/`) and are MCP resources on both servers. For Claude Code:
+These five skills ship in the npm package (one folder each under `skills/`) and are MCP resources on both servers. For Claude Code:
 
 ```bash
 npx skills add progrmoiz/aired -g -a claude-code

@@ -10,8 +10,6 @@
     "dist/cli.cjs",
     "dist/mcp.cjs",
     "bin/",
-    "SKILL.md",
-    "references/",
     "skills/"
   ],
   "scripts": {

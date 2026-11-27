@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 
 import { skillsText } from "./helpers/skills.ts";
 
-/** The aired skills: apps/cli/SKILL.md, its references and the skills under apps/cli/skills. */
+/** The aired skills: every file under apps/cli/skills. */
 const SKILLS = "apps/cli skills";
 const read = (f: string) => (f === SKILLS ? skillsText() : readFileSync(new URL(`../../../${f}`, import.meta.url), "utf8"));
 const toolsIn = (code: string) => [...code.matchAll(/registerTool\(\s*"(\w+)"/g)].map((m) => m[1]!);

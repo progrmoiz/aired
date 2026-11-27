@@ -14,7 +14,7 @@ import type { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/serv
  *     skill://aired/<name>/SKILL.md (aired-slides, aired-dashboard,
  *     aired-report, aired-forms). For any connected agent, in the Skills
  *     over MCP layout (the folder holding SKILL.md is the skill's name),
- *     served as plain resources. The files come from apps/cli (skill-files.ts).
+ *     served as plain resources. The files come from apps/cli/skills (skill-files.ts).
  *   - aired://page/{id}: the caller's own pages and their HTML. Signed-in
  *     callers only (API key, OAuth, or the CLI's sign-in on stdio); the API
  *     decides ownership, so nobody reads anyone else's page.
@@ -26,13 +26,13 @@ export const SKILL_URI = "skill://aired/SKILL.md";
 export type SkillFile = { path: string; text: string };
 
 /**
- * A skill file's URI. The core skill is the package root, so its files keep
- * their paths under skill://aired/; a skill under skills/<name>/ sits at
- * skill://aired/<name>/.
+ * A skill file's URI, from its path in the npm package. The core skill
+ * (skills/aired/) is skill://aired/; the others sit under it, so
+ * skills/aired-slides/SKILL.md is skill://aired/aired-slides/SKILL.md.
  */
 export function skillUri(path: string): string {
-  const rel = path.startsWith("skills/") ? path.slice("skills/".length) : path;
-  return `skill://aired/${rel}`;
+  const rel = path.replace(/^skills\//, "");
+  return rel.startsWith("aired/") ? `skill://${rel}` : `skill://aired/${rel}`;
 }
 
 /** A SKILL.md's frontmatter name and description, or null when it has none. */
