@@ -837,9 +837,8 @@ select.field option { background: var(--surface); }
 .cx { margin-top: 40px; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
 .cx-app { display: grid; grid-template-columns: 200px minmax(0, 1fr) auto; grid-template-areas: "name body act" "name note act"; gap: 6px 28px; padding: 22px 24px; border-top: 1px solid var(--border); scroll-margin-top: 24px; }
 .cx-app:first-child { border-top: 0; }
-.cx-name { grid-area: name; display: flex; flex-direction: column; gap: 2px; }
+.cx-name { grid-area: name; display: flex; align-items: flex-start; gap: 12px; }
 .cx-name b { font-weight: 500; font-size: 16px; }
-.cx-name span { font-size: 13px; color: var(--text-3); }
 .cx-steps, .cx-body { grid-area: body; font-size: 14px; color: var(--text-2); }
 .cx-steps { padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
 .cx-steps li::marker { color: var(--text-3); font-variant-numeric: tabular-nums; }
@@ -946,3 +945,7 @@ select.field option { background: var(--surface); }
 .g2-prose ol.steps li strong { color: var(--text-1); }
 .g2-shot { max-width: 500px; margin-left: auto; margin-right: auto; }
 .g2-shot .report.game .board { max-width: 300px; margin-left: auto; margin-right: auto; }
+.cx-ic { flex: none; width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); display: grid; place-items: center; color: var(--text-1); }
+.cx-ic svg { width: 18px; height: 18px; }
+.cx-nm { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cx-nm span { font-size: 13px; color: var(--text-3); }
