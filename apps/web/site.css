@@ -542,6 +542,8 @@ select.field option { background: var(--surface); }
 
 /* Numbered steps: the first how-to list of a guide renders as cards */
 .prose ol.steps { list-style: none; padding: 0; margin-top: 22px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; counter-reset: step; }
+/* An odd last card (3 or 5 steps) spans both columns instead of sitting alone */
+.prose ol.steps li:last-child:nth-child(odd) { grid-column: 1 / -1; }
 @media (max-width: 640px) { .prose ol.steps { grid-template-columns: minmax(0, 1fr); } }
 .prose ol.steps li { counter-increment: step; margin: 0; position: relative; padding: 18px 18px 18px 58px; border-radius: 14px; background: var(--surface); border: 1px solid var(--aired-hairline);
                      box-shadow: 0 -20px 80px -20px var(--aired-glow) inset; font-size: 14px; line-height: 1.6; }

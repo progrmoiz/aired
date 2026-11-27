@@ -19,7 +19,7 @@ The single reference for building any UI in aired. Read before writing any compo
 
 Numbered, ordered by priority. When unsure, run the decision through these.
 
-1. **Speed is the feature.** Anything that delays the URL — modal, signup, toast, animation — is wrong. The page exists to turn HTML into a link in seconds.
+1. **Speed is the feature.** Anything that delays the URL — modal, signup, toast, animation — is wrong. The page exists to turn HTML into a link in seconds. The one place motion is welcome is an explainer inside a guide article (see §9.3, Motion): it shows how something works and never stands between anyone and the publish box.
 2. **Dense, not loud.** On tool pages body text is 14px and the max heading is 24px. Marketing pages may go to 15px body and a 44px H1, but stay quiet: no gradient text, no glow, no emoji.
 3. **Quiet by default.** Neutrals carry the layout. The primary button is light (`text-primary` fill, `bg` text), not purple. Brand purple is the logo mark, focus rings and section eyebrows.
 4. **States are not optional.** Every interactive element: default, hover, active, focus, disabled. Every async action: idle, pending, success, error.
@@ -296,6 +296,7 @@ Built from the shared kit at the end of `site.css`. Same header, footer, cards a
 - **Docs:** eyebrow + H1 + four path cards (Skill, CLI, MCP, API), then contents + `.prose` with code blocks and `.snip` copy rows. Developer detail lives here, one click from every page.
 - **Dashboard:** a separate React app. See §9.4.
 - **Claim, abuse, 404:** `.duo` two columns: the task on the left in a `.panel`, context on the right (where the page goes, what happens next, popular guides).
+- **Motion (guides only):** an explainer inside a guide article may animate when the picture explains something words can't (where the page lives before a PIN, files merging into one, Markdown turning into slides). Rules: loop slowly (about 2.5 s a step), pause on hover and keyboard focus, pause when off screen, and show the last, most telling step when `prefers-reduced-motion` is set. Every step is readable at rest; nothing waits at `opacity: 0`. Never animate the publish box, the header, or anything that delays a link. Hero pictures may move only when the thing they show moves for real (a game, a deck).
 - Buttons are `.btn` (secondary), `.btn.solid` (the one primary action), `.btn.ghost`, `.btn.sm`. Fields are `.field` inside `.fl` labels.
 
 ### 9.4 Dashboard app (`apps/dashboard`, React + shadcn/ui on Base UI)
