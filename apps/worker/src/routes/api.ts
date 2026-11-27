@@ -19,6 +19,7 @@ import { siteOrigin } from "../lib/origin.ts";
 import { refreshShot } from "../lib/og-render.js";
 import { apiError } from "../lib/errors.ts";
 import { publicPageMeta } from "../lib/public-meta.ts";
+import { buildContent, contentFields, kindOf, readSidecar } from "../lib/page-content.ts";
 import type { Entitlements } from "../lib/entitlements.js";
 import {
   generateId,
@@ -138,12 +139,15 @@ api.post("/publish", publishRateLimit, async (c) => {
   // Shapes and bounds in @aired/core (schemas.ts); a wrong-typed field is ignored, as before.
   const parsed = parseBody(publishBody, json.body);
   if (!parsed.ok) return invalidInput(c, parsed.error, parsed.field);
-  const { html, title, pin, ttl, reads, permanent, project, update_token, id: existingId } = parsed.data;
+  const { title, pin, ttl, reads, permanent, project, update_token, id: existingId } = parsed.data;
+  // Markdown is rendered and an HTML deck's notes are cut out here (lib/page-content.ts).
+  const content = buildContent(parsed.data);
+  const html = content.html;
 
   const { response: invalid, ent } = await rejectInvalidHtml(c, html);
   if (invalid !== null) return invalid;
 
-  const resolvedTitle = capTitle(title) ?? capTitle(extractTitle(html));
+  const resolvedTitle = capTitle(title) ?? capTitle(content.title) ?? capTitle(extractTitle(html));
 
   const origin = new URL(c.req.url).origin;
   const user = c.get('user');
@@ -177,7 +181,7 @@ api.post("/publish", publishRateLimit, async (c) => {
       }
     }
 
-    const { metadata: updated, expiresAt, htmlEtag } = await updatePage(c.env, page, html, resolvedTitle);
+    const { metadata: updated, expiresAt, htmlEtag } = await updatePage(c.env, page, html, resolvedTitle, Date.now(), content.sidecar);
 
     // Link-preview screenshot, after the response (lib/og-render.ts).
     c.executionCtx.waitUntil(refreshShot(c.env, existingId, updated, html, htmlEtag, { replacing: true }));
@@ -187,6 +191,7 @@ api.post("/publish", publishRateLimit, async (c) => {
       url: `${origin}/p/${existingId}`,
       update_token,
       expiresAt,
+      ...contentFields(origin, existingId, content.sidecar),
       ...upgradeHint(c, ent),
     });
   }
@@ -230,7 +235,7 @@ api.post("/publish", publishRateLimit, async (c) => {
   // D1 row, R2 HTML and KV cache record, or nothing (lib/page-write.ts).
   let htmlObj: R2Object | null;
   try {
-    htmlObj = await createPage(c.env, metadata, html, now.getTime());
+    htmlObj = await createPage(c.env, metadata, html, now.getTime(), content.sidecar);
   } catch (err) {
     if (err instanceof StorageUnavailable) {
       console.error("publish storage write failed", { id, err: err.message });
@@ -256,6 +261,7 @@ api.post("/publish", publishRateLimit, async (c) => {
     url: `${origin}/p/${id}`,
     update_token: token,
     expiresAt,
+    ...contentFields(origin, id, content.sidecar),
     // Anonymous creates get a link to attach the page to an account later.
     ...(user === null ? { claim_url: claimUrl(siteOrigin(c.env), id, token) } : {}),
     ...upgradeHint(c, ent),
@@ -270,13 +276,15 @@ api.put("/pages/:id", requireCsrfHeader, async (c) => {
   if (json instanceof Response) return json;
   const parsed = parseBody(updateBody, json.body);
   if (!parsed.ok) return invalidInput(c, parsed.error, parsed.field);
-  const { html, title } = parsed.data;
+  const { title } = parsed.data;
   const update_token = readUpdateToken(parsed.data.update_token, c.req.header("Authorization"));
+  const content = buildContent(parsed.data);
+  const html = content.html;
 
   const { response: invalid, ent } = await rejectInvalidHtml(c, html);
   if (invalid !== null) return invalid;
 
-  const resolvedTitle = capTitle(title) ?? capTitle(extractTitle(html));
+  const resolvedTitle = capTitle(title) ?? capTitle(content.title) ?? capTitle(extractTitle(html));
 
   const page = await pageFor(c, id, "put");
   if (page instanceof Response) return page;
@@ -305,7 +313,7 @@ api.put("/pages/:id", requireCsrfHeader, async (c) => {
     }
   }
 
-  const { metadata: updated, expiresAt, htmlEtag } = await updatePage(c.env, page, html, resolvedTitle);
+  const { metadata: updated, expiresAt, htmlEtag } = await updatePage(c.env, page, html, resolvedTitle, Date.now(), content.sidecar);
 
   // Link-preview screenshot, after the response (lib/og-render.ts).
   c.executionCtx.waitUntil(refreshShot(c.env, id, updated, html, htmlEtag, { replacing: true }));
@@ -319,6 +327,7 @@ api.put("/pages/:id", requireCsrfHeader, async (c) => {
     url: `${origin}/p/${id}`,
     ...(returnToken !== undefined ? { update_token: returnToken } : {}),
     expiresAt,
+    ...contentFields(origin, id, content.sidecar),
     ...upgradeHint(c, ent),
   });
 });
@@ -413,6 +422,17 @@ async function viewCount(c: Context<AppBindings>, page: LoadedPage): Promise<num
   }
 }
 
+/** A page's kind (page, doc or deck) and slide count, from its sidecar. A failed read: a plain page. */
+async function kindDetails(c: Context<AppBindings>, id: string): Promise<{ kind: string; slides?: number }> {
+  try {
+    const sidecar = await readSidecar(c.env.PAGES_BUCKET, id);
+    return sidecar?.kind === "deck" ? { kind: "deck", slides: sidecar.slides } : { kind: kindOf(sidecar) };
+  } catch (err) {
+    console.error("sidecar read failed", { id, err });
+    return { kind: "page" };
+  }
+}
+
 // GET /api/pages/:id/details — the owner's view of a page (get_page): title,
 // URL, size, views, view limit, expiry, whether it has a PIN (never the PIN)
 // and project. Owner by update token or signed-in owner; anyone else is refused.
@@ -422,7 +442,7 @@ api.get("/pages/:id/details", rateLimit(TIERS.page_options), async (c) => {
   if (page instanceof Response) return page;
   const access = await ownerAccess(c, page, sentUpdateToken(c));
   if (!access.ok) return apiError(c, access.status, access.code, access.error);
-  return c.json(pageDetails(page.row, await viewCount(c, page), siteOrigin(c.env)));
+  return c.json({ ...pageDetails(page.row, await viewCount(c, page), siteOrigin(c.env)), ...(await kindDetails(c, id)) });
 });
 
 // PATCH /api/pages/:id — change a page's settings without sending its HTML

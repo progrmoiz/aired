@@ -16,12 +16,16 @@
     "@cloudflare/workers-oauth-provider": "1.2.4",
     "@modelcontextprotocol/sdk": "^1.28.0",
     "agents": "^0.8.7",
+    "highlight.js": "11",
     "hono": "^4.7.0",
     "jose": "^6.0.10",
+    "markdown-it": "14",
     "zod": "^3.22.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260317.0",
+    "@types/markdown-it": "14",
+    "happy-dom": "20",
     "typescript": "^5.7.0",
     "wrangler": "4.161.0"
   }

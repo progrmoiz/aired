@@ -12,10 +12,21 @@ import {
   checkInput,
   checkOut,
   FEEDBACK_DESCRIPTION,
+  RESPONSES_DESCRIPTION,
+  UPDATE_DATA_DESCRIPTION,
+  changesPageSettings,
+  collectPatchBody,
+  responsesInput,
+  responsesOut,
+  responsesText,
+  updateDataInput,
+  updateDataOut,
+  updateDataText,
   feedbackInput,
   feedbackOut,
   outputShapes,
-  pageOut,
+  getPageOut,
+  getPageText,
   pageText,
   patchBody,
   publishOut,
@@ -23,6 +34,7 @@ import {
   setOptionsOut,
 } from "../../worker/src/lib/mcp-shapes.ts";
 import { registerPrompts, registerResources } from "../../worker/src/lib/mcp-extras.ts";
+import { CONTENT_INPUT, GET_PAGE_DESCRIPTION, getPageInput, MISSING_CONTENT, registerTemplateTool } from "../../worker/src/lib/mcp-templates.ts";
 // The aired skill, bundled as text (esbuild/tsup loader for .md).
 import skill from "../../cli/SKILL.md";
 
@@ -47,6 +59,9 @@ interface PublishResult {
   expiresAt: string | null;
   claim_url?: string;
   upgrade?: { url?: string };
+  kind?: string;
+  slides?: number;
+  presenter_url?: string;
 }
 
 const apiBase = () => process.env["AIRED_API_URL"] ?? DEFAULT_API_URL;
@@ -119,7 +134,7 @@ function signedIn(): boolean {
 }
 
 async function publishHTML(
-  html: string,
+  content: { html?: string; markdown?: string; deck?: boolean },
   options: {
     title?: string;
     pin?: string;
@@ -130,7 +145,7 @@ async function publishHTML(
     id?: string;
   } = {},
 ): Promise<PublishResult> {
-  const body: Record<string, unknown> = { html };
+  const body: Record<string, unknown> = { ...content };
 
   if (options.title !== undefined) body["title"] = options.title;
   if (options.pin !== undefined) body["pin"] = options.pin;
@@ -158,10 +173,11 @@ server.registerTool(
   {
     title: "Publish HTML",
     description:
-      "Publish an HTML file or string to a shareable URL. Returns a live URL that renders the HTML in a browser. Pass update_token from a previous publish to update the same URL. Change the PIN, expiry, view limit or title later with set_options.",
+      "Publish HTML or Markdown (a string or a file) to a shareable URL. Returns a live URL that renders it in a browser. Markdown (or a .md file) becomes a clean, readable doc; with deck: true it becomes slides split on --- lines, and HTML with <section> slides works too. get_template has ready-made starters. Pass update_token from a previous publish to update the same URL. Change the PIN, expiry, view limit or title later with set_options.",
     inputSchema: {
       html: z.string().optional().describe("HTML content to publish"),
-      file_path: z.string().optional().describe("Path to HTML file (alternative to html)"),
+      ...CONTENT_INPUT,
+      file_path: z.string().optional().describe("Path to an HTML or Markdown (.md) file, or a folder with index.html (alternative to html)"),
       title: z.string().optional().describe("Page title"),
       pin: z.string().optional().describe("PIN to protect access"),
       ttl_seconds: z.number().optional().describe("Time to live in seconds (default: 604800 = 7 days)"),
@@ -173,11 +189,15 @@ server.registerTool(
     outputSchema: outputShapes.publish_html,
     annotations: { title: "Publish HTML", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   },
-  async ({ html, file_path, title, pin, ttl_seconds, permanent, project, update_token, id }) => {
-    // Resolve HTML content
+  async ({ html, markdown, deck, file_path, title, pin, ttl_seconds, permanent, project, update_token, id }) => {
+    // Resolve the content: HTML, or Markdown (a .md file counts as Markdown)
     let content: string;
+    let isMarkdown = false;
 
-    if (html !== undefined) {
+    if (markdown !== undefined) {
+      content = markdown;
+      isMarkdown = true;
+    } else if (html !== undefined) {
       content = html;
     } else if (file_path !== undefined) {
       try {
@@ -216,6 +236,7 @@ server.registerTool(
           });
         } else {
           content = readFileSync(file_path, "utf-8");
+          isMarkdown = /\.(md|markdown|mdown|mkd)$/i.test(file_path);
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -226,7 +247,7 @@ server.registerTool(
       }
     } else {
       return {
-        content: [{ type: "text", text: "Either html or file_path is required." }],
+        content: [{ type: "text", text: `${MISSING_CONTENT} Or pass file_path.` }],
         isError: true,
       };
     }
@@ -245,7 +266,8 @@ server.registerTool(
     }
 
     try {
-      const result = await publishHTML(content, {
+      const sent = isMarkdown ? { markdown: content } : { html: content };
+      const result = await publishHTML({ ...sent, ...(deck !== undefined ? { deck } : {}) }, {
         title,
         pin,
         ttl: ttl_seconds,
@@ -269,6 +291,10 @@ server.registerTool(
       lines.push("");
       lines.push("Pass update_token and id to update the same URL.");
       if (result.claim_url) lines.push(`To keep this page in an aired account, open: ${result.claim_url}`);
+      if (result.kind === "deck") {
+        lines.push(`Slides: ${result.slides ?? 0}. Link to one with #/N, e.g. ${result.url}#/2`);
+        if (result.presenter_url) lines.push(`Speaker view (notes, only for the signed-in owner): ${result.presenter_url}`);
+      }
 
       return {
         content: [{ type: "text", text: lines.join("\n") }],
@@ -288,21 +314,19 @@ server.registerTool(
   "get_page",
   {
     title: "Get a page",
-    description:
-      "A page's details: title, URL, size, views, view limit, expiry, project, and whether a PIN is on (never the PIN). For pages your account owns (aired login or AIRED_API_KEY), or any page whose update_token you pass.",
-    inputSchema: {
-      id: z.string().describe("Page id, from publish_html"),
-      update_token: z.string().optional().describe("The page's update token. Not needed for pages your account owns"),
-    },
+    description: GET_PAGE_DESCRIPTION,
+    inputSchema: getPageInput,
     outputSchema: outputShapes.get_page,
     annotations: { title: "Get a page", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
-  async ({ id, update_token }) => {
+  async ({ id, update_token, include_source }) => {
     if (!PAGE_ID.test(id)) return toolError("That isn't a page id.");
     try {
-      const body = await api<unknown>("GET", `/api/pages/${encodeURIComponent(id)}/details`, undefined, update_token ? { "X-Update-Token": update_token } : {});
-      const page = pageOut(body, apiBase());
-      return { content: [{ type: "text" as const, text: pageText(page, "Page") }], structuredContent: page };
+      const headers: Record<string, string> = update_token ? { "X-Update-Token": update_token } : {};
+      const body = await api<unknown>("GET", `/api/pages/${encodeURIComponent(id)}/details`, undefined, headers);
+      const source = include_source === true ? await api<unknown>("GET", `/api/pages/${encodeURIComponent(id)}/source`, undefined, headers) : undefined;
+      const page = getPageOut(body, apiBase(), source);
+      return { content: [{ type: "text" as const, text: getPageText(page) }], structuredContent: page };
     } catch (err) {
       return toolError(`Error: ${errorMessage(err)}`);
     }
@@ -322,7 +346,17 @@ server.registerTool(
   async (args) => {
     if (!PAGE_ID.test(args.id)) return toolError("That isn't a page id.");
     try {
-      const body = await api<unknown>("PATCH", `/api/pages/${encodeURIComponent(args.id)}`, patchBody(args));
+      const path = `/api/pages/${encodeURIComponent(args.id)}`;
+      // The data-layer settings go to their own endpoint, signed in only.
+      const collect = collectPatchBody(args);
+      if (collect !== null) await api<unknown>("PATCH", `${path}/responses`, collect);
+      const body =
+        collect !== null && !changesPageSettings(args)
+          ? {
+              ...((await api<Record<string, unknown>>("GET", `${path}/details`))),
+              changed: [...(args.public_results !== undefined ? ["public_results"] : []), ...(args.accept_responses !== undefined ? ["accept_responses"] : [])],
+            }
+          : await api<unknown>("PATCH", path, patchBody(args));
       const page = setOptionsOut(body, apiBase());
       const lead = page.changed.length > 0 ? `Changed ${page.changed.join(", ")} of` : "Settings of";
       return { content: [{ type: "text" as const, text: pageText(page, lead) }], structuredContent: page };
@@ -370,6 +404,52 @@ server.registerTool(
     try {
       const out = feedbackOut(await api<unknown>("POST", "/api/feedback", { ...args, source: "mcp", actor: "agent" }));
       return { content: [{ type: "text" as const, text: `Feedback sent: ${out.id}\n${out.message}` }], structuredContent: out };
+    } catch (err) {
+      return toolError(`Error: ${errorMessage(err)}`);
+    }
+  },
+);
+
+registerTemplateTool(server);
+server.registerTool(
+  "get_responses",
+  {
+    title: "Read a page's responses",
+    description: RESPONSES_DESCRIPTION,
+    inputSchema: responsesInput,
+    outputSchema: outputShapes.get_responses,
+    annotations: { title: "Read a page's responses", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ id, limit, cursor, format }) => {
+    if (!PAGE_ID.test(id)) return toolError("That isn't a page id.");
+    if (!signedIn()) return toolError("Sign in first: run `aired login`, or set AIRED_API_KEY.");
+    const q = new URLSearchParams();
+    if (limit !== undefined) q.set("limit", String(limit));
+    if (cursor) q.set("cursor", cursor);
+    try {
+      const out = responsesOut(await api<unknown>("GET", `/api/pages/${encodeURIComponent(id)}/responses${q.size ? `?${q}` : ""}`), { csv: format === "csv" });
+      return { content: [{ type: "text" as const, text: responsesText(out) }], structuredContent: out };
+    } catch (err) {
+      return toolError(`Error: ${errorMessage(err)}`);
+    }
+  },
+);
+
+server.registerTool(
+  "update_data",
+  {
+    title: "Push live data to a page",
+    description: UPDATE_DATA_DESCRIPTION,
+    inputSchema: updateDataInput,
+    outputSchema: outputShapes.update_data,
+    annotations: { title: "Push live data to a page", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  },
+  async ({ id, data }) => {
+    if (!PAGE_ID.test(id)) return toolError("That isn't a page id.");
+    if (!signedIn()) return toolError("Sign in first: run `aired login`, or set AIRED_API_KEY.");
+    try {
+      const out = updateDataOut(await api<unknown>("PUT", `/api/pages/${encodeURIComponent(id)}/data`, { data }));
+      return { content: [{ type: "text" as const, text: updateDataText(out) }], structuredContent: out };
     } catch (err) {
       return toolError(`Error: ${errorMessage(err)}`);
     }

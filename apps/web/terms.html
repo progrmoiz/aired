@@ -45,7 +45,7 @@
 
 <main class="wrap">
   <article class="legal">
-    <p class="updated">Last updated: November 25, 2026</p>
+    <p class="updated">Last updated: November 27, 2026</p>
 
     <p class="eyebrow">Legal</p>
     <h1>Terms of service</h1>
@@ -61,6 +61,7 @@
       <li>Pro is a paid plan, sold to you through Link, Stripe's checkout. Cancel anytime. Full refund within 14 days.</li>
       <li><strong>We never delete your pages because a subscription ended.</strong></li>
       <li>People who open your links never need an account and never pay.</li>
+      <li>If your page saves what visitors enter, that data is yours to look after: tell them, and don't collect passwords or payment details.</li>
     </ul>
 
     <h2>Who can use aired</h2>
@@ -89,6 +90,17 @@
     <p><strong>What you publish is yours.</strong> We don't claim ownership of it, and we don't sell it. We don't use your pages to train AI models, and we don't sell or license them to anyone who does. Pages are open to anyone with the link, so we can't stop others from copying them.</p>
     <p>To run aired, we need your permission to do a few things with it. By publishing, you give us a worldwide, non-exclusive, royalty-free license to store, copy, cache and serve your page to anyone who opens the link, to make a title and preview image for link previews, and to add the aired badge to pages on the Free plan. This license ends when your page is deleted or expires, apart from copies that sit in caches for a short time after.</p>
     <p>You promise you have the right to publish what you publish. If your page uses someone else's text, images, code or trademarks, make sure you're allowed to.</p>
+    <h2 id="collecting">Pages that save what visitors enter</h2>
+    <p>A page published from your account can save what its visitors enter, with <code>aired.collect</code>. What they enter is yours to look after, not ours:</p>
+    <ul>
+      <li>Tell visitors what you save and who sees it. The page can show aired's notice (<code>data-aired-notice</code>) or your own.</li>
+      <li>Only collect what you have a right to collect, and use it the way you told visitors you would. Follow the privacy law that applies to you and them.</li>
+      <li>Don't collect passwords, payment card details, government id numbers, health data or other sensitive data. aired refuses entries that look like passwords or card numbers, and we take down pages built to harvest them.</li>
+      <li>Delete entries when you no longer need them, and when a visitor asks you to. You can delete them from the dashboard or the API. Deleting the page or your account deletes them all.</li>
+      <li>The plan limits on the <a href="/docs#data-limits">docs</a> apply: on Free, entries are kept 90 days.</li>
+    </ul>
+    <p>We store entries for you, only to run aired, and never use them for anything else.</p>
+
     <p>If you open a page on aired, remember that a publisher made it, not us. We don't check pages before they go live. Be careful with pages from people you don't know. Never type a password for another service into a page hosted on aired.</p>
 
     <h2>What you can't do</h2>
@@ -158,7 +170,7 @@
 
 <footer><div class="wrap">
   <span>aired</span>
-  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/share-vite-app">Share a Vite app</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
+  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/share-slides">Share slides</a><a href="/share-vite-app">Share a Vite app</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
 </div></footer>
 <script src="/app.js"></script>
 </body>

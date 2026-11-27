@@ -14,6 +14,7 @@ function d1() {
   db.exec(migration("0001_accounts_billing.sql"));
   db.exec(migration("0002_billing_customers.sql"));
   db.exec(migration("0006_api_keys.sql"));
+  db.exec(migration("0014_collect.sql"));
   const prepare = (sql: string) => {
     let args: unknown[] = [];
     const stmt = {
@@ -36,17 +37,21 @@ function seed(raw: DatabaseSync, uid: number, cus: string) {
   raw.prepare("INSERT INTO billing_customers (user_id, customer_id, created_at) VALUES (?, ?, ?)").run(uid, cus, now);
   raw.prepare("INSERT INTO subscriptions (user_id, provider, customer_id, subscription_id, plan, status, updated_at) VALUES (?, 'stripe', ?, ?, 'pro', 'active', ?)").run(uid, cus, `sub_${uid}`, now);
   raw.prepare("INSERT INTO api_keys (id, user_id, name, prefix, key_hash, created_at) VALUES (?, ?, 'ci', 'aired_sk_x', ?, 1)").run(`key_${uid}`, uid, `hash_${uid}`);
+  // What a viewer saved on one of their pages, and its live data.
+  raw.prepare("INSERT INTO responses (id, page_id, owner_id, viewer, data, size, created_at, updated_at) VALUES (?, ?, ?, 'v', '{}', 2, 1, 1)").run(`r_${uid}`, `page${uid}`, uid);
+  raw.prepare("INSERT INTO page_data (page_id, owner_id, data, updated_at) VALUES (?, ?, '[]', 1)").run(`page${uid}`, uid);
 }
 
+const OWNER_COLUMN: Record<string, string> = { users: "id", responses: "owner_id", page_data: "owner_id" };
 const count = (raw: DatabaseSync, table: string, uid: number) =>
-  (raw.prepare(`SELECT count(*) AS n FROM ${table} WHERE ${table === "users" ? "id" : "user_id"} = ?`).get(uid) as { n: number }).n;
+  (raw.prepare(`SELECT count(*) AS n FROM ${table} WHERE ${OWNER_COLUMN[table] ?? "user_id"} = ?`).get(uid) as { n: number }).n;
 
-test("account deletion removes the user's billing and sign-in rows, and only theirs", async () => {
+test("account deletion removes the user's billing, sign-in and response rows, and only theirs", async () => {
   const { raw, d1: db } = d1();
   seed(raw, 1, "cus_1");
   seed(raw, 2, "cus_2");
   await deleteAccountRows(db, 1);
-  for (const table of ["subscriptions", "billing_customers", "identities", "users", "api_keys"]) {
+  for (const table of ["subscriptions", "billing_customers", "identities", "users", "api_keys", "responses", "page_data"]) {
     assert.equal(count(raw, table, 1), 0, table);
     assert.equal(count(raw, table, 2), 1, table);
   }

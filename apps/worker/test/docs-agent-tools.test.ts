@@ -6,8 +6,10 @@ const read = (f: string) => readFileSync(new URL(`../../../${f}`, import.meta.ur
 const toolsIn = (code: string) => [...code.matchAll(/registerTool\(\s*"(\w+)"/g)].map((m) => m[1]!);
 
 test("the docs name every MCP tool both servers register", () => {
-  const hosted = toolsIn(read("apps/worker/src/routes/mcp.ts"));
-  const stdio = toolsIn(read("apps/mcp/src/index.ts"));
+  // get_template is registered from a file both servers share.
+  const shared = toolsIn(read("apps/worker/src/lib/mcp-templates.ts"));
+  const hosted = [...toolsIn(read("apps/worker/src/routes/mcp.ts")), ...shared];
+  const stdio = [...toolsIn(read("apps/mcp/src/index.ts")), ...shared];
   assert.ok(hosted.length >= 8 && stdio.length >= 4);
   const docs = read("apps/web/docs.html");
   const table = docs.slice(docs.indexOf('id="mcp-tools"'), docs.indexOf("Tool: <code>publish_html</code>"));
@@ -43,10 +45,10 @@ test("the docs cover aired set, aired feedback and their endpoints", () => {
   assert.match(read("apps/web/llms.txt"), /10 an hour per caller/);
 });
 
-test("the CLI, its MCP server and the registry entry say 1.5.0", () => {
-  assert.equal(JSON.parse(read("apps/cli/package.json")).version, "1.5.0");
-  assert.equal(JSON.parse(read("server.json")).version, "1.5.0");
-  assert.match(read("apps/worker/src/routes/mcp.ts"), /name: "aired",\s*version: "1\.5\.0",/);
+test("the CLI, its MCP server and the registry entry say 1.6.0", () => {
+  assert.equal(JSON.parse(read("apps/cli/package.json")).version, "1.6.0");
+  assert.equal(JSON.parse(read("server.json")).version, "1.6.0");
+  assert.match(read("apps/worker/src/routes/mcp.ts"), /name: "aired",\s*version: "1\.6\.0",/);
 });
 
 test("the docs cover aired check, check_page, its endpoint, the prompts and the resources", async () => {
@@ -63,4 +65,24 @@ test("the docs cover aired check, check_page, its endpoint, the prompts and the 
   assert.match(read("apps/worker/src/lib/page-check.ts"), /DEFAULT_CHECK_BUDGET_MS = 3 \* 60 \* 1000;/);
   assert.match(read("apps/worker/src/lib/mcp-extras.ts"), /RESOURCE_LIST_MAX = 50;/);
   for (const f of ["apps/cli/SKILL.md", "apps/web/docs.html", "apps/web/llms-full.txt"]) assert.match(read(f), /3 minutes/, f);
+});
+
+test("the docs cover Markdown, decks, speaker notes, templates and the slides guide", async () => {
+  const { TEMPLATES } = await import("@aired/core");
+  for (const f of ["apps/cli/SKILL.md", "apps/web/docs.html", "apps/web/llms.txt", "apps/web/llms-full.txt"]) {
+    const s = read(f);
+    for (const want of ["markdown", "type: deck", "/presenter", "get_template", "#/3", '<meta name="aired" content="deck">'.replace(/</g, f.endsWith(".html") ? "&lt;" : "<").replace(/>/g, f.endsWith(".html") ? "&gt;" : ">"), ...TEMPLATES.map((t) => t.name)]) {
+      assert.ok(s.toLowerCase().includes(want.toLowerCase()), `${f} misses ${want}`);
+    }
+  }
+  for (const f of ["apps/cli/SKILL.md", "apps/web/docs.html", "apps/web/llms.txt"]) assert.ok(read(f).includes("aired new"), `${f} misses aired new`);
+  // get_template is registered on both servers, outside routes/mcp.ts.
+  assert.match(read("apps/worker/src/routes/mcp.ts"), /registerTemplateTool\(server\)/);
+  assert.match(read("apps/mcp/src/index.ts"), /registerTemplateTool\(server\)/);
+  assert.match(read("apps/worker/src/lib/mcp-templates.ts"), /registerTool\(\s*"get_template"/);
+  // The guide page exists, is in the sitemap and the footer.
+  const guide = read("apps/web/share-slides.html");
+  assert.match(guide, /<link rel="canonical" href="https:\/\/aired\.sh\/share-slides" \/>/);
+  assert.ok(read("apps/web/sitemap.xml").includes("<loc>https://aired.sh/share-slides</loc>"));
+  assert.ok(read("apps/web/index.html").includes('<a href="/share-slides">Share slides</a>'));
 });

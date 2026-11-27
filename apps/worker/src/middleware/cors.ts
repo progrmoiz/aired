@@ -73,6 +73,27 @@ export async function corsMiddleware(
     return;
   }
 
+  // The data layer's page calls (routes/collect.ts) come from published
+  // pages, whose origin is opaque ("null"). The viewer token in the body is
+  // the credential, never a cookie: open CORS, no credentials.
+  if (path.startsWith('/c/')) {
+    if (c.req.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+          'Access-Control-Max-Age': '86400',
+        },
+      });
+    }
+    await next();
+    c.res.headers.set('Access-Control-Allow-Origin', '*');
+    c.res.headers.delete('Access-Control-Allow-Credentials');
+    return;
+  }
+
   if (c.req.method === 'OPTIONS') {
     if (originAllowed(origin, path, allowed)) {
       const withCreds = allowsCredentials(path);

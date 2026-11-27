@@ -1,3 +1,5 @@
+import { COLLECT_LIMITS, type CollectLimits } from './collect-limits.ts';
+
 export type Plan = 'free' | 'pro';
 
 /** What we keep per user: the Stripe subscription status and when the paid period ends (ISO). */
@@ -10,6 +12,8 @@ export type Entitlements = {
   maxBytes: number;
   /** Rate-limit tier for signed-in publishes (see lib/rate-limit-tiers.ts). */
   publishTier: 'authenticated' | 'pro';
+  /** Data layer limits (lib/collect-limits.ts). */
+  collect: CollectLimits;
 };
 
 export const FREE_MAX_BYTES = 2 * 1024 * 1024;
@@ -31,8 +35,8 @@ export function upgradeUrl(origin: string, ref: string): string {
 
 const PAID_STATUSES = new Set(['active', 'trialing', 'past_due']);
 
-const FREE: Entitlements = { plan: 'free', badge: true, maxBytes: FREE_MAX_BYTES, publishTier: 'authenticated' };
-const PRO: Entitlements = { plan: 'pro', badge: false, maxBytes: PRO_MAX_BYTES, publishTier: 'pro' };
+const FREE: Entitlements = { plan: 'free', badge: true, maxBytes: FREE_MAX_BYTES, publishTier: 'authenticated', collect: COLLECT_LIMITS.free };
+const PRO: Entitlements = { plan: 'pro', badge: false, maxBytes: PRO_MAX_BYTES, publishTier: 'pro', collect: COLLECT_LIMITS.pro };
 
 export function isEntitled(state: SubscriptionState | null, now: Date): boolean {
   if (!state || !PAID_STATUSES.has(state.status) || !state.currentPeriodEnd) return false;
@@ -47,7 +51,7 @@ export function entitlementsFor(state: SubscriptionState | null, now: Date): Ent
 
 /** Body of the 402 a signed-in user gets when a free-plan limit blocks the request. */
 export function planLimitError(
-  limit: 'page_size' | 'publish_rate' | 'analytics',
+  limit: 'page_size' | 'publish_rate' | 'analytics' | 'responses' | 'live_data',
   origin: string,
   ref?: string,
 ): { error: string; code: 'plan_limit'; limit: string; upgrade_url: string } {
@@ -63,7 +67,7 @@ export function billingEnabled(env: { BILLING_ENABLED?: string }): boolean {
   return env.BILLING_ENABLED === '1';
 }
 
-/** The slice of Env that getEntitlements reads; structural so this module stays import-free. */
+/** The slice of Env that getEntitlements reads; structural, so this module imports only the limits config. */
 export type EntitlementsEnv = {
   BILLING_ENABLED?: string;
   PAGES_KV: { get(key: string, options: { type: 'json'; cacheTtl?: number }): Promise<unknown> };

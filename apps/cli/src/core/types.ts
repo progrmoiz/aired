@@ -3,6 +3,13 @@ export interface PublishResult {
   url: string
   update_token: string
   expiresAt: string | null
+  /** doc: rendered from Markdown; deck: slides. Absent for a plain HTML page. */
+  kind?: 'page' | 'doc' | 'deck'
+  /** Deck only. */
+  slides?: number
+  slides_with_notes?: number
+  /** Deck only: the owner's speaker view with notes. */
+  presenter_url?: string
 }
 
 export interface PageInfo {

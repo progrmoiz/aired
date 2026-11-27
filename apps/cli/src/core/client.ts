@@ -2,6 +2,7 @@ import { USER_AGENT } from '../lib/constants.js'
 import { AUTH_HEADER, CSRF_HEADER } from '@aired/core'
 import type { User } from '@aired/core'
 import type { PublishResult, PageInfo, PageDetails, FeedbackResult, CheckReport } from './types.js'
+import type { PageContent } from './markdown.js'
 
 /**
  * An API key from AIRED_API_KEY (for CI and agents), or null. When set, it's
@@ -127,13 +128,15 @@ async function handleResponse<T>(resp: Response, action: string): Promise<T> {
   }
 }
 
+export type { PageContent }
+
 export async function publishHTML(
   baseUrl: string,
-  html: string,
+  content: string | PageContent,
   options: PublishOptions = {},
   jwt?: string,
 ): Promise<PublishResponse> {
-  const body: Record<string, unknown> = { html }
+  const body: Record<string, unknown> = typeof content === 'string' ? { html: content } : { ...content }
 
   if (options.title !== undefined) body['title'] = options.title
   if (options.pin !== undefined) body['pin'] = options.pin
@@ -167,12 +170,12 @@ export async function publishHTML(
 export async function updatePage(
   baseUrl: string,
   id: string,
-  html: string,
+  content: string | PageContent,
   token: string,
   options: { title?: string } = {},
   jwt?: string,
 ): Promise<PublishResult> {
-  const body: Record<string, unknown> = { html, update_token: token }
+  const body: Record<string, unknown> = { ...(typeof content === 'string' ? { html: content } : content), update_token: token }
   if (options.title !== undefined) body['title'] = options.title
 
   const headers: Record<string, string> = {

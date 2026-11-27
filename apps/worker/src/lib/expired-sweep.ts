@@ -29,7 +29,7 @@ export const SWEEP_MIN_AGE_MS = 24 * 60 * 60 * 1000;
 /** How long a file's KV record must stay missing before the file goes. */
 export const CONFIRM_AFTER_MS = 24 * 60 * 60 * 1000;
 
-const PAGE_FILE = /^pages\/([A-Za-z0-9_-]{1,64})\/(?:index\.html|shot\.jpg|tile\.jpg)$/;
+const PAGE_FILE = /^pages\/([A-Za-z0-9_-]{1,64})\/(?:index\.html|shot\.jpg|tile\.jpg|doc\.json)$/;
 
 /** The page id of a page file key (HTML or screenshot), or null for anything else. */
 export function pageIdFromKey(key: string): string | null {

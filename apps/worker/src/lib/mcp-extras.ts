@@ -64,7 +64,11 @@ export async function readPageResource(deps: Pick<ExtrasDeps, "signedIn" | "get"
   }
   const b = obj(res.body);
   const html = typeof b.html === "string" ? b.html : "";
-  return { contents: [{ uri: pageUri(id), mimeType: "text/html", text: html }] };
+  // A Markdown page reads as its Markdown, which is what the agent can edit and publish again.
+  if (b.format === "markdown" && typeof b.source === "string") return { contents: [{ uri: pageUri(id), mimeType: "text/markdown", text: b.source }] };
+  // A deck's HTML as published, notes included (the caller owns it).
+  const source = typeof b.source === "string" && b.kind === "deck" ? b.source : html;
+  return { contents: [{ uri: pageUri(id), mimeType: "text/html", text: source }] };
 }
 
 /** resources/list: the caller's newest pages, or none when not signed in. */
@@ -120,47 +124,44 @@ export const PROMPTS: PromptDef[] = [
   {
     name: "publish_report",
     title: "Publish as a shareable report",
-    description: "Turn what we have into a clean one-page HTML report and publish it as a link.",
+    description: "Turn what we have into a clean report page (Markdown, from aired's report template) and publish it as a link.",
     args: {
       about: z.string().optional().describe("What the report covers, e.g. last week's sign-ups"),
       audience: z.string().optional().describe("Who will read it, e.g. the team or a client"),
     },
     text: (a) =>
       [
-        `Write a one-page HTML report${a.about ? ` about ${a.about}` : " from what we've been working on"}${a.audience ? `, for ${a.audience}` : ""}, and publish it with aired.`,
+        `Write a report${a.about ? ` about ${a.about}` : " from what we've been working on"}${a.audience ? `, for ${a.audience}` : ""}, and publish it with aired.`,
         "",
-        "The page:",
-        "- One self-contained HTML file: inline CSS, no build step. External scripts or fonts only from a CDN, and only if they're needed.",
-        "- A clear <title>, a short summary at the top, then sections with headings. Tables for numbers, charts only where they help.",
-        "- Readable on a phone (a viewport meta tag, no fixed widths) and when printed.",
-        "- No secrets, tokens, keys or personal data that shouldn't leave this conversation.",
+        "1. Call get_template with name \"report\". Follow its rules and keep its shape: a # title with who it's for and the date, a short summary first, a table of key numbers, what was done, and next steps as a task list.",
+        "2. Use only real figures from this conversation or files I've shared. Where one is missing, write [number] rather than guessing.",
+        "3. No secrets, tokens, keys or personal data that shouldn't leave this conversation.",
+        "4. Publish it with publish_html, the Markdown in `markdown` (not html), and a title. aired renders it as a readable page that works on phones and in dark mode.",
         "",
-        "Publish it with publish_html (title it), then:",
         CHECK_STEP,
       ].join("\n"),
   },
   {
     name: "make_slide_deck",
-    title: "Make a slide deck page",
-    description: "Build a keyboard-driven HTML slide deck and publish it as a link.",
+    title: "Make a slide deck",
+    description: "Write a slide deck in Markdown (aired's deck template), with speaker notes, and publish it as a link you can present from.",
     args: {
       topic: z.string().optional().describe("What the deck is about"),
       slides: z.string().optional().describe("About how many slides, e.g. 8"),
     },
     text: (a) =>
       [
-        `Make an HTML slide deck${a.topic ? ` about ${a.topic}` : " from what we've discussed"}${a.slides ? `, about ${a.slides} slides` : ""}, and publish it with aired.`,
+        `Make a slide deck${a.topic ? ` about ${a.topic}` : " from what we've discussed"}${a.slides ? `, about ${a.slides} slides` : ""}, and publish it with aired.`,
         "",
-        "The deck:",
-        "- One self-contained HTML file. Each slide is a 16:9 section scaled to fit the window; one slide shows at a time.",
-        "- Arrow keys, Space and Page Up/Down move between slides, Home/End jump, F toggles fullscreen. Clicking the right or left half moves too, so it works on a phone. Show the slide number.",
-        "- Keep the current slide in the URL hash (#3), so a link can open on a slide.",
-        "- A print stylesheet puts one slide per page, so Print → Save as PDF gives a PDF deck.",
-        "- Big type, one idea per slide, few words. No secrets or personal data.",
+        "1. Call get_template with name \"deck\" and follow its rules: front matter with type: deck and a title, slides split on --- lines, a # title slide first, then ## slides with one idea each and at most five short bullets.",
+        "2. Add speaker notes to each slide after a line starting with Note:. They stay out of the public page; only I see them, in the speaker view.",
+        "3. Need custom layouts or charts? Use the \"deck-html\" template instead: each top-level <section> is a 1280×720 slide, notes in <aside class=\"notes\">.",
+        "4. No secrets or personal data.",
+        "5. Publish with publish_html: the Markdown in `markdown` (or the HTML in `html`), deck: true, and the deck's title.",
         "",
-        "Publish it with publish_html (title it after the deck), then:",
+        "aired adds the controls: arrow keys, swipe on phones, F or the Present button for full screen, and #/N on the link opens slide N.",
         CHECK_STEP,
-        "Check it with viewport \"mobile\" as well.",
+        "Check it with viewport \"mobile\" as well. Give me the link, the link to slide 2 as an example, and the speaker view link if publish_html returned one.",
       ].join("\n"),
   },
   {

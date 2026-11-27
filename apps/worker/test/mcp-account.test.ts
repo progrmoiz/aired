@@ -72,7 +72,7 @@ test("wiring: only an API key or an MCP OAuth token signs MCP callers in, and th
   // Anonymous callers' API calls carry no credentials at all.
   assert.match(mcp, /if \(signedIn !== null && asKey\) headers\.set\("Authorization", authorization!\);/);
   assert.match(mcp, /signedIn !== null && asOAuth \? user!\.id : undefined/);
-  for (const tool of ["list_pages", "update_page", "delete_page", "get_account"]) {
+  for (const tool of ["list_pages", "update_page", "delete_page", "get_account", "get_responses", "update_data"]) {
     assert.match(mcp, new RegExp(`"${tool}",[\\s\\S]*?if \\(signedIn === null\\) return signInRequired\\(origin\\);`), tool);
   }
   const index = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
@@ -82,8 +82,8 @@ test("wiring: only an API key or an MCP OAuth token signs MCP callers in, and th
   assert.match(index, /if \(countMcpToolCalls\(body\) > 1\) \{/);
   assert.match(mcp, /if \(typeof update_token === "string" && typeof existingId !== "string"\) \{/);
   assert.match(mcp, /return isTokenUpdate \? publishUpdateResult\(res\.body, null\) : publishResult\(res\.body, signedIn\.login\);/);
-  // update_page, delete_page, get_page and check_page check the id; set_options checks args.id.
-  assert.equal((mcp.match(/if \(!PAGE_ID\.test\(id\)\) return badId\(\);/g) ?? []).length, 4);
+  // update_page, delete_page, get_page, check_page, get_responses and update_data check the id; set_options checks args.id.
+  assert.equal((mcp.match(/if \(!PAGE_ID\.test\(id\)\) return badId\(\);/g) ?? []).length, 6);
   assert.match(mcp, /if \(!PAGE_ID\.test\(args\.id\)\) return badId\(\);/);
   const api = readFileSync(new URL("../src/routes/api.ts", import.meta.url), "utf8");
   assert.match(api, /if \(user !== null && creds\.ownerId === null\) \{\s*const verdict = detectSpam/);

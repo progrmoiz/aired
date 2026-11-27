@@ -9,7 +9,10 @@
  */
 import {
   accountOut,
+  contentOut,
   feedbackOut,
+  getPageOut,
+  getPageText,
   listOut,
   pageOut,
   pageText,
@@ -62,6 +65,14 @@ function expiryLine(expiresAt: unknown): string {
   return e ? `Expires: ${e.split('T')[0]}` : 'Expires: never (permanent)';
 }
 
+/** For a deck: its slide count and where its owner sees the speaker notes. */
+export function deckLines(body: unknown): string[] {
+  const c = contentOut(body);
+  if (c.kind === 'doc') return ['Rendered from Markdown.'];
+  if (c.kind !== 'deck') return [];
+  return [`Slides: ${c.slides ?? 0}. Link to one with #/N, e.g. ${String((body as Obj).url ?? '')}#/2`, ...(c.presenter_url ? [`Speaker view (notes, only you): ${c.presenter_url}`] : [])];
+}
+
 function upgradeLines(body: Obj): string[] {
   const u = body.upgrade as Obj | undefined;
   const url = u && str(u.url);
@@ -75,13 +86,14 @@ export function publishResult(body: unknown, login: string): ToolResult {
     `Published to ${String(b.url)}`,
     `Owner: @${login} (it shows in the aired dashboard; update or delete it by id with update_page and delete_page)`,
     expiryLine(b.expiresAt),
+    ...deckLines(b),
     ...upgradeLines(b),
   ]), publishOut(body, { updated: false, owner: login }));
 }
 
 function updateText(body: unknown): ToolResult {
   const b = (body ?? {}) as Obj;
-  return text([`Updated ${String(b.url)}`, expiryLine(b.expiresAt), ...upgradeLines(b)]);
+  return text([`Updated ${String(b.url)}`, expiryLine(b.expiresAt), ...deckLines(b), ...upgradeLines(b)]);
 }
 
 /** update_page. */
@@ -98,10 +110,10 @@ export function deleteResult(id: string): ToolResult {
   return withData(text([`Deleted page ${id}.`]), { id, deleted: true });
 }
 
-/** get_page: GET /api/pages/:id/details. */
-export function pageResult(body: unknown, origin: string): ToolResult {
-  const p = pageOut(body, origin);
-  return withData(text([pageText(p, 'Page')]), p);
+/** get_page: GET /api/pages/:id/details, and /source when include_source was asked for. */
+export function pageResult(body: unknown, origin: string, source?: unknown): ToolResult {
+  const p = getPageOut(body, origin, source);
+  return withData(text([getPageText(p)]), p);
 }
 
 /** set_options: PATCH /api/pages/:id. */
