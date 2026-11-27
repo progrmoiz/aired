@@ -98,7 +98,8 @@ dataset = "aired_views"
 binding = "BROWSER"
 
 # Per-minute flood guards for anonymous traffic, counted by Cloudflare per
-# location (no KV writes). The hourly limits live in middleware/rate-limit.ts.
+# location (no KV writes). The hourly limits live in middleware/rate-limit.ts;
+# the publish ones are counted in D1 rate_limits (lib/durable-limit.ts).
 # Real spam ran at most 2 publishes a minute, so 6 only catches floods.
 [[ratelimits]]
 name = "PUBLISH_BURST"
@@ -135,6 +136,13 @@ simple = { limit = 5, period = 60 }
 name = "OAUTH_BURST"
 namespace_id = "1006"
 simple = { limit = 5, period = 60 }
+
+# Sign-in starts (/auth/login, /auth/github, /auth/cli, GET /auth/device):
+# each writes a KV state record, so a flood is capped per minute per IP.
+[[ratelimits]]
+name = "SIGNIN_BURST"
+namespace_id = "1008"
+simple = { limit = 10, period = 60 }
 
 # Referrer favicon fetches on an R2 miss (src/routes/favicon.ts), per account.
 [[ratelimits]]

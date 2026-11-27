@@ -17,6 +17,8 @@ import { visitorNetwork } from "../lib/pin-guess.ts";
 import { billingEnabled, getEntitlements, planLimitError, upgradeUrl } from "../lib/entitlements.js";
 import { siteOrigin } from "../lib/origin.ts";
 import { refreshShot } from "../lib/og-render.js";
+import { apiError } from "../lib/errors.ts";
+import { publicPageMeta } from "../lib/public-meta.ts";
 import type { Entitlements } from "../lib/entitlements.js";
 import {
   generateId,
@@ -28,6 +30,10 @@ import {
   parseMetadata,
   normalizeProject,
   hashToHex,
+  capTitle,
+  parseBody,
+  publishBody,
+  updateBody,
   DEFAULT_TTL,
   MAX_SIZE,
   PRO_MAX_SIZE,
@@ -44,10 +50,10 @@ const api = new Hono<AppBindings>();
  */
 export async function pageFor(c: Context<AppBindings>, id: string, route: string): Promise<LoadedPage | Response> {
   try {
-    return (await loadPage(c.env, id)) ?? c.json({ error: "Page not found" }, 404);
+    return (await loadPage(c.env, id)) ?? apiError(c, 404, "not_found", "Page not found");
   } catch (err) {
     console.error("pages lookup failed", { route, id, err });
-    return c.json({ error: CREDENTIALS_UNAVAILABLE }, 503);
+    return apiError(c, 503, "unavailable", CREDENTIALS_UNAVAILABLE);
   }
 }
 
@@ -76,7 +82,41 @@ async function rejectInvalidHtml(
       return { response: c.json(planLimitError("page_size", siteOrigin(c.env)), 402), ent };
     }
   }
-  return { response: c.json({ error: validation.error }, 400), ent };
+  return { response: apiError(c, 400, "invalid_html", validation.error), ent };
+}
+
+/**
+ * The request's JSON body, or the 400 to answer when it isn't JSON. A body
+ * sent without Content-Length that runs past the size cap is rethrown, so
+ * bodyLimit (middleware/api-contract.ts) answers its 413.
+ */
+async function readJson(c: Context<AppBindings>): Promise<{ body: unknown } | Response> {
+  try {
+    return { body: await c.req.json() };
+  } catch (err) {
+    if (err instanceof Error && err.name === "BodyLimitError") throw err;
+    return apiError(c, 400, "invalid_json", "Invalid JSON body");
+  }
+}
+
+/** A body that failed its schema (lib/errors.ts): `field` names the field when there is one. */
+function invalidInput(c: Context<AppBindings>, error: string, field: string | null): Response {
+  return apiError(c, 400, "invalid_input", error, field !== null ? { field } : {});
+}
+
+const spamRejected = (c: Context<AppBindings>) => apiError(c, 422, "spam_rejected", SPAM_REJECTION);
+const invalidToken = (c: Context<AppBindings>) => apiError(c, 403, "invalid_token", "Invalid update token");
+
+/**
+ * No working credential for a page write (PUT, DELETE): 401 when the caller
+ * sent nothing at all, 403 when they're signed in but it isn't their page.
+ * Same rule as the details and PATCH routes (lib/page-options.ts pageAccess).
+ */
+function noCredential(c: Context<AppBindings>): Response {
+  if (c.get("user") !== null) {
+    return apiError(c, 403, "not_owner", "This page isn't in your account. Use its update token instead.");
+  }
+  return apiError(c, 401, "token_required", "Send the page's update_token (in the body or as Authorization: Bearer <update_token>), or sign in as its owner.");
 }
 
 /**
@@ -93,30 +133,17 @@ function upgradeHint(
 
 // POST /api/publish — create a new page or update an existing one via update_token
 api.post("/publish", publishRateLimit, async (c) => {
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ error: "Invalid JSON body" }, 400);
-  }
-
-  if (typeof body !== "object" || body === null || Array.isArray(body)) {
-    return c.json({ error: "Request body must be a JSON object" }, 400);
-  }
-
-  const req = body as Record<string, unknown>;
-  const { html, title, pin, ttl, reads, permanent, project, update_token, id: existingId } = req;
-
-  if (typeof html !== "string") {
-    return c.json({ error: "html is required and must be a string" }, 400);
-  }
+  const json = await readJson(c);
+  if (json instanceof Response) return json;
+  // Shapes and bounds in @aired/core (schemas.ts); a wrong-typed field is ignored, as before.
+  const parsed = parseBody(publishBody, json.body);
+  if (!parsed.ok) return invalidInput(c, parsed.error, parsed.field);
+  const { html, title, pin, ttl, reads, permanent, project, update_token, id: existingId } = parsed.data;
 
   const { response: invalid, ent } = await rejectInvalidHtml(c, html);
   if (invalid !== null) return invalid;
 
-  const resolvedTitle =
-    (typeof title === "string" && title.trim() ? title.trim() : null) ??
-    extractTitle(html);
+  const resolvedTitle = capTitle(title) ?? capTitle(extractTitle(html));
 
   const origin = new URL(c.req.url).origin;
   const user = c.get('user');
@@ -127,7 +154,7 @@ api.post("/publish", publishRateLimit, async (c) => {
     const verdict = detectSpam(html, resolvedTitle);
     if (verdict.spam) {
       console.log({ event: "spam_rejected", route: "api_publish", reason: verdict.reason });
-      return c.json({ error: SPAM_REJECTION }, 422);
+      return spamRejected(c);
     }
   }
 
@@ -138,9 +165,7 @@ api.post("/publish", publishRateLimit, async (c) => {
     const creds = { ownerId: page.row.ownerId, tokenHash: page.row.tokenHash };
 
     const valid = await verifyToken(update_token, creds.tokenHash);
-    if (!valid) {
-      return c.json({ error: "Invalid update token" }, 403);
-    }
+    if (!valid) return invalidToken(c);
 
     // An anonymous page is screened on update whoever sends it, so a clean
     // page can't be swapped for spam (as PUT does).
@@ -148,7 +173,7 @@ api.post("/publish", publishRateLimit, async (c) => {
       const verdict = detectSpam(html, resolvedTitle);
       if (verdict.spam) {
         console.log({ event: "spam_rejected", route: "api_publish_update", reason: verdict.reason });
-        return c.json({ error: SPAM_REJECTION }, 422);
+        return spamRejected(c);
       }
     }
 
@@ -209,7 +234,7 @@ api.post("/publish", publishRateLimit, async (c) => {
   } catch (err) {
     if (err instanceof StorageUnavailable) {
       console.error("publish storage write failed", { id, err: err.message });
-      return c.json({ error: STORAGE_FULL }, 503);
+      return apiError(c, 503, "storage_unavailable", STORAGE_FULL);
     }
     throw err;
   }
@@ -241,33 +266,17 @@ api.post("/publish", publishRateLimit, async (c) => {
 api.put("/pages/:id", requireCsrfHeader, async (c) => {
   const id = c.req.param("id") ?? "";
 
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ error: "Invalid JSON body" }, 400);
-  }
-
-  if (typeof body !== "object" || body === null || Array.isArray(body)) {
-    return c.json({ error: "Request body must be a JSON object" }, 400);
-  }
-
-  const { html, title } = body as Record<string, unknown>;
-  const update_token = readUpdateToken(
-    (body as Record<string, unknown>).update_token,
-    c.req.header("Authorization"),
-  );
-
-  if (typeof html !== "string") {
-    return c.json({ error: "html is required and must be a string" }, 400);
-  }
+  const json = await readJson(c);
+  if (json instanceof Response) return json;
+  const parsed = parseBody(updateBody, json.body);
+  if (!parsed.ok) return invalidInput(c, parsed.error, parsed.field);
+  const { html, title } = parsed.data;
+  const update_token = readUpdateToken(parsed.data.update_token, c.req.header("Authorization"));
 
   const { response: invalid, ent } = await rejectInvalidHtml(c, html);
   if (invalid !== null) return invalid;
 
-  const resolvedTitle =
-    (typeof title === "string" && title.trim() ? title.trim() : null) ??
-    extractTitle(html);
+  const resolvedTitle = capTitle(title) ?? capTitle(extractTitle(html));
 
   const page = await pageFor(c, id, "put");
   if (page instanceof Response) return page;
@@ -284,12 +293,7 @@ api.put("/pages/:id", requireCsrfHeader, async (c) => {
     matches: (hash) => verifyToken(update_token as string, hash),
   });
 
-  if (!auth.ok) {
-    if (auth.reason === "bad_token") {
-      return c.json({ error: "Invalid update token" }, 403);
-    }
-    return c.json({ error: "update_token required" }, 400);
-  }
+  if (!auth.ok) return auth.reason === "bad_token" ? invalidToken(c) : noCredential(c);
 
   // Anonymous pages are screened on update too, so a clean page can't be
   // swapped for spam after publishing.
@@ -297,7 +301,7 @@ api.put("/pages/:id", requireCsrfHeader, async (c) => {
     const verdict = detectSpam(html, resolvedTitle);
     if (verdict.spam) {
       console.log({ event: "spam_rejected", route: "api_put", reason: verdict.reason });
-      return c.json({ error: SPAM_REJECTION }, 422);
+      return spamRejected(c);
     }
   }
 
@@ -359,12 +363,7 @@ api.delete("/pages/:id", requireCsrfHeader, async (c) => {
     authorized = true;
   }
 
-  if (!authorized) {
-    if (token !== null) {
-      return c.json({ error: "Invalid token" }, 403);
-    }
-    return c.json({ error: "Authorization: Bearer <update_token> is required" }, 401);
-  }
+  if (!authorized) return token !== null ? invalidToken(c) : noCredential(c);
 
   // The D1 row is marked first, then the HTML and cache record go
   // (lib/page-write.ts). If the row can't be marked, nothing has changed and
@@ -373,7 +372,7 @@ api.delete("/pages/:id", requireCsrfHeader, async (c) => {
     await deletePage(c.env, page, (work) => c.executionCtx.waitUntil(work));
   } catch (err) {
     console.error("page delete failed", { id, err });
-    return c.json({ error: "Could not delete this page. Please try again." }, 503);
+    return apiError(c, 503, "unavailable", "Could not delete this page. Please try again.");
   }
 
   return c.json({ ok: true });
@@ -422,7 +421,7 @@ api.get("/pages/:id/details", rateLimit(TIERS.page_options), async (c) => {
   const page = await pageFor(c, id, "details");
   if (page instanceof Response) return page;
   const access = await ownerAccess(c, page, sentUpdateToken(c));
-  if (!access.ok) return c.json({ error: access.error }, access.status);
+  if (!access.ok) return apiError(c, access.status, access.code, access.error);
   return c.json(pageDetails(page.row, await viewCount(c, page), siteOrigin(c.env)));
 });
 
@@ -432,20 +431,17 @@ api.get("/pages/:id/details", rateLimit(TIERS.page_options), async (c) => {
 // (body, X-Update-Token or Bearer) or signed-in owner (session or API key).
 api.patch("/pages/:id", requireCsrfHeader, rateLimit(TIERS.page_options), async (c) => {
   const id = c.req.param("id") ?? "";
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ error: "Invalid JSON body" }, 400);
-  }
+  const json = await readJson(c);
+  if (json instanceof Response) return json;
+  const body = json.body;
   const parsed = parseOptions(body);
-  if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+  if (!parsed.ok) return invalidInput(c, parsed.error, null);
   const { change } = parsed;
 
   const page = await pageFor(c, id, "patch");
   if (page instanceof Response) return page;
   const access = await ownerAccess(c, page, sentUpdateToken(c, (body as Record<string, unknown>).update_token));
-  if (!access.ok) return c.json({ error: access.error }, access.status);
+  if (!access.ok) return apiError(c, access.status, access.code, access.error);
 
   // A new title on an anonymous page is screened with its HTML, as an
   // update would be, so a clean page can't be retitled into spam.
@@ -454,7 +450,7 @@ api.patch("/pages/:id", requireCsrfHeader, rateLimit(TIERS.page_options), async 
     const verdict = detectSpam(obj === null ? "" : await obj.text(), change.title);
     if (verdict.spam) {
       console.log({ event: "spam_rejected", route: "api_patch", reason: verdict.reason });
-      return c.json({ error: SPAM_REJECTION }, 422);
+      return spamRejected(c);
     }
   }
 
@@ -464,9 +460,9 @@ api.patch("/pages/:id", requireCsrfHeader, rateLimit(TIERS.page_options), async 
   try {
     ({ row } = await setPageOptions(c.env, page, settingsChange(change, pinHash, now), now));
   } catch (err) {
-    if (err instanceof PageGone) return c.json({ error: "Page not found" }, 404);
+    if (err instanceof PageGone) return apiError(c, 404, "not_found", "Page not found");
     console.error("page options write failed", { id, err });
-    return c.json({ error: "Could not change this page's settings. Please try again." }, 503);
+    return apiError(c, 503, "unavailable", "Could not change this page's settings. Please try again.");
   }
   return c.json({ ...pageDetails(row, await viewCount(c, page), siteOrigin(c.env)), changed: changedSettings(change) });
 });
@@ -475,12 +471,9 @@ api.patch("/pages/:id", requireCsrfHeader, rateLimit(TIERS.page_options), async 
 // (send_feedback, `aired feedback`; lib/feedback.ts). Works signed in or
 // not. Never page HTML. Answers an id to pass on to the user.
 api.post("/feedback", rateLimit(TIERS.feedback), async (c) => {
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ error: "Invalid JSON body" }, 400);
-  }
+  const json = await readJson(c);
+  if (json instanceof Response) return json;
+  const body = json.body;
   // The source, when the client didn't say: the MCP servers and CLI name themselves.
   if (typeof body === "object" && body !== null && !Array.isArray(body) && (body as Record<string, unknown>).source === undefined) {
     const ua = c.req.header("User-Agent") ?? "";
@@ -488,7 +481,7 @@ api.post("/feedback", rateLimit(TIERS.feedback), async (c) => {
     if (source !== undefined) (body as Record<string, unknown>).source = source;
   }
   const parsed = parseFeedback(body);
-  if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+  if (!parsed.ok) return invalidInput(c, parsed.error, null);
 
   const user = c.get("user");
   const ip = c.req.header("CF-Connecting-IP") ?? c.req.header("X-Forwarded-For") ?? "unknown";
@@ -500,47 +493,42 @@ api.post("/feedback", rateLimit(TIERS.feedback), async (c) => {
     if (!(await insertFeedback(c.env.DB, id, parsed.input, { userId: user?.id ?? null, rateKey }, now))) {
       const limit = await feedbackAllowed(c.env.DB, rateKey, now);
       const global = !limit.ok && limit.reason === "global";
-      return c.json(
-        { error: global ? "aired isn't taking feedback right now. Try again tomorrow." : "Feedback limit reached: 10 an hour. Send it later, or not at all." },
+      return apiError(
+        c,
         429,
+        "rate_limited",
+        global ? "aired isn't taking feedback right now. Try again tomorrow." : "Feedback limit reached: 10 an hour. Send it later, or not at all.",
       );
     }
     console.log({ event: "feedback_received", id, kind: parsed.input.kind, impact: parsed.input.impact, source: parsed.input.source });
     return c.json({ id, message: `${NOT_SUPPORT} Tell the user you sent feedback ${id}.` });
   } catch (err) {
     console.error("feedback write failed", { err });
-    return c.json({ error: "Could not save feedback. Please try again later." }, 503);
+    return apiError(c, 503, "unavailable", "Could not save feedback. Please try again later.");
   }
 });
 
-// GET /api/pages/:id — public metadata (no token required)
+// GET /api/pages/:id — public metadata (no token required). A PIN-protected
+// page's title and view count stay hidden (lib/public-meta.ts).
 api.get("/pages/:id", async (c) => {
   const id = c.req.param("id");
 
   const raw = await c.env.PAGES_KV.get(`page:${id}`);
-  if (raw === null) {
-    return c.json({ error: "Page not found" }, 404);
-  }
+  if (raw === null) return apiError(c, 404, "not_found", "Page not found");
 
   const metadata = parseMetadata(raw);
-  if (metadata === null) {
-    return c.json({ error: "Page metadata is corrupted" }, 500);
-  }
+  if (metadata === null) return apiError(c, 500, "internal_error", "Page metadata is corrupted");
 
   let readCount = metadata.readCount;
-  try {
-    readCount = viewCountOf(await pageViewCounts(c.env.DB, [id]), id, metadata.readCount);
-  } catch (err) {
-    console.error("page_views lookup failed", { id, err });
+  if (metadata.pin === null) {
+    try {
+      readCount = viewCountOf(await pageViewCounts(c.env.DB, [id]), id, metadata.readCount);
+    } catch (err) {
+      console.error("page_views lookup failed", { id, err });
+    }
   }
 
-  return c.json({
-    id: metadata.id,
-    title: metadata.title,
-    size: metadata.size,
-    readCount,
-    expiresAt: metadata.expiresAt,
-  });
+  return c.json(publicPageMeta(metadata, readCount));
 });
 
 // GET /api/stats — public stats: counters and per-country views only. Views

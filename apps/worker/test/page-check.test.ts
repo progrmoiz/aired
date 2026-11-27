@@ -259,7 +259,7 @@ test("wiring: the check route asks for the owner, rate-limits, and spends the bu
   const check = route.slice(route.indexOf('pageTools.post("/pages/:id/check"'), route.indexOf('pageTools.get("/pages/:id/check.jpg"'));
   assert.match(check, /pageTools\.post\("\/pages\/:id\/check", requireCsrfHeader, rateLimit\(TIERS\.page_check\), async/);
   const access = check.indexOf("const access = await ownerAccess(c, page, sentUpdateToken(c, body.update_token));");
-  const refused = check.indexOf("if (!access.ok) return c.json({ error: access.error }, access.status);");
+  const refused = check.indexOf("if (!access.ok) return apiError(c, access.status, access.code, access.error);");
   const burst = check.indexOf("underBurstLimit(c.env.CHECK_BURST, caller.key)");
   const render = check.indexOf("await checkPage(c.env, id, html, viewport, caller)");
   assert.ok(access > 0 && refused > access && burst > refused && render > burst, "owner check, then the burst guard, then the browser");

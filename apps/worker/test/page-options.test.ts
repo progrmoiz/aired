@@ -38,15 +38,17 @@ test("another account's page is refused, signed in or with a wrong token", () =>
   assert.deepEqual(pageAccess({ ...theirs, tokenSent: false, tokenMatches: false }), {
     ok: false,
     status: 403,
+    code: "not_owner",
     error: "This page isn't in your account. Use its update token instead.",
   });
-  assert.deepEqual(pageAccess({ ...theirs, tokenSent: true, tokenMatches: false }), { ok: false, status: 403, error: "Invalid update token" });
+  assert.deepEqual(pageAccess({ ...theirs, tokenSent: true, tokenMatches: false }), { ok: false, status: 403, code: "invalid_token", error: "Invalid update token" });
   // Being signed in never opens an anonymous page.
   assert.equal(pageAccess({ ownerId: null, userId: 8, tokenSent: false, tokenMatches: false }).ok, false);
   // No credentials at all: 401, so the agent knows to sign in.
   const anon = pageAccess({ ownerId: 7, userId: null, tokenSent: false, tokenMatches: false });
   assert.equal(anon.ok, false);
   if (!anon.ok) assert.equal(anon.status, 401);
+  if (!anon.ok) assert.equal(anon.code, "token_required");
 });
 
 test("the owner, or anyone with the page's token, gets in", () => {
@@ -61,7 +63,7 @@ test("wiring: details and PATCH go through pageFor and ownerAccess before anythi
   const api = readFileSync(new URL("../src/routes/api.ts", import.meta.url), "utf8");
   const details = api.slice(api.indexOf('api.get("/pages/:id/details"'), api.indexOf('api.patch("/pages/:id"'));
   assert.match(details, /rateLimit\(TIERS\.page_options\)/);
-  assert.match(details, /const access = await ownerAccess\(c, page, sentUpdateToken\(c\)\);\s*if \(!access\.ok\) return c\.json\(\{ error: access\.error \}, access\.status\);\s*return c\.json\(pageDetails\(/);
+  assert.match(details, /const access = await ownerAccess\(c, page, sentUpdateToken\(c\)\);\s*if \(!access\.ok\) return apiError\(c, access\.status, access\.code, access\.error\);\s*return c\.json\(pageDetails\(/);
   const patch = api.slice(api.indexOf('api.patch("/pages/:id"'), api.indexOf('api.post("/feedback"'));
   assert.match(patch, /requireCsrfHeader, rateLimit\(TIERS\.page_options\)/);
   assert.ok(patch.indexOf("if (!access.ok)") < patch.indexOf("setPageOptions("), "access is checked before the write");

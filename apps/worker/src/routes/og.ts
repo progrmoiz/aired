@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { AppBindings } from "../types.js";
 import { parseMetadata } from "@aired/core";
 import { pageViewCounts, viewCountOf } from "../lib/view-counts.ts";
+import { cardTitle } from "../lib/public-meta.ts";
 import { SHOT_CONTENT_TYPE, ogCacheControl, shotAllowed, shotKey, versionFromEtag } from "../lib/og-shot.js";
 
 const og = new Hono<AppBindings>();
@@ -32,16 +33,20 @@ og.get("/og/:id", async (c) => {
   }
 
   let title = "Untitled";
-  let views = 0;
+  let views: number | null = 0;
   let expiryText = "";
 
   if (metadata) {
-    title = metadata.title ?? "Untitled";
-    views = metadata.readCount;
-    try {
-      views = viewCountOf(await pageViewCounts(c.env.DB, [id]), id, metadata.readCount);
-    } catch {
-      // The card still draws, with the count frozen in KV.
+    // A PIN-protected page's card shows neither its title nor its views
+    // (lib/public-meta.ts).
+    title = cardTitle(metadata);
+    views = metadata.pin !== null ? null : metadata.readCount;
+    if (views !== null) {
+      try {
+        views = viewCountOf(await pageViewCounts(c.env.DB, [id]), id, metadata.readCount);
+      } catch {
+        // The card still draws, with the count frozen in KV.
+      }
     }
     if (metadata.permanent) {
       expiryText = "Permanent";
@@ -79,12 +84,13 @@ og.get("/og/:id", async (c) => {
 
 function renderOgSvg(opts: {
   title: string;
-  views: number;
+  /** null: a PIN-protected page, whose views aren't shown. */
+  views: number | null;
   expiryText: string;
   id: string;
 }): string {
   const { title, views, expiryText, id } = opts;
-  const viewsText = `${views} view${views !== 1 ? "s" : ""}`;
+  const viewsText = views === null ? "PIN required" : `${views} view${views !== 1 ? "s" : ""}`;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <defs>

@@ -12,6 +12,8 @@ export interface PageInfo {
   readCount: number
   expiresAt: string | null
   project?: string | null
+  /** A PIN is on: the API hides title and readCount (null and 0) then. Older APIs leave it out. */
+  pinProtected?: boolean
 }
 
 export interface TokenRecord {

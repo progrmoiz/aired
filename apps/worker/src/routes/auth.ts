@@ -39,7 +39,7 @@ import { isNativeDeviceCode } from '../lib/device-code.js';
 const auth = new Hono<AppBindings>();
 
 // GET /auth/github — initiate web OAuth flow
-auth.get('/github', rateLimit(TIERS.oauth_init), async (c) => {
+auth.get('/github', rateLimit(TIERS.signin_start), async (c) => {
   const url = new URL(c.req.url);
   const returnParam = url.searchParams.get('return') ?? '/dashboard';
   const returnPath = isAllowedReturn(returnParam) ? returnParam : '/dashboard';
@@ -70,7 +70,7 @@ auth.get('/github', rateLimit(TIERS.oauth_init), async (c) => {
 });
 
 // GET /auth/cli — initiate CLI OAuth flow
-auth.get('/cli', rateLimit(TIERS.oauth_init), async (c) => {
+auth.get('/cli', rateLimit(TIERS.signin_start), async (c) => {
   const url = new URL(c.req.url);
   const portParam = url.searchParams.get('port');
   const clientState = url.searchParams.get('state') ?? '';
@@ -298,7 +298,7 @@ auth.post('/logout', requireAuth, requireCsrfHeader, async (c) => {
 });
 
 // GET /auth/device — GitHub's device flow, for CLI versions before aired's own (POST /auth/device)
-auth.get('/device', rateLimit(TIERS.oauth_init), async (c) => {
+auth.get('/device', rateLimit(TIERS.signin_start), async (c) => {
   let deviceResponse: Record<string, unknown>;
   try {
     deviceResponse = await requestDeviceCode(c.env);

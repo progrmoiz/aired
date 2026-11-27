@@ -6,14 +6,20 @@ export type RateLimitTier = {
    * Workers Rate Limiting binding that also caps anonymous requests per
    * minute (see lib/burst-limit.ts). Signed-in users skip it.
    */
-  burst?: 'PUBLISH_BURST' | 'REPORT_BURST' | 'DEVICE_BURST' | 'OAUTH_BURST';
+  burst?: 'PUBLISH_BURST' | 'REPORT_BURST' | 'DEVICE_BURST' | 'OAUTH_BURST' | 'SIGNIN_BURST';
+  /**
+   * Count in D1 (lib/durable-limit.ts), shared by every isolate, instead of
+   * in memory. For the limits that are a plan promise: publishes.
+   */
+  durable?: true;
 };
 
 export const TIERS = {
-  anonymous:     { bucketPrefix: 'rl:ip',     limit: 5,  windowSeconds: 3600, burst: 'PUBLISH_BURST' },
+  // Publishes: durable, so 5 an hour means 5 an hour across all of Cloudflare.
+  anonymous:     { bucketPrefix: 'rl:ip',     limit: 5,  windowSeconds: 3600, burst: 'PUBLISH_BURST', durable: true },
   report:        { bucketPrefix: 'rl:report', limit: 10, windowSeconds: 3600, burst: 'REPORT_BURST' },
-  authenticated: { bucketPrefix: 'rl:user',   limit: 30, windowSeconds: 3600 },
-  pro:           { bucketPrefix: 'rl:pro',    limit: 500, windowSeconds: 86400 },
+  authenticated: { bucketPrefix: 'rl:user',   limit: 30, windowSeconds: 3600, durable: true },
+  pro:           { bucketPrefix: 'rl:pro',    limit: 500, windowSeconds: 86400, durable: true },
   claim_batch:   { bucketPrefix: 'rl:claim',  limit: 5,  windowSeconds: 3600 },
   delete:        { bucketPrefix: 'rl:delete', limit: 10, windowSeconds: 3600 },
   // Checkout, portal and /upgrade each call Stripe.
@@ -21,6 +27,10 @@ export const TIERS = {
   // OAuth init endpoints need higher limits — each sign-in attempt fires multiple
   // requests (init + callback + retries on stale browser tabs).
   oauth_init:    { bucketPrefix: 'rl:oauth',  limit: 60, windowSeconds: 3600 },
+  // Sign-in starts (/auth/login, /auth/github, /auth/cli, GET /auth/device)
+  // write KV on every hit: the same hourly bucket as oauth_init, plus a
+  // per-minute flood guard counted by Cloudflare.
+  signin_start:  { bucketPrefix: 'rl:oauth',  limit: 60, windowSeconds: 3600, burst: 'SIGNIN_BURST' },
   // Remote MCP tool calls made with an API key (per account). Publishes also
   // count against the account's publish limit inside the API.
   mcp_key:       { bucketPrefix: 'rl:mcpkey', limit: 120, windowSeconds: 3600 },

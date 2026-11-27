@@ -1,13 +1,6 @@
 import { DEFAULT_TTL, kvKeys, parseMetadata, serializeMetadata } from "@aired/core";
 import type { PageMetadata } from "@aired/core";
 import {
-  addPageToOwner,
-  addPageToOwnerProject,
-  bumpProjectCount,
-  removePageFromOwner,
-  removePageFromOwnerProject,
-} from "./owner-index.js";
-import {
   getPageRow,
   insertPageRow,
   isLive,
@@ -20,7 +13,6 @@ import {
   updatePageOptions,
   type PageRow,
 } from "./pages-store.ts";
-import { tombstoneClaim } from "./page-claims.ts";
 import { forgetShots } from "./og-render.js";
 import { isPinHash } from "./pin-hash.js";
 
@@ -30,10 +22,11 @@ import { isPinHash } from "./pin-hash.js";
  * routes/mcp.ts). D1 `pages` is written first and decides; then R2 holds
  * the HTML and KV `page:<id>` the viewer's cached copy.
  *
- * The KV owner and project indexes (lib/owner-index.ts) and `page_claims`
- * are still written, best-effort, so rolling back to the code before
- * `pages` loses nothing. Nothing reads them for decisions. Drop those writes
- * once this has run a release without a rollback.
+ * The KV owner and project indexes (`pages_by_owner:`,
+ * `pages_by_owner_project:`, `projects_by_owner:`) and D1 `page_claims` are
+ * no longer written: D1 `pages` replaced them, and nothing reads them for
+ * decisions. Rolling back past this needs the old keys rebuilt
+ * (docs/pages-in-d1.md, "Retiring the old copies").
  */
 
 type PageEnv = { PAGES_KV: KVNamespace; PAGES_BUCKET: R2Bucket; DB: D1Database };
@@ -74,8 +67,7 @@ export class StorageUnavailable extends Error {}
 const limitHit = (err: unknown) => (err instanceof Error ? err.message : String(err)).includes("limit exceeded");
 
 /**
- * Create a page: its D1 row, then R2, then the KV cache record, then the old
- * KV indexes (best-effort). A failure undoes what was written and throws, so
+ * Create a page: its D1 row, then R2, then the KV cache record. A failure undoes what was written and throws, so
  * no half-made page is left behind; a storage failure or "limit exceeded"
  * becomes StorageUnavailable (503). The row goes first so an id that is
  * somehow taken fails before anything of the other page is overwritten.
@@ -107,21 +99,7 @@ export async function createPage(env: PageEnv, page: PageMetadata, html: string,
     if (limitHit(err)) throw new StorageUnavailable(String(err));
     throw err;
   }
-  if (page.ownerId !== null) await indexForOwner(env.PAGES_KV, page.ownerId, page);
   return htmlObj;
-}
-
-/** The old KV owner and project indexes, for a rollback (see the top). Never throws. */
-export async function indexForOwner(kv: KVNamespace, ownerId: number, page: PageMetadata): Promise<void> {
-  try {
-    await addPageToOwner(kv, ownerId, page.id, page.createdAt, page.expiresAt);
-    if (page.project !== null) {
-      await addPageToOwnerProject(kv, ownerId, page.project, page.id, page.createdAt, page.expiresAt);
-      await bumpProjectCount(kv, ownerId, page.project, 1);
-    }
-  } catch (err) {
-    console.error("owner-index write failed", { id: page.id, ownerId, err });
-  }
 }
 
 /**
@@ -222,9 +200,8 @@ async function removeContent(env: PageEnv, id: string): Promise<void> {
  * works and no update can bring it back (updatePage re-checks). Then its
  * HTML and KV record go; if that keeps failing, it's handed to `later`
  * (waitUntil) and logged, since the page is already deleted for every API.
- * Screenshots, the `page_claims` tombstone and the old indexes follow,
- * best-effort. Throws only if the row can't be marked: nothing has changed
- * then, and a retry works.
+ * Screenshots follow, best-effort. Throws only if the row can't be marked:
+ * nothing has changed then, and a retry works.
  */
 export async function deletePage(env: PageEnv, page: LoadedPage, later: (work: Promise<unknown>) => void, now = Date.now()): Promise<void> {
   const { row } = page;
@@ -243,25 +220,6 @@ export async function deletePage(env: PageEnv, page: LoadedPage, later: (work: P
     await forgetShots(env, row.id);
   } catch (err) {
     console.error("screenshot cleanup failed on delete", { id: row.id, err });
-  }
-  // For a rollback: the old code reads page_claims, and a stale KV copy must
-  // not let the page's old token bring it back there either.
-  try {
-    await tombstoneClaim(env.DB, row.id, now);
-  } catch (err) {
-    console.error("page_claims tombstone failed", { id: row.id, err });
-  }
-  if (row.ownerId !== null) {
-    const createdAt = new Date(row.createdAt).toISOString();
-    try {
-      await removePageFromOwner(env.PAGES_KV, row.ownerId, row.id, createdAt);
-      if (row.project !== null) {
-        await removePageFromOwnerProject(env.PAGES_KV, row.ownerId, row.project, row.id, createdAt);
-        await bumpProjectCount(env.PAGES_KV, row.ownerId, row.project, -1);
-      }
-    } catch (err) {
-      console.error("owner-index delete failed", { id: row.id, ownerId: row.ownerId, err });
-    }
   }
 }
 

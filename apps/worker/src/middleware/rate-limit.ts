@@ -5,6 +5,9 @@ import { TIERS, publishTier, type RateLimitTier } from "../lib/rate-limit-tiers.
 import { underBurstLimit } from "../lib/burst-limit.js";
 import { billingEnabled, getEntitlements, planLimitError } from "../lib/entitlements.js";
 import { siteOrigin } from "../lib/origin.ts";
+import { takeDurableSlot } from "../lib/durable-limit.ts";
+import { apiError } from "../lib/errors.ts";
+import { log } from "../lib/log.js";
 
 type RateLimitOptions = {
   /**
@@ -15,8 +18,10 @@ type RateLimitOptions = {
 };
 
 /**
- * In-memory rate limit store.
- * Resets on worker cold start — that's fine for a low-traffic service.
+ * In-memory rate limit store, per isolate: it resets on a cold start and
+ * every isolate has its own. Fine for the limits that only guard against
+ * floods; the plan limits (tiers with `durable`) count in D1 instead
+ * (lib/durable-limit.ts) and fall back to this only if D1 fails.
  * Keys are `${tier.bucketPrefix}:${bucketSubKey}`.
  */
 const store = new Map<string, { count: number; resetAt: number }>();
@@ -57,6 +62,20 @@ function checkRateLimit(
 
   entry.count++;
   return { allowed: true, remaining: limit - entry.count };
+}
+
+/**
+ * A durable tier's check in D1. If D1 fails, the in-memory count decides
+ * for this request, so an outage neither blocks every publish nor lifts
+ * the limit entirely.
+ */
+async function durableAllowed(c: Context<AppBindings>, key: string, tier: RateLimitTier): Promise<boolean> {
+  try {
+    return await takeDurableSlot(c.env.DB, key, tier, Date.now());
+  } catch (err) {
+    log("error", "durable_limit_failed", { bucket: tier.bucketPrefix, error: String(err) }, c.get("requestId"));
+    return checkRateLimit(key, tier.limit, tier.windowSeconds).allowed;
+  }
 }
 
 /**
@@ -101,24 +120,20 @@ export function rateLimit(
     // rather than per isolate.
     if (tier.burst !== undefined && !c.get("user")) {
       if (!(await underBurstLimit(c.env[tier.burst], key))) {
-        return c.json(
-          { error: "Too many requests. Please wait a minute and try again." },
-          429,
-        );
+        return apiError(c, 429, "rate_limited", "Too many requests. Please wait a minute and try again.");
       }
     }
 
-    const { allowed } = checkRateLimit(key, tier.limit, tier.windowSeconds);
+    const allowed = tier.durable === true && c.env.DB !== undefined
+      ? await durableAllowed(c, key, tier)
+      : checkRateLimit(key, tier.limit, tier.windowSeconds).allowed;
 
     maybePrune();
 
     if (!allowed) {
       const custom = options.onLimited?.(c);
       if (custom !== undefined) return custom;
-      return c.json(
-        { error: "Rate limit exceeded. Please try again later." },
-        429,
-      );
+      return apiError(c, 429, "rate_limited", "Rate limit exceeded. Please try again later.");
     }
 
     await next();
@@ -151,32 +166,4 @@ export async function publishRateLimit(
     : tier === TIERS.authenticated ? publishLimits.authenticated
     : publishLimits.anonymous;
   return limiter(c, next);
-}
-
-/**
- * @deprecated Use rateLimit(tier) factory instead.
- * Kept for backward-compatibility during migration.
- */
-export async function rateLimitMiddleware(
-  c: Context<AppBindings>,
-  next: Next,
-): Promise<Response | void> {
-  const ip =
-    c.req.header("CF-Connecting-IP") ??
-    c.req.header("X-Forwarded-For") ??
-    "unknown";
-
-  const ipHash = await hashToHex(ip, 16);
-  const { allowed } = checkRateLimit(`rl:ip:${ipHash}`, 5, 3600);
-
-  maybePrune();
-
-  if (!allowed) {
-    return c.json(
-      { error: "Rate limit exceeded. Maximum 5 uploads per hour." },
-      429,
-    );
-  }
-
-  await next();
 }

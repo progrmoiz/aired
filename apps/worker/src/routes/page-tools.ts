@@ -10,6 +10,7 @@ import { checkPage, deleteCheckShots } from "../lib/og-render.js";
 import { buildReport, CheckUnavailable, CHECK_SHOT_TTL_MS, checkShotKey, parseViewport, SHOT_URL_KEY, shotUnexpired, type CheckCaller } from "../lib/page-check.ts";
 import { ownerAccess, pageFor, sentUpdateToken } from "./api.ts";
 import { hashToHex } from "@aired/core";
+import { apiError } from "../lib/errors.ts";
 
 /**
  * Owner tools for one page, beside the page routes in api.ts:
@@ -54,35 +55,35 @@ function randomKey(): string {
 // inline_screenshot?: boolean }.
 pageTools.post("/pages/:id/check", requireCsrfHeader, rateLimit(TIERS.page_check), async (c) => {
   const id = c.req.param("id") ?? "";
-  if (!PAGE_ID.test(id)) return c.json({ error: "Page not found" }, 404);
+  if (!PAGE_ID.test(id)) return apiError(c, 404, "not_found", "Page not found");
   let body: Record<string, unknown> = {};
   const raw = await c.req.text();
   if (raw.trim() !== "") {
     try {
       const parsed: unknown = JSON.parse(raw);
-      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return c.json({ error: "Request body must be a JSON object" }, 400);
+      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return apiError(c, 400, "invalid_input", "Request body must be a JSON object");
       body = parsed as Record<string, unknown>;
     } catch {
-      return c.json({ error: "Invalid JSON body" }, 400);
+      return apiError(c, 400, "invalid_json", "Invalid JSON body");
     }
   }
   const viewport = parseViewport(body.viewport);
-  if (viewport === null) return c.json({ error: 'viewport must be "desktop" or "mobile"' }, 400);
+  if (viewport === null) return apiError(c, 400, "invalid_input", 'viewport must be "desktop" or "mobile"', { field: "viewport" });
 
   const page = await pageFor(c, id, "check");
   if (page instanceof Response) return page;
   const access = await ownerAccess(c, page, sentUpdateToken(c, body.update_token));
-  if (!access.ok) return c.json({ error: access.error }, access.status);
+  if (!access.ok) return apiError(c, access.status, access.code, access.error);
 
   // Browser Rendering allows one new browser every few seconds: a few checks a minute per caller.
   const caller = await checkCaller(c);
   if (!(await underBurstLimit(c.env.CHECK_BURST, caller.key))) {
     c.header("Retry-After", "60");
-    return c.json({ error: "Too many checks. Wait a minute and try again." }, 429);
+    return apiError(c, 429, "rate_limited", "Too many checks. Wait a minute and try again.");
   }
 
   const obj = await c.env.PAGES_BUCKET.get(`pages/${id}/index.html`);
-  if (obj === null) return c.json({ error: "Page not found" }, 404);
+  if (obj === null) return apiError(c, 404, "not_found", "Page not found");
   const html = await obj.text();
 
   let result: Awaited<ReturnType<typeof checkPage>>;
@@ -92,10 +93,10 @@ pageTools.post("/pages/:id/check", requireCsrfHeader, rateLimit(TIERS.page_check
     if (err instanceof CheckUnavailable) {
       if (err.waitSeconds !== null) c.header("Retry-After", String(err.waitSeconds));
       const u = UNAVAILABLE[err.reason];
-      return c.json({ error: u.error, code: u.code }, u.status);
+      return apiError(c, u.status, u.code, u.error);
     }
     console.error("page check failed", { id, err: String(err) });
-    return c.json({ error: "The check didn't finish. Try again; if it keeps failing, the page may hang the browser." }, 502);
+    return apiError(c, 502, "check_failed", "The check didn't finish. Try again; if it keeps failing, the page may hang the browser.");
   }
 
   const now = Date.now();
@@ -142,16 +143,16 @@ pageTools.post("/pages/:id/check", requireCsrfHeader, rateLimit(TIERS.page_check
 pageTools.get("/pages/:id/check.jpg", async (c) => {
   const id = c.req.param("id") ?? "";
   const sent = c.req.query("k") ?? "";
-  if (!PAGE_ID.test(id) || !SHOT_URL_KEY.test(sent)) return c.json({ error: "Not found" }, 404);
+  if (!PAGE_ID.test(id) || !SHOT_URL_KEY.test(sent)) return apiError(c, 404, "not_found", "Not found");
   const obj = await c.env.PAGES_BUCKET.get(checkShotKey(id, await hashToHex(sent, 32)));
-  if (obj === null || !shotUnexpired(obj.customMetadata?.expires, Date.now())) return c.json({ error: "Not found" }, 404);
+  if (obj === null || !shotUnexpired(obj.customMetadata?.expires, Date.now())) return apiError(c, 404, "not_found", "Not found");
   let live: Awaited<ReturnType<typeof loadPage>>;
   try {
     live = await loadPage(c.env, id);
   } catch {
-    return c.json({ error: "Try again" }, 503);
+    return apiError(c, 503, "unavailable", "Try again");
   }
-  if (live === null) return c.json({ error: "Not found" }, 404);
+  if (live === null) return apiError(c, 404, "not_found", "Not found");
   return new Response(obj.body, {
     headers: {
       "Content-Type": "image/jpeg",
@@ -168,13 +169,13 @@ pageTools.get("/pages/:id/check.jpg", async (c) => {
 // owner gets here.
 pageTools.get("/pages/:id/source", rateLimit(TIERS.page_options), async (c) => {
   const id = c.req.param("id") ?? "";
-  if (!PAGE_ID.test(id)) return c.json({ error: "Page not found" }, 404);
+  if (!PAGE_ID.test(id)) return apiError(c, 404, "not_found", "Page not found");
   const page = await pageFor(c, id, "source");
   if (page instanceof Response) return page;
   const access = await ownerAccess(c, page, sentUpdateToken(c));
-  if (!access.ok) return c.json({ error: access.error }, access.status);
+  if (!access.ok) return apiError(c, access.status, access.code, access.error);
   const obj = await c.env.PAGES_BUCKET.get(`pages/${id}/index.html`);
-  if (obj === null) return c.json({ error: "Page not found" }, 404);
+  if (obj === null) return apiError(c, 404, "not_found", "Page not found");
   const html = await obj.text();
   return c.json({ id, url: `${siteOrigin(c.env)}/p/${id}`, title: page.row.title, size: page.row.size, html });
 });

@@ -118,7 +118,7 @@
         status.textContent = 'Sending…';
         fetch('/api/report', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-Aired-Request': '1' },
           body: JSON.stringify({
             id: page.value.trim(),
             category: document.getElementById('category').value,

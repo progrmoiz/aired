@@ -195,10 +195,10 @@ url = "https://aired.sh/mcp"</code></pre>
         <p>Inputs:</p>
 <pre><code>{
   "html":         "string, required, &lt;= 2 MB",
-  "title":        "string, optional",
-  "ttl_seconds":  "number, optional (default 604800 = 7 days)",
+  "title":        "string, optional, cut to 200 characters",
+  "ttl_seconds":  "number, optional (default 604800 = 7 days, at most 31536000 = a year)",
   "permanent":    "boolean, optional",
-  "pin":          "string, optional",
+  "pin":          "string, optional, at most 64 characters",
   "update_token": "string, optional, with id to update",
   "id":           "string, optional"
 }</code></pre>
@@ -229,7 +229,7 @@ url = "https://aired.sh/mcp"</code></pre>
             <tr><td><code>POST</code></td><td><code>/api/publish</code></td><td>Create a page. Returns <code>{ id, url, update_token, expiresAt }</code>. Also updates if <code>id</code> + <code>update_token</code> are in the body.</td></tr>
             <tr><td><code>PUT</code></td><td><code>/api/pages/:id</code></td><td>Update by <code>update_token</code> in the JSON body.</td></tr>
             <tr><td><code>DELETE</code></td><td><code>/api/pages/:id</code></td><td>Delete by <code>Authorization: Bearer &lt;token&gt;</code> header.</td></tr>
-            <tr><td><code>GET</code></td><td><code>/api/pages/:id</code></td><td>Public metadata: <code>{ id, title, size, readCount, expiresAt }</code>. No auth.</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/pages/:id</code></td><td>Public metadata: <code>{ id, title, size, readCount, expiresAt, pinProtected }</code>. No auth. A PIN-protected page answers <code>title: null</code> and <code>readCount: 0</code> (its owner sees both in <code>/details</code>).</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/pages/:id/details</code></td><td>The owner's view: <code>{ id, url, title, size, readCount, reads, hasPin, permanent, createdAt, expiresAt, project }</code>. Never the PIN. Signed in as the owner, or the page's token in <code>X-Update-Token</code> (or <code>Authorization: Bearer</code>).</td></tr>
             <tr><td><code>PATCH</code></td><td><code>/api/pages/:id</code></td><td>Change settings without the HTML: <code>title</code>, <code>pin</code>, <code>ttl</code> or <code>permanent</code>, <code>reads</code>. Same credentials as PUT. Returns the details plus <code>changed</code>.</td></tr>
             <tr><td><code>POST</code></td><td><code>/api/pages/:id/check</code></td><td>Body <code>{ update_token?, viewport?: "desktop" | "mobile", inline_screenshot? }</code>. Render the page in a browser and return the report <code>check_page</code> gives (<code>ok</code>, <code>issues</code>, <code>console</code>, <code>failed_requests</code>, <code>blank</code>, <code>page</code>, <code>screenshot_url</code>). Same credentials as PATCH. <code>429</code> with <code>code: "check_budget"</code> when today's browser time is spent.</td></tr>
@@ -239,7 +239,7 @@ url = "https://aired.sh/mcp"</code></pre>
             <tr><td><code>GET</code></td><td><code>/api/me/analytics</code></td><td>Pro, signed in or with an API key. <code>?range=7|30|90</code> (default 30) and <code>&amp;offset=N</code> to step back whole windows, within the last 90 days. Views per day, the total for the window before, the busiest day and its top referrer, and countries, referrer sites and pages across your pages, busiest first (up to 50 each). <code>/api/me/analytics/pages/:id</code> is the same for one of your pages. Free accounts get <code>402</code> with <code>code: "plan_limit"</code> and an <code>upgrade_url</code>.</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/favicon/:host</code></td><td>Signed in. The icon of a site that sent views, from the signed URLs in an analytics report's <code>icons</code> field. aired fetches it once and keeps it; a site without one gets a 404.</td></tr>
             <tr><td><code>POST</code></td><td><code>/api/report</code></td><td>Body <code>{ id, category?, reason, contact? }</code>. <code>id</code> is a page ID or URL; <code>category</code> is one of <code>spam</code>, <code>phishing</code>, <code>malware</code>, <code>illegal</code>, <code>other</code>. Flags a page for abuse review. Or use the <a href="/abuse">report form</a>.</td></tr>
-            <tr><td><code>GET</code></td><td><code>/og/:id</code></td><td>Open Graph image for the page: a 1200×630 screenshot taken after each publish or update, or a generated title card for pages with a PIN or a view limit, pages over 1 MB, and until the screenshot is ready.</td></tr>
+            <tr><td><code>GET</code></td><td><code>/og/:id</code></td><td>Open Graph image for the page: a 1200×630 screenshot taken after each publish or update, or a generated title card for pages with a PIN or a view limit, pages over 1 MB, and until the screenshot is ready. A PIN-protected page's card shows neither its title nor its views.</td></tr>
             <tr><td><code>GET</code></td><td><code>/p/:id</code></td><td>Public viewer for a published page.</td></tr>
             <tr><td><code>POST</code></td><td><code>/p/:id/verify-pin</code></td><td>Submit a PIN to view a protected page.</td></tr>
           </tbody>
@@ -247,17 +247,18 @@ url = "https://aired.sh/mcp"</code></pre>
 
         <h3>Request body — <code>POST /api/publish</code></h3>
 <pre><code>{
-  "html": "&lt;!doctype html&gt;...",   // required, max 2 MB
-  "title": "My dashboard",        // optional, auto-extracted from &lt;title&gt; if omitted
-  "ttl": 604800,                  // optional seconds (default 604800 = 7 days)
+  "html": "&lt;!doctype html&gt;...",   // required, max 2 MB (10 MB on Pro)
+  "title": "My dashboard",        // optional, from &lt;title&gt; if omitted; cut to 200 characters
+  "ttl": 604800,                  // optional seconds (default 604800 = 7 days), at most 31536000 (a year)
   "permanent": false,             // optional, true = no expiry (overrides ttl)
-  "pin": "1234",                  // optional, viewer must enter to view
-  "reads": 10,                    // optional, stop opening after N views
+  "pin": "1234",                  // optional, at most 64 characters; viewer must enter it to view
+  "reads": 10,                    // optional, stop opening after N views, at most 1000000
 
   // To update an existing page in one call, also include:
   "id": "a1b2c3d4e5",
   "update_token": "at_..."
 }</code></pre>
+        <p>A field of the wrong type is ignored, as it always was. A value past its bound is refused with <code>400</code>, <code>code: "invalid_input"</code> and the <code>field</code>.</p>
 
         <h3>Request body — <code>PUT /api/pages/:id</code></h3>
 <pre><code>{
@@ -296,6 +297,8 @@ url = "https://aired.sh/mcp"</code></pre>
           <li><strong>PUT</strong> takes the token in the JSON body as <code>update_token</code>, or as an <code>Authorization: Bearer &lt;token&gt;</code> header.</li>
           <li><strong>DELETE</strong> takes the token as <code>Authorization: Bearer &lt;token&gt;</code> header, or as <code>update_token</code> in a JSON body (use the body when <code>Authorization</code> carries an API key).</li>
           <li><strong>POST</strong> can act as update when <code>id</code> and <code>update_token</code> are both in the body.</li>
+          <li>PUT and DELETE answer the same way without a working credential: <code>401</code> (<code>token_required</code>) when nothing was sent, <code>403</code> (<code>not_owner</code>) when you're signed in but it isn't your page, <code>403</code> (<code>invalid_token</code>) for a wrong token.</li>
+          <li>A browser signed in to aired (the session cookie) must send <code>X-Aired-Request: 1</code> on every <code>POST</code>, <code>PUT</code>, <code>PATCH</code> and <code>DELETE</code> to <code>/api</code> and <code>/auth</code>, or gets <code>403</code>. Requests without the cookie (curl, the CLI, agents, API keys) don't need it.</li>
           <li>Lose the token and you can't mutate the page (you can still publish a fresh one).</li>
           <li>Adding a page to your account (<code>aired claim</code>, a claim link or the dashboard) replaces its token. The old token stops working everywhere it was shared, and the claim response returns the new one; the CLI stores it for you. Signed in, you can also update or delete your own pages without a token.</li>
         </ul>
@@ -317,21 +320,22 @@ url = "https://aired.sh/mcp"</code></pre>
       <!-- ─── Errors ─── -->
       <section id="errors">
         <h2>Errors</h2>
-        <p>All errors from <code>/api/*</code> are JSON: <code>{ "error": "&lt;message&gt;" }</code>, sometimes with a machine-readable <code>code</code>.</p>
+        <p>All errors from <code>/api/*</code> and <code>/auth/*</code> are JSON: <code>{ "error": "&lt;message&gt;", "code": "&lt;code&gt;" }</code>. <code>error</code> is for people and may change; <code>code</code> is stable, for programs. Some errors add fields: <code>field</code> on <code>invalid_input</code>, <code>limit</code> and <code>upgrade_url</code> on <code>plan_limit</code>.</p>
         <div class="table-wrap"><table>
           <thead><tr><th>Status</th><th>When</th></tr></thead>
           <tbody>
-            <tr><td><code>400</code></td><td>Invalid JSON body, missing <code>html</code>, validation failed, or the page is too large: over 2 MB anonymously (or whenever billing is off), over 10 MB on any plan.</td></tr>
-            <tr><td><code>401</code></td><td>Missing credentials where they're required, or an API key that's invalid or revoked (a bad key is never treated as anonymous).</td></tr>
+            <tr><td><code>400</code></td><td><code>invalid_json</code> (the body isn't JSON), <code>invalid_input</code> (missing <code>html</code>, or a value past its bound, with <code>field</code>), or <code>invalid_html</code> (empty, relative asset paths, or too large: over 2 MB anonymously or whenever billing is off, over 10 MB on any plan).</td></tr>
+            <tr><td><code>401</code></td><td><code>token_required</code>: no credential where one is needed. Also an API key that's invalid or revoked (a bad key is never treated as anonymous).</td></tr>
             <tr><td><code>402</code></td><td><code>code: "plan_limit"</code>: signed in on Free with billing on, and the request needs Pro (a page of 2–10 MB, or more publishes than Free allows). Includes <code>limit</code> and an <code>upgrade_url</code> for a person to open.</td></tr>
-            <tr><td><code>403</code></td><td><code>update_token</code> does not match the page, the page isn't in your account, or the action needs the website (API keys, billing and account deletion can't be done with a CLI token, an API key or a connected app).</td></tr>
-            <tr><td><code>404</code></td><td>Page id does not exist, the page expired, or the API path doesn't exist.</td></tr>
+            <tr><td><code>403</code></td><td><code>invalid_token</code> (<code>update_token</code> does not match the page), <code>not_owner</code> (signed in, but the page isn't in your account), <code>forbidden</code> (a signed-in browser request without <code>X-Aired-Request: 1</code>), or the action needs the website (API keys, billing and account deletion can't be done with a CLI token, an API key or a connected app).</td></tr>
+            <tr><td><code>404</code></td><td><code>not_found</code>: page id does not exist, the page expired, or the API path doesn't exist.</td></tr>
             <tr><td><code>409</code></td><td>Conflict, with a <code>code</code>: <code>key_limit</code> (already 5 API keys), or billing state such as <code>already_pro</code>.</td></tr>
             <tr><td><code>410</code></td><td>Page reached its view limit (<code>reads</code>).</td></tr>
-            <tr><td><code>422</code></td><td>The page looks like spam or phishing and wasn't published.</td></tr>
-            <tr><td><code>429</code></td><td>Rate limit: 5 publishes an hour per IP anonymously, 30 an hour signed in on Free (402 when billing is on), 500 a day on Pro.</td></tr>
-            <tr><td><code>500</code> / <code>502</code></td><td>Something failed on our side or at the payment provider. Retry, and report it if it persists.</td></tr>
-            <tr><td><code>503</code></td><td>A dependency is briefly unavailable (storage, the database, or a sign-in provider). Retry shortly.</td></tr>
+            <tr><td><code>413</code></td><td><code>payload_too_large</code>: the request body is over 21 MB (publish, PUT and the MCP endpoint) or 1 MB (everything else).</td></tr>
+            <tr><td><code>422</code></td><td><code>spam_rejected</code>: the page looks like spam or phishing and wasn't published.</td></tr>
+            <tr><td><code>429</code></td><td><code>rate_limited</code>: 5 publishes an hour per IP anonymously, 30 an hour signed in on Free (402 when billing is on), 500 a day on Pro. The window starts at your first publish and the full quota is back one window later. <code>check_budget</code>: today's browser time for page checks (yours or everyone's) is spent until 00:00 UTC; see <code>Retry-After</code>.</td></tr>
+            <tr><td><code>500</code> / <code>502</code></td><td><code>internal_error</code> / <code>bad_gateway</code>: something failed on our side or at the payment provider. Retry, and report it if it persists. <code>check_failed</code> (502): a page check didn't finish; retry, and if it keeps happening the page may hang the browser.</td></tr>
+            <tr><td><code>503</code></td><td><code>unavailable</code> or <code>storage_unavailable</code>: a dependency is briefly unavailable (storage, the database, or a sign-in provider). Retry shortly. <code>check_busy</code>: the page-check browser is busy, retry after <code>Retry-After</code>; <code>check_unavailable</code>: checks can't run right now or on this server.</td></tr>
           </tbody>
         </table></div>
       </section>
@@ -355,7 +359,8 @@ url = "https://aired.sh/mcp"</code></pre>
             <tr><td>Max page size</td><td>2 MB (Free), 10 MB (Pro)</td></tr>
             <tr><td>Publishes</td><td>5 an hour per IP anonymously, 30 an hour signed in on Free, 500 a day on Pro</td></tr>
             <tr><td>Default TTL</td><td>7 days</td></tr>
-            <tr><td>Max TTL</td><td>permanent</td></tr>
+            <tr><td>Max TTL</td><td>a year with <code>ttl</code>, or <code>permanent</code></td></tr>
+            <tr><td>Request body</td><td>21 MB for publish, PUT and MCP; 1 MB for other API calls</td></tr>
           </tbody>
         </table></div>
         <p>Need more? aired is open source — run your own.</p>

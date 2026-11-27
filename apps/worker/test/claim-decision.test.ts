@@ -252,28 +252,27 @@ function fakeClaim(opts: { kvOwnerId: number | null; kvTokenHash: string; row?: 
     hash: async (t) => sha(t),
     matches: async (hash) => sha(opts.token) === hash,
     mirrorToKv: async (ownerId, hash) => { log.push(`kv:${ownerId}:${hash === row?.tokenHash ? "row" : "other"}`); },
-    indexPage: async () => { log.push("index"); },
   };
   const run = (now = NOW) => runClaim({ kvOwnerId: opts.kvOwnerId, kvTokenHash: opts.kvTokenHash, userId: opts.userId, now }, deps);
   return { run, log, row: () => row };
 }
 
-test("runClaim: first claim stores the old hash as prev, mirrors the new hash and indexes once", async () => {
+test("runClaim: first claim stores the old hash as prev and mirrors the new hash", async () => {
   const f = fakeClaim({ kvOwnerId: null, kvTokenHash: sha(OLD), userId: ME, token: OLD });
   const out = await f.run();
   assert.deepEqual(out, { ok: true, token: "at_issued_1" });
   assert.deepEqual(f.row(), { ownerId: ME, tokenHash: sha("at_issued_1"), prevTokenHash: sha(OLD), claimedAt: NOW });
-  assert.deepEqual(f.log, [`upsert:${ME}`, `kv:${ME}:row`, "index"]);
+  assert.deepEqual(f.log, [`upsert:${ME}`, `kv:${ME}:row`]);
 });
 
-test("runClaim: a retry with the old token inside the window reissues without indexing again", async () => {
+test("runClaim: a retry with the old token inside the window reissues the token", async () => {
   const f = fakeClaim({ kvOwnerId: null, kvTokenHash: sha(OLD), userId: ME, token: OLD });
   await f.run();
   const again = await f.run(NOW + 1000);
   assert.deepEqual(again, { ok: true, token: "at_issued_2" });
   assert.equal(f.row()?.tokenHash, sha("at_issued_2"));
   assert.equal(f.row()?.prevTokenHash, sha(OLD));
-  assert.deepEqual(f.log, [`upsert:${ME}`, `kv:${ME}:row`, "index", "replace", `kv:${ME}:row`]);
+  assert.deepEqual(f.log, [`upsert:${ME}`, `kv:${ME}:row`, "replace", `kv:${ME}:row`]);
 });
 
 test("runClaim: on your own page with any other token, nothing is written and no token returned", async () => {

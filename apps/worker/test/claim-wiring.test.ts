@@ -13,7 +13,7 @@ test("api.ts: publish-update, PUT and DELETE all read credentials from the D1 ro
   const code = src("routes/api.ts");
   assert.doesNotMatch(code, /verifyToken\([^)]*metadata\.tokenHash/);
   assert.doesNotMatch(code, /getClaim|page_claims|PAGES_KV\.get\(`page:\$\{(existingId|id)\}`\)[\s\S]{0,200}verifyToken/);
-  assert.match(code, /return \(await loadPage\(c\.env, id\)\) \?\? c\.json\(\{ error: "Page not found" \}, 404\)/);
+  assert.match(code, /return \(await loadPage\(c\.env, id\)\) \?\? apiError\(c, 404, "not_found", "Page not found"\)/);
   // publish-update, PUT, DELETE, and the details and PATCH routes (set_options).
   assert.equal(count(code, /await pageFor\(c, /), 5);
   assert.equal(count(code, /const creds = \{ ownerId: page\.row\.ownerId, tokenHash: page\.row\.tokenHash \};/), 3);
@@ -36,15 +36,15 @@ test("page-write.ts: loadPage reads the row (made from KV only if missing) and d
   assert.match(code, /const metadata = cacheRecord\(updated, kv\);/);
 });
 
-test("page-write.ts: DELETE marks the row and tombstones page_claims for a rollback", () => {
+test("page-write.ts: DELETE marks the row; the retired page_claims and KV indexes aren't written", () => {
   const code = src("lib/page-write.ts");
   // Marked first, so no update can bring the page back once a delete starts.
   const fn = code.slice(code.indexOf("export async function deletePage"));
   assert.match(fn, /^[^]*?\{\s*const \{ row \} = page;\s*await markPageDeleted\(env\.DB, row\.id, now\);\s*try \{\s*await removeContent\(env, row\.id\);/);
   // An update that raced a delete removes what it wrote.
   assert.match(code, /if \(after === null \|\| after\.deletedAt !== null\) \{\s*await removeContent\(env, row\.id\);/);
-  assert.match(code, /tombstoneClaim\(env\.DB, row\.id, now\)/);
-  assert.doesNotMatch(code, /DELETE FROM page_claims/);
+  assert.doesNotMatch(code, /tombstoneClaim|mirrorClaim|page_claims \(|DELETE FROM page_claims/);
+  assert.doesNotMatch(code, /owner-index|addPageToOwner|removePageFromOwner|bumpProjectCount|indexForOwner/);
 });
 
 test("mcp.ts: MCP updates read credentials from the D1 row", () => {
@@ -60,8 +60,10 @@ test("me.ts: claims go through runClaim on the row; account deletion releases pa
   assert.match(code, /upsertClaim: \(record, checkedHash\) => claimPageRow\(env\.DB, pageId, record, checkedHash\)/);
   assert.match(code, /replaceClaimToken: \(hash\) => replacePageToken\(env\.DB, pageId, userId, hash, Date\.now\(\)\)/);
   // Pages are released in the same batch as the account rows.
-  assert.match(code, /await deleteAccountRows\(c\.env\.DB, userId, \[releaseOwnerPagesStatement\(c\.env\.DB, userId, now\)\]\)/);
-  assert.match(code, /releaseClaimsForOwner\(c\.env\.DB, userId\)/);
+  // Old claims too, so a page without a row can't come back owned by the deleted id.
+  assert.match(code, /await deleteAccountRows\(c\.env\.DB, userId, \[\s*releaseOwnerPagesStatement\(c\.env\.DB, userId, now\),\s*releaseClaimsStatement\(c\.env\.DB, userId\),\s*\]\)/);
+  assert.match(code, /claimIds = claimedPageIds\(claims\);/);
+  assert.doesNotMatch(code, /releaseClaimsForOwner|mirrorClaim|indexForOwner|indexPage/);
   // Lists and project counts come from D1, not the KV indexes.
   assert.match(code, /listOwnerPages\(c\.env\.DB, ownerId, filter, cursor, limit, Date\.now\(\)\)/);
   assert.match(code, /listOwnerProjects\(c\.env\.DB, user\.id, Date\.now\(\)\)/);
