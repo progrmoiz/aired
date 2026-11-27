@@ -553,6 +553,11 @@ select.field option { background: var(--surface); }
 
 /* Cards that link to other guides */
 .more { margin-top: 112px; }
+/* /guides: groups of guide cards */
+.gsec { margin-top: 56px; }
+.gsec .sec-head { text-align: left; margin: 0; max-width: none; }
+.gsec .gcards { margin-top: 20px; }
+.gsec-docs { margin-top: 48px; justify-content: flex-start; }
 .more .sec-head { text-align: left; margin: 0; max-width: none; }
 .gcards { margin-top: 28px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 @media (max-width: 880px) { .gcards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
