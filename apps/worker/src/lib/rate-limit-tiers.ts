@@ -24,6 +24,16 @@ export const TIERS = {
   // Remote MCP tool calls made with an API key (per account). Publishes also
   // count against the account's publish limit inside the API.
   mcp_key:       { bucketPrefix: 'rl:mcpkey', limit: 120, windowSeconds: 3600 },
+  // Page settings changes and owner detail reads (PATCH /api/pages/:id,
+  // GET /api/pages/:id/details): each change writes D1 and KV.
+  page_options:  { bucketPrefix: 'rl:opts',   limit: 60, windowSeconds: 3600 },
+  // Agent feedback (POST /api/feedback), in front of the D1 limit of 10 an
+  // hour (lib/feedback.ts), so a flood never reaches D1. Anonymous senders
+  // also get REPORT_BURST's per-minute guard.
+  feedback:      { bucketPrefix: 'rl:feedback', limit: 20, windowSeconds: 3600, burst: 'REPORT_BURST' },
+  // Remote MCP tool calls without a key that don't publish (get_page,
+  // set_options, send_feedback), per IP. publish_html keeps the publish limit.
+  mcp_anon:      { bucketPrefix: 'rl:mcpanon', limit: 60, windowSeconds: 3600 },
   // CLI device sign-in starts write to D1: an hourly cap plus a per-minute
   // flood guard counted by Cloudflare, not per isolate.
   device_start:  { bucketPrefix: 'rl:devstart', limit: 30, windowSeconds: 3600, burst: 'DEVICE_BURST' },

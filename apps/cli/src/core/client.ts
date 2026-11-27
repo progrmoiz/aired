@@ -1,7 +1,7 @@
 import { USER_AGENT } from '../lib/constants.js'
 import { AUTH_HEADER, CSRF_HEADER } from '@aired/core'
 import type { User } from '@aired/core'
-import type { PublishResult, PageInfo } from './types.js'
+import type { PublishResult, PageInfo, PageDetails, FeedbackResult } from './types.js'
 
 /**
  * An API key from AIRED_API_KEY (for CI and agents), or null. When set, it's
@@ -91,7 +91,17 @@ export interface AuthTokenResult {
 
 async function handleResponse<T>(resp: Response, action: string): Promise<T> {
   if (resp.status === 429) {
-    const err = new Error('Rate limited: too many uploads. Try again in an hour.')
+    // Publishes keep their familiar message; other limits (set, feedback) say their own.
+    let message = 'Rate limited: too many uploads. Try again in an hour.'
+    if (action !== 'Publish' && action !== 'Update') {
+      try {
+        const body = (await resp.json()) as Record<string, unknown>
+        if (typeof body['error'] === 'string') message = `Rate limited: ${body['error']}`
+      } catch {
+        // keep the default
+      }
+    }
+    const err = new Error(message)
     ;(err as NodeJS.ErrnoException).code = 'RATE_LIMITED'
     throw err
   }
@@ -432,4 +442,53 @@ export async function pollDeviceToken(
     // ignore
   }
   return { status: resp.status, data: errorData }
+}
+
+/** The headers that say who's calling: the CLI session (if any) and AIRED_API_KEY (if set). */
+function callerHeaders(jwt?: string): Record<string, string> {
+  const headers: Record<string, string> = { 'User-Agent': USER_AGENT }
+  if (jwt !== undefined) {
+    headers[AUTH_HEADER] = jwt
+    headers[CSRF_HEADER] = '1'
+  }
+  return addApiKey(headers)
+}
+
+/**
+ * Change a page's settings without its HTML (PATCH /api/pages/:id). `token`
+ * is the stored update token, '' when there is none (the session or API
+ * key must then own the page).
+ */
+export async function setPageOptions(
+  baseUrl: string,
+  id: string,
+  change: Record<string, unknown>,
+  token: string,
+  jwt?: string,
+): Promise<PageDetails> {
+  const body = token !== '' ? { ...change, update_token: token } : change
+  const resp = await fetch(`${baseUrl}/api/pages/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { ...callerHeaders(jwt), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  return handleResponse<PageDetails>(resp, 'Set')
+}
+
+/** The owner's view of a page (GET /api/pages/:id/details). */
+export async function getPageDetails(baseUrl: string, id: string, token: string, jwt?: string): Promise<PageDetails> {
+  const headers = callerHeaders(jwt)
+  if (token !== '') headers['X-Update-Token'] = token
+  const resp = await fetch(`${baseUrl}/api/pages/${encodeURIComponent(id)}/details`, { headers })
+  return handleResponse<PageDetails>(resp, 'Get page')
+}
+
+/** Feedback about aired itself (POST /api/feedback). Signed in if a session or key is there. */
+export async function sendFeedback(baseUrl: string, feedback: Record<string, unknown>, jwt?: string): Promise<FeedbackResult> {
+  const resp = await fetch(`${baseUrl}/api/feedback`, {
+    method: 'POST',
+    headers: { ...callerHeaders(jwt), 'Content-Type': 'application/json' },
+    body: JSON.stringify(feedback),
+  })
+  return handleResponse<FeedbackResult>(resp, 'Feedback')
 }

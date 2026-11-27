@@ -62,14 +62,23 @@ url = "https://aired.sh/mcp"
 
 # Signed in as your aired account: add this URL as a connector; the client
 # opens aired to sign in (OAuth). Enables list_pages, update_page,
-# delete_page and get_account. An API key header also works.
+# delete_page and get_account, and get_page / set_options on your pages
+# without a token. An API key header also works.
 claude mcp add aired --transport http https://aired.sh/mcp/account
 
 # STDIO bridge for clients without HTTP transport
 { "mcpServers": { "aired": { "command": "npx", "args": ["-y", "mcp-remote", "https://aired.sh/mcp"] } } }
 ```
 
-Exposes a single tool: `publish_html(html, ttl?, pin?)` returning `{ url, update_token, expiresAt }`.
+Tools, each returning text plus `structuredContent` that matches its `outputSchema`:
+
+- `publish_html(html, title?, pin?, ttl_seconds?, permanent?, update_token?, id?)` → `{ id, url, updated, update_token, expires_at, owner, claim_url, upgrade_url }`
+- `get_page(id, update_token?)` → `{ id, url, title, size, views, view_limit, has_pin, permanent, created_at, expires_at, project }` (never the PIN)
+- `set_options(id, update_token?, title?, pin?, ttl_seconds?, permanent?, view_limit?)` → the same plus `changed`. `null` clears title, PIN or view limit.
+- `send_feedback(kind, message, impact?, page_id?, tool?)` → `{ id, message }`. Feedback about aired itself; tell the user the id. Never page HTML.
+- Signed in only: `list_pages`, `update_page`, `delete_page`, `get_account`.
+
+The local server (`npx aired --mcp`) has publish_html (also `file_path`), get_page, set_options and send_feedback.
 
 ### 4. HTTP API
 
@@ -139,6 +148,31 @@ Create a key (`aired_sk_…`) under **API keys** in the dashboard; it's shown on
 ### GET /api/pages/:id
 
 Public metadata: `{ id, title, size, readCount, expiresAt }`. No auth.
+
+### GET /api/pages/:id/details
+
+The owner's view: `{ id, url, title, size, readCount, reads, hasPin, permanent, createdAt, expiresAt, project }`. Never the PIN. Signed in as the owner (session or API key), or the page's token in `X-Update-Token` (or `Authorization: Bearer <update_token>`). Anyone else gets 401 or 403.
+
+### PATCH /api/pages/:id
+
+Change settings without sending the HTML again. Send only what should change; unknown fields are refused.
+
+```
+{
+  "title": "New title",     // 1–200 characters, or null to clear
+  "pin": "4821",            // 4–64 characters, or null to remove the PIN
+  "ttl": 86400,             // seconds from now, 60 to 31536000; or:
+  "permanent": true,        // true: never expires; false: 7 days from now
+  "reads": 50,              // view limit 1 to 1000000, or null to remove it
+  "update_token": "at_..."  // unless signed in as the owner
+}
+```
+
+Returns the details plus `changed` (the settings that moved). CLI: `aired set <id> --pin 4821 --ttl 24h`.
+
+### POST /api/feedback
+
+Feedback from agents and people about aired itself. Body `{ kind: "bug" | "friction" | "idea", message, impact?: "blocked" | "worked_around" | "minor", page_id?, tool? }`; the message is 10–2000 characters and never page HTML. Works without signing in, 10 an hour per caller. Returns `{ id, message }`: pass the id on to the user. Not a support channel. CLI: `aired feedback --kind bug "…"`.
 
 ### GET /api/stats
 

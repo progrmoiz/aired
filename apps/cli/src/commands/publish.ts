@@ -12,17 +12,7 @@ import { apiKeyConfigured } from '../lib/api-key-env.js'
 import { getSession, clearSession } from '../core/session.js'
 import { isDirectory, bundleDirectory } from '../core/bundler.js'
 import { detectProject } from '../core/project.js'
-
-function parseTtl(ttl: string): number | null {
-  const match = /^(\d+)(h|d|m)?$/i.exec(ttl)
-  if (!match) return null
-  const n = parseInt(match[1]!, 10)
-  const unit = (match[2] ?? 's').toLowerCase()
-  if (unit === 'h') return n * 3600
-  if (unit === 'd') return n * 86400
-  if (unit === 'm') return n * 60
-  return n
-}
+import { parseTtl } from '../lib/duration.js'
 
 async function readStdin(): Promise<string> {
   return new Promise((resolve, reject) => {

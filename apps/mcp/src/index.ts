@@ -6,6 +6,18 @@ import { join, dirname } from "node:path";
 import { z } from "zod";
 import { AUTH_HEADER, CSRF_HEADER } from "@aired/core";
 import { readCliSession } from "./session.js";
+import {
+  FEEDBACK_DESCRIPTION,
+  feedbackInput,
+  feedbackOut,
+  outputShapes,
+  pageOut,
+  pageText,
+  patchBody,
+  publishOut,
+  setOptionsInput,
+  setOptionsOut,
+} from "../../worker/src/lib/mcp-shapes.ts";
 
 declare const __AIRED_VERSION__: string | undefined;
 
@@ -26,6 +38,64 @@ interface PublishResult {
   url: string;
   update_token: string;
   expiresAt: string | null;
+  claim_url?: string;
+  upgrade?: { url?: string };
+}
+
+const apiBase = () => process.env["AIRED_API_URL"] ?? DEFAULT_API_URL;
+
+/**
+ * Who the call is from: the aired CLI's sign-in (`aired login`) and, if set,
+ * AIRED_API_KEY (CI, agents). A set-but-wrong key is an error, never a quiet
+ * anonymous call.
+ */
+function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  // Attach the CLI session if signed in, so the page is owned by the account
+  // (authenticated publishes default to permanent rather than a 7-day expiry).
+  const jwt = readCliSession();
+  if (jwt !== null) {
+    headers[AUTH_HEADER] = jwt;
+    headers[CSRF_HEADER] = "1";
+  }
+  const rawKey = process.env["AIRED_API_KEY"];
+  if (rawKey !== undefined) {
+    const apiKey = rawKey.trim().replace(/^bearer\s+/i, "");
+    if (!apiKey.startsWith("aired_sk_")) {
+      throw new Error("AIRED_API_KEY must be an aired API key starting with aired_sk_ (or unset it to publish anonymously).");
+    }
+    headers["Authorization"] = `Bearer ${apiKey}`;
+  }
+  return headers;
+}
+
+/** One aired API call. Throws with the API's error message on a non-2xx answer. */
+async function api<T>(method: string, path: string, body?: unknown, extra: Record<string, string> = {}): Promise<T> {
+  const headers: Record<string, string> = {
+    "User-Agent": `aired-mcp/${typeof __AIRED_VERSION__ === "string" ? __AIRED_VERSION__ : "dev"}`,
+    ...authHeaders(),
+    ...extra,
+  };
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const resp = await fetch(`${apiBase()}${path}`, {
+    method,
+    headers,
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  });
+  let parsed: unknown = null;
+  try {
+    parsed = await resp.json();
+  } catch {
+    // handled below
+  }
+  if (!resp.ok) {
+    const message = typeof (parsed as Record<string, unknown> | null)?.["error"] === "string"
+      ? String((parsed as Record<string, unknown>)["error"])
+      : `aired answered ${resp.status}`;
+    throw new Error(resp.status === 429 ? `Rate limited: ${message}` : message);
+  }
+  if (parsed === null) throw new Error("aired: unexpected response format");
+  return parsed as T;
 }
 
 async function publishHTML(
@@ -38,10 +108,8 @@ async function publishHTML(
     project?: string;
     update_token?: string;
     id?: string;
-    apiUrl?: string;
   } = {},
 ): Promise<PublishResult> {
-  const base = options.apiUrl ?? process.env["AIRED_API_URL"] ?? DEFAULT_API_URL;
   const body: Record<string, unknown> = { html };
 
   if (options.title !== undefined) body["title"] = options.title;
@@ -52,55 +120,12 @@ async function publishHTML(
   if (options.update_token !== undefined) body["update_token"] = options.update_token;
   if (options.id !== undefined) body["id"] = options.id;
 
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-
-  // Attach the CLI session if signed in, so the page is owned by the account
-  // (authenticated publishes default to permanent rather than a 7-day expiry).
-  const jwt = readCliSession();
-  if (jwt !== null) {
-    headers[AUTH_HEADER] = jwt;
-    headers[CSRF_HEADER] = "1";
-  }
-  // AIRED_API_KEY (CI, agents) signs the publish in as the key's account. A
-  // set-but-wrong value is an error, never a quiet anonymous publish.
-  const rawKey = process.env["AIRED_API_KEY"];
-  if (rawKey !== undefined) {
-    const apiKey = rawKey.trim().replace(/^bearer\s+/i, "");
-    if (!apiKey.startsWith("aired_sk_")) {
-      throw new Error("AIRED_API_KEY must be an aired API key starting with aired_sk_ (or unset it to publish anonymously).");
-    }
-    headers["Authorization"] = `Bearer ${apiKey}`;
-  }
-
-  const resp = await fetch(`${base}/api/publish`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
-
-  if (resp.status === 429) {
-    throw new Error("Rate limited: too many uploads. Try again in an hour.");
-  }
-
-  if (!resp.ok) {
-    let message = `Publish failed (${resp.status})`;
-    try {
-      const errorBody = await resp.json() as Record<string, unknown>;
-      if (typeof errorBody["error"] === "string") {
-        message = errorBody["error"];
-      }
-    } catch {
-      // ignore parse error
-    }
-    throw new Error(message);
-  }
-
-  try {
-    return await resp.json() as PublishResult;
-  } catch {
-    throw new Error("Publish: unexpected response format");
-  }
+  return api<PublishResult>("POST", "/api/publish", body);
 }
+
+const PAGE_ID = /^[A-Za-z0-9_-]{1,64}$/;
+const toolError = (text: string) => ({ content: [{ type: "text" as const, text }], isError: true });
+const errorMessage = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 const server = new McpServer({
   name: "aired",
@@ -108,21 +133,26 @@ const server = new McpServer({
   version: typeof __AIRED_VERSION__ === "string" ? __AIRED_VERSION__ : "0.0.0-dev",
 });
 
-server.tool(
+server.registerTool(
   "publish_html",
-  "Publish an HTML file or string to a shareable URL. Returns a live URL that renders the HTML in a browser. Pass update_token from a previous publish to update the same URL.",
   {
-    html: z.string().optional().describe("HTML content to publish"),
-    file_path: z.string().optional().describe("Path to HTML file (alternative to html)"),
-    title: z.string().optional().describe("Page title"),
-    pin: z.string().optional().describe("PIN to protect access"),
-    ttl_seconds: z.number().optional().describe("Time to live in seconds (default: 604800 = 7 days)"),
-    permanent: z.boolean().optional().describe("If true, page never expires"),
-    project: z.string().optional().describe("Group this page under a project on your dashboard (e.g. the repo or app name). Not auto-detected over MCP — pass it explicitly to organize related pages together."),
-    update_token: z.string().optional().describe("Pass a previously returned token to update the same URL instead of creating a new one"),
-    id: z.string().optional().describe("Page ID — required when update_token is provided to update the same URL"),
+    title: "Publish HTML",
+    description:
+      "Publish an HTML file or string to a shareable URL. Returns a live URL that renders the HTML in a browser. Pass update_token from a previous publish to update the same URL. Change the PIN, expiry, view limit or title later with set_options.",
+    inputSchema: {
+      html: z.string().optional().describe("HTML content to publish"),
+      file_path: z.string().optional().describe("Path to HTML file (alternative to html)"),
+      title: z.string().optional().describe("Page title"),
+      pin: z.string().optional().describe("PIN to protect access"),
+      ttl_seconds: z.number().optional().describe("Time to live in seconds (default: 604800 = 7 days)"),
+      permanent: z.boolean().optional().describe("If true, page never expires"),
+      project: z.string().optional().describe("Group this page under a project on your dashboard (e.g. the repo or app name). Not auto-detected over MCP — pass it explicitly to organize related pages together."),
+      update_token: z.string().optional().describe("Pass a previously returned token to update the same URL instead of creating a new one"),
+      id: z.string().optional().describe("Page ID — required when update_token is provided to update the same URL"),
+    },
+    outputSchema: outputShapes.publish_html,
+    annotations: { title: "Publish HTML", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   },
-  { title: "Publish HTML", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   async ({ html, file_path, title, pin, ttl_seconds, permanent, project, update_token, id }) => {
     // Resolve HTML content
     let content: string;
@@ -218,9 +248,11 @@ server.tool(
 
       lines.push("");
       lines.push("Pass update_token and id to update the same URL.");
+      if (result.claim_url) lines.push(`To keep this page in an aired account, open: ${result.claim_url}`);
 
       return {
         content: [{ type: "text", text: lines.join("\n") }],
+        structuredContent: publishOut(result, { updated: update_token !== undefined, owner: null }),
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -228,6 +260,73 @@ server.tool(
         content: [{ type: "text", text: `Error: ${message}` }],
         isError: true,
       };
+    }
+  },
+);
+
+server.registerTool(
+  "get_page",
+  {
+    title: "Get a page",
+    description:
+      "A page's details: title, URL, size, views, view limit, expiry, project, and whether a PIN is on (never the PIN). For pages your account owns (aired login or AIRED_API_KEY), or any page whose update_token you pass.",
+    inputSchema: {
+      id: z.string().describe("Page id, from publish_html"),
+      update_token: z.string().optional().describe("The page's update token. Not needed for pages your account owns"),
+    },
+    outputSchema: outputShapes.get_page,
+    annotations: { title: "Get a page", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ id, update_token }) => {
+    if (!PAGE_ID.test(id)) return toolError("That isn't a page id.");
+    try {
+      const body = await api<unknown>("GET", `/api/pages/${encodeURIComponent(id)}/details`, undefined, update_token ? { "X-Update-Token": update_token } : {});
+      const page = pageOut(body, apiBase());
+      return { content: [{ type: "text" as const, text: pageText(page, "Page") }], structuredContent: page };
+    } catch (err) {
+      return toolError(`Error: ${errorMessage(err)}`);
+    }
+  },
+);
+
+server.registerTool(
+  "set_options",
+  {
+    title: "Change page settings",
+    description:
+      "Change a page's PIN (or remove it), expiry (a TTL, or permanent), view limit or title after publishing, without sending its HTML again. Send only what should change. For pages your account owns, or any page whose update_token you pass.",
+    inputSchema: setOptionsInput,
+    outputSchema: outputShapes.set_options,
+    annotations: { title: "Change page settings", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  },
+  async (args) => {
+    if (!PAGE_ID.test(args.id)) return toolError("That isn't a page id.");
+    try {
+      const body = await api<unknown>("PATCH", `/api/pages/${encodeURIComponent(args.id)}`, patchBody(args));
+      const page = setOptionsOut(body, apiBase());
+      const lead = page.changed.length > 0 ? `Changed ${page.changed.join(", ")} of` : "Settings of";
+      return { content: [{ type: "text" as const, text: pageText(page, lead) }], structuredContent: page };
+    } catch (err) {
+      return toolError(`Error: ${errorMessage(err)}`);
+    }
+  },
+);
+
+server.registerTool(
+  "send_feedback",
+  {
+    title: "Send feedback to aired",
+    description: FEEDBACK_DESCRIPTION,
+    inputSchema: feedbackInput,
+    outputSchema: outputShapes.send_feedback,
+    annotations: { title: "Send feedback to aired", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  },
+  async (args) => {
+    try {
+      const out = feedbackOut(await api<unknown>("POST", "/api/feedback", { ...args, source: "mcp", actor: "agent" }));
+      return { content: [{ type: "text" as const, text: `Feedback sent: ${out.id}\n${out.message}` }], structuredContent: out };
+    } catch (err) {
+      return toolError(`Error: ${errorMessage(err)}`);
     }
   },
 );

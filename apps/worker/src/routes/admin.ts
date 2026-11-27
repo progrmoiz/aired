@@ -3,6 +3,7 @@ import { parseMetadata } from "@aired/core";
 import type { AppBindings } from "../types.js";
 import { BACKFILL_MAX_LIMIT, backfillBatch } from "../lib/pages-backfill.ts";
 import { log } from "../lib/log.js";
+import { FEEDBACK_KINDS, listFeedback } from "../lib/feedback.ts";
 
 /**
  * Operator-only endpoints. Off unless the ADMIN_TOKEN secret is set
@@ -57,6 +58,27 @@ admin.post("/pages-backfill", async (c) => {
   );
   log("info", "pages_backfill_batch", { dryRun, ...report.counts, done: report.cursor === null }, c.get("requestId"));
   return c.json(report);
+});
+
+// GET /api/admin/feedback — agent feedback, newest first (lib/feedback.ts).
+// ?limit= (default 50, at most 200), ?before=<created_at ms> for the next
+// page, ?kind=bug|friction|idea. scripts/feedback.mjs reads the same table
+// without the token, through wrangler.
+admin.get("/feedback", async (c) => {
+  const rawLimit = Number(c.req.query("limit") ?? 50);
+  const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 200) : 50;
+  const before = Number(c.req.query("before"));
+  const kind = c.req.query("kind");
+  if (kind !== undefined && !(FEEDBACK_KINDS as readonly string[]).includes(kind)) return c.json({ error: "Unknown kind" }, 400);
+  const rows = await listFeedback(c.env.DB, {
+    limit,
+    ...(Number.isFinite(before) && before > 0 ? { before } : {}),
+    ...(kind !== undefined ? { kind } : {}),
+  });
+  return c.json({
+    feedback: rows.map((r) => ({ ...r, created_at: new Date(r.created_at).toISOString() })),
+    next_before: rows.length === limit ? rows[rows.length - 1]!.created_at : null,
+  });
 });
 
 export { admin };

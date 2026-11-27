@@ -97,6 +97,8 @@
             <tr><td><code>aired update &lt;id&gt; &lt;file&gt;</code></td><td>Update an existing page</td></tr>
             <tr><td><code>aired delete &lt;id&gt;</code></td><td>Delete a page</td></tr>
             <tr><td><code>aired info &lt;id&gt;</code></td><td>Show page metadata</td></tr>
+            <tr><td><code>aired set &lt;id&gt;</code></td><td>Change the PIN (<code>--pin</code>, <code>--clear-pin</code>), expiry (<code>--ttl</code>, <code>--permanent</code>), view limit (<code>--reads</code>, <code>--clear-reads</code>) or title (<code>--title</code>, <code>--clear-title</code>) without uploading again</td></tr>
+            <tr><td><code>aired feedback</code></td><td>Send the aired team a bug, friction or idea: <code>aired feedback --kind friction "what happened"</code>. Asks before sending in a terminal</td></tr>
             <tr><td><code>aired tokens</code></td><td>List stored update tokens</td></tr>
             <tr><td><code>aired tokens prune</code></td><td>Drop tokens for expired pages</td></tr>
             <tr><td><code>aired doctor</code></td><td>Diagnostics (Node.js, API reachability, token store)</td></tr>
@@ -108,7 +110,7 @@
       <!-- ─── MCP ─── -->
       <section id="mcp">
         <h2>MCP server</h2>
-        <p>Streamable HTTP at <code>https://aired.sh/mcp</code>. Exposes a <code>publish_html</code> tool — your AI publishes artifacts directly through the MCP transport.</p>
+        <p>Streamable HTTP at <code>https://aired.sh/mcp</code>. Your AI publishes with <code>publish_html</code>, then reads and changes the page with <code>get_page</code> and <code>set_options</code>, all through the MCP transport. The <a href="#mcp-tools">tools table</a> lists everything.</p>
 
         <h3>Claude Code</h3>
         <div class="snip"><code>claude mcp add aired --transport http https://aired.sh/mcp</code><button type="button" class="btn sm copy-snippet" data-copy="claude mcp add aired --transport http https://aired.sh/mcp">Copy</button></div>
@@ -139,11 +141,11 @@
 url = "https://aired.sh/mcp"</code></pre>
 
         <h3>Signed in: connect your account</h3>
-        <p>Add <code>https://aired.sh/mcp/account</code> as a custom connector (Claude, ChatGPT, Cursor, VS Code and any client that supports MCP sign-in). The app opens aired, you sign in and choose Allow, and the server works as your account: <code>publish_html</code> pages belong to you, and <code>list_pages</code>, <code>update_page</code>, <code>delete_page</code> and <code>get_account</code> become available. It can't see your keys or billing, or delete your account.</p>
+        <p>Add <code>https://aired.sh/mcp/account</code> as a custom connector (Claude, ChatGPT, Cursor, VS Code and any client that supports MCP sign-in). The app opens aired, you sign in and choose Allow, and the server works as your account: <code>publish_html</code> pages belong to you, <code>get_page</code> and <code>set_options</code> work on your pages without a token, and <code>list_pages</code>, <code>update_page</code>, <code>delete_page</code> and <code>get_account</code> become available. It can't see your keys or billing, or delete your account.</p>
         <div class="snip"><code>claude mcp add aired --transport http https://aired.sh/mcp/account</code><button type="button" class="btn sm copy-snippet" data-copy="claude mcp add aired --transport http https://aired.sh/mcp/account">Copy</button></div>
 
         <h3>Signed in with an API key</h3>
-        <p>For CI or clients without MCP sign-in, add your <a href="#api-keys">API key</a> as a header instead (on <code>/mcp</code> or <code>/mcp/account</code>). Without a key or a sign-in, <code>/mcp</code> offers only anonymous <code>publish_html</code>.</p>
+        <p>For CI or clients without MCP sign-in, add your <a href="#api-keys">API key</a> as a header instead (on <code>/mcp</code> or <code>/mcp/account</code>). Without a key or a sign-in, <code>/mcp</code> offers anonymous <code>publish_html</code>, <code>get_page</code> and <code>set_options</code> with a page's <code>update_token</code>, and <code>send_feedback</code>.</p>
 <pre><code>{
   "mcpServers": {
     "aired": {
@@ -163,17 +165,35 @@ url = "https://aired.sh/mcp"</code></pre>
   }
 }</code></pre>
 
+        <h3 id="mcp-tools">Tools</h3>
+        <p>Every tool returns its result twice: as text, and as <code>structuredContent</code> matching the tool's <code>outputSchema</code>, so an agent can read <code>url</code>, <code>id</code> or <code>expires_at</code> without parsing prose.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Tool</th><th>Who can use it</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td><code>publish_html</code></td><td>Anyone</td><td>Publish HTML and get <code>{ id, url, update_token, expires_at, claim_url }</code>. Pass <code>id</code> and <code>update_token</code> to replace a page's HTML.</td></tr>
+            <tr><td><code>get_page</code></td><td>The owner, or anyone with the page's <code>update_token</code></td><td>Title, URL, size, views, view limit, expiry, project, and whether a PIN is on (never the PIN).</td></tr>
+            <tr><td><code>set_options</code></td><td>The owner, or anyone with the page's <code>update_token</code></td><td>Change the PIN (<code>null</code> removes it), <code>ttl_seconds</code> or <code>permanent</code>, <code>view_limit</code> and <code>title</code> without sending the HTML again. Send only what should change.</td></tr>
+            <tr><td><code>send_feedback</code></td><td>Anyone</td><td>Tell the aired team about a <code>bug</code>, <code>friction</code> or an <code>idea</code>, with an <code>impact</code> (<code>blocked</code>, <code>worked_around</code>, <code>minor</code>). Returns an id to pass on to the user. Never send page HTML.</td></tr>
+            <tr><td><code>list_pages</code></td><td>Signed in</td><td>Your pages, newest first, with a cursor.</td></tr>
+            <tr><td><code>update_page</code></td><td>Signed in</td><td>Replace the HTML of your page by id, no token.</td></tr>
+            <tr><td><code>delete_page</code></td><td>Signed in</td><td>Delete your page for good.</td></tr>
+            <tr><td><code>get_account</code></td><td>Signed in</td><td>Plan, limits, renewal and an upgrade link for a person to open.</td></tr>
+          </tbody>
+        </table></div>
+        <p>The local server (<code>npx aired --mcp</code>) has <code>publish_html</code> (which also takes a <code>file_path</code> or a folder), <code>get_page</code>, <code>set_options</code> and <code>send_feedback</code>. It signs in with <code>aired login</code> or <code>AIRED_API_KEY</code>.</p>
+
         <h3>Tool: <code>publish_html</code></h3>
-        <p>Single tool. Inputs:</p>
+        <p>Inputs:</p>
 <pre><code>{
-  "html":      "string, required, &lt;= 2 MB",
-  "title":     "string, optional",
-  "ttl":       "number (seconds), optional",
-  "permanent": "boolean, optional",
-  "pin":       "string, optional",
-  "reads":     "number, optional, auto-delete after N views"
+  "html":         "string, required, &lt;= 2 MB",
+  "title":        "string, optional",
+  "ttl_seconds":  "number, optional (default 604800 = 7 days)",
+  "permanent":    "boolean, optional",
+  "pin":          "string, optional",
+  "update_token": "string, optional, with id to update",
+  "id":           "string, optional"
 }</code></pre>
-        <p>Returns <code>{ id, url, update_token, expiresAt }</code>.</p>
+        <p>Returns <code>{ id, url, updated, update_token, expires_at, owner, claim_url, upgrade_url }</code> as structured content. Set a view limit or change any of these later with <code>set_options</code>.</p>
       </section>
 
       <!-- ─── API ─── -->
@@ -201,6 +221,9 @@ url = "https://aired.sh/mcp"</code></pre>
             <tr><td><code>PUT</code></td><td><code>/api/pages/:id</code></td><td>Update by <code>update_token</code> in the JSON body.</td></tr>
             <tr><td><code>DELETE</code></td><td><code>/api/pages/:id</code></td><td>Delete by <code>Authorization: Bearer &lt;token&gt;</code> header.</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/pages/:id</code></td><td>Public metadata: <code>{ id, title, size, readCount, expiresAt }</code>. No auth.</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/pages/:id/details</code></td><td>The owner's view: <code>{ id, url, title, size, readCount, reads, hasPin, permanent, createdAt, expiresAt, project }</code>. Never the PIN. Signed in as the owner, or the page's token in <code>X-Update-Token</code> (or <code>Authorization: Bearer</code>).</td></tr>
+            <tr><td><code>PATCH</code></td><td><code>/api/pages/:id</code></td><td>Change settings without the HTML: <code>title</code>, <code>pin</code>, <code>ttl</code> or <code>permanent</code>, <code>reads</code>. Same credentials as PUT. Returns the details plus <code>changed</code>.</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/feedback</code></td><td>Body <code>{ kind, message, impact?, page_id?, tool? }</code>. Feedback about aired itself; works without signing in, 10 an hour. Returns <code>{ id, message }</code>.</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/stats</code></td><td>Aggregate counts: publishes, views and views per country. No page titles.</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/me/analytics</code></td><td>Pro, signed in or with an API key. <code>?range=7|30|90</code> (default 30). Views per day, top countries, top referrer sites and top pages across your pages. <code>/api/me/analytics/pages/:id</code> is the same for one of your pages. Free accounts get <code>402</code> with <code>code: "plan_limit"</code> and an <code>upgrade_url</code>.</td></tr>
             <tr><td><code>POST</code></td><td><code>/api/report</code></td><td>Body <code>{ id, category?, reason, contact? }</code>. <code>id</code> is a page ID or URL; <code>category</code> is one of <code>spam</code>, <code>phishing</code>, <code>malware</code>, <code>illegal</code>, <code>other</code>. Flags a page for abuse review. Or use the <a href="/abuse">report form</a>.</td></tr>
@@ -230,6 +253,17 @@ url = "https://aired.sh/mcp"</code></pre>
   "title": "Optional new title",  // optional
   "update_token": "at_..."       // required (or send Authorization: Bearer)
 }</code></pre>
+
+        <h3>Request body — <code>PATCH /api/pages/:id</code></h3>
+<pre><code>{
+  "title": "New title",           // 1–200 characters, or null to clear
+  "pin": "4821",                  // 4–64 characters, or null to remove the PIN
+  "ttl": 86400,                   // seconds from now, 60 to 31536000 (a year)
+  "permanent": true,              // or false: expires 7 days from now. Not with ttl
+  "reads": 50,                    // view limit, 1 to 1000000, or null to remove it
+  "update_token": "at_..."        // unless you're signed in as the owner
+}</code></pre>
+        <p>Send only the fields that should change. Unknown fields are refused, so a typo fails loudly instead of doing nothing.</p>
 
         <h3>Update via curl</h3>
 <pre><code>curl -X PUT https://aired.sh/api/pages/a1b2c3d4e5 \
@@ -278,7 +312,7 @@ url = "https://aired.sh/mcp"</code></pre>
             <tr><td><code>400</code></td><td>Invalid JSON body, missing <code>html</code>, validation failed, or the page is too large: over 2 MB anonymously (or whenever billing is off), over 10 MB on any plan.</td></tr>
             <tr><td><code>401</code></td><td>Missing credentials where they're required, or an API key that's invalid or revoked (a bad key is never treated as anonymous).</td></tr>
             <tr><td><code>402</code></td><td><code>code: "plan_limit"</code>: signed in on Free with billing on, and the request needs Pro (a page of 2–10 MB, or more publishes than Free allows). Includes <code>limit</code> and an <code>upgrade_url</code> for a person to open.</td></tr>
-            <tr><td><code>403</code></td><td><code>update_token</code> does not match the page, or the action needs the website (API keys, billing and account deletion can't be done with a CLI token, an API key or a connected app).</td></tr>
+            <tr><td><code>403</code></td><td><code>update_token</code> does not match the page, the page isn't in your account, or the action needs the website (API keys, billing and account deletion can't be done with a CLI token, an API key or a connected app).</td></tr>
             <tr><td><code>404</code></td><td>Page id does not exist, the page expired, or the API path doesn't exist.</td></tr>
             <tr><td><code>409</code></td><td>Conflict, with a <code>code</code>: <code>key_limit</code> (already 5 API keys), or billing state such as <code>already_pro</code>.</td></tr>
             <tr><td><code>410</code></td><td>Page reached its view limit (<code>reads</code>).</td></tr>

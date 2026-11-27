@@ -2,8 +2,8 @@ import type { Context, Next } from 'hono';
 import type { AppBindings } from '../types.js';
 import { siteOrigin } from '../lib/origin.ts';
 
-const ALLOWED_METHODS = 'GET, POST, PUT, DELETE, OPTIONS';
-const ALLOWED_HEADERS = 'Content-Type, Authorization, aired-Session, X-Aired-Request';
+const ALLOWED_METHODS = 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
+const ALLOWED_HEADERS = 'Content-Type, Authorization, aired-Session, X-Aired-Request, X-Update-Token';
 const PUBLIC_ALLOWED_HEADERS = 'Authorization, Content-Type, Mcp-Session-Id, Mcp-Protocol-Version, Last-Event-ID';
 
 /** /mcp, /mcp/account, /oauth/* and the OAuth discovery documents. Not /authorize (a page). */

@@ -217,6 +217,37 @@ export async function updatePageContent(
   return result.meta.changes === 1;
 }
 
+/**
+ * New settings for a live page (set_options): only the columns given, so
+ * concurrent changes to different settings don't undo each other. False if
+ * the page is deleted or has expired in the meantime, so a dead page can't
+ * be brought back by giving it a new expiry.
+ */
+export async function updatePageOptions(
+  db: D1Database,
+  id: string,
+  change: { title?: string | null; pin?: string | null; reads?: number | null; permanent?: boolean; expiresAt?: number | null },
+  now: number,
+): Promise<boolean> {
+  const sets: string[] = [];
+  const args: unknown[] = [];
+  const col = (name: string, v: unknown) => {
+    sets.push(`${name} = ?`);
+    args.push(v);
+  };
+  if (change.title !== undefined) col('title', change.title);
+  if (change.pin !== undefined) col('pin', change.pin);
+  if (change.reads !== undefined) col('reads', change.reads);
+  if (change.permanent !== undefined) col('permanent', change.permanent ? 1 : 0);
+  if (change.expiresAt !== undefined) col('expires_at', change.expiresAt);
+  col('updated_at', now);
+  const result = await db
+    .prepare(`UPDATE pages SET ${sets.join(', ')} WHERE id = ? AND deleted_at IS NULL AND (expires_at IS NULL OR expires_at > ?)`)
+    .bind(...args, id, now)
+    .run();
+  return result.meta.changes === 1;
+}
+
 /** Deleted: no token matches it again, and it leaves every list. */
 export async function markPageDeleted(db: D1Database, id: string, now: number): Promise<void> {
   await db

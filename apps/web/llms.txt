@@ -22,7 +22,9 @@ Agents and humans use aired for one job:
 ## Install and agent runtime
 - Skill: `npx skills add progrmoiz/aired -g` — adds a SKILL.md to your project so any AI agent (Claude Code, Cursor, Windsurf) discovers and uses aired automatically.
 - CLI: `npx aired path/to/file.html` — publishes a file or directory and prints the URL. Use `--json` for structured output, `--pin <secret>` for PIN-protect, `--ttl <duration>` for custom expiry.
-- MCP server: `claude mcp add aired --transport http https://aired.sh/mcp` — exposes a `publish_html` tool. Other clients use the streamable HTTP endpoint at https://aired.sh/mcp.
+- MCP server: `claude mcp add aired --transport http https://aired.sh/mcp` — `publish_html`, then `get_page` and `set_options` (with the page's update_token, or signed in) and `send_feedback`. Every tool returns `structuredContent` matching its `outputSchema`, next to the text. Other clients use the streamable HTTP endpoint at https://aired.sh/mcp. Locally: `npx aired --mcp`.
+- Change a page after publishing without re-uploading: `aired set <id> --pin 4821 --ttl 24h --reads 50 --title "…"` (or `--clear-pin`, `--permanent`, `--clear-reads`), the `set_options` MCP tool, or PATCH /api/pages/:id.
+- Report a bug, friction or missing feature in aired itself: `aired feedback --kind friction "…"`, the `send_feedback` MCP tool, or POST /api/feedback. At most one per task; tell the user the id it returns. Never include page HTML, tokens or PINs.
 - HTTP API: `POST https://aired.sh/api/publish` with `{"html": "..."}` — no auth required.
 
 Agents should read the live docs at https://github.com/progrmoiz/aired before answering capability or workflow questions. If local skill text and live docs disagree, prefer the live docs.
@@ -32,7 +34,7 @@ Agents should read the live docs at https://github.com/progrmoiz/aired before an
 - The update_token returned with each publish is the only credential for that artifact.
 - PUT /api/pages/:id takes the token in the JSON body as `update_token`, or as an `Authorization: Bearer <token>` header.
 - DELETE /api/pages/:id takes the token in `Authorization: Bearer <token>` header, or as `update_token` in a JSON body.
-- API keys (`aired_sk_…`, created in the dashboard) sign requests in as an account: send `Authorization: Bearer aired_sk_…`. Pages are owned by the account and permanent by default; the owner can update or delete them with the key alone. The CLI and local MCP read `AIRED_API_KEY`. On the remote MCP (`https://aired.sh/mcp`), the same header unlocks `list_pages`, `update_page`, `delete_page` and `get_account`. A key can't open billing; a plan limit returns an upgrade link a person must open.
+- API keys (`aired_sk_…`, created in the dashboard) sign requests in as an account: send `Authorization: Bearer aired_sk_…`. Pages are owned by the account and permanent by default; the owner can update or delete them with the key alone. The CLI and local MCP read `AIRED_API_KEY`. On the remote MCP (`https://aired.sh/mcp`), the same header unlocks `list_pages`, `update_page`, `delete_page` and `get_account`, and lets `get_page` and `set_options` work on your own pages without a token. A key can't open billing; a plan limit returns an upgrade link a person must open.
 - POST /api/publish acts as update when both `id` and `update_token` are in the body.
 - Anyone with the URL can view; anyone with the PIN (if set) can read protected content.
 
@@ -41,6 +43,9 @@ Agents should read the live docs at https://github.com/progrmoiz/aired before an
 - PUT /api/pages/:id — update an artifact. Pass `update_token` in the JSON body or as `Authorization: Bearer <update_token>`.
 - DELETE /api/pages/:id — delete an artifact. Pass `Authorization: Bearer <update_token>`, or `update_token` in a JSON body when Authorization carries an API key.
 - GET /api/pages/:id — public metadata: `{ id, title, size, readCount, expiresAt }`.
+- GET /api/pages/:id/details — the owner's view: `{ id, url, title, size, readCount, reads, hasPin, permanent, createdAt, expiresAt, project }`, never the PIN. Signed in as the owner, or the token in `X-Update-Token` (or `Authorization: Bearer <update_token>`).
+- PATCH /api/pages/:id — change settings without the HTML. Body: `title?` (1–200 characters, null clears), `pin?` (4–64 characters, null removes), `ttl?` (60 to 31536000 seconds) or `permanent?`, `reads?` (1 to 1000000, null removes), `update_token?`. Unknown fields are refused. Returns the details plus `changed`.
+- POST /api/feedback — body `{ kind: "bug"|"friction"|"idea", message (10–2000 characters), impact?: "blocked"|"worked_around"|"minor", page_id?, tool? }`. No auth needed; 10 an hour per caller. Returns `{ id, message }`. Not a support channel.
 - GET /api/stats — aggregate counts (publishes, views, views per country). No page titles or URLs.
 - POST /api/report — body `{ id, reason }`, no auth, flags an artifact for review.
 - POST /p/:id/verify-pin — body `{ pin }`, sets a 1-hour cookie scoped to the page.
@@ -55,7 +60,7 @@ Agents should read the live docs at https://github.com/progrmoiz/aired before an
 - Static HTML only. No server-side compute, no databases, no long-running jobs.
 - No file types other than HTML at the entry point. CSS, JS, images get inlined into the HTML at publish time.
 - Code-split builds (Vite, most React apps) break when published as a directory: chunks loaded later with import() are not inlined. Build a single file with vite-plugin-singlefile, use hash routing, then publish dist-single/index.html. See https://aired.sh/share-vite-app.
-- No editing in-browser after publish — update via the API with the update_token.
+- No editing in-browser after publish — update via the API with the update_token, or change the PIN, expiry, view limit or title with PATCH /api/pages/:id.
 - No custom domains and no team accounts. The dashboard shows view counts per page, not detailed analytics.
 
 ## Error recovery
@@ -63,7 +68,7 @@ Agents should read the live docs at https://github.com/progrmoiz/aired before an
 - 400: invalid body, or the page is too large (over 2 MB anonymously or when billing is off, over 10 MB on any plan). Make it smaller.
 - 401: missing credentials, or an invalid or revoked API key.
 - 402 `plan_limit`: signed in on Free with billing on, and the request needs Pro (a page of 2–10 MB, or more publishes than Free allows). Pass the `upgrade_url` to a person; agents can't pay.
-- 403: the update_token doesn't match the page, or the action needs the aired website (API keys, billing, account deletion).
+- 403: the update_token doesn't match the page, the page isn't in your account, or the action needs the aired website (API keys, billing, account deletion).
 - 409: a conflict, with a `code` such as `key_limit`.
 - 422: the page looks like spam or phishing and wasn't published.
 - 429: rate limited. Wait and retry later.

@@ -95,7 +95,7 @@
   "mcp": {
     "transport": "http",
     "url": "https://aired.sh/mcp",
-    "tools": ["publish_html"]
+    "tools": ["publish_html", "get_page", "set_options", "send_feedback", "list_pages", "update_page", "delete_page", "get_account"]
   },
   "skill": {
     "install": "npx skills add progrmoiz/aired -g",

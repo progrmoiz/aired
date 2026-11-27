@@ -69,16 +69,22 @@ test("wiring: only an API key or an MCP OAuth token signs MCP callers in, and th
   assert.match(mcp, /const asKey = via === "key" && authorization !== undefined;\s*const asOAuth = via === "oauth";/);
   assert.match(mcp, /user !== null && \(asKey \|\| asOAuth\)/);
   // The OAuth token is never passed on: OAuth calls run as the account in-process.
-  assert.match(mcp, /if \(asKey\) headers\.set\("Authorization", authorization!\);/);
+  // Anonymous callers' API calls carry no credentials at all.
+  assert.match(mcp, /if \(signedIn !== null && asKey\) headers\.set\("Authorization", authorization!\);/);
+  assert.match(mcp, /signedIn !== null && asOAuth \? user!\.id : undefined/);
   for (const tool of ["list_pages", "update_page", "delete_page", "get_account"]) {
     assert.match(mcp, new RegExp(`"${tool}",[\\s\\S]*?if \\(signedIn === null\\) return signInRequired\\(origin\\);`), tool);
   }
   const index = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
-  assert.match(index, /return via === "key" \|\| via === "oauth" \? rateLimit\(TIERS\.mcp_key\)\(c, next\) : publishRateLimit\(c, next\);/);
+  assert.match(index, /if \(via === "key" \|\| via === "oauth"\) return rateLimit\(TIERS\.mcp_key\)\(c, next\);/);
+  // Anonymous: publish_html keeps the publish limit; the other tools get their own per-IP one.
+  assert.match(index, /return mcpToolName\(body\) === "publish_html" \? publishRateLimit\(c, next\) : rateLimit\(TIERS\.mcp_anon\)\(c, next\);/);
   assert.match(index, /if \(countMcpToolCalls\(body\) > 1\) \{/);
   assert.match(mcp, /if \(typeof update_token === "string" && typeof existingId !== "string"\) \{/);
-  assert.match(mcp, /return isTokenUpdate \? updateResult\(res\.body\) : publishResult\(res\.body, signedIn\.login\);/);
-  assert.equal((mcp.match(/if \(!PAGE_ID\.test\(id\)\) return badId\(\);/g) ?? []).length, 2);
+  assert.match(mcp, /return isTokenUpdate \? publishUpdateResult\(res\.body, null\) : publishResult\(res\.body, signedIn\.login\);/);
+  // update_page, delete_page and get_page check the id; set_options checks args.id.
+  assert.equal((mcp.match(/if \(!PAGE_ID\.test\(id\)\) return badId\(\);/g) ?? []).length, 3);
+  assert.match(mcp, /if \(!PAGE_ID\.test\(args\.id\)\) return badId\(\);/);
   const api = readFileSync(new URL("../src/routes/api.ts", import.meta.url), "utf8");
   assert.match(api, /if \(user !== null && creds\.ownerId === null\) \{\s*const verdict = detectSpam/);
 });
