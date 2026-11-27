@@ -416,3 +416,19 @@ export async function pageHasResponses(db: D1Database, pageId: string): Promise<
   const row = await db.prepare("SELECT 1 AS x FROM responses WHERE page_id = ? LIMIT 1").bind(pageId).first<{ x: number }>();
   return row !== null;
 }
+
+/** How many stored responses each of these pages has. Pages with none are left out. Throws on a D1 error. */
+export async function responseCounts(db: D1Database, ids: readonly string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  // D1 caps bound parameters at 100 per query.
+  for (let i = 0; i < ids.length; i += 100) {
+    const chunk = ids.slice(i, i + 100);
+    if (chunk.length === 0) continue;
+    const { results } = await db
+      .prepare(`SELECT page_id, COUNT(*) AS n FROM responses WHERE page_id IN (${chunk.map(() => "?").join(", ")}) GROUP BY page_id`)
+      .bind(...chunk)
+      .all<{ page_id: string; n: number }>();
+    for (const r of results ?? []) out.set(r.page_id, Number(r.n));
+  }
+  return out;
+}

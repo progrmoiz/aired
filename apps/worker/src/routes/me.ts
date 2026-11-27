@@ -51,6 +51,7 @@ import {
 } from '../lib/pages-store.ts';
 import { loadPage, refreshCache, type LoadedPage } from '../lib/page-write.ts';
 import { pageViewCounts, viewCountOf } from '../lib/view-counts.ts';
+import { responseCounts } from '../lib/collect-store.ts';
 
 const me = new Hono<AppBindings>();
 
@@ -192,6 +193,8 @@ me.get('/pages', async (c) => {
     project: string | null;
     /** The dashboard tile's version and blurred placeholder (lib/og-shot.ts), or null. */
     tile: { v: string; lqip: string } | null;
+    /** Stored responses (aired.collect), for the dashboard's "Has responses" filter. */
+    responses: number;
   }> = listed.rows.map((r) => {
     const m = metadataFromRow(r, readCounts.get(r.id) ?? 0);
     return {
@@ -209,6 +212,7 @@ me.get('/pages', async (c) => {
       ownerId: m.ownerId,
       project: m.project,
       tile: null,
+      responses: 0,
     };
   });
 
@@ -220,6 +224,13 @@ me.get('/pages', async (c) => {
       for (const p of pages) p.tile = tileInfo(rows.get(p.id));
     } catch (err) {
       console.error('page_shots lookup failed while listing pages', { ownerId, err });
+    }
+    // Response counts: one D1 read. Best-effort: on an error every page shows 0.
+    try {
+      const counts = await responseCounts(c.env.DB, pages.map((p) => p.id));
+      for (const p of pages) p.responses = counts.get(p.id) ?? 0;
+    } catch (err) {
+      console.error('responses lookup failed while listing pages', { ownerId, err });
     }
   }
 

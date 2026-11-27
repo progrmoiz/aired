@@ -25,6 +25,8 @@ export type Page = {
   project: string | null
   /** The dashboard tile's version and blurred placeholder, once the page has been drawn. */
   tile?: TileInfo | null
+  /** Stored responses (aired.collect). Older servers leave it out. */
+  responses?: number
   /** Which list it came from: a project name or UNSORTED. Set by loadAllPages. */
   group: string
 }

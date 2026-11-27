@@ -13,10 +13,12 @@ export type TilePage = { id: string; title: string; html?: string; expires: stri
  * The top is a live preview when the page's HTML is at hand (mockups), or a
  * `cover` (the real dashboard: opening the page would count a view). `meta`
  * replaces the views line and `actions` the copy/more buttons. `href` opens
- * the page; `onOpen` handles the click instead.
+ * the page; `onOpen` handles the click instead. `titleHref` links the title.
  */
-export function PageTile({ page, origin, meta, actions, onOpen, cover, href }: {
+export function PageTile({ page, origin, meta, actions, onOpen, cover, href, titleHref }: {
   page: TilePage; origin: string; meta?: ReactNode; actions?: ReactNode; onOpen?: () => void; cover?: ReactNode; href?: string
+  /** Where the title goes: the page's panel on the real dashboard. */
+  titleHref?: string
 }) {
   return (
     <article className="group">
@@ -32,7 +34,7 @@ export function PageTile({ page, origin, meta, actions, onOpen, cover, href }: {
       </Card>
       <div className="mt-3 flex items-start gap-1 px-0.5">
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-body font-medium text-foreground">{page.title}</h3>
+          <h3 className="truncate text-body font-medium text-foreground">{titleHref ? <a href={titleHref} className="hover:underline hover:decoration-input hover:underline-offset-4">{page.title}</a> : page.title}</h3>
           {meta ?? <p className="mt-0.5 flex items-center gap-1.5 text-sm text-subtle"><EyeIcon className="size-3.5" />{page.views} views · {page.published}</p>}
         </div>
         {actions ?? <>
