@@ -86,6 +86,13 @@ migrations_dir = "migrations"
 binding = "VIEWS"
 dataset = "aired_views"
 
+# Clicks on the agent menu at the top of each guide and the docs (POST
+# /api/site-event, src/lib/site-event.ts): page, menu item and day, nothing
+# about the visitor. GET /api/admin/site-events reads the totals.
+[[analytics_engine_datasets]]
+binding = "SITE_EVENTS"
+dataset = "aired_site_events"
+
 # Link-preview screenshots (src/lib/og-render.ts): after a publish or update,
 # a 1200x630 JPEG of the page goes to R2 next to its HTML and /og/:id serves
 # it. Browser Rendering needs no setup on the account beyond this binding and

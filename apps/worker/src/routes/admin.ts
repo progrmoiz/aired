@@ -4,6 +4,8 @@ import type { AppBindings } from "../types.js";
 import { BACKFILL_MAX_LIMIT, backfillBatch } from "../lib/pages-backfill.ts";
 import { log } from "../lib/log.js";
 import { FEEDBACK_KINDS, listFeedback } from "../lib/feedback.ts";
+import { analyticsConfig, runQuery } from "../lib/analytics.ts";
+import { siteEventQuery } from "../lib/site-event.ts";
 
 /**
  * Operator-only endpoints. Off unless the ADMIN_TOKEN secret is set
@@ -79,6 +81,17 @@ admin.get("/feedback", async (c) => {
     feedback: rows.map((r) => ({ ...r, created_at: new Date(r.created_at).toISOString() })),
     next_before: rows.length === limit ? rows[rows.length - 1]!.created_at : null,
   });
+});
+
+// GET /api/admin/site-events — agent menu clicks per page and item
+// (lib/site-event.ts) over ?days= (1 to 90, default 30).
+admin.get("/site-events", async (c) => {
+  const raw = Number(c.req.query("days") ?? 30);
+  const days = Number.isInteger(raw) && raw >= 1 && raw <= 90 ? raw : 30;
+  const config = analyticsConfig(c.env);
+  if (config === null) return c.json({ error: "Analytics isn't set up: CF_ACCOUNT_ID and CF_ANALYTICS_TOKEN" }, 503);
+  const rows = await runQuery((url, init) => fetch(url, init), config, siteEventQuery(days));
+  return c.json({ days, clicks: rows.map((r) => ({ page: String(r.page ?? ""), item: String(r.item ?? ""), clicks: Number(r.clicks ?? 0) })) });
 });
 
 export { admin };

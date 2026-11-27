@@ -115,7 +115,9 @@ A page published from an aired account can save what viewers enter and show live
 - https://aired.sh/share-html-privately — guide: PIN, expiry, view limits and what stays private.
 - https://aired.sh/share-html-with-client — guide: send a report or mockup to a client and update it at the same link.
 - https://aired.sh/share-vite-app — guide: share a Vite, React or Toolcraft app by building it as one HTML file.
+- https://aired.sh/share-slides — guide: share Markdown or HTML slides with speaker notes.
 - https://aired.sh/tiiny-host-alternative — comparison with Tiiny Host and Netlify Drop.
+- Every guide above has a Markdown copy: add .md to its address, e.g. https://aired.sh/html-to-link.md.
 - https://aired.sh/docs — install and API reference.
 - https://aired.sh/llms.txt — this file, concise agent context.
 - https://aired.sh/llms-full.txt — expanded agent context with full API examples.

@@ -10,6 +10,7 @@ import { me } from "./routes/me.js";
 import { viewer } from "./routes/viewer.js";
 import { presenter } from "./routes/presenter.ts";
 import { report } from "./routes/report.js";
+import { siteEvent } from "./routes/site-event.js";
 import { handleMcp } from "./routes/mcp.js";
 import { og } from "./routes/og.js";
 import { auth } from "./routes/auth.js";
@@ -197,6 +198,7 @@ app.route("/api", pageTools);
 app.route("/api", responses);
 app.route("/api", api);
 app.route("/api", report);
+app.route("/api", siteEvent);
 
 // GET /upgrade — sign in if needed, then redirect to checkout
 app.route("/", upgrade);
