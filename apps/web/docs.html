@@ -35,7 +35,7 @@
     <h1>Publish from your agent, terminal or code</h1>
     <p class="lede">Most people never need this page: <a href="/#publish">paste or drop the HTML on the homepage</a> and send the link. These docs are for publishing from Claude Code, Cursor, scripts and CI. Every path is free and needs no account. Source is on <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a>.</p>
     <div class="gcards docs-paths">
-      <a class="gcard" href="#skill"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.3L12 16.8l-6.2 4.4 2.4-7.3L2 9.4h7.6z"/></svg></span><b>Skill</b><span>For Claude Code, Cursor, Windsurf and Codex. Your agent learns to publish.</span><em class="mono">npx skills add progrmoiz/aired -g</em></a>
+      <a class="gcard" href="#skill"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.3L12 16.8l-6.2 4.4 2.4-7.3L2 9.4h7.6z"/></svg></span><b>Skills</b><span>For Claude Code, Cursor, Windsurf and Codex. Your agent learns to publish decks, dashboards, reports and forms.</span><em class="mono">npx skills add progrmoiz/aired -g</em></a>
       <a class="gcard" href="#cli"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 17 6-5-6-5M12 19h8"/></svg></span><b>CLI</b><span>Publish a file or a whole folder from your terminal.</span><em class="mono">npx aired page.html</em></a>
       <a class="gcard" href="#mcp"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 9h8M8 13h5"/></svg></span><b>MCP server</b><span>Give any MCP client a publish_html tool.</span><em class="mono">aired.sh/mcp</em></a>
       <a class="gcard" href="#api"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-4 3 4 3M16 9l4 3-4 3M14 5l-4 14"/></svg></span><b>HTTP API</b><span>POST the HTML, get a link back. No key needed.</span><em class="mono">POST /api/publish</em></a>
@@ -45,7 +45,7 @@
   <div class="doc-grid">
     <aside class="toc" aria-label="On this page">
       <p>Install</p>
-      <a href="#skill">Skill</a>
+      <a href="#skill">Skills</a>
       <a href="#cli">CLI</a>
       <a href="#mcp">MCP server</a>
       <a href="#api">HTTP API</a>
@@ -64,14 +64,29 @@
 
       <!-- ─── Skill ─── -->
       <section id="skill">
-        <h2>Skill</h2>
-        <p>Adds a <code>SKILL.md</code> to your project so any AI agent (Claude Code, Cursor, Windsurf, Codex) discovers and uses aired automatically. This is the recommended path.</p>
-        <div class="snip"><code>npx skills add progrmoiz/aired -g</code><button type="button" class="btn sm copy-snippet" data-copy="npx skills add progrmoiz/aired -g">Copy</button></div>
+        <h2>Skills</h2>
+        <p>Skills teach an AI agent (Claude Code, Cursor, Windsurf, Codex) when and how to use aired. There are five: one core skill and four for common jobs. An agent loads a skill only when its description matches the task, so the specialised ones cost nothing until they're needed.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Skill</th><th>For</th></tr></thead>
+          <tbody>
+            <tr><td><code>aired</code></td><td>Publishing, updating, sign-in, limits, and which skill to load next. Reference files cover every CLI command, every MCP tool, app builds and errors.</td></tr>
+            <tr><td><code>aired-slides</code></td><td>Markdown or HTML decks, speaker notes, slide links, the speaker view, and a check before sharing.</td></tr>
+            <tr><td><code>aired-dashboard</code></td><td>Live dashboards: a page that reads <code>aired.data</code>, pushes with <code>update_data</code>, and the data limits.</td></tr>
+            <tr><td><code>aired-report</code></td><td>Client reports and one-pagers, sharing with a PIN or named people, versions and restore.</td></tr>
+            <tr><td><code>aired-forms</code></td><td>Pages that save what visitors enter with <code>aired.collect</code>, the privacy notice, <code>get_responses</code> and CSV.</td></tr>
+          </tbody>
+        </table></div>
+        <p>Install all five for Claude Code, for every project:</p>
+        <div class="snip"><code>npx skills add progrmoiz/aired -g -a claude-code</code><button type="button" class="btn sm copy-snippet" data-copy="npx skills add progrmoiz/aired -g -a claude-code">Copy</button></div>
         <ul>
-          <li><code>-g</code> installs the skill user-globally (under <code>~/&lt;agent&gt;/skills/</code>) so it works across all projects.</li>
-          <li>The skills CLI auto-detects which agent is running it and targets that agent.</li>
+          <li>Leave out <code>-a claude-code</code> and the skills CLI asks which agents to install for. Leave out <code>-g</code> to install into this project only (<code>.claude/skills/</code>).</li>
+          <li><code>--skill aired-slides</code> installs one skill; <code>--list</code> shows them without installing.</li>
           <li>Powered by <a href="https://skills.sh" target="_blank" rel="noopener">skills.sh</a>.</li>
         </ul>
+        <p>The skills also ship in the <code>aired</code> npm package, one folder each under <code>skills/</code>. To copy them into Claude Code by hand:</p>
+<pre><code>npm install -g aired
+cp -R "$(npm root -g)/aired/skills/." ~/.claude/skills/</code></pre>
+        <p>Connected to aired's <a href="#mcp">MCP server</a>? Nothing to install: every skill is also a resource, at <code>skill://aired/SKILL.md</code> and <code>skill://aired/&lt;name&gt;/SKILL.md</code>.</p>
       </section>
 
       <!-- ─── CLI ─── -->
@@ -206,7 +221,8 @@ url = "https://aired.sh/mcp"</code></pre>
 
         <h3 id="mcp-prompts">Prompts and resources</h3>
         <p>Clients that show MCP prompts list four as slash commands: <code>publish_report</code> (a Markdown report from the <code>report</code> template), <code>make_slide_deck</code> (a deck with speaker notes from the <code>deck</code> template), <code>share_privately</code> (a PIN and an expiry, with the PIN sent separately) and <code>check_and_fix</code>. Each ends with a <code>check_page</code> pass.</p>
-        <p>Resources: <code>skill://aired/SKILL.md</code> is the aired skill, so a connected agent can read how to use aired without installing anything. Signed in (API key, <code>/mcp/account</code>, or <code>aired login</code> for the local server), your pages are <code>aired://page/{id}</code> resources: the newest 50 are listed, and reading one returns its HTML (or its Markdown, for a Markdown page). Another account's page, or an anonymous page, is refused.</p>
+        <p>The <code>make_slide_deck</code> prompt points the agent at the <code>aired-slides</code> skill, and <code>publish_report</code> and <code>share_privately</code> at <code>aired-report</code>.</p>
+        <p>Resources: the <a href="#skill">skills</a>, so a connected agent can read how to use aired without installing anything. <code>skill://aired/SKILL.md</code> is the core skill and <code>skill://aired/references/*.md</code> its reference files (<code>cli.md</code>, <code>mcp.md</code>, <code>bundling.md</code>, <code>troubleshooting.md</code>); <code>skill://aired/aired-slides/SKILL.md</code>, <code>skill://aired/aired-dashboard/SKILL.md</code>, <code>skill://aired/aired-report/SKILL.md</code> and <code>skill://aired/aired-forms/SKILL.md</code> are the skills for each job. Signed in (API key, <code>/mcp/account</code>, or <code>aired login</code> for the local server), your pages are <code>aired://page/{id}</code> resources: the newest 50 are listed, and reading one returns its HTML (or its Markdown, for a Markdown page). Another account's page, or an anonymous page, is refused.</p>
 
         <h3>Tool: <code>publish_html</code></h3>
         <p>Inputs:</p>

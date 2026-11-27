@@ -4,11 +4,14 @@ import { readFileSync } from "node:fs";
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { PROMPTS, registerPrompts, registerResources, SKILL_URI, skillDescription } from "../src/lib/mcp-extras.ts";
+import { PROMPTS, registerPrompts, registerResources, SKILL_URI, skillDescription, skillUri } from "../src/lib/mcp-extras.ts";
+import { skillFiles } from "./helpers/skills.ts";
 import { pageAccess } from "../src/lib/page-options.ts";
 
 const read = (f: string) => readFileSync(new URL(`../../../${f}`, import.meta.url), "utf8");
-const SKILL = read("apps/cli/SKILL.md");
+const SKILL = read("apps/cli/skills/aired/SKILL.md");
+const SKILLS = skillFiles();
+const SKILL_URIS = SKILLS.map((f) => skillUri(f.path));
 
 /**
  * The API as the resources see it: pages with owners, and the caller's
@@ -47,7 +50,7 @@ async function connect(callerId: number | null) {
   const api = fakeApi(callerId);
   const server = new McpServer({ name: "aired", version: "test" });
   registerPrompts(server);
-  registerResources(server, { origin: "https://aired.test", signedIn: callerId !== null, get: api.get, skill: SKILL, ResourceTemplate });
+  registerResources(server, { origin: "https://aired.test", signedIn: callerId !== null, get: api.get, skills: SKILLS, ResourceTemplate });
   const [a, b] = InMemoryTransport.createLinkedPair();
   await server.connect(a);
   const client = new Client({ name: "test", version: "1" });
@@ -59,7 +62,7 @@ test("resources: a signed-in caller lists and reads only their own pages", async
   const { client } = await connect(7);
   const list = await client.listResources();
   const uris = list.resources.map((r) => r.uri).sort();
-  assert.deepEqual(uris, ["aired://page/mine1", "aired://page/mine2", SKILL_URI]);
+  assert.deepEqual(uris, ["aired://page/mine1", "aired://page/mine2", ...SKILL_URIS].sort());
   const mine = list.resources.find((r) => r.uri === "aired://page/mine1")!;
   assert.equal(mine.name, "My report");
   assert.equal(mine.mimeType, "text/html");
@@ -78,7 +81,7 @@ test("resources: a signed-in caller lists and reads only their own pages", async
 test("resources: an anonymous caller sees the skill and no pages, and can't read any page", async () => {
   const { client, api } = await connect(null);
   const list = await client.listResources();
-  assert.deepEqual(list.resources.map((r) => r.uri), [SKILL_URI]);
+  assert.deepEqual(list.resources.map((r) => r.uri), SKILL_URIS);
   for (const id of ["mine1", "theirs", "anon"]) {
     await assert.rejects(client.readResource({ uri: `aired://page/${id}` }), /signed-in callers/);
   }
@@ -87,7 +90,7 @@ test("resources: an anonymous caller sees the skill and no pages, and can't read
   await client.close();
 });
 
-test("the skill resource is SKILL.md itself, in the Skills over MCP layout", async () => {
+test("the core skill resource is SKILL.md itself, in the Skills over MCP layout", async () => {
   const { client } = await connect(null);
   const skill = (await client.listResources()).resources.find((r) => r.uri === SKILL_URI)!;
   assert.equal(SKILL_URI, "skill://aired/SKILL.md");
@@ -125,15 +128,16 @@ test("prompts: listed with titles and optional string arguments, and each mentio
   await client.close();
 });
 
-test("both servers register the same prompts and resources, and serve SKILL.md as bundled text", () => {
+test("both servers register the same prompts and resources, and serve the skills as bundled text", () => {
   const hosted = read("apps/worker/src/routes/mcp.ts");
   const stdio = read("apps/mcp/src/index.ts");
   for (const code of [hosted, stdio]) {
     assert.match(code, /registerPrompts\(server\);/);
     assert.match(code, /registerResources\(server, \{/);
   }
-  assert.match(hosted, /import skill from "\.\.\/\.\.\/\.\.\/cli\/SKILL\.md";/);
-  assert.match(stdio, /import skill from "\.\.\/\.\.\/cli\/SKILL\.md";/);
+  assert.match(hosted, /import \{ SKILL_FILES \} from "\.\.\/lib\/skill-files\.ts";/);
+  assert.match(stdio, /import \{ SKILL_FILES \} from "\.\.\/\.\.\/worker\/src\/lib\/skill-files\.ts";/);
+  assert.match(read("apps/worker/src/lib/skill-files.ts"), /import core from "\.\.\/\.\.\/\.\.\/cli\/skills\/aired\/SKILL\.md";/);
   // Hosted: signed in means an API key or OAuth, never a cookie (handleMcp's signedIn).
   assert.match(hosted, /signedIn: signedIn !== null,/);
   assert.match(read("apps/worker/wrangler.toml"), /\[\[rules\]\]\ntype = "Text"\nglobs = \["\*\*\/\*\.md"\]/);
@@ -143,11 +147,11 @@ test("both servers register the same prompts and resources, and serve SKILL.md a
 
 test("resources/list still lists the skill when fetching the caller's pages throws (offline, bad key)", async () => {
   const server = new McpServer({ name: "aired", version: "test" });
-  registerResources(server, { origin: "https://aired.test", signedIn: true, get: async () => { throw new Error("fetch failed"); }, skill: SKILL, ResourceTemplate });
+  registerResources(server, { origin: "https://aired.test", signedIn: true, get: async () => { throw new Error("fetch failed"); }, skills: SKILLS, ResourceTemplate });
   const [a, b] = InMemoryTransport.createLinkedPair();
   await server.connect(a);
   const client = new Client({ name: "test", version: "1" });
   await client.connect(b);
-  assert.deepEqual((await client.listResources()).resources.map((r) => r.uri), [SKILL_URI]);
+  assert.deepEqual((await client.listResources()).resources.map((r) => r.uri), SKILL_URIS);
   await client.close();
 });

@@ -1,6 +1,6 @@
 {
   "name": "aired",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Publish HTML artifacts to shareable URLs instantly",
   "type": "module",
   "bin": {
@@ -10,7 +10,7 @@
     "dist/cli.cjs",
     "dist/mcp.cjs",
     "bin/",
-    "SKILL.md"
+    "skills/"
   ],
   "scripts": {
     "build": "node build.mjs",

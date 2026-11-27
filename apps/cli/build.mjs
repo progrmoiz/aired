@@ -29,7 +29,7 @@ await build({
   format: 'cjs',
   minify: true,
   outfile: 'dist/mcp.cjs',
-  // The skill is served as an MCP resource from the same SKILL.md.
+  // The skills (skills/*/SKILL.md) are served as MCP resources from the same files.
   loader: { '.md': 'text' },
   banner: { js: `// ${pkg.name} v${pkg.version} MCP server — MIT License` },
   define: { '__AIRED_VERSION__': JSON.stringify(pkg.version) },
