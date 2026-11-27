@@ -1,8 +1,14 @@
 # Share an HTML page privately
 
-For a draft, a client report or anything that isn't for the whole internet. Publish it with a PIN and a short expiry, send the link to the people who need it, and delete it when you're done.
+**Add a PIN, pick a short expiry, or list exactly who may open the page.** Nobody else can find it or read it.
 
 Source: https://aired.sh/share-html-privately
+
+## How to do it
+
+1. **Add a PIN** Checked on the server, before the page loads.
+2. **Set when it ends** A time limit, a view limit, or both.
+3. **Or name the people** Each person gets a one-time code by email.
 
 ## Four settings that keep a page private
 
@@ -55,5 +61,3 @@ Delete the page with its update token, or from your dashboard if you published w
 ### Can I see who opened it?
 
 Signed-in users see a view count for each page. Who opened it, and when, is part of the planned Pro plan.
-
-Updated November 2026.

@@ -1,8 +1,14 @@
 # Share a Vite or React app as one link
 
-You built a tool with Vite, [Toolcraft](https://toolcraft.sh) (an open-source kit for building design apps), Claude Code or Cursor, and it only runs on your localhost. Build it as one HTML file, publish it, and send your client a link that opens the working app. No deploy and no hosting account.
+**Build your app as one HTML file and publish it.** Your client opens the working app from a link, with nothing to install and no hosting to set up.
 
 Source: https://aired.sh/share-vite-app
+
+## How to do it
+
+1. **Add one plugin** It puts every script, style and image in one file.
+2. **Build one file** A second build config; your normal build stays as it is.
+3. **Send the link** The real app runs in their browser.
 
 ## How to share it
 
@@ -120,5 +126,3 @@ Yes. Build again and run `npx aired update <id> dist-single/index.html`. The CLI
 ### Can the app call an API?
 
 It can call public APIs that allow requests from any origin. Because the page is sandboxed, requests come from a `null` origin, and APIs that check the origin or need cookies will refuse them. aired is for apps that run in the browser, not for apps with a backend.
-
-Updated November 2026.

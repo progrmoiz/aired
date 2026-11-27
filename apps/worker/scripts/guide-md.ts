@@ -147,13 +147,16 @@ export function guideMarkdown(html: string, slug: string): string {
   if (lede) out.push(line(lede as unknown as Node));
   out.push(`Source: ${ORIGIN}/${slug}`);
   // v2 guides put the steps above the article as pictured cards (.g2-steps).
+  const list = doc.querySelector(".g2-steps");
   const steps = Array.from(doc.querySelectorAll(".g2-steps > li"));
-  if (steps.length) {
-    out.push("## How to do it");
+  if (list && steps.length) {
+    // Facts (the comparison guide) aren't a sequence, so they're bullets.
+    const facts = list.classList.contains("g2-facts");
+    out.push(`## ${list.getAttribute("data-md-title") ?? "How to do it"}`);
     out.push(steps.map((li, i) => {
       const title = squash(li.querySelector("b")?.textContent ?? "").trim();
       const text = line(li.querySelector("p") as unknown as Node);
-      return `${i + 1}. **${title}** ${text}`;
+      return `${facts ? "-" : `${i + 1}.`} **${title}** ${text}`;
     }).join("\n"));
   }
   blocks(article as unknown as Node, out);

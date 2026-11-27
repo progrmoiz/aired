@@ -871,7 +871,7 @@ select.field option { background: var(--surface); }
 /* Guide layout v2 (`main.g2`, DESIGN.md §9.3): answer first, then read like an
    article. A serif title, a lead that answers the search, three pictured steps,
    a compact publish panel, then one centred column of brighter, larger text
-   with few boxes. Opt-in per guide while the others move over. */
+   with few boxes. Every guide uses it. */
 .g2 { --g2-body: color-mix(in srgb, var(--text-1) 78%, var(--text-2)); }
 .g2-top { max-width: 720px; margin: 0 auto; padding-top: 56px; }
 @media (max-width: 880px) { .g2-top { padding-top: 32px; } }
@@ -928,3 +928,21 @@ select.field option { background: var(--surface); }
   .g2-file { padding: 6px 8px; font-size: 11px; }
   .g2-send span { gap: 8px; padding: 4px 8px; font-size: 11.5px; }
 }
+.g2-link { padding: 7px 12px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--aired-ok) 45%, transparent); font: 12px var(--mono); color: var(--ok); background: var(--bg); max-width: 90%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g2-say { max-width: 86%; padding: 8px 12px; border-radius: 12px 12px 12px 4px; background: var(--surface-2); border: 1px solid var(--border-2); font-size: 12.5px; line-height: 1.4; color: var(--text-1); text-align: left; }
+.g2-facts b::before { content: none; }
+.g2-shot { margin: 40px 0 0; }
+.g2-shot .crop { margin-top: 0; }
+.g2-prose ol.steps { display: block; margin-top: 16px; padding-left: 22px; counter-reset: none; list-style: decimal; }
+.g2-prose ol.steps li { padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+.g2-prose ol.steps li::before { content: none; }
+.g2-prose ol.steps li strong { display: inline; margin: 0; font-size: inherit; }
+.g2-prose h3 { margin-top: 32px; font-size: 19px; letter-spacing: -0.01em; color: var(--text-1); }
+.g2-prose pre { font-size: 13px; line-height: 1.6; }
+@media (max-width: 760px) { .g2-link { font-size: 10.5px; padding: 5px 8px; } .g2-say { font-size: 11px; padding: 6px 8px; } }
+
+.g2-prose ol.steps li + li { margin-top: 10px; }
+.g2-prose ol.steps li { font-size: inherit; line-height: inherit; color: inherit; }
+.g2-prose ol.steps li strong { color: var(--text-1); }
+.g2-shot { max-width: 500px; margin-left: auto; margin-right: auto; }
+.g2-shot .report.game .board { max-width: 300px; margin-left: auto; margin-right: auto; }
