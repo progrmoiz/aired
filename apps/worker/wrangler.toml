@@ -70,6 +70,15 @@ database_name = "aired"
 database_id = "4581e15e-7f00-408c-a69c-2558584a6d84"
 migrations_dir = "migrations"
 
+# Page views for Pro analytics (src/lib/view-event.ts writes, src/lib/analytics.ts
+# reads through the SQL API with the CF_ANALYTICS_TOKEN and CF_ACCOUNT_ID
+# secrets). One data point per view: page, owner, country, referrer host and
+# day; never the IP. Analytics Engine keeps data for three months. The
+# dataset is created by the first write; local `wrangler dev` keeps nothing.
+[[analytics_engine_datasets]]
+binding = "VIEWS"
+dataset = "aired_views"
+
 # Link-preview screenshots (src/lib/og-render.ts): after a publish or update,
 # a 1200x630 JPEG of the page goes to R2 next to its HTML and /og/:id serves
 # it. Browser Rendering needs no setup on the account beyond this binding and

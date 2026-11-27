@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { AppBindings } from "../types.js";
 import { parseMetadata } from "@aired/core";
+import { pageViewCounts, viewCountOf } from "../lib/view-counts.ts";
 import { SHOT_CONTENT_TYPE, ogCacheControl, shotAllowed, shotKey, versionFromEtag } from "../lib/og-shot.js";
 
 const og = new Hono<AppBindings>();
@@ -37,6 +38,11 @@ og.get("/og/:id", async (c) => {
   if (metadata) {
     title = metadata.title ?? "Untitled";
     views = metadata.readCount;
+    try {
+      views = viewCountOf(await pageViewCounts(c.env.DB, [id]), id, metadata.readCount);
+    } catch {
+      // The card still draws, with the count frozen in KV.
+    }
     if (metadata.permanent) {
       expiryText = "Permanent";
     } else if (metadata.expiresAt) {

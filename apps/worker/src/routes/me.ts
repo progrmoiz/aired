@@ -49,6 +49,7 @@ import {
   type ProjectFilter,
 } from '../lib/pages-store.ts';
 import { indexForOwner, loadPage, refreshCache, type LoadedPage } from '../lib/page-write.ts';
+import { pageViewCounts, viewCountOf } from '../lib/view-counts.ts';
 
 const me = new Hono<AppBindings>();
 
@@ -148,19 +149,26 @@ me.get('/pages', async (c) => {
     return c.json({ error: 'Could not load your pages. Please try again.' }, 503);
   }
 
-  // View counts still live in the KV records (one bulk read). Best-effort:
-  // a page whose record can't be read shows 0.
+  // View counts: D1 page_views (lib/view-counts.ts), falling back to the count
+  // frozen in the KV record for a page not viewed since. Best-effort: a page
+  // whose count can't be read shows 0.
   const readCounts = new Map<string, number>();
   if (listed.rows.length > 0) {
-    try {
-      const raws = await c.env.PAGES_KV.get(listed.rows.map((r) => kvKeys.page(r.id)));
-      for (const r of listed.rows) {
-        const raw = raws.get(kvKeys.page(r.id));
-        const m = raw === null || raw === undefined ? null : parseMetadata(raw);
-        if (m !== null) readCounts.set(r.id, m.readCount);
-      }
-    } catch (err) {
-      console.error('view counts lookup failed while listing pages', { ownerId, err });
+    const ids = listed.rows.map((r) => r.id);
+    const [kvCounts, d1Counts] = await Promise.all([
+      c.env.PAGES_KV.get(ids.map((id) => kvKeys.page(id))).catch((err) => {
+        console.error('view counts lookup failed while listing pages', { ownerId, err });
+        return null;
+      }),
+      pageViewCounts(c.env.DB, ids).catch((err) => {
+        console.error('page_views lookup failed while listing pages', { ownerId, err });
+        return new Map<string, number>();
+      }),
+    ]);
+    for (const id of ids) {
+      const raw = kvCounts?.get(kvKeys.page(id));
+      const m = raw === null || raw === undefined ? null : parseMetadata(raw);
+      readCounts.set(id, viewCountOf(d1Counts, id, m?.readCount ?? 0));
     }
   }
 

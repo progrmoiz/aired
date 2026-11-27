@@ -1,6 +1,7 @@
 import { Hono, type Context } from "hono";
 import type { AppBindings } from "../types.js";
 import { loadStats, publicStats, saveStats } from "../lib/stats.js";
+import { countryTotals, mergeViewTotals, pageViewCounts, viewCountOf } from "../lib/view-counts.ts";
 import { rateLimit, publishRateLimit } from "../middleware/rate-limit.js";
 import { requireCsrfHeader } from "../middleware/csrf.js";
 import { readUpdateToken } from "../lib/page-token.js";
@@ -388,19 +389,34 @@ api.get("/pages/:id", async (c) => {
     return c.json({ error: "Page metadata is corrupted" }, 500);
   }
 
+  let readCount = metadata.readCount;
+  try {
+    readCount = viewCountOf(await pageViewCounts(c.env.DB, [id]), id, metadata.readCount);
+  } catch (err) {
+    console.error("page_views lookup failed", { id, err });
+  }
+
   return c.json({
     id: metadata.id,
     title: metadata.title,
     size: metadata.size,
-    readCount: metadata.readCount,
+    readCount,
     expiresAt: metadata.expiresAt,
   });
 });
 
-// GET /api/stats — public stats: counters and per-country views only
+// GET /api/stats — public stats: counters and per-country views only. Views
+// are the totals frozen in stats:live plus D1's per-country counts since
+// (lib/view-counts.ts); if D1 fails, the frozen totals alone.
 api.get("/stats", async (c) => {
   const stats = await loadStats(c.env.PAGES_KV);
-  return c.json(publicStats(stats));
+  let geo: Record<string, number> = {};
+  try {
+    geo = await countryTotals(c.env.DB);
+  } catch (err) {
+    console.error("view_totals lookup failed", { err });
+  }
+  return c.json(publicStats(mergeViewTotals(stats, geo)));
 });
 
 export { api };

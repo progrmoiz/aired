@@ -33,9 +33,11 @@ test("an unreadable expiry skips the write instead of making the page permanent"
   assert.deepEqual(viewWrite({ permanent: false, expiresAt: "not a date" }, NOW), { expired: false, options: null });
 });
 
-test("viewer.ts uses viewWrite for both the 404 and the KV write", () => {
+test("viewer.ts uses viewWrite for the 404, and a view writes neither the page record nor stats:live", () => {
   const code = readFileSync(new URL("../src/routes/viewer.ts", import.meta.url), "utf8");
   assert.match(code, /const write = viewWrite\(metadata, Date\.now\(\)\);\s*if \(write\.expired\) \{\s*return notFoundPage/);
-  assert.match(code, /const kvOptions: KVNamespacePutOptions \| null = write\.options;/);
-  assert.doesNotMatch(code, /expirationTtl = remaining/);
+  const view = code.slice(code.indexOf('viewer.get("/p/:id"'), code.indexOf('viewer.post("/p/:id/verify-pin"'));
+  assert.ok(view.length > 0);
+  assert.doesNotMatch(view, /PAGES_KV\.put|saveStats|recordView/);
+  assert.match(view, /countPageView\(c\.env\.DB, id, metadata\.readCount, metadata\.reads\)/);
 });

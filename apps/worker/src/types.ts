@@ -75,6 +75,25 @@ export type Env = {
   BROWSER?: Fetcher;
   /** Daily browser time for screenshots, in seconds (lib/og-shot.ts). Default 480; "0" turns them off. */
   OG_SHOT_DAILY_SECONDS?: string;
+  /**
+   * Analytics Engine dataset `aired_views` (wrangler.toml): one data point
+   * per page view (lib/view-event.ts). Optional so tests run without it;
+   * local `wrangler dev` accepts writes and keeps nothing.
+   */
+  VIEWS?: AnalyticsEngineDataset;
+  /**
+   * Secret: a Cloudflare API token with Account Analytics Read, for the
+   * Analytics Engine SQL API that Pro analytics reads (lib/analytics.ts).
+   * Unset: /api/me/analytics answers 503.
+   */
+  CF_ANALYTICS_TOKEN?: string;
+  /** The Cloudflare account id that owns the dataset (a var, not secret). */
+  CF_ACCOUNT_ID?: string;
+  /**
+   * Local dev only (.dev.vars): "1" makes /api/me/analytics answer with
+   * made-up numbers instead of calling Cloudflare, which keeps nothing locally.
+   */
+  ANALYTICS_DEMO?: string;
 };
 
 export type AppBindings = {
