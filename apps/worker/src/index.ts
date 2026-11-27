@@ -11,6 +11,7 @@ import { pruneCollectData } from "./lib/collect-store.ts";
 import { me } from "./routes/me.js";
 import { viewer } from "./routes/viewer.js";
 import { presenter } from "./routes/presenter.ts";
+import { pdf } from "./routes/pdf.ts";
 import { access } from "./routes/access.ts";
 import { pruneAccessData } from "./lib/access-store.ts";
 import { report } from "./routes/report.js";
@@ -215,6 +216,8 @@ app.get("/device", devicePage);
 
 // A deck's speaker view, for its owner (routes/presenter.ts)
 app.route("/", presenter);
+// PDF export: GET /p/:id/pdf and POST /api/pages/:id/pdf (routes/pdf.ts)
+app.route("/", pdf);
 
 // "Only these people": the gate's two steps and the owner's list (routes/access.ts).
 app.route("/", access);

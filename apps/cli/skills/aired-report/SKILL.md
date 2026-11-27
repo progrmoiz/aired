@@ -88,6 +88,20 @@ Over MCP: `publish_html` with `id` and `update_token` (or `id` alone when you ow
 - Each version records who made it: `owner`, `token` or `agent`, and the note from `-m` / `message`.
 - Free keeps the last 5 earlier versions; Pro the last 50, each for 90 days (the newest 5 stay however old). Deleting the page deletes its history.
 
+## Send it as a PDF
+
+Clients often want a file they can forward or keep. Make one from the published report:
+
+```bash
+aired pdf <id> -o acme-november.pdf     # A4 or Letter, with page numbers
+```
+
+Over MCP: `export_pdf` with `{ "id": "<id>" }` (add `"paper": "a4"` or `"letter"` to choose; the default follows the caller's country). Attach the file, or send the `download_url`, which works for 15 minutes.
+
+Or let the client download it from the page: `aired set <id> --allow-pdf` (`set_options` with `allow_pdf: true`, or "Let viewers download a PDF" on the dashboard's Share screen). The page then shows a PDF button. It works behind a PIN or a people list (only for someone who can open the page right now), but not on a page with a view limit, and it never counts a view.
+
+On Free the PDF has a small "Made with aired · aired.sh" footer; on Pro it has none, the same as the badge.
+
 ## Check before sending
 
 `aired check <id>` (or `check_page`) opens the page as a visitor would, even behind a PIN or a people list. Fix what it reports and update the same id.

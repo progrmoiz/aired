@@ -40,6 +40,8 @@ export type PageRow = {
   updatedAt: number;
   /** 'people': only the listed people may open it (migrations/0017_page_access.sql). Null: public or PIN. */
   access: 'people' | null;
+  /** Viewers may download the page as a PDF (migrations/0018_page_allow_pdf.sql). */
+  allowPdf: boolean;
 };
 
 type DbRow = {
@@ -60,10 +62,11 @@ type DbRow = {
   deleted_at: number | null;
   updated_at: number;
   access: string | null;
+  allow_pdf: number;
 };
 
 const COLUMNS =
-  'id, owner_id, workspace_id, project, title, size, token_hash, prev_token_hash, claimed_at, pin, reads, permanent, created_at, expires_at, deleted_at, updated_at, access';
+  'id, owner_id, workspace_id, project, title, size, token_hash, prev_token_hash, claimed_at, pin, reads, permanent, created_at, expires_at, deleted_at, updated_at, access, allow_pdf';
 
 function fromDb(r: DbRow): PageRow {
   return {
@@ -84,6 +87,7 @@ function fromDb(r: DbRow): PageRow {
     deletedAt: r.deleted_at,
     updatedAt: r.updated_at,
     access: r.access === 'people' ? 'people' : null,
+    allowPdf: r.allow_pdf === 1,
   };
 }
 
@@ -106,6 +110,7 @@ function toDb(row: PageRow): DbRow {
     deleted_at: row.deletedAt,
     updated_at: row.updatedAt,
     access: row.access,
+    allow_pdf: row.allowPdf ? 1 : 0,
   };
 }
 
@@ -141,6 +146,7 @@ export function rowFromMetadata(meta: PageMetadata, claim: ClaimRecord | null, n
     deletedAt: tombstoned ? now : null,
     updatedAt: now,
     access: meta.access === 'people' ? 'people' : null,
+    allowPdf: meta.allowPdf === true,
   };
 }
 
@@ -160,6 +166,7 @@ export function metadataFromRow(row: PageRow, readCount: number): PageMetadata {
     ownerId: row.ownerId,
     project: row.project,
     access: row.access,
+    allowPdf: row.allowPdf,
   };
 }
 
@@ -177,8 +184,8 @@ export async function getPageRow(db: D1Database, id: string): Promise<PageRow | 
 export async function insertPageRow(db: D1Database, row: PageRow): Promise<boolean> {
   const v = toDb(row);
   const result = await db
-    .prepare(`INSERT OR IGNORE INTO pages (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .bind(v.id, v.owner_id, v.workspace_id, v.project, v.title, v.size, v.token_hash, v.prev_token_hash, v.claimed_at, v.pin, v.reads, v.permanent, v.created_at, v.expires_at, v.deleted_at, v.updated_at, v.access)
+    .prepare(`INSERT OR IGNORE INTO pages (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(v.id, v.owner_id, v.workspace_id, v.project, v.title, v.size, v.token_hash, v.prev_token_hash, v.claimed_at, v.pin, v.reads, v.permanent, v.created_at, v.expires_at, v.deleted_at, v.updated_at, v.access, v.allow_pdf)
     .run();
   return result.meta.changes === 1;
 }
@@ -232,6 +239,7 @@ export type PageOptionsColumns = {
   permanent?: boolean;
   expiresAt?: number | null;
   access?: 'people' | null;
+  allowPdf?: boolean;
 };
 
 /**
@@ -258,6 +266,7 @@ export async function updatePageOptions(
   if (change.permanent !== undefined) col('permanent', change.permanent ? 1 : 0);
   if (change.expiresAt !== undefined) col('expires_at', change.expiresAt);
   if (change.access !== undefined) col('access', change.access);
+  if (change.allowPdf !== undefined) col('allow_pdf', change.allowPdf ? 1 : 0);
   col('updated_at', now);
   const result = await db
     .prepare(`UPDATE pages SET ${sets.join(', ')} WHERE id = ? AND deleted_at IS NULL AND (expires_at IS NULL OR expires_at > ?)`)

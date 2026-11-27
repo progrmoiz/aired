@@ -23,6 +23,8 @@ interface SetOpts {
   clearReads?: boolean
   only?: string
   public?: boolean
+  /** --allow-pdf (true) or --no-allow-pdf (false); undefined when neither is given. */
+  allowPdf?: boolean
 }
 
 
@@ -62,8 +64,9 @@ export function changeFromFlags(o: SetOpts): { change: Record<string, unknown> }
     change['access'] = parsed.access
   }
   if (o.public) change['access'] = { mode: 'public' }
+  if (o.allowPdf !== undefined) change['allow_pdf'] = o.allowPdf
   if (Object.keys(change).length === 0) {
-    return { error: 'Nothing to change. Pass --title, --pin, --clear-pin, --only, --public, --ttl, --permanent, --reads or --clear-reads.' }
+    return { error: 'Nothing to change. Pass --title, --pin, --clear-pin, --only, --public, --ttl, --permanent, --reads, --clear-reads or --allow-pdf.' }
   }
   return { change }
 }
@@ -82,6 +85,8 @@ export function makeSetCommand(globalOpts: () => GlobalOpts): Command {
     .option('--permanent', 'Never expire')
     .option('--reads <n>', 'Gone after this many views')
     .option('--clear-reads', 'Remove the view limit')
+    .option('--allow-pdf', 'Give viewers a Download PDF button (not on pages with a view limit)')
+    .option('--no-allow-pdf', 'Take the Download PDF button away (you can still use aired pdf)')
     .action(async (id: string, cmdOpts: SetOpts) => {
       const opts = globalOpts()
       const baseUrl = resolveApiUrl(opts)

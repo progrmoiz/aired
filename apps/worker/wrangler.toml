@@ -96,8 +96,11 @@ dataset = "aired_site_events"
 # Link-preview screenshots (src/lib/og-render.ts): after a publish or update,
 # a 1200x630 JPEG of the page goes to R2 next to its HTML and /og/:id serves
 # it. Browser Rendering needs no setup on the account beyond this binding and
-# the og_shot_budget migration (0008). Workers Free allows 10 minutes a day,
-# so screenshots stop at 8 (OG_SHOT_DAILY_SECONDS, a var, overrides it).
+# the og_shot_budget migration (0008). The account is on Workers Paid (10
+# hours a month included, then $0.09 an hour): all browser work (screenshots,
+# check_page, PDF export) stops at 40 minutes a day by default, checks at 10
+# and new PDFs at 20 (OG_SHOT_DAILY_SECONDS, CHECK_DAILY_SECONDS and
+# PDF_DAILY_SECONDS, vars or secrets, override them).
 # Local `wrangler dev` can't emulate this browser for @cloudflare/puppeteer
 # 1.4 (it answers 405, and pages keep the card); to try screenshots locally,
 # add `remote = true` below, which uses the account's real browser.
@@ -163,6 +166,13 @@ simple = { limit = 30, period = 60 }
 name = "CHECK_BURST"
 namespace_id = "1009"
 simple = { limit = 3, period = 60 }
+
+# New PDF renders (GET /p/:id/pdf, POST /api/pages/:id/pdf, routes/pdf.ts):
+# each launches a browser. Cached PDFs don't count. Per caller.
+[[ratelimits]]
+name = "PDF_BURST"
+namespace_id = "1010"
+simple = { limit = 4, period = 60 }
 
 # Data-layer calls from published pages (routes/collect.ts): every save,
 # read and live-data poll, per network (an IPv6 visitor by /64). A page

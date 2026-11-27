@@ -43,7 +43,7 @@ For your own layouts, charts or brand colours, write HTML where each top-level `
 - **Move:** arrow keys, Space, Page Up and Page Down (so presentation clickers work), Home and End. On a phone, swipe.
 - **Present:** press F or the Present button. The controls fade until you move the mouse.
 - **Link to a slide:** the link button copies the address of the slide you're on, like `aired.sh/p/abc#/3`.
-- **PDF:** print the page and choose Save as PDF; each slide gets its own page.
+- **PDF:** choose Download PDF in the dashboard or run `aired pdf`; each slide gets its own page, and you can add your speaker notes. Turn on the PDF button and viewers can download it too.
 
 ## Speaker notes
 
@@ -71,7 +71,7 @@ No. aired cuts the notes out of the page when you publish. Only you see them, si
 
 ### Can I turn the deck into a PDF?
 
-Yes. Print the page and choose Save as PDF: each slide goes on its own page.
+Yes. Run `aired pdf` with the deck's id, or use Download PDF in the dashboard: each slide goes on its own page, with your speaker notes after each slide if you ask. Notes are never in the PDF unless you, signed in, ask for them. You can also turn on a PDF button so viewers download it themselves.
 
 ### Can Claude or ChatGPT write the deck?
 

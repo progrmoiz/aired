@@ -63,6 +63,7 @@ aired update abc123 dashboard-v2.html
 | `update <id> <file>` | Update an existing page using the stored token |
 | `delete <id>` | Delete a page using the stored token |
 | `info <id>` | Show page metadata (title, size, reads, expiry) |
+| `pdf <id>` | Download a page as a PDF (`-o, --out <file>`, `--paper a4\|letter`, `--notes` for a deck's speaker notes) |
 
 ### Management
 
@@ -125,7 +126,7 @@ Spawn the MCP server for AI tool integration:
 aired --mcp
 ```
 
-This starts a stdio MCP server with `publish_html`, `get_page`, `set_options`, `list_versions`, `restore_version`, `check_page`, `get_template`, `get_responses`, `update_data` and `send_feedback`. Configure it in your AI tool's MCP settings, or `claude mcp add aired -- npx aired --mcp`.
+This starts a stdio MCP server with `publish_html`, `get_page`, `set_options`, `list_versions`, `restore_version`, `check_page`, `export_pdf`, `get_template`, `get_responses`, `update_data` and `send_feedback`. Configure it in your AI tool's MCP settings, or `claude mcp add aired -- npx aired --mcp`.
 
 ---
 

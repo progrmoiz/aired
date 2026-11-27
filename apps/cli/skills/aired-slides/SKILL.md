@@ -89,8 +89,23 @@ The result has `kind: "deck"`, `slides`, and a `presenter_url` (the speaker view
 | `https://aired.sh/p/<id>/presenter` | The speaker view: notes, next slide, a timer, and buttons that move the slides window. Owner only, signed in |
 
 - Notes are cut out of the public page when you publish. Only the signed-in owner sees them. An anonymous deck's notes come back only through `get_page` with `include_source` and its update token.
-- Print (Save as PDF) gives one slide per page, so the deck exports as a PDF.
 - Need it private? Add a PIN or share with named people: see `aired-report`.
+
+## Export as a PDF
+
+For an attachment, a handout or a file to send ahead of the meeting:
+
+```bash
+aired pdf <id>                  # one slide per page, at 1280×720 (landscape)
+aired pdf <id> --notes          # a page of speaker notes after each slide that has notes
+```
+
+Over MCP: `export_pdf` with `{ "id": "<id>" }`, or `{ "id": "<id>", "notes": true }` for the notes version. It returns a `download_url` that works for 15 minutes.
+
+- Notes are never in a PDF unless the signed-in owner asks. An update token isn't enough, the same as the speaker view, so publish signed in if you'll want them.
+- To let viewers download the deck as a PDF (never with notes), turn on the button: `aired set <id> --allow-pdf` or `set_options` with `allow_pdf: true`. It shows a PDF button on the aired badge; not on decks with a view limit.
+- Free PDFs carry a small "Made with aired" mark in the corner of each slide; Pro PDFs don't.
+- Printing from the browser (Save as PDF) also gives one slide per page.
 
 ## Check before sharing
 

@@ -32,6 +32,7 @@ export function printPageDetails(page: PageDetails): void {
     ['Access:  ', accessLine(page)],
     ['Expires: ', formatExpiry(page.expiresAt)],
   ]
+  if (page.allowPdf !== undefined) lines.push(['PDF:     ', page.allowPdf ? 'viewers can download it' : 'only you (aired pdf)'])
   if (page.project !== null) lines.push(['Project: ', page.project])
   for (const [label, value] of lines) process.stdout.write(pc.dim(label!) + value + '\n')
 }

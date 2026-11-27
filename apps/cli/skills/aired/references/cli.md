@@ -13,6 +13,7 @@ Run it with `npx aired` (no install) or install it with `npm install -g aired`.
 | `aired restore <id> <version>` | Put an earlier version back (it goes live as a new version) |
 | `aired set <id>` | Change who can open it, its expiry, view limit or title without uploading again |
 | `aired check <id>` | Open the page in a real browser and report errors (exits 1 if broken) |
+| `aired pdf <id>` | Download the page as a PDF (a deck: one slide per page) |
 | `aired info <id>` | Title, size, views and expiry |
 | `aired delete <id>` | Delete a page |
 | `aired feedback` | Report a bug, friction or idea in aired itself |
@@ -48,7 +49,7 @@ aired set abc123 --only alice@client.com,@client.com   # only these people (each
 aired set abc123 --public                    # anyone with the link again
 ```
 
-Also `--clear-title` and `--clear-reads`. PINs are 4–64 characters, TTLs a minute to a year (use `--permanent` beyond that), titles up to 200 characters. It uses the stored update token, else your sign-in or `AIRED_API_KEY` (your own pages only). `--only` needs sign-in and a page in your account.
+Also `--clear-title` and `--clear-reads`, and `--allow-pdf` / `--no-allow-pdf` to give viewers a Download PDF button or take it away (off by default; not on pages with a view limit). PINs are 4–64 characters, TTLs a minute to a year (use `--permanent` beyond that), titles up to 200 characters. It uses the stored update token, else your sign-in or `AIRED_API_KEY` (your own pages only). `--only` needs sign-in and a page in your account.
 
 ## aired check
 
@@ -59,7 +60,19 @@ aired check abc123 --screenshot shot.jpg --json
 aired check abc123 --strict         # also fail on warnings
 ```
 
-It reports script and console errors, files that didn't load, broken images and a blank screen, plus warnings for slow, heavy, very tall or sideways-scrolling pages, with a screenshot URL that works for 24 hours. Checks share a daily browser budget of 3 minutes across everyone; each caller's share is 2 minutes signed in or 1 minute per IP without an account (a check takes about 10–15 seconds), plus 20 an hour and 3 a minute. When it's spent you get HTTP 429 (exit 3) until 00:00 UTC.
+It reports script and console errors, files that didn't load, broken images and a blank screen, plus warnings for slow, heavy, very tall or sideways-scrolling pages, with a screenshot URL that works for 24 hours. Checks share a daily browser budget of 10 minutes across everyone; each caller's share is 2 minutes signed in or 1 minute per IP without an account (a check takes about 10–15 seconds), plus 20 an hour and 3 a minute. When it's spent you get HTTP 429 (exit 3) until 00:00 UTC.
+
+## aired pdf
+
+```bash
+aired pdf abc123                    # saves <page-title>.pdf here
+aired pdf abc123 -o deck.pdf --notes   # a deck with a page of speaker notes after each slide
+aired pdf abc123 --paper a4         # a4 or letter
+```
+
+A deck prints one slide per page at 1280×720 (landscape). A doc or page prints on A4 or Letter with margins and page numbers: Letter by default in the US, Canada and a few other Letter countries, A4 elsewhere. `--notes` is for your own decks, signed in; an update token isn't enough. Free PDFs carry a small "Made with aired · aired.sh" line; Pro PDFs have none. It uses the stored update token, else your sign-in or `AIRED_API_KEY`.
+
+Each PDF is kept for its page version, so running it again uses no browser time until the page changes. New PDFs share 20 minutes of browser time a day across everyone (a fresh PDF takes about 10 seconds); each caller's share is 3 minutes a day on Free (about 18 PDFs) and 10 minutes on Pro (about 60), plus 60 downloads an hour and 4 new PDFs a minute. When it's spent you get HTTP 429 `pdf_budget` (exit 3) until 00:00 UTC; PDFs made before still download.
 
 ## aired feedback
 
@@ -81,10 +94,10 @@ aired feedback --kind friction --impact worked_around "aired set needed the page
 
 | Code | Meaning |
 |---|---|
-| 0 | Success |
+| 0 | Success (for `aired pdf`, the file is saved) |
 | 1 | API error; for `aired check`, only "the page is broken" |
 | 2 | Bad input, missing file or no token; for `aired check`, also no access to the page |
-| 3 | Rate limited; for `aired check`, also "the check couldn't run, try later" |
+| 3 | Rate limited; for `aired check`, also "the check couldn't run, try later"; for `aired pdf`, also a spent budget or a busy browser |
 
 A malformed `AIRED_API_KEY` stops the run with exit 2, so CI never publishes anonymously by mistake.
 

@@ -1,7 +1,7 @@
 import { USER_AGENT } from '../lib/constants.js'
 import { AUTH_HEADER, CSRF_HEADER } from '@aired/core'
 import type { User } from '@aired/core'
-import type { PublishResult, PageInfo, PageDetails, FeedbackResult, CheckReport } from './types.js'
+import type { PublishResult, PageInfo, PageDetails, FeedbackResult, CheckReport, PdfExport } from './types.js'
 import type { PageContent } from './markdown.js'
 
 /**
@@ -516,6 +516,28 @@ export async function checkPage(
     body: JSON.stringify(body),
   })
   return handleResponse<CheckReport>(resp, 'Check')
+}
+
+/**
+ * POST /api/pages/:id/pdf: make (or reuse) the page's PDF and get a link to
+ * it. As for checks: the update token, else the session or API key owns
+ * the page. Speaker notes need the signed-in owner.
+ */
+export async function exportPdf(
+  baseUrl: string,
+  id: string,
+  opts: { token: string; jwt?: string; notes?: boolean; paper?: 'a4' | 'letter' },
+): Promise<PdfExport> {
+  const body: Record<string, unknown> = {}
+  if (opts.token !== '') body['update_token'] = opts.token
+  if (opts.notes) body['notes'] = true
+  if (opts.paper !== undefined) body['paper'] = opts.paper
+  const resp = await fetch(`${baseUrl}/api/pages/${encodeURIComponent(id)}/pdf`, {
+    method: 'POST',
+    headers: { ...callerHeaders(opts.jwt), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  return handleResponse<PdfExport>(resp, 'PDF export')
 }
 
 /** One version in a page's history (GET /api/pages/:id/versions). */

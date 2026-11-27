@@ -201,7 +201,7 @@ test("the limits the skills give are the ones in the config", () => {
       `| ${mb(FREE_MAX_BYTES)} |`,
       `| ${mb(PRO_MAX_BYTES)} |`,
     ],
-    "skills/aired/references/cli.md": ["3 minutes", "2 minutes signed in", `${TIERS.page_check.limit} an hour`],
+    "skills/aired/references/cli.md": ["10 minutes", "2 minutes signed in", `${TIERS.page_check.limit} an hour`, "20 minutes of browser time", `${TIERS.pdf.limit} downloads an hour`],
     "skills/aired/references/bundling.md": [mb(FREE_MAX_BYTES), mb(PRO_MAX_BYTES)],
     "skills/aired-slides/SKILL.md": [`${mb(FREE_MAX_BYTES)} on Free (${mb(PRO_MAX_BYTES)} on Pro)`],
     "skills/aired-dashboard/SKILL.md": [
@@ -232,7 +232,8 @@ test("the limits the skills give are the ones in the config", () => {
   assert.equal(free.retentionDays, 90);
   assert.equal(pro.retentionDays, null);
   assert.equal(ACCESS_LIMITS.free.domains, 0);
-  assert.match(repo("apps/worker/src/lib/page-check.ts"), /DEFAULT_CHECK_BUDGET_MS = 3 \* 60 \* 1000;/);
+  assert.match(repo("apps/worker/src/lib/page-check.ts"), /DEFAULT_CHECK_BUDGET_MS = 10 \* 60 \* 1000;/);
+  assert.match(repo("apps/worker/src/lib/pdf-export.ts"), /DEFAULT_PDF_BUDGET_MS = 20 \* 60 \* 1000;/);
   for (const [path, strings] of Object.entries(want)) {
     const text = FILES.find((f) => f.path === path)!.text;
     for (const s of strings) assert.ok(text.includes(s), `${path} should say "${s}"`);

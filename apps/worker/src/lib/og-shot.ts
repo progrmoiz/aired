@@ -17,10 +17,12 @@
  * Pages over SHOT_MAX_BYTES get neither.
  *
  * Browser Rendering is metered: Workers Free allows 10 minutes a day, 3
- * browsers at once and 1 new browser every 20 seconds; Workers Paid includes
- * 10 hours a month, then $0.09 an hour. aired spends at most a daily budget
- * (OG_SHOT_DAILY_SECONDS, default 8 minutes) and, after a 429, stops trying
- * until the limit lifts. A page that misses out keeps the card: no retries.
+ * browsers at once and 1 new browser every 20 seconds; Workers Paid (the
+ * account's plan) includes 10 hours a month, then $0.09 an hour, and 10
+ * browsers at once. aired spends at most a daily budget across screenshots,
+ * checks and PDFs (OG_SHOT_DAILY_SECONDS, default 40 minutes: at most 20
+ * hours a month, about $0.90 over the included time) and, after a 429, stops
+ * trying until the limit lifts. A page that misses out keeps the card: no retries.
  */
 
 import { PRODUCTION_ORIGIN } from "./origin.ts";
@@ -48,8 +50,13 @@ export const RENDER_TIMEOUT_MS = 15_000;
 /** How long to wait for the page's load event before taking the shot anyway. */
 export const LOAD_TIMEOUT_MS = 8_000;
 
-/** Default daily browser time for screenshots: 8 of Workers Free's 10 minutes. */
-export const DEFAULT_DAILY_BUDGET_MS = 8 * 60 * 1000;
+/**
+ * Default daily browser time for everything (screenshots, checks, PDFs): 40
+ * minutes. Workers Paid includes 10 hours a month (20 minutes a day); a month
+ * at the cap is 20 hours, about $0.90 more. On Workers Free set
+ * OG_SHOT_DAILY_SECONDS to 480 (8 of its 10 minutes).
+ */
+export const DEFAULT_DAILY_BUDGET_MS = 40 * 60 * 1000;
 
 /** After a 429 that isn't the daily limit (too many browsers, or one too soon). */
 export const RATE_LIMIT_BACKOFF_MS = 60_000;

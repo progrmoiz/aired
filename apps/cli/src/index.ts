@@ -15,6 +15,7 @@ import { makeClaimCommand } from './commands/claim.js'
 import { makeSetCommand } from './commands/set.js'
 import { makeFeedbackCommand } from './commands/feedback.js'
 import { makeCheckCommand } from './commands/check.js'
+import { makePdfCommand } from './commands/pdf.js'
 import { makeNewCommand } from './commands/new.js'
 import { makeRestoreCommand, makeVersionsCommand } from './commands/versions.js'
 
@@ -78,6 +79,7 @@ if (process.argv.includes('--mcp')) {
   program.addCommand(makeClaimCommand(getGlobalOpts))
   program.addCommand(makeSetCommand(getGlobalOpts))
   program.addCommand(makeCheckCommand(getGlobalOpts))
+  program.addCommand(makePdfCommand(getGlobalOpts))
   program.addCommand(makeFeedbackCommand(getGlobalOpts))
   program.addCommand(makeNewCommand(getGlobalOpts))
   program.addCommand(makeVersionsCommand(getGlobalOpts))

@@ -49,6 +49,19 @@ import {
   type CheckObservations,
   type CheckViewport,
 } from "./page-check.ts";
+import { BrowserUnavailable, laneGate, reserveLaneTime, settleLaneTime } from "./browser-budget.ts";
+import {
+  PDF_BUDGET_ROW,
+  PDF_LOAD_TIMEOUT_MS,
+  PDF_RESERVE_MS,
+  PDF_TIMEOUT_MS,
+  pdfLane,
+  pdfOptions,
+  pdfPrefix,
+  type PdfBudgetVars,
+  type PdfCallerTier,
+  type PdfVariant,
+} from "./pdf-export.ts";
 
 /**
  * Draws pages with Cloudflare Browser Rendering (rules in og-shot.ts): the
@@ -102,13 +115,27 @@ export async function refreshShot(
   await renderShots(env, [{ id, page, html, htmlEtag }]);
 }
 
-/** Remove a page's images, its check screenshots and its page_shots row (update, delete). */
+/** Remove a page's images, its check screenshots, its cached PDFs and its page_shots row (update, delete). */
 export async function forgetShots(env: Pick<ShotEnv, "PAGES_BUCKET" | "DB">, id: string): Promise<void> {
   await Promise.all([
     env.PAGES_BUCKET.delete([shotKey(id), tileKey(id)]),
     deleteCheckShots(env.PAGES_BUCKET, id, () => true),
+    deletePrefix(env.PAGES_BUCKET, pdfPrefix(id)),
     env.DB.prepare("DELETE FROM page_shots WHERE id = ?").bind(id).run(),
   ]);
+}
+
+/** Delete every object under a prefix (a page's cached PDFs). */
+async function deletePrefix(bucket: R2Bucket, prefix: string): Promise<void> {
+  let cursor: string | undefined;
+  for (let i = 0; i < 20; i++) {
+    const listed = await bucket.list({ prefix, limit: 1000, ...(cursor !== undefined ? { cursor } : {}) });
+    const keys = listed.objects.map((o) => o.key);
+    if (keys.length > 0) await bucket.delete(keys);
+    if (!listed.truncated) return;
+    cursor = (listed as { cursor?: string }).cursor;
+    if (cursor === undefined) return;
+  }
 }
 
 /** Delete a page's check screenshots that `drop` picks (all on update or delete; old ones after a check). */
@@ -335,6 +362,77 @@ export async function checkPage(
   } finally {
     await browser.close().catch(() => {});
     await settle();
+  }
+}
+
+export type PdfEnv = ShotEnv & PdfBudgetVars;
+
+/**
+ * PDF export (rules in pdf-export.ts): print `html` (the stored page as
+ * printHtml prepared it) the way the variant says. Gates on the PDFs' share
+ * of the browser budget and this caller's, reserves the longest a render can
+ * take, and settles to the real time after. Throws BrowserUnavailable when
+ * the browser can't run now, any other error when the render failed.
+ */
+export async function renderPdf(
+  env: PdfEnv,
+  id: string,
+  html: string,
+  variant: PdfVariant,
+  caller: { key: string; tier: PdfCallerTier },
+): Promise<Uint8Array> {
+  if (env.BROWSER === undefined) throw new BrowserUnavailable("no_browser", null);
+  const lane = pdfLane(env, caller.tier);
+  await laneGate(env.DB, lane, caller.key, Date.now());
+  let reserved: number;
+  try {
+    reserved = await reserveLaneTime(env.DB, lane, caller.key, PDF_RESERVE_MS, Date.now());
+  } catch (err) {
+    console.error("pdf budget write failed", { err: String(err) });
+    throw new BrowserUnavailable("storage", 30);
+  }
+
+  const started = Date.now();
+  const settle = () =>
+    settleLaneTime(env.DB, lane, caller.key, reserved, Date.now() - started, Date.now()).catch((err) =>
+      console.error("pdf budget write failed", { err: String(err) }),
+    );
+  let browser: Browser;
+  try {
+    browser = await puppeteer.launch(env.BROWSER);
+  } catch (err) {
+    await settle();
+    const until = blockAfterError(String(err), Date.now());
+    const daily = /time limit exceeded/i.test(String(err));
+    // The account's daily limit stops everything; "too many browsers" only holds back PDFs.
+    if (until !== null) await setBlocked(env.DB, until, daily ? BUDGET_ROW : PDF_BUDGET_ROW).catch(() => {});
+    console.log({ event: "pdf_skipped", id, reason: daily ? "daily_limit" : until !== null ? "limit" : "launch", err: String(err) });
+    const wait = until !== null ? Math.max(1, Math.ceil((until - Date.now()) / 1000)) : 60;
+    throw new BrowserUnavailable(daily ? "budget" : "busy", wait);
+  }
+  try {
+    return await withTimeout(printPage(browser, renderOrigin(siteOrigin(env)), id, html, variant, blockedHosts(env)), PDF_TIMEOUT_MS);
+  } finally {
+    await browser.close().catch(() => {});
+    await settle();
+  }
+}
+
+async function printPage(browser: Browser, origin: string, id: string, html: string, variant: PdfVariant, extraHosts: string[]): Promise<Uint8Array> {
+  const page = await browser.newPage();
+  try {
+    // Decks lay out at their slide size; docs and pages at a laptop's width (print CSS takes over for the paper).
+    await page.setViewport(variant.kind === "deck" ? { width: 1280, height: 720, deviceScaleFactor: 1 } : { width: 1280, height: 900, deviceScaleFactor: 1 });
+    const url = await serveStoredPage(page, origin, id, html, undefined, extraHosts);
+    // A slow image or font shouldn't cost the PDF: print what loaded.
+    await page.goto(url, { waitUntil: "load", timeout: PDF_LOAD_TIMEOUT_MS }).catch(() => {});
+    await page
+      .evaluate("Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 2000))]).then(() => true)")
+      .catch(() => {});
+    await sleep(400);
+    return (await page.pdf(pdfOptions(variant) as Parameters<BrowserPage["pdf"]>[0])) as Uint8Array;
+  } finally {
+    await page.close().catch(() => {});
   }
 }
 

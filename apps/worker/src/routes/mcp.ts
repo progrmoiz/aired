@@ -39,6 +39,10 @@ import {
   type ToolResult,
 } from "../lib/mcp-account.js";
 import {
+  EXPORT_PDF_DESCRIPTION,
+  exportPdfInput,
+  exportPdfOut,
+  exportPdfText,
   CHECK_DESCRIPTION,
   FEEDBACK_DESCRIPTION,
   contentOut,
@@ -126,7 +130,7 @@ export function createAiredMcpServer(
 ) {
   const server = new McpServer({
     name: "aired",
-    version: "1.8.0",
+    version: "1.9.0",
   });
   const origin = siteOrigin(env);
 
@@ -523,6 +527,35 @@ export function createAiredMcpServer(
       });
       if (res.status === 200) return { content: checkContent(res.body, withImage), structuredContent: checkOut(res.body) };
       // Not "wait before publishing again": a busy browser or a spent budget isn't about publishing.
+      if (res.status === 429 || res.status === 503) return errorText(String((res.body as { error?: unknown } | null)?.error ?? `The aired API answered ${res.status}.`));
+      return apiErrorResult(res.status, res.body, origin);
+    },
+  );
+
+  server.registerTool(
+    "export_pdf",
+    {
+      title: "Export a page as a PDF",
+      description: EXPORT_PDF_DESCRIPTION,
+      inputSchema: exportPdfInput,
+      outputSchema: outputShapes.export_pdf,
+      annotations: { title: "Export a page as a PDF", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    async ({ id, update_token, notes, paper }) => {
+      if (!PAGE_ID.test(id)) return badId();
+      if (signedIn === null && update_token === undefined) {
+        return errorText(`Pass the page's update_token, or sign in. ${signInRequiredText(origin)}`);
+      }
+      const res = await callApi("POST", `/api/pages/${encodeURIComponent(id)}/pdf`, {
+        ...(update_token !== undefined ? { update_token } : {}),
+        ...(notes !== undefined ? { notes } : {}),
+        ...(paper !== undefined ? { paper } : {}),
+      });
+      if (res.status === 200) {
+        const out = exportPdfOut(res.body);
+        return { content: [{ type: "text" as const, text: exportPdfText(out) }], structuredContent: out };
+      }
+      // A busy browser or a spent budget isn't about publishing.
       if (res.status === 429 || res.status === 503) return errorText(String((res.body as { error?: unknown } | null)?.error ?? `The aired API answered ${res.status}.`));
       return apiErrorResult(res.status, res.body, origin);
     },

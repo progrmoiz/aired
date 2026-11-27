@@ -31,6 +31,7 @@ export const pageShape = {
   created_at: nullableString,
   expires_at: nullableString.describe("ISO time, or null when permanent"),
   project: nullableString,
+  allow_pdf: z.boolean().optional().describe("Whether viewers get a Download PDF button (you always can, with export_pdf)"),
 };
 
 /** What a publish made, when it isn't a plain HTML page: a Markdown doc, or a deck. */
@@ -194,6 +195,20 @@ export const outputShapes = {
     cursor: nullableString.describe("Pass to get_responses for the next, older entries; null at the end"),
     csv: nullableString.describe('These entries as CSV, when format was "csv"'),
   },
+  export_pdf: {
+    id: z.string(),
+    url: z.string().describe("The page itself"),
+    download_url: z.string().describe("The PDF; works for 15 minutes, for whoever has the link. Give it to the user or download it"),
+    expires_at: z.string(),
+    filename: z.string(),
+    bytes: z.number(),
+    pages: z.number().describe("Pages in the PDF (a deck: one per slide, plus notes pages)"),
+    kind: z.enum(["page", "doc", "deck"]),
+    paper: z.enum(["a4", "letter"]).nullable().describe("null for a deck, which prints at its slide size"),
+    notes: z.boolean().describe("Speaker notes pages included"),
+    footer: z.boolean().describe('Has the small "Made with aired" line (free plan); Pro PDFs have none'),
+    cached: z.boolean().describe("Made before for this version: no browser time used"),
+  },
   update_data: {
     id: z.string(),
     url: z.string(),
@@ -216,6 +231,7 @@ export type FeedbackOut = Shape<typeof outputShapes.send_feedback>;
 export type CheckOut = Shape<typeof outputShapes.check_page>;
 export type ResponsesOut = Shape<typeof outputShapes.get_responses>;
 export type UpdateDataOut = Shape<typeof outputShapes.update_data>;
+export type ExportPdfOut = Shape<typeof outputShapes.export_pdf>;
 export type ListVersionsOut = Shape<typeof outputShapes.list_versions>;
 export type RestoreVersionOut = Shape<typeof outputShapes.restore_version>;
 
@@ -241,6 +257,7 @@ export function pageOut(body: unknown, origin: string): PageOut {
     created_at: str(p.createdAt),
     expires_at: str(p.expiresAt),
     project: str(p.project),
+    ...(typeof p.allowPdf === "boolean" ? { allow_pdf: p.allowPdf } : {}),
   };
 }
 
@@ -375,6 +392,7 @@ export function pageText(p: PageOut & { allowed?: { emails: string[]; domains: s
     ...(people.length > 0 ? [`People: ${people.join(", ")}`] : []),
     p.expires_at !== null ? `Expires: ${p.expires_at}` : "Expires: never (permanent)",
     `Size: ${p.size} bytes`,
+    ...(p.allow_pdf !== undefined ? [`Viewers can download a PDF: ${p.allow_pdf ? "yes" : "no"}`] : []),
     ...(p.project !== null ? [`Project: ${p.project}`] : []),
   ].join("\n");
 }
@@ -399,6 +417,7 @@ export const setOptionsInput = {
       'Who can open the page. "people": only these emails, and anyone at these domains (like "client.com"); each person types their email and gets a one-time code, and the page stays private. ' +
         'Sending a list replaces the old one. "public": anyone with the link (removes the PIN and the list). "pin": the PIN in `pin`. Your own pages only, signed in. Free lists 3 people; whole domains need Pro',
     ),
+  allow_pdf: z.boolean().optional().describe("true puts a Download PDF button on the page for viewers (not on pages with a view limit); false (the default) leaves PDFs to you, with export_pdf"),
   public_results: z.boolean().optional().describe("Data layer: true lets every viewer read all entries with aired.collect.all(), as for a poll. Needs sign-in"),
   accept_responses: z.boolean().optional().describe("Data layer: false stops new entries (close a form or poll), true opens it again. Needs sign-in"),
 };
@@ -519,7 +538,7 @@ export function collectPatchBody(args: { public_results?: boolean; accept_respon
 
 /** Whether set_options changes any page setting (not just the data-layer ones). */
 export function changesPageSettings(args: Record<string, unknown>): boolean {
-  return ["title", "pin", "ttl_seconds", "permanent", "view_limit", "access"].some((k) => args[k] !== undefined);
+  return ["title", "pin", "ttl_seconds", "permanent", "view_limit", "access", "allow_pdf"].some((k) => args[k] !== undefined);
 }
 
 /** set_options arguments as a PATCH /api/pages/:id body. */
@@ -530,6 +549,7 @@ export function patchBody(args: {
   permanent?: boolean;
   view_limit?: number | null;
   access?: { mode: "public" | "pin" | "people"; emails?: string[]; domains?: string[] };
+  allow_pdf?: boolean;
   update_token?: string;
 }): Record<string, unknown> {
   const body: Record<string, unknown> = {};
@@ -539,6 +559,7 @@ export function patchBody(args: {
   if (args.permanent !== undefined) body.permanent = args.permanent;
   if (args.view_limit !== undefined) body.reads = args.view_limit;
   if (args.access !== undefined) body.access = args.access;
+  if (args.allow_pdf !== undefined) body.allow_pdf = args.allow_pdf;
   if (args.update_token !== undefined) body.update_token = args.update_token;
   return body;
 }
@@ -586,6 +607,51 @@ export function checkContent(body: unknown, withImage: boolean): ({ type: "text"
     { type: "text", text: reportText(out as unknown as CheckReport) },
     ...(withImage && typeof img === "string" && img !== "" ? [{ type: "image" as const, data: img, mimeType: "image/jpeg" }] : []),
   ];
+}
+
+// --- PDF export (export_pdf) ----------------------------------------------------
+
+/** Input for export_pdf, the same on both servers. */
+export const exportPdfInput = {
+  id: z.string().describe("Page id, from publish_html or list_pages"),
+  update_token: z.string().optional().describe("The page's update token. Not needed for pages your account owns"),
+  notes: z.boolean().optional().describe("Decks: add a page of speaker notes after each slide that has some. Your own decks only, signed in"),
+  paper: z.enum(["a4", "letter"]).optional().describe("Docs and pages: the paper size (default: Letter in the US and Canada, A4 elsewhere). Decks print one slide per landscape page"),
+};
+
+export const EXPORT_PDF_DESCRIPTION =
+  "Turn a published page into a PDF and get a download link that works for 15 minutes: a deck prints one slide per landscape page, a doc or page as A4 or Letter with page numbers. " +
+  "Use it when the user wants an attachment, a file to email, or something to print. Speaker notes are never included unless you ask for notes on your own deck. " +
+  "Free PDFs carry a small \"Made with aired\" line; Pro PDFs don't. The PDF is kept per version, so asking again is free until the page changes. " +
+  "For your own pages, or any page whose update_token you pass. To let viewers download it themselves, set allow_pdf with set_options.";
+
+/** POST /api/pages/:id/pdf. */
+export function exportPdfOut(body: unknown): ExportPdfOut {
+  const b = obj(body);
+  const kind = b.kind === "deck" || b.kind === "doc" ? b.kind : "page";
+  return {
+    id: String(b.id ?? ""),
+    url: String(b.url ?? ""),
+    download_url: String(b.download_url ?? ""),
+    expires_at: String(b.expires_at ?? ""),
+    filename: String(b.filename ?? ""),
+    bytes: num(b.bytes) ?? 0,
+    pages: num(b.pages) ?? 0,
+    kind,
+    paper: b.paper === "a4" || b.paper === "letter" ? b.paper : null,
+    notes: b.notes === true,
+    footer: b.footer === true,
+    cached: b.cached === true,
+  };
+}
+
+export function exportPdfText(p: ExportPdfOut): string {
+  const what = p.kind === "deck" ? `${p.pages} pages (one per slide${p.notes ? ", plus speaker notes" : ""})` : `${p.pages} page${p.pages === 1 ? "" : "s"}, ${p.paper === "letter" ? "Letter" : "A4"}`;
+  return [
+    `PDF of ${p.url}: ${p.filename}, ${what}, ${Math.max(1, Math.round(p.bytes / 1024))} KB${p.cached ? " (made before, no browser time used)" : ""}.`,
+    `Download (works until ${p.expires_at}): ${p.download_url}`,
+    ...(p.footer ? ['It has a small "Made with aired" line; Pro PDFs have none.'] : []),
+  ].join("\n");
 }
 
 // --- Page history (list_versions, restore_version) --------------------------

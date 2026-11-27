@@ -21,6 +21,7 @@ import { hashToHex } from "@aired/core";
 import { dataLayerFor, VIEWER_COOKIE } from "../lib/collect-page.ts";
 import { accessGate, logVisit } from "./access.ts";
 import { gateMaterial } from "../lib/access-list.ts";
+import { viewerPdfHref } from "../lib/pdf-export.ts";
 
 /** A page that has used up its view limit. */
 function viewLimitReached(): Response {
@@ -164,6 +165,16 @@ viewer.get("/p/:id", async (c) => {
     if (dataLayer.setCookie !== null) headers.append("Set-Cookie", dataLayer.setCookie);
   }
 
+  // The owner's "let viewers download a PDF" (lib/pdf-export.ts). A PIN
+  // page's link carries a grant, so the response is never cached.
+  const pdfHref = await viewerPdfHref(
+    siteOrigin(c.env),
+    { id, pin: metadata.pin, allowPdf: metadata.allowPdf === true, reads: metadata.reads },
+    c.env.SESSION_SECRET,
+    Math.floor(now / 1000),
+  ).catch(() => null);
+  if (pdfHref !== null && metadata.pin !== null) headers.set("Cache-Control", "private, no-store");
+
   // The shim must run before page scripts, so it goes in after the bar's
   // own <head> injection.
   const wrappedHtml = injectEarlyScript(
@@ -175,6 +186,7 @@ viewer.get("/p/:id", async (c) => {
       badge,
       // Changes with every update, so previews fetch the new screenshot.
       imageVersion: versionFromEtag(obj.etag),
+      pdfHref,
     }),
     SANDBOX_SHIM + (dataLayer?.script ?? ""),
   );

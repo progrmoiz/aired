@@ -48,6 +48,10 @@ export const TIERS = {
   // daily browser budget (lib/page-check.ts) is the real cap; CHECK_BURST
   // adds a per-minute guard per caller, signed in or not.
   page_check:    { bucketPrefix: 'rl:check',  limit: 20, windowSeconds: 3600 },
+  // PDF downloads (GET /p/:id/pdf, POST /api/pages/:id/pdf), cached or not,
+  // per caller. New renders also count against the PDFs' daily browser time
+  // (lib/pdf-export.ts) and PDF_BURST's per-minute guard.
+  pdf:           { bucketPrefix: 'rl:pdf',    limit: 60, windowSeconds: 3600 },
   // Agent feedback (POST /api/feedback), in front of the D1 limit of 10 an
   // hour (lib/feedback.ts), so a flood never reaches D1. Anonymous senders
   // also get REPORT_BURST's per-minute guard.

@@ -61,8 +61,9 @@ test("the daily budget reads OG_SHOT_DAILY_SECONDS, with 0 turning screenshots o
   assert.equal(dailyBudgetMs("1200"), 1_200_000);
   assert.equal(dailyBudgetMs("0"), 0);
   assert.equal(budgetAllows(null, NOW, 0), false);
-  // The default stays inside Workers Free's 10 minutes a day.
-  assert.ok(DEFAULT_DAILY_BUDGET_MS < 10 * 60 * 1000);
+  // Workers Paid: a whole month at the default cap stays near the included 10
+  // hours (at most 21 hours, about $1 more at $0.09 an hour).
+  assert.ok((DEFAULT_DAILY_BUDGET_MS * 31) / 3_600_000 <= 21);
 });
 
 test("the budget stops screenshots once today's time is spent, and resets on the next UTC day", () => {

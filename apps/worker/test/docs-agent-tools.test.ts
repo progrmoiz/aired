@@ -49,10 +49,10 @@ test("the docs cover aired set, aired feedback and their endpoints", () => {
   assert.match(read("apps/web/llms.txt"), /10 an hour per caller/);
 });
 
-test("the CLI, its MCP server and the registry entry say 1.8.0", () => {
-  assert.equal(JSON.parse(read("apps/cli/package.json")).version, "1.8.0");
-  assert.equal(JSON.parse(read("server.json")).version, "1.8.0");
-  assert.match(read("apps/worker/src/routes/mcp.ts"), /name: "aired",\s*version: "1\.8\.0",/);
+test("the CLI, its MCP server and the registry entry say 1.9.0", () => {
+  assert.equal(JSON.parse(read("apps/cli/package.json")).version, "1.9.0");
+  assert.equal(JSON.parse(read("server.json")).version, "1.9.0");
+  assert.match(read("apps/worker/src/routes/mcp.ts"), /name: "aired",\s*version: "1\.9\.0",/);
 });
 
 test("the docs cover aired check, check_page, its endpoint, the prompts and the resources", async () => {
@@ -66,9 +66,26 @@ test("the docs cover aired check, check_page, its endpoint, the prompts and the 
     for (const want of ["/api/pages/:id/check", "/api/pages/:id/source", "check_budget"]) assert.ok(s.includes(want), `${f} misses ${want}`);
   }
   // The limits the docs give are the ones the code has.
-  assert.match(read("apps/worker/src/lib/page-check.ts"), /DEFAULT_CHECK_BUDGET_MS = 3 \* 60 \* 1000;/);
+  assert.match(read("apps/worker/src/lib/page-check.ts"), /DEFAULT_CHECK_BUDGET_MS = 10 \* 60 \* 1000;/);
   assert.match(read("apps/worker/src/lib/mcp-extras.ts"), /RESOURCE_LIST_MAX = 50;/);
-  for (const f of [SKILLS, "apps/web/docs.html", "apps/web/llms-full.txt"]) assert.match(read(f), /3 minutes/, f);
+  for (const f of [SKILLS, "apps/web/docs.html", "apps/web/llms-full.txt"]) assert.match(read(f), /10 minutes/, f);
+});
+
+test("the docs cover aired pdf, export_pdf, allow_pdf, the PDF endpoints and the PDF budget", () => {
+  for (const f of [SKILLS, "apps/web/docs.html", "apps/web/llms.txt", "apps/web/llms-full.txt"]) {
+    const s = read(f);
+    for (const want of ["aired pdf", "export_pdf", "allow_pdf", "--allow-pdf", "pdf_budget", "download_url"]) assert.ok(s.includes(want), `${f} misses ${want}`);
+  }
+  for (const f of ["apps/web/docs.html", "apps/web/llms.txt", "apps/web/llms-full.txt"]) {
+    const s = read(f);
+    for (const want of ["/api/pages/:id/pdf", "/p/:id/pdf", "pdf_busy", "owner_required"]) assert.ok(s.includes(want), `${f} misses ${want}`);
+  }
+  // The PDF budget the docs give is the one the code has.
+  assert.match(read("apps/worker/src/lib/pdf-export.ts"), /DEFAULT_PDF_BUDGET_MS = 20 \* 60 \* 1000;/);
+  for (const f of [SKILLS, "apps/web/docs.html", "apps/web/llms.txt", "apps/web/llms-full.txt"]) assert.match(read(f), /20 minutes of browser time/, f);
+  // The download link lasts 15 minutes too, and the agent manifest lists the tool.
+  assert.match(read("apps/worker/src/lib/mcp-shapes.ts"), /download_url: z\.string\(\)\.describe\("The PDF; works for 15 minutes/);
+  assert.ok((JSON.parse(read("apps/web/.well-known/agent.json")) as { mcp: { tools: string[] } }).mcp.tools.includes("export_pdf"));
 });
 
 test("the docs cover Markdown, decks, speaker notes, templates and the slides guide", async () => {

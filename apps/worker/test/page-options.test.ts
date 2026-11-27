@@ -165,6 +165,7 @@ test("details never include the PIN or token, only whether a PIN is on", () => {
     createdAt: new Date(NOW - HOUR).toISOString(),
     expiresAt: new Date(NOW + 24 * HOUR).toISOString(),
     project: "q4",
+    allowPdf: false,
   });
   assert.ok(!JSON.stringify(d).includes("pbkdf2"));
   assert.ok(!JSON.stringify(d).includes("h_p1"));

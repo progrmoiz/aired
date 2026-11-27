@@ -95,7 +95,7 @@
   "mcp": {
     "transport": "http",
     "url": "https://aired.sh/mcp",
-    "tools": ["publish_html", "get_page", "set_options", "list_versions", "restore_version", "check_page", "send_feedback", "list_pages", "update_page", "delete_page", "get_responses", "update_data", "get_account", "get_template"],
+    "tools": ["publish_html", "get_page", "set_options", "list_versions", "restore_version", "check_page", "export_pdf", "send_feedback", "list_pages", "update_page", "delete_page", "get_responses", "update_data", "get_account", "get_template"],
     "prompts": ["publish_report", "make_slide_deck", "share_privately", "check_and_fix"],
     "resources": ["skill://aired/SKILL.md", "skill://aired/references/cli.md", "skill://aired/references/mcp.md", "skill://aired/references/bundling.md", "skill://aired/references/troubleshooting.md", "skill://aired/aired-slides/SKILL.md", "skill://aired/aired-dashboard/SKILL.md", "skill://aired/aired-report/SKILL.md", "skill://aired/aired-forms/SKILL.md", "aired://page/{id}"]
   },

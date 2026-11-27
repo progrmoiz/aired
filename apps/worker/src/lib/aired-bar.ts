@@ -7,6 +7,11 @@
  * default) and a light one (on light pages), so it never looks pasted on.
  * Hover (or tap, on touch screens) reveals the view count and a report link.
  * Pages owned by a Pro account get the OG tags only (badge: false).
+ *
+ * When the owner lets viewers download a PDF (allow_pdf, lib/pdf-export.ts),
+ * the badge gets a "PDF" button, always visible; a Pro page, which has no
+ * badge, gets a small "Download PDF" button of its own in the same corner.
+ * Neither is printed.
  */
 
 export interface AiredBarOptions {
@@ -19,6 +24,8 @@ export interface AiredBarOptions {
   badge?: boolean;
   /** Added to the og:image URL as ?v= (og-shot.ts versionFromEtag). */
   imageVersion?: string;
+  /** The viewer's PDF download link (lib/pdf-export.ts viewerPdfHref), or null for none. */
+  pdfHref?: string | null;
 }
 
 export const badgeHref = (origin: string): string => `${origin}/?ref=badge`;
@@ -28,9 +35,8 @@ export function injectAiredBar(html: string, opts: AiredBarOptions): string {
   const ogTags = renderOgTags(opts);
   let out = html.replace(/<\/head>/i, `${ogTags}\n</head>`);
   if (out === html) out = ogTags + "\n" + html;
-  if (opts.badge === false) return out;
-
-  const bar = renderAiredBar(opts);
+  const bar = opts.badge === false ? (opts.pdfHref ? renderPdfButton(opts.pdfHref) : "") : renderAiredBar(opts);
+  if (bar === "") return out;
   const barOut = out.replace(/<\/body>/i, `${bar}\n</body>`);
   return barOut === out ? out + bar : barOut;
 }
@@ -51,7 +57,26 @@ export function renderOgTags({ origin, id, title, imageVersion }: AiredBarOption
   <meta name="twitter:image" content="${ogImageUrl}" />`;
 }
 
-export function renderAiredBar({ origin, id, readCount }: AiredBarOptions): string {
+const PDF_ICON = `<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/></svg>`;
+
+/** The download button on a page with no badge (Pro owners). */
+export function renderPdfButton(href: string): string {
+  return `
+<!-- aired pdf -->
+<style>
+  #__aired-pdf { all: initial; position: fixed; bottom: 14px; right: 14px; z-index: 2147483647; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 8px; box-sizing: border-box; cursor: pointer;
+    font: 500 12px/1 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; -webkit-font-smoothing: antialiased; white-space: nowrap;
+    background: rgba(255, 255, 255, 0.9); color: rgba(10, 10, 11, 0.78); border: 1px solid rgba(10, 10, 11, 0.12);
+    box-shadow: 0 1px 2px rgba(10, 10, 11, 0.06), 0 6px 20px rgba(10, 10, 11, 0.08); backdrop-filter: saturate(160%) blur(14px); -webkit-backdrop-filter: saturate(160%) blur(14px); }
+  #__aired-pdf:hover { color: #0a0a0b; }
+  #__aired-pdf:focus-visible { outline: 2px solid #7c6aef; outline-offset: 2px; }
+  #__aired-pdf svg { width: 13px; height: 13px; flex: none; }
+  @media print { #__aired-pdf { display: none; } }
+</style>
+<a id="__aired-pdf" href="${escapeAttr(href)}" rel="nofollow" aria-label="Download this page as a PDF">${PDF_ICON}<span>Download PDF</span></a>`;
+}
+
+export function renderAiredBar({ origin, id, readCount, pdfHref }: AiredBarOptions): string {
   const views = `${readCount.toLocaleString("en-US")} view${readCount !== 1 ? "s" : ""}`;
   return `
 <!-- aired badge -->
@@ -103,11 +128,16 @@ export function renderAiredBar({ origin, id, readCount }: AiredBarOptions): stri
   #__aired-bar .__aired-views { font-variant-numeric: tabular-nums; }
   #__aired-bar .__aired-report { opacity: 0.8; }
   #__aired-bar .__aired-report:hover { opacity: 1; text-decoration: underline; }
+  #__aired-bar .__aired-pdf { gap: 5px; margin-left: 8px; padding-left: 8px; border-left: 1px solid currentColor; border-left-color: rgba(127, 127, 127, 0.35); font-weight: 600; }
+  #__aired-bar .__aired-pdf svg { color: inherit; }
+  #__aired-bar .__aired-pdf:hover { color: #ededef; }
+  #__aired-bar.is-light .__aired-pdf:hover { color: #0a0a0b; }
   @media (prefers-reduced-motion: reduce) { #__aired-bar, #__aired-bar .__aired-meta { transition: none; } }
   @media print { #__aired-bar { display: none; } }
 </style>
 <div id="__aired-bar" role="complementary" aria-label="Shared with aired">
-  <a href="${badgeHref(origin)}" target="_blank" rel="noopener" class="__aired-brand"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span>Shared with <b>aired</b></span></a>
+  <a href="${badgeHref(origin)}" target="_blank" rel="noopener" class="__aired-brand"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span>Shared with <b>aired</b></span></a>${pdfHref ? `
+  <a href="${escapeAttr(pdfHref)}" rel="nofollow" class="__aired-pdf" aria-label="Download this page as a PDF">${PDF_ICON}<span>PDF</span></a>` : ""}
   <span class="__aired-meta">
     <span class="__aired-sep"></span>
     <span class="__aired-views">${views}</span>

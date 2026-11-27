@@ -114,7 +114,7 @@ test("check: the owner (account or update token) gets through to the browser", a
 test("check: a spent daily budget answers 429 with Retry-After and never launches a browser", async () => {
   let launched = 0;
   const { call, db } = await setup({ user: kim, browser: { launch: async () => { launched++; throw new Error("no"); } } });
-  await addSpent(db as never, 3 * 60 * 1000, Date.now(), "check");
+  await addSpent(db as never, 10 * 60 * 1000, Date.now(), "check");
   const res = await call("POST", "/api/pages/mine/check", {}, ip());
   assert.equal(res.status, 429);
   const body = (await res.json()) as { code: string; error: string };

@@ -51,6 +51,8 @@ export interface PageDetails {
   createdAt: string
   expiresAt: string | null
   project: string | null
+  /** Viewers get a Download PDF button. Absent from servers before PDF export. */
+  allowPdf?: boolean
   /** PATCH only: the settings that changed. */
   changed?: string[]
 }
@@ -61,6 +63,22 @@ export interface FeedbackResult {
 }
 
 /** POST /api/pages/:id/check: what a browser saw on the page (check_page). */
+/** POST /api/pages/:id/pdf: a link to the PDF, for 15 minutes. */
+export interface PdfExport {
+  id: string
+  url: string
+  download_url: string
+  expires_at: string
+  filename: string
+  bytes: number
+  pages: number
+  kind: 'page' | 'doc' | 'deck'
+  paper: 'a4' | 'letter' | null
+  notes: boolean
+  footer: boolean
+  cached: boolean
+}
+
 export interface CheckReport {
   id: string
   url: string

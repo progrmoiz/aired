@@ -77,10 +77,14 @@ export type Env = {
   WORKOS_API_BASE?: string;
   /** Browser Rendering (wrangler.toml [browser]), for link-preview screenshots. Unset: cards only. */
   BROWSER?: Fetcher;
-  /** Daily browser time for screenshots, in seconds (lib/og-shot.ts). Default 480; "0" turns them off. */
+  /** Daily browser time for all browser work (screenshots, checks, PDFs), in seconds (lib/og-shot.ts). Default 2400; "0" turns it all off. */
   OG_SHOT_DAILY_SECONDS?: string;
-  /** Daily browser time for check_page, in seconds, inside OG_SHOT_DAILY_SECONDS (lib/page-check.ts). Default 180; "0" turns checks off. */
+  /** Daily browser time for check_page, in seconds, inside OG_SHOT_DAILY_SECONDS (lib/page-check.ts). Default 600; "0" turns checks off. */
   CHECK_DAILY_SECONDS?: string;
+  /** Daily browser time for PDF export, in seconds, inside OG_SHOT_DAILY_SECONDS (lib/pdf-export.ts). Default 1200; "0" turns new PDFs off (cached ones still download). */
+  PDF_DAILY_SECONDS?: string;
+  /** Workers Rate Limiting binding: new PDF renders per caller per minute (routes/pdf.ts). */
+  PDF_BURST?: { limit(options: { key: string }): Promise<{ success: boolean }> };
   /** Workers Rate Limiting binding: data-layer calls per network per minute (routes/collect.ts). */
   COLLECT_BURST?: RateLimit;
   /** Workers Rate Limiting binding: page checks per caller per minute (routes/page-tools.ts). */

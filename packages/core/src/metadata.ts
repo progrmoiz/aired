@@ -19,6 +19,11 @@ export type PageMetadata = {
    * Copied from the D1 row whenever the record is rebuilt.
    */
   access?: "people" | null;
+  /**
+   * Viewers may download the page as a PDF (the worker's lib/pdf-export.ts).
+   * Absent or false: only the owner can. Copied from the D1 row.
+   */
+  allowPdf?: boolean;
 };
 
 export function serializeMetadata(meta: PageMetadata): string {
@@ -56,6 +61,7 @@ export function parseMetadata(raw: string): PageMetadata | null {
       ownerId: typeof obj["ownerId"] === "number" ? obj["ownerId"] : null,
       project: typeof obj["project"] === "string" ? obj["project"] : null,
       access: obj["access"] === "people" ? "people" : null,
+      allowPdf: obj["allowPdf"] === true,
     };
   } catch {
     return null;

@@ -17,10 +17,11 @@
 | `publish_html` | nothing | Publish `html` or `markdown`, with `deck`, `title`, `pin`, `ttl_seconds`, `permanent`; `id` + `update_token` to update (owner: `id` alone); `message` labels the version; `file_path` and `project` on the local server |
 | `get_template` | nothing | Starters: `deck`, `deck-html`, `report`, `one-pager` (no name lists them) |
 | `get_page` | owner, or the `update_token` | Title, URL, size, views, view limit, expiry, project, PIN on or off, doc or deck, live `version`; `include_source` adds the Markdown or HTML as published and a deck's notes |
-| `set_options` | owner, or the `update_token` | Change `pin` (null removes), `ttl_seconds` or `permanent`, `view_limit` (null removes), `title`; signed in: `access`, `public_results`, `accept_responses` |
+| `set_options` | owner, or the `update_token` | Change `pin` (null removes), `ttl_seconds` or `permanent`, `view_limit` (null removes), `title`, `allow_pdf` (viewers can download a PDF); signed in: `access`, `public_results`, `accept_responses` |
 | `list_versions` | owner, or the `update_token` | Every version kept, newest first, with who made it, when, size and note |
 | `restore_version` | owner, or the `update_token` | Put `version` back as a new version; a page with responses needs the owner |
 | `check_page` | owner, or the `update_token` | Render the page in a browser: errors, failed files, blank screen, screenshot; `viewport` `desktop` or `mobile` |
+| `export_pdf` | owner, or the `update_token`; `notes` needs the owner | Turn the page into a PDF: `download_url` (15 minutes), `filename`, `pages`, `cached`; `paper` `a4` or `letter`; `notes` for a deck's speaker notes |
 | `send_feedback` | nothing | Report a bug, friction or idea in aired itself |
 | `get_responses` | owner, signed in | What viewers saved with `aired.collect`; `limit` (up to 200), `cursor`, `format: "csv"` |
 | `update_data` | owner, signed in | Push JSON a page reads with `aired.data`, without republishing |

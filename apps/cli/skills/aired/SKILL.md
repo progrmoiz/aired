@@ -30,6 +30,19 @@ Markdown renders as a readable page in light and dark, with highlighted code, ta
 
 Checks share a small daily browser budget, so check once per change, not in a loop.
 
+## Send it as a PDF
+
+When the user wants an attachment, a file to email or something to print, make a PDF instead of (or as well as) sending the link:
+
+```bash
+aired pdf <id>                      # saves q3-update.pdf here (a name from the page title)
+aired pdf <id> -o report.pdf --paper a4
+```
+
+Over MCP it's `export_pdf` with `id` (and `update_token` unless signed in as the owner). It returns a `download_url` that works for 15 minutes: give it to the user or download it. A deck prints one slide per page; a doc or page prints on A4 or Letter with page numbers. Free PDFs carry a small "Made with aired" line; Pro PDFs don't. Asking again for the same version uses no browser time.
+
+To let viewers download it themselves, turn on the PDF button: `aired set <id> --allow-pdf`, or `set_options` with `allow_pdf: true`. It doesn't work on a page with a view limit.
+
 ## Load the skill for the job
 
 | The user wants | Load | Over MCP |
@@ -72,7 +85,7 @@ aired set <id> --pin 4821 --ttl 24h --reads 50 --title "Q4"
 aired set <id> --clear-pin --permanent
 ```
 
-Over MCP it's `set_options`; `get_page` reads the settings back (whether a PIN is on, never the PIN). Every update keeps the old content: `aired versions <id>` and `aired restore <id> <n>` (`list_versions`, `restore_version`). Details in `aired-report`.
+Over MCP it's `set_options`; `get_page` reads the settings back (whether a PIN is on, never the PIN, and `allow_pdf`). Every update keeps the old content: `aired versions <id>` and `aired restore <id> <n>` (`list_versions`, `restore_version`). Details in `aired-report`.
 
 ## When aired gets in the way
 

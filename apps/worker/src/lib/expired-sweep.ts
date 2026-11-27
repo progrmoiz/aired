@@ -1,7 +1,7 @@
 /**
  * Deletes the R2 files of expired pages. A page's KV record expires with the
- * page, but nothing removed its files in R2 (`pages/<id>/index.html` and its
- * screenshots `pages/<id>/shot.jpg` and `tile.jpg`). A Cron Trigger
+ * page, but nothing removed its files in R2 (`pages/<id>/index.html`, its
+ * screenshots `pages/<id>/shot.jpg` and `tile.jpg`, and its cached PDFs). A Cron Trigger
  * (index.ts) walks the bucket a batch at a time; each file is judged on its
  * own. When the HTML goes, index.ts also drops the page's page_shots row.
  *
@@ -30,8 +30,9 @@ export const SWEEP_MIN_AGE_MS = 24 * 60 * 60 * 1000;
 export const CONFIRM_AFTER_MS = 24 * 60 * 60 * 1000;
 
 // Version files (lib/page-versions.ts) too: housekeeping removes them by their
-// D1 rows, and this catches any a failed write left behind.
-const PAGE_FILE = /^pages\/([A-Za-z0-9_-]{1,64})\/(?:index\.html|shot\.jpg|tile\.jpg|doc\.json|versions\/[0-9a-f]{24}\.(?:html|doc\.json))$/;
+// D1 rows, and this catches any a failed write left behind. Cached PDFs
+// (lib/pdf-export.ts pdfKey) go with their page.
+const PAGE_FILE = /^pages\/([A-Za-z0-9_-]{1,64})\/(?:index\.html|shot\.jpg|tile\.jpg|doc\.json|versions\/[0-9a-f]{24}\.(?:html|doc\.json)|pdf\/[A-Za-z0-9]{1,12}\/(?:deck-(?:mark|clean)(?:-notes)?|(?:page|doc)-(?:a4|letter)-(?:mark|clean))\.pdf)$/;
 
 /** The page id of a page file key (HTML or screenshot), or null for anything else. */
 export function pageIdFromKey(key: string): string | null {

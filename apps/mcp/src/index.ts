@@ -7,6 +7,10 @@ import { z } from "zod";
 import { AUTH_HEADER, CSRF_HEADER } from "@aired/core";
 import { readCliSession } from "./session.js";
 import {
+  EXPORT_PDF_DESCRIPTION,
+  exportPdfInput,
+  exportPdfOut,
+  exportPdfText,
   CHECK_DESCRIPTION,
   checkContent,
   checkInput,
@@ -444,6 +448,32 @@ server.registerTool(
         inline_screenshot: withImage,
       });
       return { content: checkContent(body, withImage), structuredContent: checkOut(body) };
+    } catch (err) {
+      return toolError(`Error: ${errorMessage(err)}`);
+    }
+  },
+);
+
+server.registerTool(
+  "export_pdf",
+  {
+    title: "Export a page as a PDF",
+    description: EXPORT_PDF_DESCRIPTION,
+    inputSchema: exportPdfInput,
+    outputSchema: outputShapes.export_pdf,
+    annotations: { title: "Export a page as a PDF", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  },
+  async ({ id, update_token, notes, paper }) => {
+    if (!PAGE_ID.test(id)) return toolError("That isn't a page id.");
+    try {
+      const out = exportPdfOut(
+        await api<unknown>("POST", `/api/pages/${encodeURIComponent(id)}/pdf`, {
+          ...(update_token !== undefined ? { update_token } : {}),
+          ...(notes !== undefined ? { notes } : {}),
+          ...(paper !== undefined ? { paper } : {}),
+        }),
+      );
+      return { content: [{ type: "text" as const, text: exportPdfText(out) }], structuredContent: out };
     } catch (err) {
       return toolError(`Error: ${errorMessage(err)}`);
     }

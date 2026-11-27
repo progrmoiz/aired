@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { CopyRow, ViewHeader } from '@/components/common'
+import { PdfCard } from '@/components/pdf-card'
 import type { PagesState } from '@/App'
 import { getJson, mutate, readJson } from '@/lib/api'
 import { relativeAge } from '@/lib/format'
@@ -248,6 +249,8 @@ export function ShareView({ pageId, pages, isPro }: { pageId: string; pages: Pag
             <p className="text-sm font-medium">Link</p>
             <CopyRow text={url} label="Copy link" />
           </div>
+
+          <PdfCard pageId={pageId} isPro={isPro} />
 
           {(access.mode === 'people' || access.visitors.length > 0) && <Visitors visitors={access.visitors} />}
         </>

@@ -1,14 +1,26 @@
-import { addSpent, dailyBudgetMs, readBudget, utcDay } from "./og-shot.ts";
+import { dailyBudgetMs } from "./og-shot.ts";
+import {
+  BrowserUnavailable,
+  laneCallerRow,
+  laneCapMs,
+  laneGate,
+  reserveLaneTime,
+  secondsToNextUtcDay,
+  settleLaneTime,
+  type BrowserUnavailableReason,
+  type BudgetLane,
+} from "./browser-budget.ts";
 
 /**
  * check_page / `aired check`: load a published page in Browser Rendering and
  * say whether it works. The rules, the budget and the report live here (its
- * only import is og-shot.ts, which has none), so tests load them directly. The browser work is checkPage in
+ * imports are og-shot.ts and browser-budget.ts, which import nothing else),
+ * so tests load them directly. The browser work is checkPage in
  * og-render.ts, the route is POST /api/pages/:id/check in routes/page-tools.ts.
  *
  * Browser time is shared with the link-preview screenshots (og-shot.ts): both
  * add to the "browser" budget row, which stops at OG_SHOT_DAILY_SECONDS.
- * Checks also have their own row and cap (CHECK_DAILY_SECONDS, default 3
+ * Checks also have their own row and cap (CHECK_DAILY_SECONDS, default 10
  * minutes), so a run of checks can never use the time link previews need.
  */
 
@@ -29,8 +41,8 @@ export const CHECK_SHOT_QUALITY = 70;
 /** A check's screenshot URL works this long. */
 export const CHECK_SHOT_TTL_MS = 24 * 60 * 60 * 1000;
 
-/** Default daily browser time for checks: 3 of the 8 minutes screenshots may use. */
-export const DEFAULT_CHECK_BUDGET_MS = 3 * 60 * 1000;
+/** Default daily browser time for checks: 10 of the 40 minutes all browser work may use. */
+export const DEFAULT_CHECK_BUDGET_MS = 10 * 60 * 1000;
 export const CHECK_BUDGET_ROW = "check";
 
 /** Warnings, not errors: the page works but is heavy. */
@@ -55,27 +67,16 @@ export const SHOT_URL_KEY = /^[0-9a-f]{32}$/;
 
 /** CHECK_DAILY_SECONDS as ms, never more than the whole browser budget. "0" turns checks off. */
 export function checkBudgetMs(raw: string | undefined, totalMs: number): number {
-  let ms = DEFAULT_CHECK_BUDGET_MS;
-  if (raw !== undefined && raw.trim() !== "") {
-    const n = Number(raw);
-    if (Number.isFinite(n) && n >= 0) ms = Math.floor(n * 1000);
-  }
-  return Math.max(0, Math.min(ms, totalMs));
+  return laneCapMs(raw, DEFAULT_CHECK_BUDGET_MS, totalMs);
 }
 
-/** Why a check didn't run: a spent budget, a busy or blocking browser, no browser here, or the budget couldn't be read. */
-export type CheckUnavailableReason = "budget" | "busy" | "no_browser" | "storage";
-export class CheckUnavailable extends Error {
-  readonly reason: CheckUnavailableReason;
-  readonly waitSeconds: number | null;
-  constructor(reason: CheckUnavailableReason, waitSeconds: number | null) {
-    super(reason);
-    this.reason = reason;
-    this.waitSeconds = waitSeconds;
-  }
-}
+/** Why a check didn't run (lib/browser-budget.ts): the same class PDF export throws. */
+export const CheckUnavailable = BrowserUnavailable;
+export type CheckUnavailable = BrowserUnavailable;
+export type CheckUnavailableReason = BrowserUnavailableReason;
 
-type BudgetDb = Parameters<typeof readBudget>[0];
+type BudgetDb = Parameters<typeof laneGate>[0];
+type RunDb = Parameters<typeof settleLaneTime>[0];
 export type BudgetVars = { OG_SHOT_DAILY_SECONDS?: string; CHECK_DAILY_SECONDS?: string };
 
 /** Who a check counts against: an account, or an IP (hashed) for token holders. */
@@ -90,53 +91,38 @@ export const CALLER_BUDGET_MS = { anonymous: 60_000, signedIn: 120_000 } as cons
 export const CHECK_RESERVE_MS = CHECK_TIMEOUT_MS + 5_000;
 
 export function callerRow(caller: CheckCaller): string {
-  return `check:${caller.key}`;
+  return laneCallerRow({ row: CHECK_BUDGET_ROW }, caller.key);
 }
 
-const spentToday = (row: { day: string; spentMs: number } | null, nowMs: number) => (row !== null && row.day === utcDay(nowMs) ? row.spentMs : 0);
+function checkLane(vars: BudgetVars, caller: CheckCaller): BudgetLane {
+  const totalMs = dailyBudgetMs(vars.OG_SHOT_DAILY_SECONDS);
+  return {
+    row: CHECK_BUDGET_ROW,
+    totalMs,
+    capMs: checkBudgetMs(vars.CHECK_DAILY_SECONDS, totalMs),
+    callerCapMs: caller.signedIn ? CALLER_BUDGET_MS.signedIn : CALLER_BUDGET_MS.anonymous,
+  };
+}
 
 /**
- * Whether a check may start now. A block from Browser Rendering (it said
- * "too many" a moment ago) is "busy" with the seconds left; any spent cap
- * (the shared browser time, the checks' share, or this caller's share) is
- * "budget" until 00:00 UTC. A D1 error is "storage".
+ * Whether a check may start now (laneGate in lib/browser-budget.ts): the
+ * shared browser time, the checks' share and this caller's share.
  */
 export async function checkGate(db: BudgetDb, vars: BudgetVars, nowMs: number, caller: CheckCaller): Promise<void> {
-  let rows: Awaited<ReturnType<typeof readBudget>>[];
-  try {
-    rows = await Promise.all([readBudget(db), readBudget(db, CHECK_BUDGET_ROW), readBudget(db, callerRow(caller))]);
-  } catch (err) {
-    console.error("page check budget read failed", { err: String(err) });
-    throw new CheckUnavailable("storage", 30);
-  }
-  const [all, checks, mine] = rows;
-  const total = dailyBudgetMs(vars.OG_SHOT_DAILY_SECONDS);
-  const checkCap = checkBudgetMs(vars.CHECK_DAILY_SECONDS, total);
-  const callerCap = Math.min(caller.signedIn ? CALLER_BUDGET_MS.signedIn : CALLER_BUDGET_MS.anonymous, checkCap);
-  const spent =
-    checkCap <= 0 || spentToday(all ?? null, nowMs) >= total || spentToday(checks ?? null, nowMs) >= checkCap || spentToday(mine ?? null, nowMs) >= callerCap;
-  if (spent) throw new CheckUnavailable("budget", secondsToNextUtcDay(nowMs));
-  const blockedUntil = Math.max(all?.blockedUntil ?? 0, checks?.blockedUntil ?? 0);
-  if (nowMs < blockedUntil) throw new CheckUnavailable("busy", Math.max(1, Math.ceil((blockedUntil - nowMs) / 1000)));
+  await laneGate(db, checkLane(vars, caller), caller.key, nowMs);
 }
 
 /** Charge CHECK_RESERVE_MS to the shared row, the checks' row and the caller's row before launching. */
 export async function reserveCheckTime(db: BudgetDb, caller: CheckCaller, nowMs: number): Promise<number> {
-  await Promise.all([addSpent(db, CHECK_RESERVE_MS, nowMs), addSpent(db, CHECK_RESERVE_MS, nowMs, CHECK_BUDGET_ROW), addSpent(db, CHECK_RESERVE_MS, nowMs, callerRow(caller))]);
-  return CHECK_RESERVE_MS;
+  return reserveLaneTime(db, { row: CHECK_BUDGET_ROW }, caller.key, CHECK_RESERVE_MS, nowMs);
 }
 
 /** After the check: swap the reservation for the time really spent, and drop callers' rows from earlier days. */
-export async function settleCheckTime(db: BudgetDb & { prepare(q: string): { bind(...v: unknown[]): { run(): Promise<unknown> } } }, caller: CheckCaller, reservedMs: number, spentMs: number, nowMs: number): Promise<void> {
-  const delta = spentMs - reservedMs;
-  await Promise.all([addSpent(db, delta, nowMs), addSpent(db, delta, nowMs, CHECK_BUDGET_ROW), addSpent(db, delta, nowMs, callerRow(caller))]);
-  await db.prepare("DELETE FROM og_shot_budget WHERE name LIKE 'check:%' AND day < ?").bind(utcDay(nowMs)).run();
+export async function settleCheckTime(db: RunDb, caller: CheckCaller, reservedMs: number, spentMs: number, nowMs: number): Promise<void> {
+  await settleLaneTime(db, { row: CHECK_BUDGET_ROW }, caller.key, reservedMs, spentMs, nowMs);
 }
 
-export function secondsToNextUtcDay(nowMs: number): number {
-  const d = new Date(nowMs);
-  return Math.max(1, Math.ceil((Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1) - nowMs) / 1000));
-}
+export { secondsToNextUtcDay };
 
 /** A viewport name from user input; anything else is refused. */
 export function parseViewport(v: unknown): CheckViewport | null {

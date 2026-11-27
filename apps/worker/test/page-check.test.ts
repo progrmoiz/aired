@@ -24,7 +24,7 @@ import {
   secondsToNextUtcDay,
   type CheckObservations,
 } from "../src/lib/page-check.ts";
-import { addSpent, readBudget, setBlocked, utcDay } from "../src/lib/og-shot.ts";
+import { addSpent, DEFAULT_DAILY_BUDGET_MS, readBudget, setBlocked, utcDay } from "../src/lib/og-shot.ts";
 
 const src = (f: string) => readFileSync(new URL(`../${f}`, import.meta.url), "utf8");
 const NOW = Date.UTC(2026, 10, 27, 15, 0, 0);
@@ -141,8 +141,8 @@ test("viewports: desktop by default, mobile on request, anything else refused", 
   assert.equal(parseViewport(3), null);
 });
 
-test("the checks' budget: 3 minutes by default, never more than the whole browser budget, 0 turns it off", () => {
-  const total = 8 * 60 * 1000;
+test("the checks' budget: 10 minutes by default, never more than the whole browser budget, 0 turns it off", () => {
+  const total = 40 * 60 * 1000;
   assert.equal(checkBudgetMs(undefined, total), DEFAULT_CHECK_BUDGET_MS);
   assert.equal(checkBudgetMs("60", total), 60_000);
   assert.equal(checkBudgetMs("9999", total), total);
@@ -179,9 +179,9 @@ test("gate: a fresh day allows a check; spent check time stops checks but not li
 
 test("gate: screenshots using up the shared budget stop checks too", async () => {
   const { db } = fakeD1();
-  await addSpent(db as never, 8 * 60 * 1000, NOW);
+  await addSpent(db as never, DEFAULT_DAILY_BUDGET_MS, NOW);
   assert.equal((await gateFails(db))?.reason, "budget");
-  assert.equal(await gateFails(db, { OG_SHOT_DAILY_SECONDS: "900" }), null, "a bigger budget lets it run");
+  assert.equal(await gateFails(db, { OG_SHOT_DAILY_SECONDS: String(DEFAULT_DAILY_BUDGET_MS / 1000 + 60) }), null, "a bigger budget lets it run");
   assert.equal((await gateFails(fakeD1().db, { CHECK_DAILY_SECONDS: "0" }))?.reason, "budget", "0 turns checks off");
 });
 

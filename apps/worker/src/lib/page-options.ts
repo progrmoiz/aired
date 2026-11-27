@@ -24,7 +24,7 @@ export const READS_MAX = 1_000_000;
 /** The TTL `permanent: false` gives a page (DEFAULT_TTL in @aired/core). */
 const DEFAULT_TTL_SECONDS = 604800;
 
-const ALLOWED = ["title", "pin", "ttl", "permanent", "reads", "access", "update_token"] as const;
+const ALLOWED = ["title", "pin", "ttl", "permanent", "reads", "access", "allow_pdf", "update_token"] as const;
 
 /**
  * A validated change. A key that's absent leaves that setting alone; null
@@ -37,6 +37,8 @@ export type OptionsChange = {
   reads?: number | null;
   /** Who may open it (lib/access-list.ts). Plan limits are checked by the route. */
   access?: AccessInput;
+  /** Viewers may download the page as a PDF (lib/pdf-export.ts). */
+  allowPdf?: boolean;
 };
 
 export type ParsedOptions = { ok: true; change: OptionsChange } | { ok: false; error: string };
@@ -51,7 +53,7 @@ export function parseOptions(body: unknown): ParsedOptions {
   const b = body as Record<string, unknown>;
   const unknown = Object.keys(b).filter((k) => !(ALLOWED as readonly string[]).includes(k));
   if (unknown.length > 0) {
-    return fail(`Unknown field${unknown.length > 1 ? "s" : ""}: ${unknown.join(", ")}. You can change title, pin, ttl, permanent, reads and access.`);
+    return fail(`Unknown field${unknown.length > 1 ? "s" : ""}: ${unknown.join(", ")}. You can change title, pin, ttl, permanent, reads, access and allow_pdf.`);
   }
 
   const change: OptionsChange = {};
@@ -107,7 +109,12 @@ export function parseOptions(body: unknown): ParsedOptions {
     change.access = parsed.access;
   }
 
-  if (Object.keys(change).length === 0) return fail("Nothing to change: send at least one of title, pin, ttl, permanent, reads or access");
+  if ("allow_pdf" in b) {
+    if (typeof b.allow_pdf !== "boolean") return fail("allow_pdf must be true or false");
+    change.allowPdf = b.allow_pdf;
+  }
+
+  if (Object.keys(change).length === 0) return fail("Nothing to change: send at least one of title, pin, ttl, permanent, reads, access or allow_pdf");
   return { ok: true, change };
 }
 
@@ -122,6 +129,7 @@ export type PageSettings = {
   expiresAt: number | null;
   /** 'people': only the listed people may open it. */
   access: "people" | null;
+  allowPdf: boolean;
 };
 
 /**
@@ -148,6 +156,7 @@ export function settingsChange(
     next.access = null;
   }
   if (change.reads !== undefined) next.reads = change.reads;
+  if (change.allowPdf !== undefined) next.allowPdf = change.allowPdf;
   if (change.expiry !== undefined) {
     if ("permanent" in change.expiry) {
       next.permanent = true;
@@ -168,6 +177,7 @@ export function changedSettings(change: OptionsChange): string[] {
   if (change.expiry !== undefined) out.push("expiry");
   if (change.reads !== undefined) out.push("reads");
   if (change.access !== undefined) out.push("access");
+  if (change.allowPdf !== undefined) out.push("allow_pdf");
   return out;
 }
 
@@ -209,6 +219,8 @@ export type PageDetails = {
   createdAt: string;
   expiresAt: string | null;
   project: string | null;
+  /** Viewers may download a PDF (the owner always can). */
+  allowPdf: boolean;
 };
 
 /** A page's access mode from its row. */
@@ -218,7 +230,7 @@ export function accessMode(row: { pin: string | null; access?: "people" | null }
 }
 
 export function pageDetails(
-  row: { id: string; title: string | null; size: number; pin: string | null; reads: number | null; permanent: boolean; createdAt: number; expiresAt: number | null; project: string | null; access?: "people" | null },
+  row: { id: string; title: string | null; size: number; pin: string | null; reads: number | null; permanent: boolean; createdAt: number; expiresAt: number | null; project: string | null; access?: "people" | null; allowPdf?: boolean },
   readCount: number,
   origin: string,
 ): PageDetails {
@@ -235,6 +247,7 @@ export function pageDetails(
     createdAt: new Date(row.createdAt).toISOString(),
     expiresAt: row.expiresAt === null ? null : new Date(row.expiresAt).toISOString(),
     project: row.project,
+    allowPdf: row.allowPdf === true,
   };
 }
 
