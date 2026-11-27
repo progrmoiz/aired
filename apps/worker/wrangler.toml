@@ -146,7 +146,7 @@ simple = { limit = 30, period = 60 }
 # Browser Rendering starts one every few seconds at most. Per caller.
 [[ratelimits]]
 name = "CHECK_BURST"
-namespace_id = "1008"
+namespace_id = "1009"
 simple = { limit = 3, period = 60 }
 
 # Custom domain

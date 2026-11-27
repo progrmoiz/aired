@@ -230,7 +230,7 @@ test("wiring: the check route asks for the owner, rate-limits, and spends the bu
   assert.ok(fn.indexOf("await checkGate(env.DB, env, Date.now());") < fn.indexOf("puppeteer.launch(env.BROWSER)"));
   assert.match(fn, /finally \{\s*await browser\.close\(\)\.catch\(\(\) => \{\}\);\s*await recordCheckTime\(/);
   assert.match(src("src/lib/rate-limit-tiers.ts"), /page_check: +\{ bucketPrefix: 'rl:check', +limit: 20, windowSeconds: 3600 \}/);
-  assert.match(src("wrangler.toml"), /name = "CHECK_BURST"\s*\nnamespace_id = "1008"\s*\nsimple = \{ limit = 3, period = 60 \}/);
+  assert.match(src("wrangler.toml"), /name = "CHECK_BURST"\s*\nnamespace_id = "1009"\s*\nsimple = \{ limit = 3, period = 60 \}/);
   // Mounted before api.ts, so /api/pages/:id/check isn't taken by another route.
   const index = src("src/index.ts");
   assert.ok(index.indexOf('app.route("/api", pageTools);') < index.indexOf('app.route("/api", api);'));
