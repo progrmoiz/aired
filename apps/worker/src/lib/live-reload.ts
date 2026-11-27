@@ -52,8 +52,11 @@ function tick(){if(stopped||busy||d.visibilityState==="hidden")return;busy=true;
 F(L.base+"/live",{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({token:L.token,etag:L.etag}),credentials:"omit",cache:"no-store"})
 .then(function(r){if(r.status===403||r.status===404||r.status===410){stopped=true;return null}return r.ok?r.json():null})
 .then(function(j){busy=false;if(j&&j.changed===true){stopped=true;changed()}},function(){busy=false})}
-setInterval(tick,L.ms);
-d.addEventListener("visibilitychange",function(){if(d.visibilityState==="visible")tick()});
+var t0=Date.now(),tm=0;
+function gap(){var e=Date.now()-t0;return e<12e4?L.ms:e<6e5?15e3:e<72e5?6e4:0}
+function loop(){clearTimeout(tm);var g=gap();if(stopped||!g)return;tm=setTimeout(function(){tick();loop()},g)}
+loop();
+d.addEventListener("visibilitychange",function(){if(d.visibilityState==="visible"&&!stopped){t0=Date.now();tick();loop()}});
 })();</script>`;
 }
 

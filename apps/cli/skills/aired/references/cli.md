@@ -53,7 +53,7 @@ aired update abc123 abc123.md      # a deck: add --deck
 
 `aired pull` works for your own pages (signed in or `AIRED_API_KEY`) and pages you have the update token for on this machine; nobody else can read a page's source, PIN or not. It won't overwrite a file unless you pass `--force`. Its `--json` says the `version` you pulled: if `aired versions <id>` shows a newer one before you update, someone changed it since.
 
-Anyone who has the page open sees the update within about 5 seconds, without reloading: a deck stays on its slide and a long page keeps its scroll position. If they've typed into the page, they get a "Reload" button instead, so nothing they typed is lost.
+Anyone who has the page open sees the update without reloading (within about 5 seconds if they opened it in the last 2 minutes, then within 15 seconds, then within a minute): a deck stays on its slide and a long page keeps its scroll position. If they've typed into the page, they get a "Reload" button instead, so nothing they typed is lost.
 
 `aired watch page.html` publishes once and then updates the page every time you save (a folder is bundled again each time). Each save is kept as a version, so Free's last 5 turn over quickly. With `--json` it prints one line per publish or update.
 

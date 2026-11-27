@@ -256,7 +256,7 @@ GET /p/:id
 
 Serves the raw HTML. If PIN-protected, serves a PIN entry page first.
 
-An open page reloads itself within a few seconds when its content is replaced (a publish update, `PUT`, `update_page` or a restore): it asks `POST /c/:id/live` every 5 seconds while the tab is showing. A deck keeps its slide and a long page its scroll position; a viewer who has typed into the page gets a "Reload" button instead.
+An open page reloads itself within a few seconds when its content is replaced (a publish update, `PUT`, `update_page` or a restore): it asks `POST /c/:id/live` while the tab is showing: every 5 seconds for the first 2 minutes, every 15 seconds until 10 minutes, then every minute, and it stops after 2 hours until the tab is shown again. A deck keeps its slide and a long page its scroll position; a viewer who has typed into the page gets a "Reload" button instead.
 
 ### Get a page's source
 

@@ -29,7 +29,7 @@
 
 Every tool returns `structuredContent` that matches its `outputSchema`, next to the text. Read `url`, `id`, `update_token` and `expires_at` from there.
 
-To pick up a page where you left off: `list_pages` (signed in; each has `updated_at`), then `get_page` with `include_source: true`, edit `source`, and send it back with `update_page` or `publish_html` (`id` + `update_token`), with `deck: true` for a deck. Anyone who has the page open sees the new version within about 5 seconds without reloading.
+To pick up a page where you left off: `list_pages` (signed in; each has `updated_at`), then `get_page` with `include_source: true`, edit `source`, and send it back with `update_page` or `publish_html` (`id` + `update_token`), with `deck: true` for a deck. Anyone who has the page open sees the new version without reloading: within about 5 seconds if they opened it in the last 2 minutes, then within 15 seconds, then within a minute.
 
 `set_options` with `access`:
 
