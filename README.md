@@ -40,6 +40,12 @@ npx aired update <id> new-version.html
 # Page info
 npx aired info <id>
 
+# Change PIN, expiry, view limit or title without re-uploading
+npx aired set <id> --pin 4821 --ttl 24h --reads 50
+
+# Tell the aired team about a bug, friction or idea
+npx aired feedback --kind friction "what happened"
+
 # Manage stored tokens
 npx aired tokens
 npx aired tokens prune
@@ -253,7 +259,7 @@ npx aired logout
 
 **API keys (CI and agents).** Create one under API keys in the dashboard and set `AIRED_API_KEY`; the CLI, the local MCP server and the HTTP API (`Authorization: Bearer aired_sk_…`) then publish to your account.
 
-**Signed-in MCP.** Add `https://aired.sh/mcp/account` as a connector (Claude, ChatGPT, Cursor, VS Code): you sign in on aired and the server works as your account, adding `list_pages`, `update_page`, `delete_page` and `get_account`. `https://aired.sh/mcp` stays anonymous unless you send an API key.
+**Signed-in MCP.** Add `https://aired.sh/mcp/account` as a connector (Claude, ChatGPT, Cursor, VS Code): you sign in on aired and the server works as your account, adding `list_pages`, `update_page`, `delete_page` and `get_account`. `https://aired.sh/mcp` stays anonymous unless you send an API key; anonymous callers still get `get_page` and `set_options` with a page's update token, and `send_feedback`.
 
 Managing API keys, billing and deleting the account only work on the website, not from the CLI, an API key or a connected app. Sign out everywhere (under Account in the dashboard) ends every session, CLI login and connected app; API keys keep working until you revoke them. Deleting the account ends all of them and deletes the keys.
 

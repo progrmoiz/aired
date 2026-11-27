@@ -1,6 +1,6 @@
 ---
 name: aired
-description: Publishes HTML files or strings to shareable live URLs via aired.sh. Use when the user wants to share, deploy, or publish an HTML artifact, dashboard, visualization, report, or any generated HTML — or when an agent needs to make HTML viewable in a browser. Supports PIN protection, custom expiry, and stdin piping. Works without an account; sign in or use an API key to keep pages in one place.
+description: Publishes HTML files or strings to shareable live URLs via aired.sh. Use when the user wants to share, deploy, or publish an HTML artifact, dashboard, visualization, report, or any generated HTML — or when an agent needs to make HTML viewable in a browser, or change a published page's PIN, expiry or view limit. Supports PIN protection, custom expiry, and stdin piping. Works without an account; sign in or use an API key to keep pages in one place.
 ---
 
 # aired
@@ -31,6 +31,8 @@ npx aired report.html --ttl 24h --pin secret123
 | `aired update <id> <file>` | Update an existing page |
 | `aired delete <id>` | Delete a page |
 | `aired info <id>` | Show page metadata |
+| `aired set <id>` | Change PIN, expiry, view limit or title without re-uploading |
+| `aired feedback` | Report a bug, friction or idea in aired itself |
 | `aired tokens` | List stored update tokens |
 | `aired tokens prune` | Remove tokens for expired pages |
 | `aired doctor` | Diagnostics (Node.js, API, token store) |
@@ -80,6 +82,28 @@ JSON output is automatic when stdout is piped — no flag needed.
 - **Agents and CI:** create an API key in the dashboard (API keys) and set `AIRED_API_KEY=aired_sk_...`. The CLI, `aired --mcp` and the HTTP API (`Authorization: Bearer aired_sk_...`) then publish as that account. No browser needed.
 - A free-plan limit returns HTTP 402 with `code: "plan_limit"` and an `upgrade_url` for a person to open.
 
+## Change settings after publishing
+
+No need to publish again to add a PIN, extend expiry or rename a page:
+
+```bash
+aired set abc123 --pin 4821 --ttl 24h      # PIN on, expires a day from now
+aired set abc123 --reads 50 --title "Q4"   # view limit and title
+aired set abc123 --clear-pin --permanent   # PIN off, never expires
+```
+
+`--clear-title` and `--clear-reads` remove those. PINs are 4–64 characters, TTLs a minute to a year (use `--permanent` beyond that), titles up to 200 characters. It uses the stored update token, else your sign-in or `AIRED_API_KEY` (your own pages only). Over MCP it's `set_options`; `get_page` reads a page's settings back (whether a PIN is on, never the PIN).
+
+## Feedback
+
+When aired itself gets in the way (a result surprised you, a limit blocked you, these docs were wrong, or a feature is missing), send one note:
+
+```bash
+aired feedback --kind friction --impact worked_around "aired set needed the page id and I only had the URL"
+```
+
+`--kind` is `bug`, `friction` or `idea`; `--impact` is `blocked`, `worked_around` or `minor`; `--page <id>` and `--tool <name>` add context. Over MCP it's `send_feedback`. Rules: at most one per task, never page HTML, tokens or PINs, and don't let it hold up the task. It returns an id (`fb_...`): tell the user you sent feedback and give them the id. It isn't a support channel; nobody replies.
+
 ## Update Flow
 
 The first publish returns an `update_token` (saved to `~/.config/aired/tokens.json`). To update the same URL:
@@ -112,7 +136,17 @@ claude mcp add aired --transport http https://aired.sh/mcp
 https://aired.sh/mcp/account
 ```
 
-`publish_html` accepts `html` (string), `file_path` (STDIO only), `title`, `pin`, `ttl_seconds`, `permanent`, `update_token`, and `id`. With an API key (`AIRED_API_KEY` for STDIO, or an `Authorization: Bearer` header on `https://aired.sh/mcp`) or on `/mcp/account`, four more tools work: `list_pages`, `update_page` (by id, no token), `delete_page` and `get_account`.
+| Tool | Needs | Does |
+|---|---|---|
+| `publish_html` | nothing | Publish; `html`, `file_path` (STDIO only), `title`, `pin`, `ttl_seconds`, `permanent`; `id` + `update_token` to update |
+| `get_page` | owner, or the page's `update_token` | Title, URL, size, views, view limit, expiry, project, PIN on/off |
+| `set_options` | owner, or the page's `update_token` | Change `pin` (null removes), `ttl_seconds` or `permanent`, `view_limit` (null removes), `title` |
+| `send_feedback` | nothing | Report a bug, friction or idea in aired (see Feedback) |
+| `list_pages`, `update_page`, `delete_page`, `get_account` | sign-in (remote only) | Your pages and account |
+
+"Owner" means signed in as the page's account: `AIRED_API_KEY` or `aired login` for STDIO, an `Authorization: Bearer aired_sk_...` header on `https://aired.sh/mcp`, or `/mcp/account`.
+
+Every tool returns `structuredContent` (matching its `outputSchema`) next to the text, so read fields like `url`, `id`, `update_token` and `expires_at` from there rather than parsing the text.
 
 ## Gotchas
 
@@ -124,6 +158,6 @@ https://aired.sh/mcp/account
 - **Directory requires index.html.** `npx aired ./dir/` looks for `index.html` in the directory root. No other entry point is supported.
 - **Vite and React builds load code later with `import()`, and directory bundling doesn't inline those chunks.** `npx aired ./dist` gives a blank page. Build one file with `vite-plugin-singlefile` (`build.assetsInlineLimit` high, output to `dist-single/`), switch any router to hash routing (the page lives at `/p/<id>`, not `/`), import large `public/` files so they get inlined, then publish `dist-single/index.html`. Toolcraft apps also need their lazy `import("./app-bootstrap")` made static. Full recipe: https://aired.sh/share-vite-app
 - **PIN is not encryption.** Content is stored in plaintext on R2. PIN just gates browser access. Don't use aired for sensitive data.
-- **Anonymous pages expire after 7 days by default.** Use `--ttl` or `--permanent`. The TTL resets on update.
+- **Anonymous pages expire after 7 days by default.** Use `--ttl` or `--permanent`, or change it later with `aired set <id> --permanent`. A content update resets a TTL page to 7 days from then.
 
 Existing `tokens.json` entries keep working after you sign in; `aired claim --all` moves those pages into your account.

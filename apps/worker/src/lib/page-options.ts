@@ -153,7 +153,7 @@ export function pageAccess(input: {
   if (input.tokenSent && input.tokenMatches) return { ok: true, viaToken: true };
   if (input.userId !== null && input.ownerId !== null && input.ownerId === input.userId) return { ok: true, viaToken: false };
   if (input.tokenSent) return { ok: false, status: 403, error: "Invalid update token" };
-  if (input.userId !== null) return { ok: false, status: 403, error: "This page isn't yours. Send its update token to change it." };
+  if (input.userId !== null) return { ok: false, status: 403, error: "This page isn't in your account. Use its update token instead." };
   return { ok: false, status: 401, error: "Sign in (API key or aired login) or send the page's update token" };
 }
 

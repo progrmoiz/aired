@@ -411,7 +411,7 @@ api.get("/pages/:id/details", rateLimit(TIERS.page_options), async (c) => {
   if (page instanceof Response) return page;
   const access = await ownerAccess(c, page, sentUpdateToken(c));
   if (!access.ok) return c.json({ error: access.error }, access.status);
-  return c.json(pageDetails(page.row, viewCount(page), new URL(c.req.url).origin));
+  return c.json(pageDetails(page.row, viewCount(page), siteOrigin(c.env)));
 });
 
 // PATCH /api/pages/:id — change a page's settings without sending its HTML
@@ -457,7 +457,7 @@ api.patch("/pages/:id", requireCsrfHeader, rateLimit(TIERS.page_options), async 
     console.error("page options write failed", { id, err });
     return c.json({ error: "Could not change this page's settings. Please try again." }, 503);
   }
-  return c.json({ ...pageDetails(row, viewCount(page), new URL(c.req.url).origin), changed: changedSettings(change) });
+  return c.json({ ...pageDetails(row, viewCount(page), siteOrigin(c.env)), changed: changedSettings(change) });
 });
 
 // POST /api/feedback — feedback from agents and people about aired itself

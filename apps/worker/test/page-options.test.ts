@@ -38,7 +38,7 @@ test("another account's page is refused, signed in or with a wrong token", () =>
   assert.deepEqual(pageAccess({ ...theirs, tokenSent: false, tokenMatches: false }), {
     ok: false,
     status: 403,
-    error: "This page isn't yours. Send its update token to change it.",
+    error: "This page isn't in your account. Use its update token instead.",
   });
   assert.deepEqual(pageAccess({ ...theirs, tokenSent: true, tokenMatches: false }), { ok: false, status: 403, error: "Invalid update token" });
   // Being signed in never opens an anonymous page.
