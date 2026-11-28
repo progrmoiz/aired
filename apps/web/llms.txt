@@ -124,8 +124,11 @@ A page published from an aired account can save what viewers enter and show live
 - https://aired.sh/html-to-link — guide: turn an HTML file into a shareable link.
 - https://aired.sh/share-claude-artifacts — guide: share a Claude artifact with people who do not use Claude.
 - https://aired.sh/share-chatgpt-html — guide: share HTML that ChatGPT made as a link.
+- https://aired.sh/share-gemini-canvas — guide: share a Gemini Canvas page, app or game as a link that opens in any browser.
+- https://aired.sh/publish-from-claude-code — guide: publish a page or deck from Claude Code (skills, MCP server or npx aired), then pick it up again with aired list, pull and watch.
+- https://aired.sh/publish-from-cursor — guide: publish from Cursor with the one-click MCP install link, mcp.json, skills or the CLI.
 - https://aired.sh/password-protect-html — guide: put a PIN on an HTML page; checked on the server.
-- https://aired.sh/share-html-privately — guide: PIN, expiry, view limits and what stays private.
+- https://aired.sh/share-html-privately — guide: PIN, named people (a one-time code by email), expiry, view limits and what stays private.
 - https://aired.sh/share-html-with-client — guide: send a report or mockup to a client and update it at the same link.
 - https://aired.sh/share-vite-app — guide: share a Vite, React or Toolcraft app by building it as one HTML file.
 - https://aired.sh/share-slides — guide: share Markdown or HTML slides with speaker notes.

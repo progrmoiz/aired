@@ -35,7 +35,7 @@ If your `vite.config.ts` exports a function rather than an object, add `viteSing
 
 ## Or ask your AI agent
 
-Claude Code, Cursor and Codex can do all of it. Paste this into the conversation where you built the app:
+[Claude Code](https://aired.sh/publish-from-claude-code), [Cursor](https://aired.sh/publish-from-cursor) and Codex can do all of it. Paste this into the conversation where you built the app:
 
 ```
 Build this app as one self-contained HTML file so I can send it as a link.

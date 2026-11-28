@@ -4,20 +4,20 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Share an HTML page privately with a few people — aired</title>
-  <meta name="description" content="Share an HTML page with only the people you choose: a PIN, a link that expires, a view limit and no search indexing. Free, and viewers don&#x27;t need an account." />
+  <meta name="description" content="Share an HTML page with only the people you choose: a PIN, named people who get a code by email, a link that expires and a view limit. Free, and viewers don&#x27;t need an account." />
   <link rel="canonical" href="https://aired.sh/share-html-privately" />
   <link rel="alternate" type="text/markdown" href="/share-html-privately.md" />
   <meta property="og:site_name" content="aired" />
   <meta property="og:url" content="https://aired.sh/share-html-privately" />
   <meta property="og:title" content="Share an HTML page privately with a few people — aired" />
-  <meta property="og:description" content="Share an HTML page with only the people you choose: a PIN, a link that expires, a view limit and no search indexing. Free, and viewers don&#x27;t need an account." />
+  <meta property="og:description" content="Share an HTML page with only the people you choose: a PIN, named people who get a code by email, a link that expires and a view limit. Free, and viewers don&#x27;t need an account." />
   <meta property="og:type" content="article" />
   <meta property="og:image" content="https://aired.sh/og.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Share an HTML page privately with a few people — aired" />
-  <meta name="twitter:description" content="Share an HTML page with only the people you choose: a PIN, a link that expires, a view limit and no search indexing. Free, and viewers don&#x27;t need an account." />
+  <meta name="twitter:description" content="Share an HTML page with only the people you choose: a PIN, named people who get a code by email, a link that expires and a view limit. Free, and viewers don&#x27;t need an account." />
   <meta name="twitter:image" content="https://aired.sh/og.png" />
   <script type="application/ld+json">
   {
@@ -28,14 +28,14 @@
         "@id": "https://aired.sh/share-html-privately#page",
         "url": "https://aired.sh/share-html-privately",
         "name": "Share an HTML page privately with a few people — aired",
-        "description": "Share an HTML page with only the people you choose: a PIN, a link that expires, a view limit and no search indexing. Free, and viewers don't need an account.",
+        "description": "Share an HTML page with only the people you choose: a PIN, named people who get a code by email, a link that expires and a view limit. Free, and viewers don't need an account.",
         "isPartOf": {
           "@id": "https://aired.sh/#website"
         },
         "about": {
           "@id": "https://aired.sh/#app"
         },
-        "dateModified": "2026-11-25"
+        "dateModified": "2026-11-28"
       },
       {
         "@type": "BreadcrumbList",
@@ -97,7 +97,7 @@
             "name": "Do the people I share with need an aired account?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "No. They open the link in any browser and type the PIN if there is one."
+              "text": "No. With a PIN, they open the link and type it. With named people, they type their email and the 6-digit code aired sends them. No account, no password."
             }
           },
           {
@@ -121,7 +121,15 @@
             "name": "Can I see who opened it?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Signed-in users see a view count for each page. Who opened it, and when, is part of the planned Pro plan."
+              "text": "With named people, yes: your dashboard lists each person who opened the page, and when. For other pages, signed-in users see a view count."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I use a PIN and named people together?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. A page has one or the other. Choosing named people replaces the PIN, and making the page public again opens it to anyone with the link."
             }
           }
         ]
@@ -149,7 +157,7 @@
     <div class="crumbrow"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">aired</a><span aria-hidden="true">/</span><a href="/guides">Guides</a><span aria-hidden="true">/</span><span>Share HTML privately</span></nav><div class="aimenu" data-agent="share-html-privately" data-task="share an HTML page privately on aired with a few people"><button type="button" class="aimenu-copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy page</span></button><button type="button" class="aimenu-more" aria-haspopup="menu" aria-expanded="false" aria-label="More ways to use this page with AI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div></div>
     <h1 class="g2-title">Share an HTML page privately</h1>
     <p class="g2-lead"><b>Add a PIN, pick a short expiry, or list exactly who may open the page.</b> Nobody else can find it or read it.</p>
-    <p class="g2-meta"><span>4 min read</span><span>Updated November 2026</span></p>
+    <p class="g2-meta"><span>5 min read</span><span>Updated November 2026</span></p>
   </header>
 
   <ol class="g2-steps">
@@ -191,9 +199,10 @@
   </section>
 
   <article class="prose g2-prose">
-      <h2 id="checklist">Four settings that keep a page private</h2>
+      <h2 id="checklist">Five settings that keep a page private</h2>
       <ol class="steps">
         <li><strong>A PIN.</strong> Type one before you publish. The page doesn't load until it's entered, and the check happens on the server. See <a href="/password-protect-html">password-protect an HTML page</a>.</li>
+        <li><strong>Only these people.</strong> Signed in, list the email addresses that may open it. Each person gets a one-time code by email, so a forwarded link doesn't let anyone else in. See <a href="#named">below</a>.</li>
         <li><strong>A short life.</strong> Pick 1 hour or 1 day for something quick. The link stops working when the time is up.</li>
         <li><strong>A view limit.</strong> With the CLI or the API, add <code>--reads 5</code> or <code>"reads": 5</code> and the page is gone after five opens.</li>
         <li><strong>Delete it yourself.</strong> Keep the update token from the result (a private key for that page), or sign in so your pages are listed in a dashboard where you can delete them.</li>
@@ -226,16 +235,42 @@
       </div>
 
       <h2 id="named">Sharing with named people</h2>
-      <p>Sign in and list who may open a page: email addresses, and on Pro whole company domains like <code>@client.com</code>. Each person types their email on the page and gets a 6-digit code that works once. They don't need an account, and someone the link is forwarded to can't get in. Free allows 3 people per page; Pro allows 500 people and 25 domains.</p>
-      <p>Set it in your dashboard's Share view, or from the command line with <code>aired set &lt;id&gt; --only alice@client.com,@client.com</code>. Taking someone off the list locks them out. See the <a href="/docs">docs</a> for the details.</p>
+      <p>Sign in and list who may open a page: email addresses, and on Pro whole company domains like <code>@client.com</code>. This is what each person does:</p>
+      <ol class="steps">
+        <li>They open the link and type their email.</li>
+        <li>aired emails them a 6-digit code. It works once, for 10 minutes.</li>
+        <li>They type the code and the page opens. That browser stays let in for 30 days.</li>
+      </ol>
+      <p>They don't need an aired account or a password. Someone the link is forwarded to can't get in, because the code only goes to a listed address, and the page never says who is on the list. Take a person off the list and they're locked out. Webmail domains like <code>@gmail.com</code> can't be listed whole, because that would let anyone in.</p>
+      <p>Your dashboard shows each person who opened the page, with when they first and last did. Free allows 3 people per page; Pro allows 500 people and 25 domains.</p>
+      <p>Set it in your dashboard's Share view, or from the command line with <code>aired set &lt;id&gt; --only alice@client.com,@client.com</code>. An AI app connected to aired can set it for you too. See the <a href="/docs">docs</a> for the details.</p>
+
+      <h3>PIN or named people?</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th></th><th>PIN</th><th>Only these people</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Who gets in</td><td>Anyone you give the link and the PIN</td><td>Only the emails and domains you list</td></tr>
+            <tr><td>If the link is forwarded</td><td>The new person gets in with the PIN</td><td>They can't get in</td></tr>
+            <tr><td>What viewers do</td><td>Type the PIN</td><td>Type their email, then a code from their inbox</td></tr>
+            <tr><td>Do you need an account</td><td>No</td><td>Yes, a free one</td></tr>
+            <tr><td>See who opened it</td><td>A view count, signed in</td><td>Each person, and when</td></tr>
+            <tr><td>Limit</td><td>None</td><td>Free: 3 people a page. Pro: 500 people and 25 domains</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>A page uses one or the other: choosing named people replaces the PIN.</p>
 
       <h2 id="faq">Questions</h2>
       <div class="acc">
         <details open><summary>Can I share an HTML file so only certain people can see it?<i></i></summary><p>Yes. Sign in, then list their email addresses: each person types their email on the page and gets a one-time code. Free allows 3 people per page; Pro allows 500 people and whole company domains like @client.com. Or add a PIN and send it only to those people.</p></details>
-        <details><summary>Do the people I share with need an aired account?<i></i></summary><p>No. They open the link in any browser and type the PIN if there is one.</p></details>
+        <details><summary>Do the people I share with need an aired account?<i></i></summary><p>No. With a PIN, they open the link and type it. With named people, they type their email and the 6-digit code aired sends them. No account, no password.</p></details>
         <details><summary>Can someone find my page on Google?<i></i></summary><p>Pages published without an account tell search engines not to list them, and search engines can't get past a PIN. aired doesn't list pages publicly.</p></details>
         <details><summary>How do I stop people opening a link I already sent?<i></i></summary><p>Delete the page with its update token, or from your dashboard if you published while signed in. The link stops working at once.</p></details>
-        <details><summary>Can I see who opened it?<i></i></summary><p>Signed-in users see a view count for each page. Who opened it, and when, is part of the planned Pro plan.</p></details>
+        <details><summary>Can I see who opened it?<i></i></summary><p>With named people, yes: your dashboard lists each person who opened the page, and when. For other pages, signed-in users see a view count.</p></details>
+        <details><summary>Can I use a PIN and named people together?<i></i></summary><p>No. A page has one or the other. Choosing named people replaces the PIN, and making the page public again opens it to anyone with the link.</p></details>
       </div>
     
     
@@ -251,13 +286,13 @@
       <a class="gcard" href="/share-claude-artifacts"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg></span><b>Share a Claude artifact</b><span>Send what Claude made to people who don't use Claude.</span><em>Read the guide →</em></a>
       <a class="gcard" href="/tiiny-host-alternative"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg></span><b>A Tiiny Host alternative</b><span>Quick HTML links without an email sign-up.</span><em>Read the guide →</em></a>
     </div>
-    <p class="viewers" style="justify-content:flex-start"><a href="/guides">All 9 guides →</a> <span aria-hidden="true">·</span> Publishing from code or an AI agent? <a href="/docs">Read the docs →</a></p>
+    <p class="viewers" style="justify-content:flex-start"><a href="/guides">All 12 guides →</a> <span aria-hidden="true">·</span> Publishing from code or an AI agent? <a href="/docs">Read the docs →</a></p>
   </section>
 </main>
 
 <footer><div class="wrap">
   <span>aired</span>
-  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/guides">Guides</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/share-slides">Share slides</a><a href="/share-vite-app">Share a Vite app</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
+  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/guides">Guides</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/share-gemini-canvas">Share a Gemini Canvas</a><a href="/publish-from-claude-code">Publish from Claude Code</a><a href="/publish-from-cursor">Publish from Cursor</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/share-slides">Share slides</a><a href="/share-vite-app">Share a Vite app</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
 </div></footer>
 <script src="/app.js"></script>
 </body>

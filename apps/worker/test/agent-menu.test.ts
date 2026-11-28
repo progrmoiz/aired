@@ -93,7 +93,23 @@ test("POST /api/site-event writes one data point for a known click and refuses t
   assert.equal(points.length, 1, "refused clicks write nothing");
 });
 
-test("every page's Guides link opens /guides, and /guides lists all nine guides", () => {
+test("every guide is in the sitemap, llms.txt and the footer, and the guide counts match", () => {
+  const sitemap = web("sitemap.xml");
+  const llms = web("llms.txt");
+  const footer = web("index.html");
+  for (const slug of GUIDES) {
+    assert.ok(sitemap.includes(`<loc>https://aired.sh/${slug}</loc>`), `sitemap misses ${slug}`);
+    assert.ok(llms.includes(`- https://aired.sh/${slug} — `), `llms.txt misses ${slug}`);
+    assert.ok(footer.includes(`<a href="/${slug}">`), `footer misses ${slug}`);
+  }
+  for (const slug of GUIDES) {
+    const all = web(`${slug}.html`).match(/All (\d+) guides →/);
+    assert.ok(all, `${slug} has no "All guides" link`);
+    assert.equal(Number(all[1]), GUIDES.length, `${slug} counts the guides wrong`);
+  }
+});
+
+test("every page's Guides link opens /guides, and /guides lists every guide", () => {
   const dir = new URL("../../web/", import.meta.url);
   for (const f of readdirSync(dir).filter((n) => n.endsWith(".html"))) {
     const html = web(f);

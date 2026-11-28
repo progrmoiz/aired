@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>How to publish a page or deck from Claude Code — aired</title>
+  <meta name="description" content="Let Claude Code publish the HTML page or slide deck it made as a link anyone can open, and update it later at the same address. Free, and viewers don&#x27;t sign in." />
+  <link rel="canonical" href="https://aired.sh/publish-from-claude-code" />
+  <link rel="alternate" type="text/markdown" href="/publish-from-claude-code.md" />
+  <meta property="og:site_name" content="aired" />
+  <meta property="og:url" content="https://aired.sh/publish-from-claude-code" />
+  <meta property="og:title" content="How to publish a page or deck from Claude Code — aired" />
+  <meta property="og:description" content="Let Claude Code publish the HTML page or slide deck it made as a link anyone can open, and update it later at the same address. Free, and viewers don&#x27;t sign in." />
+  <meta property="og:type" content="article" />
+  <meta property="og:image" content="https://aired.sh/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="How to publish a page or deck from Claude Code — aired" />
+  <meta name="twitter:description" content="Let Claude Code publish the HTML page or slide deck it made as a link anyone can open, and update it later at the same address. Free, and viewers don&#x27;t sign in." />
+  <meta name="twitter:image" content="https://aired.sh/og.png" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebPage",
+        "@id": "https://aired.sh/publish-from-claude-code#page",
+        "url": "https://aired.sh/publish-from-claude-code",
+        "name": "How to publish a page or deck from Claude Code — aired",
+        "description": "Let Claude Code publish the HTML page or slide deck it made as a link anyone can open, and update it later at the same address. Free, and viewers don't sign in.",
+        "isPartOf": {
+          "@id": "https://aired.sh/#website"
+        },
+        "about": {
+          "@id": "https://aired.sh/#app"
+        },
+        "dateModified": "2026-11-28"
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "aired",
+            "item": "https://aired.sh/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Guides",
+            "item": "https://aired.sh/guides"
+          },
+          {
+            "@type": "ListItem",
+            "position": 3,
+            "name": "Publish from Claude Code",
+            "item": "https://aired.sh/publish-from-claude-code"
+          }
+        ]
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://aired.sh/#website",
+        "name": "aired",
+        "url": "https://aired.sh/"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://aired.sh/#app",
+        "name": "aired",
+        "url": "https://aired.sh/",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Web, macOS, Windows, Linux",
+        "isAccessibleForFree": true,
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://aired.sh/publish-from-claude-code#faq",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Do people need Claude to open the link?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. It's a normal web page. It opens in any browser, on a phone or a laptop, with no sign-in."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Skills or the MCP server: which should I use?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Either works. The skills teach Claude when and how to use aired and publish with the command-line tool; the MCP server gives Claude aired's tools directly. If you're not sure, install the skills."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can Claude change the page after I've sent the link?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. It updates the page at the same link with aired update. In a new session, aired pull gets the last published version back first."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I publish a slide deck?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Ask for a Markdown deck with --- between slides and type: deck at the top, or an HTML deck. aired shows it as slides, with speaker notes only you can see."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How long does the link last?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Seven days by default. Ask for 1 hour, 1 day, 30 days or permanent with --ttl or --permanent."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is it free?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Publishing and viewing are free. Pro removes the badge and takes bigger pages."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+  <link rel="icon" href="/favicon-16.png" type="image/png" sizes="16x16" />
+  <link rel="preload" href="/fonts/inter-latin-v20.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/fonts/fonts.css" />
+  <link rel="stylesheet" href="/site.css" />
+</head>
+<body>
+<header><div class="wrap">
+  <a class="logo" href="/" aria-label="aired home"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.5" fill="currentColor"/><path d="M9 13a10 10 0 0 1 10 10M9 6a17 17 0 0 1 17 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>aired</a>
+  <nav aria-label="Main"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/guides" class="on">Guides</a></nav>
+  <div class="right"><a class="login" id="nav-auth" href="/auth/login?return=/dashboard">Log in</a><a class="start" href="#publish" data-publish>Start free</a></div>
+</div></header>
+
+<main class="wrap g2">
+  <header class="g2-top">
+    <div class="crumbrow"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">aired</a><span aria-hidden="true">/</span><a href="/guides">Guides</a><span aria-hidden="true">/</span><span>Publish from Claude Code</span></nav><div class="aimenu" data-agent="publish-from-claude-code" data-task="publish the page or deck Claude Code made as an aired link"><button type="button" class="aimenu-copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy page</span></button><button type="button" class="aimenu-more" aria-haspopup="menu" aria-expanded="false" aria-label="More ways to use this page with AI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div></div>
+    <h1 class="g2-title">Publish from Claude Code</h1>
+    <p class="g2-lead"><b>Add aired to Claude Code once, then say &ldquo;publish this to aired&rdquo;.</b> Claude sends back a link anyone can open, and it can update the page later at the same link.</p>
+    <p class="g2-meta"><span>5 min read</span><span>Updated November 2026</span></p>
+  </header>
+
+  <ol class="g2-steps">
+    <li><div class="g2-vis" aria-hidden="true"><span class="g2-file">aired/SKILL.md</span></div><b>Add aired once</b><p>One command adds the skills or the MCP server.</p></li>
+    <li><div class="g2-vis" aria-hidden="true"><span class="g2-say">&ldquo;Publish index.html to aired&rdquo;</span></div><b>Ask Claude</b><p>A page, a folder or a slide deck.</p></li>
+    <li><div class="g2-vis" aria-hidden="true"><span class="g2-link">aired.sh/p/launch-site</span></div><b>Send the link</b><p>Anyone can open it. No Claude account.</p></li>
+  </ol>
+
+  <section class="g2-try" id="publish" aria-labelledby="try-title">
+    <div class="g2-try-head"><h2 id="try-title">Do it here</h2><p>Have the file already? Drop it here.</p></div>
+      <form id="air-form" class="form" aria-label="Publish HTML">
+        <div class="paste-area">
+          <div id="empty-hint" class="hint" aria-hidden="true">Paste HTML or drop a file<small>⌘V to paste · 2 MB max</small></div>
+          <textarea id="html-input" name="html" spellcheck="false" autocomplete="off" aria-label="HTML content"></textarea>
+          <div class="drag-hint">Drop .html file</div>
+        </div>
+        <div class="opts">
+          <button type="button" id="upload-btn" class="upl" title="Upload an .html file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg>Upload</button>
+          <input id="file-input" type="file" accept=".html,.htm,text/html" hidden />
+          <span><label for="ttl-select">Expires</label><select id="ttl-select"><option value="3600">1 hour</option><option value="86400">1 day</option><option value="604800" selected>7 days</option><option value="2592000">30 days</option><option value="permanent">Never</option></select></span>
+          <span><label for="pin-input">PIN</label><input type="password" id="pin-input" name="pin" placeholder="none" maxlength="20" inputmode="numeric" autocomplete="off" /></span>
+          <span id="char-count" class="kb"></span>
+          <button class="publish" type="submit" id="submit-btn" disabled>Publish</button>
+        </div>
+      </form>
+      <div id="error-msg" class="err hidden" role="alert"></div>
+      <div id="result-card" class="result" aria-live="polite" style="display:none">
+        <div class="box">
+          <div class="row2"><div class="lbl"><span>Your link</span><span class="live2">Live</span></div>
+            <div class="line"><a id="result-url" href="#" target="_blank" rel="noopener"></a><button type="button" id="copy-url-btn" class="copy-btn">Copy</button></div></div>
+          <div class="row2"><div class="lbl"><span>Update token</span><span id="result-expiry"></span></div>
+            <div class="line"><code id="result-token"></code><button type="button" id="copy-token-btn" class="copy-btn">Copy</button></div>
+            <p class="note">Save this token. You need it to update or delete the page.</p></div>
+          <div class="row2 hidden" id="result-saved"><p class="note" style="margin:0">Saved in this browser. <a href="/auth/login?return=/dashboard" style="color:var(--text-2);text-decoration:underline">Sign in</a> to keep this link and see who opened it.</p></div>
+        </div>
+        <button type="button" id="new-btn" class="again">Publish another</button>
+      </div>
+      <p class="proof"><b data-stat="publishes">10,827</b> pages published · opened <b data-stat="views">102,156</b> times</p>
+  </section>
+
+  <article class="prose g2-prose">
+      <h2 id="setup">Set it up once</h2>
+      <p>Claude Code is Anthropic's coding assistant. It can run commands on your computer, so it can publish what it made for you. Pick one of these three ways.</p>
+
+      <h3>1. The aired skills (the easy default)</h3>
+      <p>A skill is a short instruction file that Claude Code reads when your request matches it. aired's skills tell Claude how to publish, update and share pages, so you never have to explain. Install them for every project with:</p>
+<pre><code>npx skills add progrmoiz/aired -g -a claude-code</code></pre>
+      <p>They land in <code>~/.claude/skills/</code>, the folder Claude Code loads your own skills from in every project. There are five: <code>aired</code> for publishing, plus <code>aired-slides</code> for decks, <code>aired-report</code> for client reports, <code>aired-dashboard</code> for live dashboards and <code>aired-forms</code> for pages that collect answers. Claude only reads one when the task needs it.</p>
+      <p>The same skills ship inside the <code>aired</code> npm package, if you'd rather copy them by hand:</p>
+<pre><code>npm install -g aired
+cp -R "$(npm root -g)/aired/skills/." ~/.claude/skills/</code></pre>
+      <p>With the skills, Claude publishes through aired's command-line tool, so your computer needs Node.js 20 or later.</p>
+
+      <h3>2. The MCP server</h3>
+      <p>MCP (Model Context Protocol) is the standard way to plug tools into AI apps. Add aired's server with one command:</p>
+<pre><code>claude mcp add --transport http aired https://aired.sh/mcp</code></pre>
+      <p>That publishes without an account. To publish as your aired account, so every page shows up in your dashboard, add <code>https://aired.sh/mcp/account</code> instead. Then type <code>/mcp</code> in Claude Code, pick aired and sign in when your browser opens.</p>
+
+      <h3>3. Nothing to install</h3>
+      <p>Claude can run aired's command-line tool straight away. Say &ldquo;publish index.html with npx aired&rdquo; and it runs:</p>
+<pre><code>npx aired index.html</code></pre>
+      <p>It prints the link. CSS, scripts and images next to the page are packed into it, so nothing goes missing.</p>
+      <figure class="g2-shot"><div class="seen-cap"><span>What you see in Claude Code</span><span class="mono">~/launch-site</span></div><div class="crop" aria-label="Example of Claude Code publishing a page with aired"><div class="report term"><div class="term-bar"><i></i><i></i><i></i><span>launch-site</span></div><p class="term-you">&gt; Publish index.html to aired</p><p class="term-run">Running <code>npx aired index.html</code></p><p class="term-out">Published · expires in 7 days</p><p class="term-url">https://aired.sh/p/k3J9xQ2mTa</p><p class="term-say">Done. That link opens for anyone. Tell me what to change and I&rsquo;ll update the same page.</p></div></div></figure>
+
+      <h2 id="what">Publish a page, a folder or a deck</h2>
+      <ul>
+        <li><strong>A page:</strong> ask Claude to &ldquo;build this as one HTML file and publish it to aired&rdquo;. One file opens anywhere with nothing missing.</li>
+        <li><strong>A folder:</strong> <code>npx aired ./site/</code> packs a folder into one page.</li>
+        <li><strong>A slide deck:</strong> ask for &ldquo;a Markdown slide deck with --- between slides&rdquo;. <code>npx aired new deck</code> gives Claude a template to start from, and the deck gets speaker notes only you can see. See <a href="/share-slides">share your slides</a>.</li>
+        <li><strong>A private page:</strong> ask for a PIN (<code>--pin 4821</code>), or, signed in, let only the people you name open it. See <a href="/share-html-privately">share HTML privately</a>.</li>
+      </ul>
+
+      <h2 id="later">Pick it up again later</h2>
+      <p>The link doesn't change when the page does. You or Claude can come back to it next week, even in a new session or on another computer:</p>
+      <ol class="steps">
+        <li><strong>Find it:</strong> <code>aired list</code> shows your pages, newest first.</li>
+        <li><strong>Get the source back:</strong> <code>aired pull &lt;id&gt;</code> downloads what was last published, as Markdown or HTML.</li>
+        <li><strong>Change it:</strong> edit the file, then <code>aired update &lt;id&gt; &lt;file&gt;</code>. Anyone with the page open sees the new version within seconds, without reloading.</li>
+      </ol>
+      <p>While you work, <code>aired watch index.html</code> publishes once and then updates the page every time the file is saved, so someone watching the link sees it change. Every update is kept as a version you can go back to; Free keeps the last 5.</p>
+      <p>Sign in once with <code>npx aired login</code> so <code>aired list</code> finds your pages from any computer. Signed out, it only knows the pages published from this one.</p>
+
+      <h2 id="faq">Questions</h2>
+      <div class="acc">
+        <details open><summary>Do people need Claude to open the link?<i></i></summary><p>No. It's a normal web page. It opens in any browser, on a phone or a laptop, with no sign-in.</p></details>
+        <details><summary>Skills or the MCP server: which should I use?<i></i></summary><p>Either works. The skills teach Claude when and how to use aired and publish with the command-line tool; the MCP server gives Claude aired's tools directly. If you're not sure, install the skills.</p></details>
+        <details><summary>Can Claude change the page after I've sent the link?<i></i></summary><p>Yes. It updates the page at the same link with aired update. In a new session, aired pull gets the last published version back first.</p></details>
+        <details><summary>Can I publish a slide deck?<i></i></summary><p>Yes. Ask for a Markdown deck with --- between slides and type: deck at the top, or an HTML deck. aired shows it as slides, with speaker notes only you can see.</p></details>
+        <details><summary>How long does the link last?<i></i></summary><p>Seven days by default. Ask for 1 hour, 1 day, 30 days or permanent with --ttl or --permanent.</p></details>
+        <details><summary>Is it free?<i></i></summary><p>Yes. Publishing and viewing are free. Pro removes the badge and takes bigger pages.</p></details>
+      </div>
+  </article>
+
+  <section class="more">
+    <div class="sec-head"><p class="eyebrow">Guides</p><h2>More ways to share what you made</h2></div>
+    <div class="gcards">
+      <a class="gcard" href="/publish-from-cursor"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23"/></svg></span><b>Publish from Cursor</b><span>One-click setup, then the agent publishes for you.</span><em>Read the guide →</em></a>
+      <a class="gcard" href="/share-claude-artifacts"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg></span><b>Share a Claude artifact</b><span>Send what Claude made to people who don't use Claude.</span><em>Read the guide →</em></a>
+      <a class="gcard" href="/share-slides"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8"/></svg></span><b>Share your slides</b><span>A deck with speaker notes, as one link.</span><em>Read the guide →</em></a>
+      <a class="gcard" href="/share-html-privately"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 22 12s-1 2-3 4M6.6 6.6C4 8.3 2 12 2 12s3.5 7 10 7c1.7 0 3.2-.4 4.5-1"/></svg></span><b>Share a page privately</b><span>Keep a page out of search and away from strangers.</span><em>Read the guide →</em></a>
+      <a class="gcard" href="/share-vite-app"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M18 9h-1M18 12h-1"/></svg></span><b>Share a Vite or React app</b><span>Send a tool you built so your client can use it.</span><em>Read the guide →</em></a>
+      <a class="gcard" href="/share-gemini-canvas"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81"/></svg></span><b>Share a Gemini Canvas</b><span>Turn a canvas into a link that opens anywhere.</span><em>Read the guide →</em></a>
+    </div>
+    <p class="viewers" style="justify-content:flex-start"><a href="/guides">All 12 guides →</a> <span aria-hidden="true">·</span> Publishing from code or an AI agent? <a href="/docs">Read the docs →</a></p>
+  </section>
+</main>
+
+<footer><div class="wrap">
+  <span>aired</span>
+  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/guides">Guides</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/share-gemini-canvas">Share a Gemini Canvas</a><a href="/publish-from-claude-code">Publish from Claude Code</a><a href="/publish-from-cursor">Publish from Cursor</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/share-slides">Share slides</a><a href="/share-vite-app">Share a Vite app</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
+</div></footer>
+<script src="/app.js"></script>
+</body>
+</html>

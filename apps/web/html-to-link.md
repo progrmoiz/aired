@@ -42,7 +42,7 @@ A link avoids all three. The page loads in their browser exactly as you built it
 ## What you can publish
 
 - Reports and dashboards you made for a client or your team
-- Pages, slides and one-pagers built by [Claude](https://aired.sh/share-claude-artifacts), ChatGPT or Gemini
+- Pages, slides and one-pagers built by [Claude](https://aired.sh/share-claude-artifacts), [ChatGPT](https://aired.sh/share-chatgpt-html) or [Gemini](https://aired.sh/share-gemini-canvas)
 - Browser games, quizzes and small tools
 - Landing pages and menus for a small business
 - Email templates you want someone to preview

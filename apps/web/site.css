@@ -945,6 +945,47 @@ select.field option { background: var(--surface); }
 .g2-prose ol.steps li strong { color: var(--text-1); }
 .g2-shot { max-width: 500px; margin-left: auto; margin-right: auto; }
 .g2-shot .report.game .board { max-width: 300px; margin-left: auto; margin-right: auto; }
+
+/* The tool guides' pictures: a terminal (Claude Code), a quiz page (Gemini
+   Canvas), an agent chat with aired's card (Cursor), and an "Add to Cursor"
+   button for the first step. Fixed dark colours, like the other .report mockups,
+   so the green stays the dark-theme green in either theme. */
+.g2-btn { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 8px; background: var(--btn); color: var(--bg); font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+.g2-btn svg { width: 13px; height: 13px; }
+@media (max-width: 760px) { .g2-btn { height: 28px; padding: 0 9px; font-size: 11px; } }
+.report.term { padding: 0 0 16px; font: 12.5px/1.6 var(--mono); }
+.term-bar { display: flex; align-items: center; gap: 6px; padding: 9px 12px; border-bottom: 1px solid #26262b; background: #19191d; }
+.term-bar i { width: 9px; height: 9px; border-radius: 50%; background: #3b3b40; }
+.term-bar span { margin-left: 8px; font-size: 11px; color: #8b8b92; }
+.report.term p { margin: 0; padding: 0 16px; font-size: 12.5px; color: #c9c9ce; overflow-wrap: anywhere; }
+.report.term .term-you { margin-top: 14px; color: #ececee; }
+.report.term .term-run { margin-top: 10px; color: #8b8b92; }
+.report.term .term-run code { color: #c9c9ce; background: none; padding: 0; border: 0; font-size: inherit; }
+.report.term .term-out { margin-top: 4px; color: #8b8b92; }
+.report.term .term-url { color: #34d399; }
+.report.term .term-say { margin-top: 10px; font-family: -apple-system, 'Segoe UI', sans-serif; font-size: 13px; color: #ececee; }
+.quiz-q { margin-top: 14px; padding: 12px; border: 1px solid #26262b; border-radius: 8px; background: #19191d; }
+.quiz-q span { display: block; font-size: 11px; color: #8b8b92; }
+.quiz-q b { display: block; margin-top: 4px; font-size: 14px; font-weight: 600; }
+.report .quiz-a { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.report .quiz-a li { margin: 0;  display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border: 1px solid #26262b; border-radius: 6px; background: #131316; font-size: 13px; }
+.quiz-a li.ok { border-color: color-mix(in srgb, #34d399 55%, transparent); background: color-mix(in srgb, #34d399 10%, #131316); }
+.quiz-a em { font-style: normal; font-size: 11px; color: #34d399; }
+.report.chat { padding: 16px; display: grid; gap: 10px; }
+.report.chat p, .report.chat .chat-card { margin: 0; }
+.report.chat .chat-you { justify-self: end; max-width: 85%; padding: 8px 12px; border-radius: 12px 12px 4px 12px; background: #222227; color: #ececee; font-size: 13px; }
+.report.chat .chat-tool { font: 11.5px var(--mono); color: #8b8b92; }
+.chat-tool span { color: #c9c9ce; }
+.chat-card { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px; border: 1px solid #26262b; border-radius: 10px; background: #19191d; }
+.chat-shot { display: grid; gap: 5px; align-content: start; aspect-ratio: 4 / 3; padding: 8px; border-radius: 6px; background: #f6f6f8; }
+.chat-shot b { display: block; height: 6px; border-radius: 3px; background: #d4d4da; }
+.chat-shot b:first-child { width: 60%; height: 8px; background: #5b7cfa; }
+.chat-shot b:last-child { width: 80%; }
+.chat-card div { display: grid; gap: 2px; min-width: 0; }
+.chat-card div b { font-size: 13px; font-weight: 600; }
+.chat-card div span { font-size: 11.5px; color: #8b8b92; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-card .chat-url { font-family: var(--mono); color: #34d399; }
+.report.chat .chat-say { font-size: 13px; color: #c9c9ce; }
 .cx-ic { flex: none; width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); display: grid; place-items: center; color: var(--text-1); }
 .cx-ic svg { width: 18px; height: 18px; }
 .cx-nm { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
