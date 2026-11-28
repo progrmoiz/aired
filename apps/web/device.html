@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>aired — sign in the CLI</title>
+  <title>aired — approve a sign-in from your terminal</title>
   <meta name="robots" content="noindex" />
   <meta name="referrer" content="no-referrer" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
@@ -11,12 +11,6 @@
   <link rel="preload" href="/fonts/inter-latin-v20.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/fonts/fonts.css" />
   <link rel="stylesheet" href="/site.css" />
-  <style>
-    .device-box { margin-top: 28px; max-width: 30rem; }
-    .device-code { margin-top: 8px; font: 500 18px/1.5 'JetBrains Mono', ui-monospace, Menlo, monospace; letter-spacing: .15em; text-transform: uppercase; }
-    .device-code::placeholder { letter-spacing: .15em; }
-    @media (pointer: coarse) { .device-code, .device-box .btn { min-height: 44px; } }
-  </style>
 </head>
 <body>
 <header><div class="wrap">
@@ -25,42 +19,60 @@
   <div class="right"><a class="login" id="nav-auth" href="/auth/login?return=/dashboard">Log in</a><a class="start" href="/#publish">Start free</a></div>
 </div></header>
 <main class="wrap">
-  <section style="padding-top:64px;padding-bottom:64px">
-    <p class="eyebrow">CLI sign-in</p>
-    <h1>Sign in the aired CLI</h1>
-    <p class="lede">Enter the code <code class="mono">aired login --device</code> showed in your terminal. Only approve a code you just got from your own terminal.</p>
-    <p id="status" class="sr-only" role="status" aria-live="polite"></p>
-    <div class="panel box-pad device-box">
-      <section id="state-loading" aria-hidden="true">
-        <span class="skel" style="width:14rem;height:16px"></span>
-        <span class="skel" style="width:8rem;margin-top:12px"></span>
-      </section>
-      <section id="state-signed-out" class="hidden">
-        <p class="box-title">Sign in first</p>
-        <p class="box-sub">You come back here to approve the code after you sign in.</p>
-        <div class="btns"><a id="sign-in" class="btn solid" href="/auth/login?return=/device">Sign in</a></div>
-      </section>
-      <section id="state-approve" class="hidden">
-        <form id="approve-form">
-          <label for="user-code" class="fl">Code</label>
-          <input id="user-code" name="user_code" type="text" inputmode="text" autocomplete="off" autocapitalize="characters"
-                 spellcheck="false" maxlength="9" placeholder="BCDF-GHJK" required class="field device-code"
-                 aria-describedby="who approve-error" />
-          <p id="who" class="box-sub" style="margin-top:12px"></p>
-          <p id="approve-error" class="hidden err-t" role="alert"></p>
-          <div class="btns"><button id="approve" type="submit" class="btn solid">Approve</button></div>
-        </form>
-      </section>
-      <section id="state-done" class="hidden">
-        <p class="box-title" style="color:var(--ok)" tabindex="-1" id="done-heading">The CLI is signed in</p>
-        <p class="box-sub">Go back to your terminal. You can close this tab.</p>
-      </section>
-    </div>
-  </section>
+  <div class="duo">
+    <section>
+      <p class="eyebrow">Sign in from a terminal</p>
+      <h1>Approve a sign-in from your terminal</h1>
+      <p class="lede">You ran <code class="mono">aired login --device</code> and your terminal showed a short code. Type that code here to connect it to your aired account.</p>
+      <p id="status" class="sr-only" role="status" aria-live="polite"></p>
+      <div class="panel box-pad device-box" style="margin-top:28px">
+        <section id="state-loading" aria-hidden="true">
+          <span class="skel" style="width:14rem;height:16px"></span>
+          <span class="skel" style="width:8rem;margin-top:12px"></span>
+        </section>
+        <section id="state-signed-out" class="hidden">
+          <p class="box-title">Sign in first</p>
+          <p class="box-sub">After you sign in, you come straight back here to approve the code.</p>
+          <div class="btns"><a id="sign-in" class="btn solid" href="/auth/login?return=/device">Sign in</a></div>
+        </section>
+        <section id="state-approve" class="hidden">
+          <form id="approve-form">
+            <label for="user-code" class="fl">Code</label>
+            <input id="user-code" name="user_code" type="text" inputmode="text" autocomplete="off" autocapitalize="characters"
+                   spellcheck="false" maxlength="9" placeholder="BCDF-GHJK" required class="field device-code"
+                   aria-describedby="who approve-error" />
+            <p id="who" class="box-sub" style="margin-top:12px"></p>
+            <p id="approve-error" class="hidden err-t" role="alert"></p>
+            <div class="btns"><button id="approve" type="submit" class="btn solid">Approve</button></div>
+          </form>
+        </section>
+        <section id="state-done" class="hidden">
+          <p class="box-title" style="color:var(--ok)" tabindex="-1" id="done-heading">You're connected</p>
+          <p class="box-sub">Go back to your terminal: it now publishes to your account. You can close this tab.</p>
+        </section>
+      </div>
+    </section>
+
+    <aside class="side-vis">
+      <div class="panel box-pad">
+        <p class="box-title">What is this?</p>
+        <p class="box-sub" style="font-size:14px;color:var(--text-2);margin-top:6px">aired has a command-line tool (CLI): the <code class="mono">aired</code> command you or your coding agent type in a terminal to publish pages. Signing it in puts what it publishes in your account, so you can see views and change settings from your <a href="/dashboard" style="color:var(--text-1);text-decoration:underline;text-decoration-color:var(--border-2);text-underline-offset:3px">dashboard</a>.</p>
+        <ol class="flow">
+          <li><i>1</i><span><b>Your terminal shows a code</b>Like BCDF-GHJK.</span></li>
+          <li><i>2</i><span><b>You approve it here</b>Signed in to aired in this browser.</span></li>
+          <li><i>3</i><span><b>The terminal is connected</b>It stays signed in until you run <code class="mono">aired logout</code>.</span></li>
+        </ol>
+      </div>
+      <div class="panel box-pad" style="margin-top:14px">
+        <p class="box-title">Didn't start this?</p>
+        <p class="box-sub" style="font-size:14px;color:var(--text-2);margin-top:6px">Only approve a code you just got from your own terminal. If someone sent you here with a code, close this tab: they could be trying to sign in as you.</p>
+      </div>
+    </aside>
+  </div>
 </main>
 <footer><div class="wrap">
   <span>aired</span>
-  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/guides">Guides</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/share-gemini-canvas">Share a Gemini Canvas</a><a href="/publish-from-claude-code">Publish from Claude Code</a><a href="/publish-from-cursor">Publish from Cursor</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/share-slides">Share slides</a><a href="/share-vite-app">Share a Vite app</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
+  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/guides">Guides</a><a href="/connect">Connect your AI app</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/share-gemini-canvas">Share a Gemini Canvas</a><a href="/publish-from-claude-code">Publish from Claude Code</a><a href="/publish-from-cursor">Publish from Cursor</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/share-slides">Share slides</a><a href="/share-vite-app">Share a Vite app</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
 </div></footer>
   <script>
     (function () {
@@ -93,7 +105,7 @@
         .then(function (res) { return res.status === 200 ? res.json() : null; })
         .then(function (user) {
           if (!user || !user.login) { show('state-signed-out'); return; }
-          $('who').textContent = 'The CLI will be signed in as @' + user.login + '.';
+          $('who').textContent = 'Your terminal will be signed in as @' + user.login + '.';
           show('state-approve');
           input.focus();
         })
@@ -117,15 +129,16 @@
             return res.json().catch(function () { return {}; }).then(function (data) { return { ok: res.ok, data: data }; });
           })
           .then(function (r) {
-            if (!r.ok) throw new Error(r.data.error || 'Could not approve the code. Please try again.');
+            var msg = r.data.error && typeof r.data.error === 'object' ? r.data.error.message : r.data.error;
+            if (!r.ok) throw new Error(msg || 'That code didn\u2019t work. Check it against your terminal and try again.');
             show('state-done');
-            $('status').textContent = 'The CLI is signed in. Go back to your terminal.';
+            $('status').textContent = 'Your terminal is connected. Go back to it.';
             $('done-heading').focus();
           })
           .catch(function (err) {
             btn.disabled = false;
             btn.textContent = 'Approve';
-            showError(err.message || 'Could not approve the code. Please try again.');
+            showError(err.message || 'That code didn\u2019t work. Check it against your terminal and try again.');
             input.focus();
           });
       });

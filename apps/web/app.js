@@ -387,6 +387,28 @@
       tocUpdate();
     }
 
+    // ── Phones: copy each side contents into an "On this page" drop-down above the text ──
+    document.querySelectorAll(".doc-grid > .toc").forEach(function (toc) {
+      var body = toc.nextElementSibling;
+      if (!body) return;
+      var box = document.createElement("details");
+      box.className = "toc-m";
+      var sum = document.createElement("summary");
+      sum.textContent = "On this page";
+      var nav = document.createElement("nav");
+      nav.setAttribute("aria-label", "On this page");
+      Array.prototype.forEach.call(toc.children, function (el) {
+        if (el.tagName === "P" && el.textContent.trim() === sum.textContent) return; // already the drop-down's label
+        var copy = el.cloneNode(true);
+        copy.classList.remove("on");
+        nav.appendChild(copy);
+      });
+      nav.addEventListener("click", function (e) { if (e.target.closest("a")) box.open = false; });
+      box.appendChild(sum);
+      box.appendChild(nav);
+      body.insertBefore(box, body.firstChild);
+    });
+
     // ── "Start free" / "Publish a page" links jump to the form and focus it ──
     document.querySelectorAll("[data-publish]").forEach(function (a) {
       a.addEventListener("click", function (e) {

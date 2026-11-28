@@ -20,26 +20,6 @@
   <link rel="preload" href="/fonts/inter-latin-v20.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/fonts/fonts.css" />
   <link rel="stylesheet" href="/site.css" />
-  <style>
-    .legal { max-width: 44em; margin: 0 auto; padding: 48px 0 0; }
-    .legal h1 { margin-top: 8px; }
-    .legal .intro { color: var(--text-2); font-size: 16px; margin-top: 14px; }
-    .legal h2 { font-size: 20px; font-weight: 500; letter-spacing: -0.01em; margin-top: 44px; }
-    .legal h3 { font-size: 15px; font-weight: 600; margin-top: 24px; }
-    .legal p, .legal ul, .legal .tablewrap { margin-top: 12px; color: var(--text-2); }
-    .legal ul { padding-left: 20px; }
-    .legal li + li { margin-top: 6px; }
-    .legal strong { color: var(--text-1); font-weight: 600; }
-    .legal a { color: var(--text-1); text-decoration: underline; text-decoration-color: var(--border-2); text-underline-offset: 3px; }
-    .legal a:hover { text-decoration-color: var(--text-1); }
-    .legal code { font-family: var(--mono); font-size: 13px; color: var(--text-1); }
-    .legal .tablewrap { overflow-x: auto; }
-    .legal table { width: 100%; border-collapse: collapse; font-size: 14px; }
-    .legal th, .legal td { text-align: left; vertical-align: top; padding: 10px 14px 10px 0; border-bottom: 1px solid var(--border); }
-    .legal th { color: var(--text-1); font-weight: 500; }
-    .updated { margin: 0 0 32px; color: #a1a1a6; font-size: 14px; }
-    .legal .attr { margin-top: 56px; font-size: 13px; color: var(--text-3); }
-  </style>
 </head>
 <body>
 <header><div class="wrap">
@@ -49,14 +29,32 @@
 </div></header>
 
 <main class="wrap">
-  <article class="legal">
-    <p class="updated">Last updated: November 27, 2026</p>
-
+  <section class="legal-top">
     <p class="eyebrow">Legal</p>
     <h1>Privacy policy</h1>
-    <p class="intro">Your pages are yours, and so is your data. We collect as little as we can to run aired, we say exactly what it is below, and <strong>we never sell it.</strong></p>
+    <p class="lede">Your pages are yours, and so is your data. We collect as little as we can to run aired, we say exactly what it is below, and <strong>we never sell it.</strong></p>
+    <div class="legal-meta"><nav class="legal-tabs" aria-label="Policies"><a href="/terms">Terms</a><a href="/privacy" aria-current="page">Privacy</a><a href="/refunds">Refunds</a></nav><span>Last updated: November 27, 2026</span></div>
+  </section>
 
-    <h2>The short version</h2>
+  <div class="doc-grid tight">
+    <aside class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#short">The short version</a>
+      <a href="#who">Who we are</a>
+      <a href="#collect">What we collect and why</a>
+      <a href="#legal-reasons">Our legal reasons</a>
+      <a href="#storage">Where it's stored</a>
+      <a href="#processors">Who handles your data</a>
+      <a href="#cookies">Cookies</a>
+      <a href="#retention">How long we keep it</a>
+      <a href="#rights">Your rights</a>
+      <a href="#children">Children</a>
+      <a href="#security">Security</a>
+      <a href="#changes">Changes and questions</a>
+    </aside>
+    <article class="legal">
+
+    <h2 id="short">The short version</h2>
     <ul>
       <li>You can publish without an account. Then we know almost nothing about you.</li>
       <li>If you sign in, we keep your GitHub id, username, name and email.</li>
@@ -67,11 +65,11 @@
       <li>We don't put ads or trackers on your pages, and we don't sell or rent anyone's data.</li>
     </ul>
 
-    <h2>Who we are</h2>
+    <h2 id="who">Who we are</h2>
     <p>aired is run by M&amp;S CapitalSoft LLC, 312 W 2nd St, Unit #A3467, Casper, Wyoming 82601, United States. We decide how the data on this page is used, which makes us its "controller" under data protection law. Reach us at <a href="mailto:support@aired.sh">support@aired.sh</a>.</p>
     <p>One exception: publishers decide what goes on their own pages. If a page contains personal data, the person who published it is responsible for it. The same goes for what visitors enter on a page that saves it: the publisher decides what to collect and why, and aired stores it on their behalf.</p>
 
-    <h2>What we collect and why</h2>
+    <h2 id="collect">What we collect and why</h2>
 
     <h3>When you publish a page</h3>
     <ul>
@@ -142,7 +140,7 @@
     <p>We use Cloudflare Web Analytics to count visits to aired.sh's own pages, like the homepage, pricing and docs. It sets no cookies and doesn't track you across sites. It records things like which page was viewed, the referring site, your browser and your country. It doesn't run on pages people publish: those pages block it.</p>
     <p>When you use the "Copy page" menu on a guide or the docs, we count which item you picked, on which guide, and the day. Nothing about you: no IP address, cookie or account. The counts are kept in Cloudflare Analytics Engine for three months.</p>
 
-    <h2>Our legal reasons</h2>
+    <h2 id="legal-reasons">Our legal reasons</h2>
     <p>If you're in the EU or UK, the law asks us to say why we're allowed to use your data:</p>
     <ul>
       <li><strong>To provide aired to you</strong> (a contract): publishing, your account and your Pro plan.</li>
@@ -151,10 +149,10 @@
     </ul>
     <p>We don't make automated decisions about you that have legal or similar effects.</p>
 
-    <h2>Where it's stored</h2>
+    <h2 id="storage">Where it's stored</h2>
     <p>Everything runs on Cloudflare. Pages, and the screenshots of them shown in link previews and on your dashboard, live in Cloudflare R2. Page settings, account records, abuse reports and the records of apps you connect live in Cloudflare KV. Account and sign-in records (including the email you signed in with), API key hashes, billing records and view counts live in Cloudflare D1. What visitors save on pages, the data publishers push to their pages, and the lists, codes and visit records of pages shared with named people, live in Cloudflare D1 too. The analytics record of each view lives in Cloudflare Analytics Engine. So does a tiny blurred copy of each page's screenshot, shown on your dashboard while the screenshot loads. Cloudflare runs a global network, so your data is processed in many countries, including the United States. Link (Stripe), GitHub and WorkOS are in the United States too. The person who runs aired works from outside the US and the EU, and reaches this data from there. When your data leaves the EU or UK, we rely on the EU-U.S. Data Privacy Framework where the company is certified, and on the European Commission's standard contractual clauses where it isn't.</p>
 
-    <h2>Who handles your data</h2>
+    <h2 id="processors">Who handles your data</h2>
     <p>These companies handle personal data for aired. Link and GitHub also use it for their own purposes, under their own policies.</p>
     <div class="tablewrap">
       <table>
@@ -169,7 +167,7 @@
     </div>
     <p>Outside this list, we share data only when the law requires it, for example a valid court order. <strong>We never sell your data, never rent it, and never use it for ads.</strong></p>
 
-    <h2>Cookies</h2>
+    <h2 id="cookies">Cookies</h2>
     <p>We use these cookies. All of them are needed for aired to work, so we don't show a cookie banner.</p>
     <div class="tablewrap">
       <table>
@@ -187,7 +185,7 @@
     </div>
     <p>If you sign in from the CLI, your session lives in <code>~/.config/aired/session.json</code>, readable only by your user. It lasts up to a year.</p>
 
-    <h2>How long we keep it</h2>
+    <h2 id="retention">How long we keep it</h2>
     <ul>
       <li><strong>Pages</strong>: until they expire or you delete them. When a page expires, we stop serving it right away and delete its file within 30 days. A page that reaches its view limit stops being served, but we keep it until it expires or you delete it.</li>
       <li><strong>Deleted pages</strong>: removed from storage right away, with every earlier version of them.</li>
@@ -205,7 +203,7 @@
       <li><strong>Guide menu counts</strong> (guide, menu item, day): three months, then deleted automatically.</li>
     </ul>
 
-    <h2>Your rights</h2>
+    <h2 id="rights">Your rights</h2>
     <p>You can ask to see, correct, export or delete the data we hold about you. You can also ask us to stop or limit using it. You don't need a reason. Here's how:</p>
     <ul>
       <li><strong>Delete your account</strong>: from your dashboard. There's no undo.</li>
@@ -216,22 +214,23 @@
     </ul>
     <p>If you're in the EU or UK and you're unhappy with how we handled your data, you can complain to your local data protection authority. If you're in California, you have the same rights to know, delete and correct. We don't sell or share personal information as California law defines it.</p>
 
-    <h2>Children</h2>
+    <h2 id="children">Children</h2>
     <p>aired isn't meant for anyone under 16. If you think someone under 16 has given us personal data, email <a href="mailto:support@aired.sh">support@aired.sh</a> and we'll delete it.</p>
 
-    <h2>Security</h2>
+    <h2 id="security">Security</h2>
     <p>Every connection to aired uses HTTPS. Session cookies are HttpOnly and Secure. Update tokens are stored only as hashes. Page PINs are stored as salted hashes (older ones once they're next used), and PIN guesses are rate-limited. Email codes work once, for 10 minutes, five tries at most, and asking for and trying them is rate-limited. Sign-in asks for the smallest set of permissions. The code is open source, so anyone can check how it handles data. If we ever have a breach that puts your data at risk, we'll tell affected users and the authorities as the law requires.</p>
 
-    <h2>Changes and questions</h2>
+    <h2 id="changes">Changes and questions</h2>
     <p>When we change this policy, we update this page and the date at the top. The full history is in the <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">public repository</a>. If a change affects how we use data you already gave us, we tell signed-in users before it takes effect. Questions? Email <a href="mailto:support@aired.sh">support@aired.sh</a>. See also our <a href="/terms">terms</a> and <a href="/refunds">refund policy</a>.</p>
 
     <p class="attr">Adapted from <a href="https://github.com/basecamp/policies" target="_blank" rel="noopener">Basecamp's open-source policies</a>, available under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>.</p>
-  </article>
+    </article>
+  </div>
 </main>
 
 <footer><div class="wrap">
   <span>aired</span>
-  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/guides">Guides</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/share-gemini-canvas">Share a Gemini Canvas</a><a href="/publish-from-claude-code">Publish from Claude Code</a><a href="/publish-from-cursor">Publish from Cursor</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/share-slides">Share slides</a><a href="/share-vite-app">Share a Vite app</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
+  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/guides">Guides</a><a href="/connect">Connect your AI app</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/share-gemini-canvas">Share a Gemini Canvas</a><a href="/publish-from-claude-code">Publish from Claude Code</a><a href="/publish-from-cursor">Publish from Cursor</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/share-slides">Share slides</a><a href="/share-vite-app">Share a Vite app</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
 </div></footer>
 <script src="/app.js"></script>
 </body>

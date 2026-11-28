@@ -32,18 +32,22 @@
 <main class="wrap">
   <section class="ptop">
     <div class="crumbrow"><p class="eyebrow">Docs</p><div class="aimenu" data-agent="docs" data-md="/llms-full.txt" data-task="set up aired so you can publish pages for me"><button type="button" class="aimenu-copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy page</span></button><button type="button" class="aimenu-more" aria-haspopup="menu" aria-expanded="false" aria-label="More ways to use this page with AI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div></div>
-    <h1>Publish from your agent, terminal or code</h1>
-    <p class="lede">Most people never need this page: <a href="/#publish">paste or drop the HTML on the homepage</a> and send the link. These docs are for publishing from Claude Code, Cursor, scripts and CI. Every path is free and needs no account. Source is on <a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a>.</p>
-    <div class="gcards docs-paths">
-      <a class="gcard" href="#skill"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.3L12 16.8l-6.2 4.4 2.4-7.3L2 9.4h7.6z"/></svg></span><b>Skills</b><span>For Claude Code, Cursor, Windsurf and Codex. Your agent learns to publish decks, dashboards, reports and forms.</span><em class="mono">npx skills add progrmoiz/aired -g</em></a>
-      <a class="gcard" href="#cli"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 17 6-5-6-5M12 19h8"/></svg></span><b>CLI</b><span>Publish a file or a whole folder from your terminal.</span><em class="mono">npx aired page.html</em></a>
-      <a class="gcard" href="#mcp"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 9h8M8 13h5"/></svg></span><b>MCP server</b><span>Give any MCP client a publish_html tool.</span><em class="mono">aired.sh/mcp</em></a>
-      <a class="gcard" href="#api"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-4 3 4 3M16 9l4 3-4 3M14 5l-4 14"/></svg></span><b>HTTP API</b><span>POST the HTML, get a link back. No key needed.</span><em class="mono">POST /api/publish</em></a>
+    <h1>Get a link for anything you make with AI</h1>
+    <p class="lede">aired turns a page you made, like a report, a slide deck or a little game, into a link anyone can open on any phone or computer. Pick how you make your pages and start there.</p>
+    <h2 class="pick" id="paths">Pick your path</h2>
+    <div class="gcards docs-start">
+      <a class="gcard" href="/#publish"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 17v-6M9 14l3-3 3 3"/></svg></span><b>I have the file</b><span>Paste the code or drop the .html file on the homepage. You get a link right away, no account needed.</span><em>Publish on the homepage →</em></a>
+      <a class="gcard" href="/connect"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></span><b>I use a chat app</b><span>Claude, ChatGPT, Gemini or Copilot. Connect aired once, then just ask: "publish this and give me a link".</span><em>Connect your AI app →</em></a>
+      <a class="gcard" href="#install"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M12 15h5"/></svg></span><b>I use Claude Code, Cursor or a terminal</b><span>Teach your coding agent to publish, or run one command yourself. Free, no account needed.</span><em>Set up your agent ↓</em></a>
     </div>
   </section>
 
-  <div class="doc-grid">
+  <div class="doc-grid tight">
     <aside class="toc" aria-label="On this page">
+      <p>Start here</p>
+      <a href="#what">What aired does</a>
+      <a href="#words">Words on this page</a>
+      <a href="#install">Pick a way to install</a>
       <p>Install</p>
       <a href="#skill">Skills</a>
       <a href="#cli">CLI</a>
@@ -57,11 +61,48 @@
       <a href="#auth">Auth</a>
       <a href="#errors">Errors</a>
       <a href="#pin">PIN protection</a>
+      <a href="#sharing">Sharing with people</a>
       <a href="#limits">Limits</a>
       <a href="#agents">Agent surfaces</a>
       <a href="#self-host">Self-hosting</a>
     </aside>
     <article class="prose">
+
+      <!-- ─── Start here ─── -->
+      <section id="what">
+        <h2>What aired does</h2>
+        <p>You make a page with an AI tool. aired puts it online and gives you a link like <code>aired.sh/p/q3-northwind</code>. Whoever you send it to opens it in their browser: no account, no app, nothing to install.</p>
+        <ol class="flow">
+          <li><i>1</i><span><b>You publish</b>Drop the file on the homepage, ask your chat app, or let your coding agent do it.</span></li>
+          <li><i>2</i><span><b>You get a link</b>It lasts 7 days unless you pick longer. Add a PIN or a list of people if it's private.</span></li>
+          <li><i>3</i><span><b>They open it</b>On any phone or computer. Publish again and the same link shows the new version.</span></li>
+        </ol>
+      </section>
+
+      <section id="words">
+        <h2>Words on this page</h2>
+        <p>The rest of these docs are for setting aired up in coding tools. These are the words they use.</p>
+        <dl class="words">
+          <div><dt>HTML</dt><dd>The code a web page is made of. When Claude or ChatGPT "makes a page", it writes HTML.</dd></div>
+          <div><dt>Agent</dt><dd>An AI that does work on your computer for you, like Claude Code, Cursor or Codex.</dd></div>
+          <div><dt>Skill</dt><dd>A short instruction file that teaches an agent how to use aired.</dd></div>
+          <div><dt>CLI</dt><dd>Command-line tool: the <code>aired</code> command you type in a terminal.</dd></div>
+          <div><dt>MCP</dt><dd>Model Context Protocol, the standard way AI apps plug in tools. aired's MCP server gives your AI a "publish" tool.</dd></div>
+          <div><dt>API</dt><dd>A web address programs call directly. Send it HTML, get a link back.</dd></div>
+          <div><dt>Update token</dt><dd>A secret that comes with each page. Whoever has it can change or delete that page, so keep it private.</dd></div>
+        </dl>
+      </section>
+
+      <section id="install">
+        <h2>Pick a way to install</h2>
+        <p>All four are free and work without an account. Most people with a coding agent want the skills.</p>
+        <div class="gcards docs-paths">
+      <a class="gcard" href="#skill"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.3L12 16.8l-6.2 4.4 2.4-7.3L2 9.4h7.6z"/></svg></span><b>Skills</b><span>For Claude Code, Cursor, Windsurf and Codex. Your agent learns to publish decks, dashboards, reports and forms.</span><em class="mono">npx skills add progrmoiz/aired -g</em></a>
+      <a class="gcard" href="#cli"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 17 6-5-6-5M12 19h8"/></svg></span><b>CLI</b><span>Publish a file or a whole folder from your terminal.</span><em class="mono">npx aired page.html</em></a>
+      <a class="gcard" href="#mcp"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 9h8M8 13h5"/></svg></span><b>MCP server</b><span>Give any MCP client a publish_html tool.</span><em class="mono">aired.sh/mcp</em></a>
+      <a class="gcard" href="#api"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-4 3 4 3M16 9l4 3-4 3M14 5l-4 14"/></svg></span><b>HTTP API</b><span>POST the HTML, get a link back. No key needed.</span><em class="mono">POST /api/publish</em></a>
+        </div>
+      </section>
 
       <!-- ─── Skill ─── -->
       <section id="skill">
@@ -604,7 +645,7 @@ curl -X POST https://aired.sh/p/a1b2c3d4e5/access/verify \
 
 <footer><div class="wrap">
   <span>aired</span>
-  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/guides">Guides</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/share-gemini-canvas">Share a Gemini Canvas</a><a href="/publish-from-claude-code">Publish from Claude Code</a><a href="/publish-from-cursor">Publish from Cursor</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/share-slides">Share slides</a><a href="/share-vite-app">Share a Vite app</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
+  <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/guides">Guides</a><a href="/connect">Connect your AI app</a><a href="/html-to-link">HTML to link</a><a href="/share-claude-artifacts">Share Claude artifacts</a><a href="/share-chatgpt-html">Share ChatGPT HTML</a><a href="/share-gemini-canvas">Share a Gemini Canvas</a><a href="/publish-from-claude-code">Publish from Claude Code</a><a href="/publish-from-cursor">Publish from Cursor</a><a href="/password-protect-html">Password-protect HTML</a><a href="/share-html-privately">Share HTML privately</a><a href="/share-html-with-client">Send HTML to a client</a><a href="/share-slides">Share slides</a><a href="/share-vite-app">Share a Vite app</a><a href="/tiiny-host-alternative">Tiiny Host alternative</a><a href="/abuse">Report abuse</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/progrmoiz/aired" target="_blank" rel="noopener">GitHub</a></nav>
 </div></footer>
   <script>
     // ── Code-block enhancements: detect language, highlight, add copy button ──
