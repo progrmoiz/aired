@@ -27,7 +27,7 @@ Use this when the people you're sharing with also use Claude, or when you want t
 3. Paste it in the box above, or drop the file, and click **Publish**.
 4. Send the link. It opens in any browser, with no sign-in.
 
-Using Claude Code? Add aired once with `npx skills add progrmoiz/aired -g` and then just say "publish this to aired". Claude Desktop and other apps can connect to `https://aired.sh/mcp`. See the [docs](https://aired.sh/docs) for each setup.
+Using Claude Code? Add aired once with `npx skills add progrmoiz/aired -g` and then just say "publish this to aired". Claude Desktop and other apps can connect to `https://aired.sh/mcp`. See [publish from Claude Code](https://aired.sh/publish-from-claude-code), or the [docs](https://aired.sh/docs) for other apps.
 
 ## When Claude's built-in sharing gets in the way
 
@@ -56,7 +56,7 @@ Claude details from Anthropic's help center article "Share artifacts", November 
 
 ## The same works for ChatGPT and Gemini
 
-ChatGPT and Gemini can write HTML too. ChatGPT replaced Canvas with code blocks in May 2026, so ask it for "one self-contained HTML file" in a code block; Gemini can still build pages in Canvas. Copy the code and publish it the same way. See [share HTML from ChatGPT](https://aired.sh/share-chatgpt-html).
+ChatGPT and Gemini can write HTML too. ChatGPT replaced Canvas with code blocks in May 2026, so ask it for "one self-contained HTML file" in a code block; Gemini can still build pages in Canvas. Copy the code and publish it the same way. See [share HTML from ChatGPT](https://aired.sh/share-chatgpt-html) and [share a Gemini Canvas](https://aired.sh/share-gemini-canvas).
 
 ## Questions
 

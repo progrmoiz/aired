@@ -2,12 +2,15 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://aired.sh/</loc><lastmod>2026-11-25</lastmod></url>
   <url><loc>https://aired.sh/connect</loc><lastmod>2026-11-28</lastmod></url>
-  <url><loc>https://aired.sh/guides</loc><lastmod>2026-11-27</lastmod></url>
+  <url><loc>https://aired.sh/guides</loc><lastmod>2026-11-28</lastmod></url>
   <url><loc>https://aired.sh/html-to-link</loc><lastmod>2026-11-21</lastmod></url>
   <url><loc>https://aired.sh/share-claude-artifacts</loc><lastmod>2026-11-21</lastmod></url>
   <url><loc>https://aired.sh/share-chatgpt-html</loc><lastmod>2026-11-25</lastmod></url>
+  <url><loc>https://aired.sh/share-gemini-canvas</loc><lastmod>2026-11-28</lastmod></url>
+  <url><loc>https://aired.sh/publish-from-claude-code</loc><lastmod>2026-11-28</lastmod></url>
+  <url><loc>https://aired.sh/publish-from-cursor</loc><lastmod>2026-11-28</lastmod></url>
   <url><loc>https://aired.sh/password-protect-html</loc><lastmod>2026-11-25</lastmod></url>
-  <url><loc>https://aired.sh/share-html-privately</loc><lastmod>2026-11-25</lastmod></url>
+  <url><loc>https://aired.sh/share-html-privately</loc><lastmod>2026-11-28</lastmod></url>
   <url><loc>https://aired.sh/share-html-with-client</loc><lastmod>2026-11-27</lastmod></url>
   <url><loc>https://aired.sh/share-slides</loc><lastmod>2026-11-27</lastmod></url>
   <url><loc>https://aired.sh/share-vite-app</loc><lastmod>2026-11-27</lastmod></url>
