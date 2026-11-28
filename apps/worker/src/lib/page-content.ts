@@ -2,8 +2,8 @@ import { htmlIsDeck, injectDeckRuntime, parseHtmlDeck } from "./deck.ts";
 import { renderMarkdownPage } from "./doc-render.ts";
 
 /**
- * What a publish or update turns into before it's stored (routes/api.ts,
- * routes/mcp.ts): the public HTML, plus — for Markdown and decks — a
+ * What a publish or update turns into before it's stored
+ * (lib/pages-service.ts prepareContent): the public HTML, plus — for Markdown and decks — a
  * sidecar kept beside it in R2 at `pages/<id>/doc.json`.
  *
  * - Plain HTML: stored as sent, no sidecar.

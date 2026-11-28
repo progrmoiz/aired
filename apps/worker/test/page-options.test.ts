@@ -70,8 +70,8 @@ test("wiring: details and PATCH go through pageFor and ownerAccess before anythi
   assert.ok(patch.indexOf("parseOptions(body)") < patch.indexOf("pageFor(c, id"), "input is validated before the lookup");
   // The write goes through the page-write module, never straight to KV or D1.
   assert.doesNotMatch(patch, /PAGES_KV\.put|DB\.prepare/);
-  // Anonymous pages' new titles are screened.
-  assert.match(patch, /page\.row\.ownerId === null && typeof change\.title === "string"[\s\S]*detectSpam/);
+  // New titles are screened where writes are (anonymous pages, anonymous callers).
+  assert.match(patch, /typeof change\.title === "string" && spamScreened\(c, page\.row\.ownerId\)[\s\S]*spamRefusal\(/);
 });
 
 // --- Validation -------------------------------------------------------------

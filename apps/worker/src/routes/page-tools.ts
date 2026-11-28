@@ -8,7 +8,7 @@ import { siteOrigin } from "../lib/origin.ts";
 import { loadPage } from "../lib/page-write.ts";
 import { checkPage, deleteCheckShots } from "../lib/og-render.js";
 import { buildReport, CheckUnavailable, CHECK_SHOT_TTL_MS, checkShotKey, parseViewport, SHOT_URL_KEY, shotUnexpired, type CheckCaller } from "../lib/page-check.ts";
-import { ownerAccess, pageFor, sentUpdateToken } from "./api.ts";
+import { ownerAccess, pageFor, sentUpdateToken } from "../lib/pages-service.ts";
 import { hashToHex } from "@aired/core";
 import { apiError } from "../lib/errors.ts";
 import { kindOf, readSidecar } from "../lib/page-content.ts";

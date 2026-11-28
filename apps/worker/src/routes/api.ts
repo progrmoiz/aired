@@ -1,348 +1,94 @@
 import { Hono, type Context } from "hono";
 import type { AppBindings } from "../types.js";
-import { loadStats, publicStats, saveStats } from "../lib/stats.js";
+import { loadStats, publicStats } from "../lib/stats.js";
 import { countryTotals, mergeViewTotals, pageViewCounts, viewCountOf } from "../lib/view-counts.ts";
 import { rateLimit, publishRateLimit } from "../middleware/rate-limit.js";
 import { requireCsrfHeader } from "../middleware/csrf.js";
 import { readUpdateToken } from "../lib/page-token.js";
 import { TIERS } from "../lib/rate-limit-tiers.js";
-import { detectSpam, SPAM_REJECTION } from "../lib/spam.js";
-import { claimUrl } from "../lib/claim-url.js";
 import { hashPin } from "../lib/pin-hash.js";
 import { authorizePageWrite } from "../lib/claim-decision.js";
-import { createPage, deletePage, loadPage, PageGone, setPageOptions, StorageUnavailable, updatePage, type LoadedPage } from "../lib/page-write.ts";
-import { changedSettings, OWNER_REQUIRED_MESSAGE, pageAccess, pageDetails, parseOptions, replaceAllowed, settingsChange } from "../lib/page-options.ts";
-import { pageHasResponses } from "../lib/collect-store.ts";
+import { deletePage, PageGone, setPageOptions, type LoadedPage } from "../lib/page-write.ts";
+import { changedSettings, pageDetails, parseOptions, settingsChange } from "../lib/page-options.ts";
 import { feedbackAllowed, feedbackId, insertFeedback, NOT_SUPPORT, parseFeedback } from "../lib/feedback.ts";
 import { visitorNetwork } from "../lib/pin-guess.ts";
-import { billingEnabled, getEntitlements, planLimitError, upgradeUrl } from "../lib/entitlements.js";
+import { getEntitlements, planLimitError } from "../lib/entitlements.js";
 import { siteOrigin } from "../lib/origin.ts";
-import { refreshShot } from "../lib/og-render.js";
 import { apiError } from "../lib/errors.ts";
 import { publicPageMeta } from "../lib/public-meta.ts";
-import { buildContent, contentFields, kindOf, readSidecar } from "../lib/page-content.ts";
-import { versionAuthor, versionCounts, type VersionAuthor } from "../lib/page-versions.ts";
-import type { Entitlements } from "../lib/entitlements.js";
+import { kindOf, readSidecar } from "../lib/page-content.ts";
+import { versionCounts } from "../lib/page-versions.ts";
 import { fromEntries, overLimit, toEntries } from "../lib/access-list.ts";
 import { clearAccessList, getAccessEntries, replaceAccessList } from "../lib/access-store.ts";
 import { emailSenderFor } from "../lib/email-sender.ts";
 import {
-  generateId,
-  generateToken,
-  hashToken,
-  verifyToken,
-  validateHtml,
-  extractTitle,
-  parseMetadata,
-  normalizeProject,
-  hashToHex,
-  capTitle,
-  parseBody,
-  publishBody,
-  updateBody,
-  DEFAULT_TTL,
-  MAX_SIZE,
-  PRO_MAX_SIZE,
-} from "@aired/core";
-import type { PageMetadata } from "@aired/core";
+  createFromPublish,
+  invalidInput,
+  invalidToken,
+  noCredential,
+  ownerAccess,
+  pageFor,
+  prepareContent,
+  readJson,
+  replaceContent,
+  sentUpdateToken,
+  spamRefusal,
+  spamScreened,
+} from "../lib/pages-service.ts";
+import { idempotentPublish } from "../middleware/idempotency.ts";
+import { verifyToken, parseMetadata, hashToHex, parseBody, publishBody, updateBody } from "@aired/core";
 
 const api = new Hono<AppBindings>();
 
-/**
- * The live page and the owner and token hash that count for it, from its D1
- * row (lib/page-write.ts loadPage), never from the KV record, which can be
- * written back stale. A D1 error answers 503: fail closed rather than trust
- * a possibly stale hash.
- */
-export async function pageFor(c: Context<AppBindings>, id: string, route: string): Promise<LoadedPage | Response> {
-  try {
-    return (await loadPage(c.env, id)) ?? apiError(c, 404, "not_found", "Page not found");
-  } catch (err) {
-    console.error("pages lookup failed", { route, id, err });
-    return apiError(c, 503, "unavailable", CREDENTIALS_UNAVAILABLE);
-  }
-}
-
-const CREDENTIALS_UNAVAILABLE = "Could not check this page's credentials. Please try again.";
-const STORAGE_FULL = "Service temporarily unavailable — storage write limit reached. Try again later.";
-
-/**
- * Validate HTML against the caller's plan size limit. `response` is the error
- * response, or null when the HTML is fine. A signed-in free user whose page
- * would fit on Pro gets a 402 upgrade prompt when billing is on; everyone else
- * gets the validateHtml 400 as before. `ent` is the caller's entitlements
- * (null when anonymous), returned so the success path doesn't read KV again.
- */
-async function rejectInvalidHtml(
-  c: Context<AppBindings>,
-  html: string,
-): Promise<{ response: Response | null; ent: Entitlements | null }> {
-  const user = c.get("user");
-  const ent = user !== null ? await getEntitlements(c.env, user.id) : null;
-  const maxBytes = ent !== null ? ent.maxBytes : MAX_SIZE;
-  const validation = validateHtml(html, maxBytes);
-  if (validation.ok) return { response: null, ent };
-  if (ent !== null && ent.plan === "free" && billingEnabled(c.env)) {
-    const size = new TextEncoder().encode(html).byteLength;
-    if (size > maxBytes && size <= PRO_MAX_SIZE) {
-      return { response: c.json(planLimitError("page_size", siteOrigin(c.env)), 402), ent };
-    }
-  }
-  return { response: apiError(c, 400, "invalid_html", validation.error), ent };
-}
-
-/**
- * The request's JSON body, or the 400 to answer when it isn't JSON. A body
- * sent without Content-Length that runs past the size cap is rethrown, so
- * bodyLimit (middleware/api-contract.ts) answers its 413.
- */
-async function readJson(c: Context<AppBindings>): Promise<{ body: unknown } | Response> {
-  try {
-    return { body: await c.req.json() };
-  } catch (err) {
-    if (err instanceof Error && err.name === "BodyLimitError") throw err;
-    return apiError(c, 400, "invalid_json", "Invalid JSON body");
-  }
-}
-
-/** A body that failed its schema (lib/errors.ts): `field` names the field when there is one. */
-function invalidInput(c: Context<AppBindings>, error: string, field: string | null): Response {
-  return apiError(c, 400, "invalid_input", error, field !== null ? { field } : {});
-}
-
-const spamRejected = (c: Context<AppBindings>) => apiError(c, 422, "spam_rejected", SPAM_REJECTION);
-const invalidToken = (c: Context<AppBindings>) => apiError(c, 403, "invalid_token", "Invalid update token");
-
-/**
- * No working credential for a page write (PUT, DELETE): 401 when the caller
- * sent nothing at all, 403 when they're signed in but it isn't their page.
- * Same rule as the details and PATCH routes (lib/page-options.ts pageAccess).
- */
-function noCredential(c: Context<AppBindings>): Response {
-  if (c.get("user") !== null) {
-    return apiError(c, 403, "not_owner", "This page isn't in your account. Use its update token instead.");
-  }
-  return apiError(c, 401, "token_required", "Send the page's update_token (in the body or as Authorization: Bearer <update_token>), or sign in as its owner.");
-}
-
-/**
- * The `upgrade` key for a successful publish/update response: only a signed-in
- * free-plan caller with billing on sees the offer to remove the badge.
- */
-function upgradeHint(
-  c: Context<AppBindings>,
-  ent: Entitlements | null,
-): { upgrade: { reason: "badge"; url: string } } | Record<string, never> {
-  if (ent === null || ent.plan !== "free" || !billingEnabled(c.env)) return {};
-  return { upgrade: { reason: "badge", url: upgradeUrl(siteOrigin(c.env), "publish") } };
-}
-
-// POST /api/publish — create a new page or update an existing one via update_token
-api.post("/publish", publishRateLimit, async (c) => {
+// POST /api/publish — create a new page, or replace one with id + update_token.
+// Accepts an Idempotency-Key header (lib/idempotency.ts): a retry with the
+// same key and body answers the first response instead of a second page.
+api.post("/publish", idempotentPublish, publishRateLimit, async (c) => {
   const json = await readJson(c);
   if (json instanceof Response) return json;
   // Shapes and bounds in @aired/core (schemas.ts); a wrong-typed field is ignored, as before.
   const parsed = parseBody(publishBody, json.body);
   if (!parsed.ok) return invalidInput(c, parsed.error, parsed.field);
-  const { title, pin, ttl, reads, permanent, project, update_token, id: existingId, message } = parsed.data;
-  // Markdown is rendered and an HTML deck's notes are cut out here (lib/page-content.ts).
-  const content = buildContent(parsed.data);
-  const html = content.html;
-
-  const { response: invalid, ent } = await rejectInvalidHtml(c, html);
-  if (invalid !== null) return invalid;
-
-  const resolvedTitle = capTitle(title) ?? capTitle(content.title) ?? capTitle(extractTitle(html));
-
-  const origin = new URL(c.req.url).origin;
-  const user = c.get('user');
-
-  // Anonymous publishes (create or update) are screened for spam.
-  // Signed-in publishers are accountable and skip the filter.
-  if (user === null) {
-    const verdict = detectSpam(html, resolvedTitle);
-    if (verdict.spam) {
-      console.log({ event: "spam_rejected", route: "api_publish", reason: verdict.reason });
-      return spamRejected(c);
-    }
-  }
+  const { update_token, id: existingId, message } = parsed.data;
+  // Markdown rendered, an HTML deck's notes cut out, the plan's size limit (lib/pages-service.ts).
+  const prepared = await prepareContent(c, parsed.data);
+  if (prepared instanceof Response) return prepared;
 
   // Update path: update_token + id provided
   if (typeof update_token === "string" && typeof existingId === "string") {
     const page = await pageFor(c, existingId, "publish_update");
     if (page instanceof Response) return page;
-    const creds = { ownerId: page.row.ownerId, tokenHash: page.row.tokenHash };
-
-    const valid = await verifyToken(update_token, creds.tokenHash);
-    if (!valid) return invalidToken(c);
-    const refusal = await replaceRefusal(c, page);
-    if (refusal !== null) return refusal;
-
-    // An anonymous page is screened on update whoever sends it, so a clean
-    // page can't be swapped for spam (as PUT does).
-    if (user !== null && creds.ownerId === null) {
-      const verdict = detectSpam(html, resolvedTitle);
-      if (verdict.spam) {
-        console.log({ event: "spam_rejected", route: "api_publish_update", reason: verdict.reason });
-        return spamRejected(c);
-      }
-    }
-
-    const { metadata: updated, expiresAt, htmlEtag, version } = await updatePage(c.env, page, html, resolvedTitle, Date.now(), content.sidecar, authorOf(c, true, message));
-
-    // Link-preview screenshot, after the response (lib/og-render.ts).
-    c.executionCtx.waitUntil(refreshShot(c.env, existingId, updated, html, htmlEtag, { replacing: true }));
-
-    return c.json({
-      id: existingId,
-      url: `${origin}/p/${existingId}`,
-      update_token,
-      expiresAt,
-      ...(version !== null ? { version } : {}),
-      ...contentFields(origin, existingId, content.sidecar),
-      ...upgradeHint(c, ent),
-    });
+    if (!(await verifyToken(update_token, page.row.tokenHash))) return invalidToken(c);
+    return replaceContent(c, page, prepared, { token: update_token, message, route: "api_publish_update" });
   }
-
-  // Create path: new page
-  const id = generateId();
-  const token = generateToken();
-  const tokenHash = await hashToken(token);
-
-  // Authenticated publishers default to permanent (no expiry).
-  // Explicit `permanent: false` or an explicit `ttl` opts back into expiration.
-  const isPermanent =
-    permanent === true ||
-    (permanent !== false && (typeof ttl !== "number" || ttl <= 0) && user !== null);
-  const ttlSeconds =
-    isPermanent ? null
-    : typeof ttl === "number" && ttl > 0 ? Math.floor(ttl)
-    : DEFAULT_TTL;
-
-  const now = new Date();
-  const expiresAt = ttlSeconds !== null
-    ? new Date(now.getTime() + ttlSeconds * 1000).toISOString()
-    : null;
-
-  const metadata: PageMetadata = {
-    id,
-    title: resolvedTitle,
-    size: new TextEncoder().encode(html).byteLength,
-    tokenHash,
-    // Stored as a salted PBKDF2 hash (lib/pin-hash.ts), never as typed.
-    pin: typeof pin === "string" && pin.length > 0 ? await hashPin(pin) : null,
-    reads: typeof reads === "number" && reads > 0 ? Math.floor(reads) : null,
-    readCount: 0,
-    permanent: isPermanent,
-    createdAt: now.toISOString(),
-    expiresAt,
-    ownerId: user !== null ? user.id : null,
-    project: normalizeProject(project),
-  };
-
-  // D1 row, R2 HTML and KV cache record, or nothing (lib/page-write.ts).
-  let htmlObj: R2Object | null;
-  try {
-    htmlObj = await createPage(c.env, metadata, html, now.getTime(), content.sidecar, authorOf(c, false, message));
-  } catch (err) {
-    if (err instanceof StorageUnavailable) {
-      console.error("publish storage write failed", { id, err: err.message });
-      return apiError(c, 503, "storage_unavailable", STORAGE_FULL);
-    }
-    throw err;
-  }
-
-  // Increment publish counter (fire-and-forget)
-  c.executionCtx.waitUntil(
-    (async () => {
-      const stats = await loadStats(c.env.PAGES_KV);
-      stats.publishes += 1;
-      await saveStats(c.env.PAGES_KV, stats);
-    })().catch(() => {}),
-  );
-
-  // Link-preview screenshot, after the response (lib/og-render.ts).
-  c.executionCtx.waitUntil(refreshShot(c.env, id, metadata, html, htmlObj?.etag ?? null, { replacing: false }));
-
-  return c.json({
-    id,
-    url: `${origin}/p/${id}`,
-    update_token: token,
-    expiresAt,
-    version: 1,
-    ...contentFields(origin, id, content.sidecar),
-    // Anonymous creates get a link to attach the page to an account later.
-    ...(user === null ? { claim_url: claimUrl(siteOrigin(c.env), id, token) } : {}),
-    ...upgradeHint(c, ent),
-  });
+  return createFromPublish(c, parsed.data, prepared, "api_publish");
 });
 
 // PUT /api/pages/:id — update by token (body or Bearer header) or owner JWT
 api.put("/pages/:id", requireCsrfHeader, async (c) => {
   const id = c.req.param("id") ?? "";
-
   const json = await readJson(c);
   if (json instanceof Response) return json;
   const parsed = parseBody(updateBody, json.body);
   if (!parsed.ok) return invalidInput(c, parsed.error, parsed.field);
-  const { title } = parsed.data;
   const update_token = readUpdateToken(parsed.data.update_token, c.req.header("Authorization"));
-  const content = buildContent(parsed.data);
-  const html = content.html;
-
-  const { response: invalid, ent } = await rejectInvalidHtml(c, html);
-  if (invalid !== null) return invalid;
-
-  const resolvedTitle = capTitle(title) ?? capTitle(content.title) ?? capTitle(extractTitle(html));
+  const prepared = await prepareContent(c, parsed.data);
+  if (prepared instanceof Response) return prepared;
 
   const page = await pageFor(c, id, "put");
   if (page instanceof Response) return page;
-  const creds = { ownerId: page.row.ownerId, tokenHash: page.row.tokenHash };
-
   // Authorization: update_token (body, else Bearer header) wins (R6); else owner JWT
-  const putUser = c.get('user');
   const auth = await authorizePageWrite({
-    ownerId: creds.ownerId,
-    tokenHash: creds.tokenHash,
+    ownerId: page.row.ownerId,
+    tokenHash: page.row.tokenHash,
     token: update_token,
-    userId: putUser?.id ?? null,
+    userId: c.get("user")?.id ?? null,
     allowSession: true,
     matches: (hash) => verifyToken(update_token as string, hash),
   });
-
   if (!auth.ok) return auth.reason === "bad_token" ? invalidToken(c) : noCredential(c);
-  const refusal = await replaceRefusal(c, page);
-  if (refusal !== null) return refusal;
-
-  // Anonymous pages are screened on update too, so a clean page can't be
-  // swapped for spam after publishing.
-  if (creds.ownerId === null) {
-    const verdict = detectSpam(html, resolvedTitle);
-    if (verdict.spam) {
-      console.log({ event: "spam_rejected", route: "api_put", reason: verdict.reason });
-      return spamRejected(c);
-    }
-  }
-
-  const author = authorOf(c, auth.viaToken, parsed.data.message);
-  const { metadata: updated, expiresAt, htmlEtag, version } = await updatePage(c.env, page, html, resolvedTitle, Date.now(), content.sidecar, author);
-
-  // Link-preview screenshot, after the response (lib/og-render.ts).
-  c.executionCtx.waitUntil(refreshShot(c.env, id, updated, html, htmlEtag, { replacing: true }));
-
-  const origin = new URL(c.req.url).origin;
-  // Return the token string back (prefer the body token; if owner-JWT path used, no token in response)
-  const returnToken = auth.viaToken ? (update_token as string) : undefined;
-
-  return c.json({
-    id,
-    url: `${origin}/p/${id}`,
-    ...(returnToken !== undefined ? { update_token: returnToken } : {}),
-    expiresAt,
-    ...(version !== null ? { version } : {}),
-    ...contentFields(origin, id, content.sidecar),
-    ...upgradeHint(c, ent),
-  });
+  // The token is echoed back only when it's what authorized the write.
+  return replaceContent(c, page, prepared, { token: auth.viaToken ? update_token : null, message: parsed.data.message, route: "api_put" });
 });
 
 // DELETE /api/pages/:id — delete by Bearer token OR owner-JWT convenience path
@@ -399,47 +145,6 @@ api.delete("/pages/:id", requireCsrfHeader, async (c) => {
 
   return c.json({ ok: true });
 });
-
-/**
- * The update token a request carries for get_page and set_options: the
- * body's update_token, else X-Update-Token (for API key callers, whose
- * Authorization holds the key), else a non-key Bearer token.
- */
-export function sentUpdateToken(c: Context<AppBindings>, bodyToken?: unknown): string | null {
-  const header = c.req.header("X-Update-Token");
-  if (typeof bodyToken === "string" && bodyToken !== "") return bodyToken;
-  if (header !== undefined && header.trim() !== "") return header.trim();
-  return readUpdateToken(undefined, c.req.header("Authorization"));
-}
-
-/** Who is publishing or updating, for the page's history (lib/page-versions.ts). */
-export function authorOf(c: Context<AppBindings>, viaToken: boolean, message?: string, restoredFrom?: number): VersionAuthor {
-  return versionAuthor({ viaToken, via: c.get("via") ?? null, userAgent: c.req.header("User-Agent"), message: message ?? null, restoredFrom: restoredFrom ?? null });
-}
-
-/** null when this caller may replace the page's content; else the refusal (see replaceAllowed). */
-export async function replaceRefusal(c: Context<AppBindings>, page: LoadedPage): Promise<Response | null> {
-  if (page.row.ownerId === null) return null; // anonymous pages can't collect responses
-  let hasResponses: boolean;
-  try {
-    hasResponses = await pageHasResponses(c.env.DB, page.row.id);
-  } catch (err) {
-    console.error("responses lookup failed before replace", { id: page.row.id, err });
-    return apiError(c, 503, "unavailable", "Could not check this page. Please try again.");
-  }
-  const userId = c.get("user")?.id ?? null;
-  return replaceAllowed({ ownerId: page.row.ownerId, userId, hasResponses }) ? null : apiError(c, 403, "owner_required", OWNER_REQUIRED_MESSAGE);
-}
-
-/** The token or signed-in owner check shared by details and PATCH (lib/page-options.ts). */
-export async function ownerAccess(c: Context<AppBindings>, page: LoadedPage, token: string | null) {
-  return pageAccess({
-    ownerId: page.row.ownerId,
-    userId: c.get("user")?.id ?? null,
-    tokenSent: token !== null,
-    tokenMatches: token !== null && (await verifyToken(token, page.row.tokenHash)),
-  });
-}
 
 /** The page's view count, from its KV record (where views are counted). */
 // Views live in D1 page_views; the KV readCount is the fallback for pages
@@ -516,15 +221,12 @@ api.patch("/pages/:id", requireCsrfHeader, rateLimit(TIERS.page_options), async 
   const access = await ownerAccess(c, page, sentUpdateToken(c, (body as Record<string, unknown>).update_token));
   if (!access.ok) return apiError(c, access.status, access.code, access.error);
 
-  // A new title on an anonymous page is screened with its HTML, as an
-  // update would be, so a clean page can't be retitled into spam.
-  if (page.row.ownerId === null && typeof change.title === "string") {
+  // A new title is screened with the page's HTML, as an update would be
+  // (lib/pages-service.ts), so a clean page can't be retitled into spam.
+  if (typeof change.title === "string" && spamScreened(c, page.row.ownerId)) {
     const obj = await c.env.PAGES_BUCKET.get(`pages/${id}/index.html`);
-    const verdict = detectSpam(obj === null ? "" : await obj.text(), change.title);
-    if (verdict.spam) {
-      console.log({ event: "spam_rejected", route: "api_patch", reason: verdict.reason });
-      return spamRejected(c);
-    }
+    const spam = spamRefusal(c, obj === null ? "" : await obj.text(), change.title, "api_patch", page.row.ownerId);
+    if (spam !== null) return spam;
   }
 
   const now = Date.now();

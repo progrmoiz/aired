@@ -77,16 +77,18 @@ test("wiring: only an API key or an MCP OAuth token signs MCP callers in, and th
   }
   const index = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
   assert.match(index, /if \(via === "key" \|\| via === "oauth"\) return rateLimit\(TIERS\.mcp_key\)\(c, next\);/);
-  // Anonymous: publish_html keeps the publish limit; the other tools get their own per-IP one.
-  assert.match(index, /return mcpToolName\(body\) === "publish_html" \? publishRateLimit\(c, next\) : rateLimit\(TIERS\.mcp_anon\)\(c, next\);/);
+  // Anonymous: a per-IP limit on every tool call; publishes count against the publish limit inside the API.
+  assert.match(index, /return rateLimit\(TIERS\.mcp_anon\)\(c, next\);/);
+  assert.match(readFileSync(new URL("../src/routes/api.ts", import.meta.url), "utf8"), /api\.post\("\/publish", idempotentPublish, publishRateLimit,/);
   assert.match(index, /if \(countMcpToolCalls\(body\) > 1\) \{/);
   assert.match(mcp, /if \(typeof update_token === "string" && typeof existingId !== "string"\) \{/);
-  assert.match(mcp, /return isTokenUpdate \? publishUpdateResult\(res\.body, null\) : publishResult\(res\.body, signedIn\.login\);/);
+  assert.match(mcp, /if \(isTokenUpdate\) return signedIn !== null \? publishUpdateResult\(res\.body, null\) : anonymousUpdateResult\(res\.body\);/);
   // update_page, delete_page, get_page, check_page, export_pdf, get_responses, update_data, list_versions and restore_version check the id; set_options checks args.id.
   assert.equal((mcp.match(/if \(!PAGE_ID\.test\(id\)\) return badId\(\);/g) ?? []).length, 9);
   assert.match(mcp, /if \(!PAGE_ID\.test\(args\.id\)\) return badId\(\);/);
-  const api = readFileSync(new URL("../src/routes/api.ts", import.meta.url), "utf8");
-  assert.match(api, /if \(user !== null && creds\.ownerId === null\) \{\s*const verdict = detectSpam/);
+  // Signed-in callers are screened for spam on anonymous pages (lib/pages-service.ts).
+  const service = readFileSync(new URL("../src/lib/pages-service.ts", import.meta.url), "utf8");
+  assert.match(service, /return c\.get\("user"\) === null \|\| pageOwnerId === null;/);
 });
 
 test("get_account hides the upgrade link when billing is off", () => {

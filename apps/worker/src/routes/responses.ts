@@ -6,7 +6,7 @@ import { TIERS } from "../lib/rate-limit-tiers.js";
 import { apiError } from "../lib/errors.ts";
 import { siteOrigin } from "../lib/origin.ts";
 import { billingEnabled, getEntitlements, planLimitError } from "../lib/entitlements.js";
-import { pageFor } from "./api.ts";
+import { pageFor } from "../lib/pages-service.ts";
 import {
   decodeEntryCursor,
   deleteEntries,

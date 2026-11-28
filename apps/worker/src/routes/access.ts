@@ -16,7 +16,7 @@ import { accessCookieName, accessCookieValue, cleanCode, codeHash, emailKey, new
 import { durableUsed, getAccessEntries, listVisitors, putCode, recordVisit, useCode } from "../lib/access-store.ts";
 import { accessCodeEmail, emailSenderFor } from "../lib/email-sender.ts";
 import { accessGatePage, gateHeaders, newNonce } from "../lib/access-page.ts";
-import { pageFor } from "./api.ts";
+import { pageFor } from "../lib/pages-service.ts";
 
 /**
  * "Only these people": a page its owner shared with named emails and

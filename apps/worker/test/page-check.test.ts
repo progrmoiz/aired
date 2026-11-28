@@ -288,8 +288,8 @@ test("wiring: the check route asks for the owner, rate-limits, and spends the bu
   assert.match(src("src/lib/rate-limit-tiers.ts"), /page_check: +\{ bucketPrefix: 'rl:check', +limit: 20, windowSeconds: 3600 \}/);
   assert.match(src("wrangler.toml"), /name = "CHECK_BURST"\s*\nnamespace_id = "1009"\s*\nsimple = \{ limit = 3, period = 60 \}/);
   // Mounted before api.ts, so /api/pages/:id/check isn't taken by another route.
-  const index = src("src/index.ts");
-  assert.ok(index.indexOf('app.route("/api", pageTools);') < index.indexOf('app.route("/api", api);'));
+  const index = src("src/routes/api-table.ts");
+  assert.ok(index.indexOf('["/api", pageTools]') > 0 && index.indexOf('["/api", pageTools]') < index.indexOf('["/api", api]'));
 });
 
 test("local origins render at aired.sh, since Browser Rendering refuses local addresses", async () => {

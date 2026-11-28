@@ -41,10 +41,29 @@ function text(lines: string[], isError = false): ToolResult {
 type Obj = Record<string, unknown>;
 const str = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
 
+/**
+ * An API error body's fields, `{ error: { code, message, ...extra } }`
+ * (lib/errors.ts), flat: `message`, `code` and the extras. A flat body
+ * (`{ error: "...", code }`) reads the same.
+ */
+export function apiErrorFields(body: unknown): Obj & { message: string | null; code: string | null } {
+  const b = (body ?? {}) as Obj;
+  if (typeof b.error === 'object' && b.error !== null) {
+    const e = b.error as Obj;
+    return { ...e, message: str(e.message), code: str(e.code) };
+  }
+  return { ...b, message: str(b.error), code: str(b.code) };
+}
+
+/** An API error's message, or "The aired API answered <status>." */
+export function apiErrorMessage(status: number, body: unknown): string {
+  return apiErrorFields(body).message ?? `The aired API answered ${status}.`;
+}
+
 /** An API error as a tool error. Plan limits say a person must open the upgrade link. */
 export function apiErrorResult(status: number, body: unknown, origin: string): ToolResult {
-  const b = (body ?? {}) as Obj;
-  const message = str(b.error) ?? `The aired API answered ${status}.`;
+  const b = apiErrorFields(body);
+  const message = apiErrorMessage(status, body);
   if (b.code === 'plan_limit' && str(b.upgrade_url)) {
     return text(
       [
@@ -89,6 +108,33 @@ export function publishResult(body: unknown, login: string): ToolResult {
     ...deckLines(b),
     ...upgradeLines(b),
   ]), publishOut(body, { updated: false, owner: login }));
+}
+
+/** An anonymous publish_html create, answered by the API: the token to update it and the link to keep it. */
+export function anonymousPublishResult(body: unknown, origin: string): ToolResult {
+  const b = (body ?? {}) as Obj;
+  const c = contentOut(b);
+  const lines = [
+    `Published to ${String(b.url)}`,
+    `Update token: ${String(b.update_token)}`,
+    expiryLine(b.expiresAt),
+    '',
+    'Pass update_token and id to update the same URL.',
+    `To keep this page in an aired account, open: ${String(b.claim_url)}`,
+  ];
+  if (c.kind === 'deck') {
+    lines.push(`Slides: ${c.slides ?? 0}. Speaker notes stay out of the public page; the owner sees them at ${origin}/p/${String(b.id)}/presenter once the page is in their account.`);
+  }
+  return withData(text(lines), publishOut(body, { updated: false, owner: null }));
+}
+
+/** An anonymous publish_html update by id and update token, answered by the API. */
+export function anonymousUpdateResult(body: unknown): ToolResult {
+  const b = (body ?? {}) as Obj;
+  const c = contentOut(b);
+  const lines = [`Updated ${String(b.url)}`, `Update token: ${String(b.update_token)}`, 'Pass update_token and id to update again.'];
+  if (c.kind === 'deck') lines.push(`Slides: ${c.slides ?? 0}.`);
+  return withData(text(lines), publishOut(body, { updated: true, owner: null }));
 }
 
 function updateText(body: unknown): ToolResult {

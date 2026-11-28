@@ -24,10 +24,10 @@ import { getEntitlements } from "./entitlements.js";
 import { deletePageAccessData } from "./access-store.ts";
 
 /**
- * The one way every route creates, updates, deletes or looks up a page
- * (routes/api.ts publish, PUT, PATCH and DELETE, and the anonymous MCP tool in
- * routes/mcp.ts). D1 `pages` is written first and decides; then R2 holds
- * the HTML and KV `page:<id>` the viewer's cached copy.
+ * The one way every route creates, updates, deletes or looks up a page in
+ * storage (the rules around it are lib/pages-service.ts, which routes/api.ts
+ * and, through it, the MCP use). D1 `pages` is written first and decides;
+ * then R2 holds the HTML and KV `page:<id>` the viewer's cached copy.
  *
  * The KV owner and project indexes (`pages_by_owner:`,
  * `pages_by_owner_project:`, `projects_by_owner:`) and D1 `page_claims` are

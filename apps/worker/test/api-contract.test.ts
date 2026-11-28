@@ -1,112 +1,33 @@
-import "./helpers/ts-resolve.ts";
+import { setupApi as setup, errorOf } from "./helpers/api-app.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fakeD1 } from "./helpers/d1.ts";
 
-// The real API router behind the same contract middleware index.ts applies
-// (middleware/api-contract.ts). index.ts itself needs the Workers runtime.
-const { Hono } = await import("hono");
-type Context = import("hono").Context;
-const { api } = await import("../src/routes/api.ts");
-const { applyApiContract, apiNotFound } = await import("../src/middleware/api-contract.ts");
-const { BODY_LIMIT_BYTES } = await import("../src/lib/input-limits.ts");
-
-type User = { id: number; login: string; email: string | null; name: string | null };
-
-function fakeKv(): KVNamespace {
-  const m = new Map<string, string>();
-  return {
-    async get(k: string, opts?: unknown) {
-      const v = m.get(k) ?? null;
-      const type = typeof opts === "string" ? opts : (opts as { type?: string } | undefined)?.type;
-      return v !== null && type === "json" ? JSON.parse(v) : v;
-    },
-    async put(k: string, v: string) { m.set(k, v); },
-    async delete(k: string) { m.delete(k); },
-    async list() { return { keys: [], list_complete: true, cursor: "" }; },
-  } as unknown as KVNamespace;
-}
-
-function fakeR2(): R2Bucket {
-  const m = new Map<string, string>();
-  return {
-    async put(k: string, v: string) { m.set(k, String(v)); return { key: k, etag: `e${m.size}` }; },
-    async get(k: string) {
-      const v = m.get(k);
-      return v === undefined ? null : { text: async () => v, body: v, customMetadata: {} };
-    },
-    async delete(keys: string | string[]) { for (const k of [keys].flat()) m.delete(k); },
-    async list() { return { objects: [], truncated: false }; },
-  } as unknown as R2Bucket;
-}
-
-function setup() {
-  const d1 = fakeD1();
-  const env = { PAGES_KV: fakeKv(), PAGES_BUCKET: fakeR2(), DB: d1.db, SESSION_SECRET: "x".repeat(32) };
-  const app = new Hono<{ Bindings: typeof env; Variables: { user: User | null; via: string | null; jti: string | null; requestId: string } }>();
-  // Stands in for authMiddleware: X-Test-User signs the request in as that
-  // id, and X-Test-Bad-Key answers 401 the way a revoked API key does.
-  applyApiContract(app as never, (async (c: Context, next: () => Promise<void>) => {
-    if (c.req.header("X-Test-Bad-Key") !== undefined) return c.json({ error: "Invalid or revoked API key" }, 401);
-    const id = c.req.header("X-Test-User");
-    c.set("user", id === undefined ? null : { id: Number(id), login: `u${id}`, email: null, name: null });
-    c.set("via", id === undefined ? null : "key");
-    c.set("jti", null);
-    c.set("requestId", "test");
-    await next();
-  }) as never);
-  app.route("/api", api as never);
-  app.get("/api/legacy-conflict", (c) => c.json({ error: "Already there" }, 409));
-  app.get("/api/legacy-pending", (c) => c.json({ error: "authorization_pending" }, 400));
-  app.notFound((c) => apiNotFound(c) ?? c.text("site 404", 404));
-  const ctx = { waitUntil() {}, passThroughOnException() {}, props: {} };
-  const call = (path: string, init: RequestInit = {}) =>
-    app.request(`https://aired.sh${path}`, { ...init, headers: { "CF-Connecting-IP": "203.0.113.9", ...(init.headers ?? {}) } }, env, ctx as never);
-  const post = (path: string, body: unknown, headers: Record<string, string> = {}, method = "POST") =>
-    call(path, { method, body: typeof body === "string" ? body : JSON.stringify(body), headers: { "Content-Type": "application/json", ...headers } });
-  return { env, raw: d1.raw, call, post };
-}
+// Error shape, JSON 404s and 413s: api-errors.test.ts.
 
 const publish = async (s: ReturnType<typeof setup>, body: Record<string, unknown> = {}, headers: Record<string, string> = {}) => {
   const res = await s.post("/api/publish", { html: "<h1>Hello</h1>", ...body }, headers);
   return { res, body: (await res.json()) as Record<string, unknown> };
 };
 
-test("an unknown /api path answers a JSON 404 with a code", async () => {
-  const s = setup();
-  const res = await s.call("/api/nope");
-  assert.equal(res.status, 404);
-  assert.deepEqual(await res.json(), { error: "Not found", code: "not_found" });
-  assert.equal(await (await s.call("/elsewhere")).text(), "site 404");
-});
-
-test("older routes that send only { error } get a code from the status, or their own code-like error", async () => {
-  const s = setup();
-  // Auth's own errors too: it runs inside the error-code middleware.
-  assert.deepEqual(await (await s.call("/api/stats", { headers: { "X-Test-Bad-Key": "1" } })).json(), { error: "Invalid or revoked API key", code: "unauthorized" });
-  assert.deepEqual(await (await s.call("/api/legacy-conflict")).json(), { error: "Already there", code: "conflict" });
-  assert.deepEqual(await (await s.call("/api/legacy-pending")).json(), { error: "authorization_pending", code: "authorization_pending" });
-});
-
 test("publish: bad JSON, no html and a non-object body are 400s with codes", async () => {
   const s = setup();
   const bad = await s.post("/api/publish", "{nope");
   assert.equal(bad.status, 400);
-  assert.equal(((await bad.json()) as { code: string }).code, "invalid_json");
+  assert.equal((await errorOf(bad)).code, "invalid_json");
 
   const noHtml = await s.post("/api/publish", { title: "x" });
   assert.equal(noHtml.status, 400);
-  assert.deepEqual(await noHtml.json(), { error: "html is required and must be a string", code: "invalid_input", field: "html" });
+  assert.deepEqual(await errorOf(noHtml), { code: "invalid_input", message: "html is required and must be a string", field: "html" });
 
   const arr = await s.post("/api/publish", [1]);
-  assert.deepEqual(await arr.json(), { error: "Request body must be a JSON object", code: "invalid_input" });
+  assert.deepEqual(await errorOf(arr), { code: "invalid_input", message: "Request body must be a JSON object" });
 });
 
 test("publish: ttl 1e20 or Infinity is a 400, not a 500", async () => {
   const s = setup();
   const huge = await s.post("/api/publish", { html: "<p>x</p>", ttl: 1e20 });
   assert.equal(huge.status, 400);
-  const body = (await huge.json()) as Record<string, unknown>;
+  const body = await errorOf(huge);
   assert.equal(body.code, "invalid_input");
   assert.equal(body.field, "ttl");
   // JSON.parse turns 1e400 into Infinity.
@@ -121,7 +42,7 @@ test("publish: a PIN over 64 characters and a view limit over a million are refu
   const s = setup();
   const pin = await s.post("/api/publish", { html: "<p>x</p>", pin: "1".repeat(65) });
   assert.equal(pin.status, 400);
-  assert.equal(((await pin.json()) as { field: string }).field, "pin");
+  assert.equal((await errorOf(pin)).field, "pin");
   const reads = await s.post("/api/publish", { html: "<p>x</p>", reads: 1e9 });
   assert.equal(reads.status, 400);
 });
@@ -146,18 +67,6 @@ test("publish: a long title is cut to 200 characters", async () => {
   assert.equal(meta2.title.length, 200);
 });
 
-test("bodies over the limit are a 413, with or without Content-Length", async () => {
-  const s = setup();
-  const big = JSON.stringify({ message: "x".repeat(BODY_LIMIT_BYTES) });
-  const declared = await s.post("/api/feedback", big, { "Content-Length": String(big.length) });
-  assert.equal(declared.status, 413);
-  assert.deepEqual(await declared.json(), { error: "Request body too large: the limit is 1 MB.", code: "payload_too_large" });
-  // Streamed: counted as it's read.
-  const streamed = await s.post("/api/feedback", big);
-  assert.equal(streamed.status, 413);
-  assert.equal(((await streamed.json()) as { code: string }).code, "payload_too_large");
-});
-
 test("PUT and DELETE agree: no credential is 401, someone else's page is 403, a wrong token is 403", async () => {
   const s = setup();
   const { body: page } = await publish(s);
@@ -165,7 +74,7 @@ test("PUT and DELETE agree: no credential is 401, someone else's page is 403, a 
   const put = (headers: Record<string, string> = {}, extra: Record<string, unknown> = {}) =>
     s.post(`/api/pages/${id}`, { html: "<p>new</p>", ...extra }, headers, "PUT");
   const del = (headers: Record<string, string> = {}) => s.call(`/api/pages/${id}`, { method: "DELETE", headers });
-  const codeOf = async (r: Response) => [r.status, ((await r.json()) as { code: string }).code];
+  const codeOf = async (r: Response) => [r.status, (await errorOf(r)).code];
 
   assert.deepEqual(await codeOf(await put()), [401, "token_required"]);
   assert.deepEqual(await codeOf(await del()), [401, "token_required"]);
@@ -184,7 +93,7 @@ test("CSRF: a request carrying the session cookie needs X-Aired-Request on every
   const cookie = { Cookie: "aired_session=abc" };
   const blocked = await s.post("/api/publish", { html: "<p>x</p>" }, cookie);
   assert.equal(blocked.status, 403);
-  assert.equal(((await blocked.json()) as { code: string }).code, "forbidden");
+  assert.equal((await errorOf(blocked)).code, "forbidden");
   const report = await s.post("/api/report", { id: "x", reason: "spam" }, cookie);
   assert.equal(report.status, 403);
   // With the header, or without the cookie (CLI, agents), it goes through.
@@ -203,7 +112,7 @@ test("anonymous publishes are counted in D1 and the sixth in an hour is a 429", 
   assert.equal(rows.length, 1);
   assert.equal(rows[0]!.count, 5);
   const last = await publish(s, {}, { "CF-Connecting-IP": "198.51.100.77" });
-  assert.equal(last.body.code, "rate_limited");
+  assert.equal((last.body.error as { code: string }).code, "rate_limited");
 });
 
 test("a PIN-protected page's public metadata hides its title and views", async () => {

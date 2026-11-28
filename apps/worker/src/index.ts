@@ -1,42 +1,30 @@
 import { Hono, type Context, type Next } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { AppBindings } from "./types.js";
-import { api } from "./routes/api.js";
-import { pageTools } from "./routes/page-tools.ts";
-import { responses } from "./routes/responses.ts";
-import { versions } from "./routes/versions.ts";
 import { pruneVersions } from "./lib/page-versions.ts";
 import { collect } from "./routes/collect.ts";
 import { pruneCollectData } from "./lib/collect-store.ts";
-import { me } from "./routes/me.js";
 import { viewer } from "./routes/viewer.js";
 import { presenter } from "./routes/presenter.ts";
-import { pdf } from "./routes/pdf.ts";
-import { access } from "./routes/access.ts";
 import { pruneAccessData } from "./lib/access-store.ts";
-import { report } from "./routes/report.js";
-import { siteEvent } from "./routes/site-event.js";
 import { handleMcp } from "./routes/mcp.js";
 import { og } from "./routes/og.js";
 import { auth } from "./routes/auth.js";
 import { dashboard } from "./routes/dashboard.js";
-import { billing, upgrade } from "./routes/billing.js";
-import { keys } from "./routes/keys.js";
-import { analytics } from "./routes/analytics.ts";
-import { favicon } from "./routes/favicon.ts";
-import { admin } from "./routes/admin.ts";
+import { upgrade } from "./routes/billing.js";
+import { allowedMethods, mountApi, mountMixed } from "./routes/api-table.ts";
 import { authWorkos } from "./routes/auth-workos.js";
 import { authDevice, devicePage } from "./routes/auth-device.js";
-import { publishRateLimit } from "./middleware/rate-limit.js";
 import { corsMiddleware } from "./middleware/cors.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { requestIdMiddleware } from "./middleware/request-id.js";
 import { apiNotFound, applyApiContract } from "./middleware/api-contract.ts";
 import { apiError, codeForStatus } from "./lib/errors.ts";
 import { pruneBillingEvents, pruneRateLimits } from "./lib/durable-limit.ts";
+import { pruneIdempotencyKeys } from "./lib/idempotency.ts";
 import { log, logError } from "./lib/log.js";
 import { cachedHealth, checkHealth, publicReport, storageProbes } from "./lib/health.js";
-import { countMcpToolCalls, isMcpToolCall, mcpToolName } from "./lib/mcp-rpc.js";
+import { countMcpToolCalls, isMcpToolCall } from "./lib/mcp-rpc.js";
 import { rateLimit } from "./middleware/rate-limit.js";
 import { TIERS } from "./lib/rate-limit-tiers.js";
 import { pageIdFromKey, sweepExpiredPages } from "./lib/expired-sweep.js";
@@ -155,15 +143,13 @@ async function mcpPostLimits(c: Context<AppBindings>, next: Next): Promise<Respo
     );
   }
   if (isMcpToolCall(body)) {
-    // Signed-in callers (key or OAuth): a per-account limit on every tool
-    // call (publishes also count against the publish limit inside the API).
-    // Everyone else: the publish limit for publish_html, and a per-IP limit
-    // for the tools that don't publish (get_page, set_options,
-    // send_feedback), so reading a page doesn't use up publishes. Those go
-    // through the API, whose own limits apply too.
+    // A flood guard on every tool call: per account for signed-in callers
+    // (key or OAuth), per IP for everyone else. Publishes go through the
+    // API in-process (routes/mcp.ts), which counts them against the same
+    // publish limit as any other publish, anonymous ones by IP.
     const via = c.get("via");
     if (via === "key" || via === "oauth") return rateLimit(TIERS.mcp_key)(c, next);
-    return mcpToolName(body) === "publish_html" ? publishRateLimit(c, next) : rateLimit(TIERS.mcp_anon)(c, next);
+    return rateLimit(TIERS.mcp_anon)(c, next);
   }
   await next();
 }
@@ -186,25 +172,10 @@ app.route("/auth", authWorkos);
 app.route("/auth", authDevice);
 app.route("/auth", auth);
 
-// Operator endpoints, off unless ADMIN_TOKEN is set (routes/admin.ts)
-app.route("/api/admin", admin);
-
-// Mount billing routes before api so /api/billing/* matches first
-app.route("/api/billing", billing);
-
-// Mount key routes before me, and me before api, so the longer paths match first
-app.route("/api/me/keys", keys);
-app.route("/api/me/analytics", analytics);
-app.route("/api/favicon", favicon);
-app.route("/api/me", me);
-
-// Mount API routes
-app.route("/api", pageTools);
-app.route("/api", responses);
-app.route("/api", versions);
-app.route("/api", api);
-app.route("/api", report);
-app.route("/api", siteEvent);
+// Every /api router, longer prefixes first (routes/api-table.ts, which the
+// OpenAPI test reads): admin, billing, me/keys, me/analytics, favicon, me,
+// then the page routes, the spec, publish and the rest of /api.
+mountApi(app);
 
 // GET /upgrade — sign in if needed, then redirect to checkout
 app.route("/", upgrade);
@@ -216,11 +187,9 @@ app.get("/device", devicePage);
 
 // A deck's speaker view, for its owner (routes/presenter.ts)
 app.route("/", presenter);
-// PDF export: GET /p/:id/pdf and POST /api/pages/:id/pdf (routes/pdf.ts)
-app.route("/", pdf);
-
-// "Only these people": the gate's two steps and the owner's list (routes/access.ts).
-app.route("/", access);
+// PDF export: GET /p/:id/pdf and POST /api/pages/:id/pdf (routes/pdf.ts);
+// "only these people": the gate's two steps and the owner's list (routes/access.ts).
+mountMixed(app);
 // The data layer's calls from published pages (POST /c/:id/*)
 app.route("/", collect);
 
@@ -231,12 +200,12 @@ app.route("/", viewer);
 // Cloudflare ASSETS binding handles routing to the correct file.
 app.notFound(async (c) => {
   // The API answers in JSON, including for paths it doesn't have.
-  const apiMissing = apiNotFound(c);
+  const apiMissing = apiNotFound(c, allowedMethods);
   if (apiMissing !== null) return apiMissing;
   if (c.env.ASSETS) {
     return withAssetCache(await c.env.ASSETS.fetch(c.req.raw), new URL(c.req.url).pathname);
   }
-  return c.json({ error: "Not found" }, 404);
+  return c.text("Not found", 404);
 });
 
 /**
@@ -318,7 +287,8 @@ async function runExpiredSweep(env: Env): Promise<void> {
 
 /**
  * Old rows out of D1: rate-limit windows no request reads any more,
- * webhook dedupe ids past 30 days (lib/durable-limit.ts), and data-layer
+ * webhook dedupe ids past 30 days (lib/durable-limit.ts), publish
+ * Idempotency-Keys past 24 hours (lib/idempotency.ts), and data-layer
  * entries past retention or left by deleted pages (lib/collect-store.ts),
  * and page versions past their plan's limits or left by deleted pages and
  * accounts (lib/page-versions.ts). Once an hour, in the first cron run
@@ -328,13 +298,14 @@ async function runHousekeeping(env: Env, now = Date.now()): Promise<void> {
   if (new Date(now).getUTCMinutes() >= 5) return;
   const rateLimits = await pruneRateLimits(env.DB, now);
   const billingEvents = await pruneBillingEvents(env.DB, now);
+  const idempotencyKeys = await pruneIdempotencyKeys(env.DB, now);
   // Data-layer entries past their plan's retention, or of pages that are gone.
   const responses = await pruneCollectData(env.DB, now);
   // Page history: removed accounts, gone pages, past the plan's days or count.
   const versions = await pruneVersions(env, now);
   // Spent "only these people" codes, and lists and visit logs of pages that are gone.
   const access = await pruneAccessData(env.DB, now);
-  log("info", "housekeeping", { rateLimits, billingEvents, responses, access, versions });
+  log("info", "housekeeping", { rateLimits, billingEvents, idempotencyKeys, responses, access, versions });
 }
 
 /**

@@ -11,15 +11,20 @@ const count = (code: string, re: RegExp) => (code.match(new RegExp(re.source, "g
 
 test("api.ts: publish-update, PUT and DELETE all read credentials from the D1 row", () => {
   const code = src("routes/api.ts");
-  assert.doesNotMatch(code, /verifyToken\([^)]*metadata\.tokenHash/);
-  assert.doesNotMatch(code, /getClaim|page_claims|PAGES_KV\.get\(`page:\$\{(existingId|id)\}`\)[\s\S]{0,200}verifyToken/);
-  assert.match(code, /return \(await loadPage\(c\.env, id\)\) \?\? apiError\(c, 404, "not_found", "Page not found"\)/);
+  const service = src("lib/pages-service.ts");
+  for (const c of [code, service]) {
+    assert.doesNotMatch(c, /verifyToken\([^)]*metadata\.tokenHash/);
+    assert.doesNotMatch(c, /getClaim|page_claims|PAGES_KV\.get\(`page:\$\{(existingId|id)\}`\)[\s\S]{0,200}verifyToken/);
+  }
+  assert.match(service, /return \(await loadPage\(c\.env, id\)\) \?\? apiError\(c, 404, "not_found", "Page not found"\)/);
   // publish-update, PUT, DELETE, and the details and PATCH routes (set_options).
   assert.equal(count(code, /await pageFor\(c, /), 5);
-  assert.equal(count(code, /const creds = \{ ownerId: page\.row\.ownerId, tokenHash: page\.row\.tokenHash \};/), 3);
+  assert.match(code, /if \(!\(await verifyToken\(update_token, page\.row\.tokenHash\)\)\) return invalidToken\(c\);/);
+  assert.match(code, /ownerId: page\.row\.ownerId,\s*tokenHash: page\.row\.tokenHash,\s*token: update_token,/);
+  assert.equal(count(code, /const creds = \{ ownerId: page\.row\.ownerId, tokenHash: page\.row\.tokenHash \};/), 1);
   // Details and PATCH decide access from the row too (lib/page-options.ts pageAccess).
-  assert.match(code, /ownerId: page\.row\.ownerId,\s*userId: c\.get\("user"\)\?\.id \?\? null,/);
-  assert.match(code, /tokenMatches: token !== null && \(await verifyToken\(token, page\.row\.tokenHash\)\)/);
+  assert.match(service, /ownerId: page\.row\.ownerId,\s*userId: c\.get\("user"\)\?\.id \?\? null,/);
+  assert.match(service, /tokenMatches: token !== null && \(await verifyToken\(token, page\.row\.tokenHash\)\)/);
   assert.equal(count(code, /const access = await ownerAccess\(c, page, /), 2);
 });
 
@@ -47,11 +52,10 @@ test("page-write.ts: DELETE marks the row; the retired page_claims and KV indexe
   assert.doesNotMatch(code, /owner-index|addPageToOwner|removePageFromOwner|bumpProjectCount|indexForOwner/);
 });
 
-test("mcp.ts: MCP updates read credentials from the D1 row", () => {
+test("mcp.ts: the MCP never reads or writes pages itself; every publish goes through the API", () => {
   const code = src("routes/mcp.ts");
-  assert.doesNotMatch(code, /verifyToken\([^)]*metadata\.tokenHash/);
-  assert.match(code, /page = await loadPage\(env, existingId\);/);
-  assert.match(code, /verifyToken\(update_token, page\.row\.tokenHash\)/);
+  assert.doesNotMatch(code, /verifyToken|loadPage|createPage|updatePage|deletePage|PAGES_BUCKET|PAGES_KV\.(get|put)/);
+  assert.match(code, /const res = await callApi\("POST", "\/api\/publish", \{/);
 });
 
 test("me.ts: claims go through runClaim on the row; account deletion releases pages in D1 first", () => {

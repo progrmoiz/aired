@@ -471,7 +471,7 @@ test("only the signed-in owner changes who can open a page; anonymous pages can'
   const t = await setup();
   const viaToken = await t.jsonReq("PATCH", "/api/pages/report", { access: { mode: "people", emails: ["a@client.com"] }, update_token: TOKEN });
   assert.equal(viaToken.status, 403);
-  assert.equal((await body(viaToken)).code, "owner_required");
+  assert.equal((await body(viaToken)).error.code, "owner_required");
   assert.equal((await t.share("theirs", { mode: "people", emails: ["a@client.com"] }, 7)).status, 403);
   const anon = await t.jsonReq("PATCH", "/api/pages/anon", { access: { mode: "people", emails: ["a@client.com"] }, update_token: TOKEN });
   assert.equal(anon.status, 403);
@@ -510,7 +510,7 @@ test("without email set up, a page can't be made people-only", async () => {
   const t = await setup({ email: false });
   const res = await t.share("report", { mode: "people", emails: ["a@client.com"] });
   assert.equal(res.status, 503);
-  assert.equal((await body(res)).code, "email_unavailable");
+  assert.equal((await body(res)).error.code, "email_unavailable");
   assert.equal((await getPageRow(t.db, "report"))!.access, null);
 });
 

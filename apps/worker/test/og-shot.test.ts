@@ -109,16 +109,17 @@ test("a screenshot asked for by its version keeps longer than the card", () => {
 
 // --- Source tripwires ---------------------------------------------------------
 
-test("api.ts: every page HTML write queues a screenshot after the response", () => {
-  const code = src("../src/routes/api.ts");
+test("pages-service.ts: every page HTML write queues a screenshot after the response", () => {
+  assert.doesNotMatch(src("../src/routes/api.ts"), /PAGES_BUCKET\.put\(|await (createPage|updatePage)\(/);
+  const code = src("../src/lib/pages-service.ts");
   // HTML is written only through lib/page-write.ts.
   assert.doesNotMatch(code, /PAGES_BUCKET\.put\(/);
   const writes = code.match(/await (createPage|updatePage)\(c\.env, /g) ?? [];
   const shots = code.match(/c\.executionCtx\.waitUntil\(refreshShot\(/g) ?? [];
-  assert.equal(writes.length, 3, "publish create, publish update, PUT");
+  assert.equal(writes.length, 2, "create, and the update both publish-update and PUT use");
   assert.equal(shots.length, writes.length);
   // Updates drop the old image first; the create has none to drop.
-  assert.equal((code.match(/refreshShot\([^)]*\{ replacing: true \}\)/g) ?? []).length, 2);
+  assert.equal((code.match(/refreshShot\([^)]*\{ replacing: true \}\)/g) ?? []).length, 1);
   assert.equal((code.match(/refreshShot\([^)]*\{ replacing: false \}\)/g) ?? []).length, 1);
 });
 
@@ -142,14 +143,10 @@ test("versions.ts: a restore writes through updatePage and queues a screenshot",
   assert.equal((code.match(/c\.executionCtx\.waitUntil\(refreshShot\([^)]*\{ replacing: true \}\)/g) ?? []).length, 1);
 });
 
-test("mcp.ts: the anonymous publish tool queues screenshots too", () => {
+test("mcp.ts: the anonymous publish tool writes nothing itself, so the API's screenshot rule covers it", () => {
   const code = src("../src/routes/mcp.ts");
-  assert.doesNotMatch(code, /PAGES_BUCKET\.put\(/);
-  const writes = code.match(/await (createPage|updatePage)\(env, /g) ?? [];
-  const shots = code.match(/background\(refreshShot\(/g) ?? [];
-  assert.equal(writes.length, 2);
-  assert.equal(shots.length, 2);
-  assert.match(code, /createAiredMcpServer\(c\.env, signedIn, callApi, \(work\) => c\.executionCtx\.waitUntil\(work\)\)/);
+  assert.doesNotMatch(code, /PAGES_BUCKET\.put\(|createPage|updatePage|refreshShot/);
+  assert.match(code, /createAiredMcpServer\(c\.env, signedIn, callApi\)/);
 });
 
 test("og.ts: serves a screenshot only for a live page allowed one, else the card", () => {

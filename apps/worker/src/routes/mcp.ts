@@ -3,30 +3,16 @@ import { createMcpHandler } from "agents/mcp";
 import { z } from "zod";
 import type { Context } from "hono";
 import type { AppBindings } from "../types.js";
-import { loadStats, saveStats } from "../lib/stats.js";
-import { detectSpam, SPAM_REJECTION } from "../lib/spam.js";
-import { claimUrl } from "../lib/claim-url.js";
-import {
-  generateId,
-  generateToken,
-  hashToken,
-  verifyToken,
-  validateHtml,
-  extractTitle,
-  capTitle,
-  DEFAULT_TTL,
-  PAGE_INPUT_LIMITS,
-} from "@aired/core";
-import type { PageMetadata } from "@aired/core";
-import { createPage, loadPage, StorageUnavailable, updatePage, type LoadedPage } from "../lib/page-write.ts";
-import { hashPin } from "../lib/pin-hash.js";
-import { refreshShot } from "../lib/og-render.js";
+import { PAGE_INPUT_LIMITS } from "@aired/core";
 import { billingEnabled, upgradeUrl } from "../lib/entitlements.js";
 import { siteOrigin } from "../lib/origin.ts";
 import { TIERS } from "../lib/rate-limit-tiers.js";
 import {
   signInRequiredText,
   accountResult,
+  anonymousPublishResult,
+  anonymousUpdateResult,
+  apiErrorMessage,
   apiErrorResult,
   deleteResult,
   feedbackResult,
@@ -75,11 +61,7 @@ import {
 } from "../lib/mcp-shapes.ts";
 import { registerPrompts, registerResources } from "../lib/mcp-extras.ts";
 import { carded, cardTitle, cardToolMeta, registerCard } from "../lib/mcp-card.ts";
-import { OWNER_REQUIRED_MESSAGE, replaceAllowed } from "../lib/page-options.ts";
-import { pageHasResponses } from "../lib/collect-store.ts";
 import { CONTENT_INPUT, GET_PAGE_DESCRIPTION, getPageInput, MISSING_CONTENT, registerTemplateTool } from "../lib/mcp-templates.ts";
-import { buildContent, contentFields } from "../lib/page-content.ts";
-import { versionAuthor } from "../lib/page-versions.ts";
 // The aired skills, bundled as text (wrangler.toml [[rules]]), served as resources.
 import { SKILL_FILES } from "../lib/skill-files.ts";
 
@@ -103,10 +85,6 @@ type SignedIn = {
   origin: string;
 };
 
-/** A line about the deck for an anonymous publish's text answer. */
-const deckLine = (sidecar: { kind: string; slides: number } | null): string =>
-  sidecar?.kind === "deck" ? `\nSlides: ${sidecar.slides}.` : "";
-
 const signInRequired = (origin: string): ToolResult => ({ content: [{ type: "text", text: signInRequiredText(origin) }], isError: true });
 
 /** Page ids as generateId makes them; anything else never reaches the API path. */
@@ -114,20 +92,16 @@ const PAGE_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const badId = (): ToolResult => ({ content: [{ type: "text", text: "That isn't a page id." }], isError: true });
 const errorText = (text: string): ToolResult => ({ content: [{ type: "text", text }], isError: true });
 
+/**
+ * The hosted MCP server. It reads and writes nothing itself: every tool
+ * calls the HTTP API in-process (callApi), so the API's rules apply to MCP
+ * callers exactly as to anyone else (lib/pages-service.ts). `env` gives only
+ * the site origin and whether billing is on, for the answers' wording.
+ */
 export function createAiredMcpServer(
-  env: {
-    PAGES_BUCKET: R2Bucket;
-    PAGES_KV: KVNamespace;
-    DB: D1Database;
-    SITE_ORIGIN?: string;
-    BILLING_ENABLED?: string;
-    BROWSER?: Fetcher;
-    OG_SHOT_DAILY_SECONDS?: string;
-  },
+  env: { SITE_ORIGIN?: string; BILLING_ENABLED?: string },
   signedIn: SignedIn | null,
   callApi: CallApi,
-  /** Runs work after the response (the request's waitUntil). */
-  background: (work: Promise<unknown>) => void,
 ) {
   const server = new McpServer({
     name: "aired",
@@ -171,233 +145,38 @@ export function createAiredMcpServer(
     },
     carded(origin, async ({ html, markdown, deck, title, pin, ttl_seconds, permanent, update_token, id: existingId, message }) => {
       if (html === undefined && markdown === undefined) return errorText(MISSING_CONTENT);
-      // Sent on to the API as given; it renders Markdown and decks the same way.
+      if (typeof update_token === "string" && typeof existingId !== "string") {
+        return errorText("When providing update_token, you must also provide the page id.");
+      }
+      if (typeof existingId === "string" && !PAGE_ID.test(existingId)) return badId();
+      // Sent on to the API as given: it renders Markdown and decks, checks
+      // sizes, spam, tokens and limits the same way for every caller
+      // (lib/pages-service.ts), signed in or anonymous.
       const body = {
         ...(html !== undefined ? { html } : {}),
         ...(markdown !== undefined ? { markdown } : {}),
         ...(deck !== undefined ? { deck } : {}),
         ...(message !== undefined ? { message } : {}),
       };
-      if (signedIn !== null) {
-        if (typeof update_token === "string" && typeof existingId !== "string") {
-          return { content: [{ type: "text" as const, text: "When providing update_token, you must also provide the page id." }], isError: true };
-        }
-        if (typeof existingId === "string" && !PAGE_ID.test(existingId)) return badId();
-        // Your own page by id: no token needed. Otherwise the API's publish,
-        // which also accepts id + update_token.
-        if (typeof existingId === "string" && typeof update_token !== "string") {
-          const res = await callApi("PUT", `/api/pages/${encodeURIComponent(existingId)}`, { ...body, title });
-          return res.status === 200 ? publishUpdateResult(res.body, signedIn.login) : apiErrorResult(res.status, res.body, origin);
-        }
-        const isTokenUpdate = typeof update_token === "string";
-        const res = await callApi("POST", "/api/publish", {
-          ...body,
-          title,
-          pin,
-          ...(typeof ttl_seconds === "number" ? { ttl: ttl_seconds } : {}),
-          ...(typeof permanent === "boolean" ? { permanent } : {}),
-          ...(typeof update_token === "string" ? { update_token, id: existingId } : {}),
-        });
-        if (res.status !== 200) return apiErrorResult(res.status, res.body, origin);
-        // A token update may be of a page the caller doesn't own: don't claim it's theirs.
-        return isTokenUpdate ? publishUpdateResult(res.body, null) : publishResult(res.body, signedIn.login);
+      // Your own page by id: no token needed. Anonymous callers need its token.
+      if (typeof existingId === "string" && typeof update_token !== "string") {
+        if (signedIn === null) return errorText(`Pass the page's update_token with its id, or sign in. ${signInRequiredText(origin)}`);
+        const res = await callApi("PUT", `/api/pages/${encodeURIComponent(existingId)}`, { ...body, title });
+        return res.status === 200 ? publishUpdateResult(res.body, signedIn.login) : apiErrorResult(res.status, res.body, origin);
       }
-
-      // Markdown rendered, an HTML deck's notes cut out (lib/page-content.ts), as the API does.
-      const content = buildContent(body);
-      const pageHtml = content.html;
-      const validation = validateHtml(pageHtml);
-      if (!validation.ok) {
-        return {
-          content: [{ type: "text" as const, text: validation.error }],
-          isError: true,
-        };
-      }
-
-      const resolvedTitle = capTitle(title) ?? capTitle(content.title) ?? capTitle(extractTitle(pageHtml));
-
-      // Anonymous remote MCP publishes (no API key) are always screened.
-      const verdict = detectSpam(pageHtml, resolvedTitle);
-      if (verdict.spam) {
-        console.log({ event: "spam_rejected", route: "mcp", reason: verdict.reason });
-        return {
-          content: [{ type: "text" as const, text: SPAM_REJECTION }],
-          isError: true,
-        };
-      }
-
-      // Update path
-      if (
-        typeof update_token === "string" &&
-        typeof existingId === "string"
-      ) {
-        // The page's D1 row decides its token (lib/page-write.ts loadPage),
-        // never the KV record, which can be written back stale. Fail closed
-        // if D1 can't be read.
-        let page: LoadedPage | null;
-        try {
-          page = await loadPage(env, existingId);
-        } catch (err) {
-          console.error("pages lookup failed on MCP update", { id: existingId, err });
-          return {
-            content: [{ type: "text" as const, text: "Could not check this page's credentials. Please try again." }],
-            isError: true,
-          };
-        }
-        if (page === null) {
-          return {
-            content: [{ type: "text" as const, text: "Page not found" }],
-            isError: true,
-          };
-        }
-        const valid = await verifyToken(update_token, page.row.tokenHash);
-        if (!valid) {
-          return {
-            content: [{ type: "text" as const, text: "Invalid update token" }],
-            isError: true,
-          };
-        }
-
-        // A page that has collected responses needs its signed-in owner
-        // (lib/page-options.ts replaceAllowed); this path is token-only.
-        if (page.row.ownerId !== null) {
-          let hasResponses: boolean;
-          try {
-            hasResponses = await pageHasResponses(env.DB, page.row.id);
-          } catch (err) {
-            console.error("responses lookup failed on MCP update", { id: existingId, err });
-            return { content: [{ type: "text" as const, text: "Could not check this page. Please try again." }], isError: true };
-          }
-          if (!replaceAllowed({ ownerId: page.row.ownerId, userId: null, hasResponses })) {
-            return { content: [{ type: "text" as const, text: OWNER_REQUIRED_MESSAGE }], isError: true };
-          }
-        }
-        // Same update as the API: title, size and expiry move with the HTML.
-        const author = versionAuthor({ viaToken: true, via: null, userAgent: "aired-mcp", message: message ?? null });
-        const { metadata: updated, htmlEtag, version } = await updatePage(env, page, pageHtml, resolvedTitle, Date.now(), content.sidecar, author);
-        // Link-preview screenshot, after the response (lib/og-render.ts).
-        background(refreshShot(env, existingId, updated, pageHtml, htmlEtag, { replacing: true }));
-
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Updated ${origin}/p/${existingId}\nUpdate token: ${update_token}\nPass update_token and id to update again.${deckLine(content.sidecar)}`,
-            },
-          ],
-          structuredContent: {
-            id: existingId,
-            url: `${origin}/p/${existingId}`,
-            updated: true,
-            update_token,
-            expires_at: updated.expiresAt,
-            owner: null,
-            claim_url: null,
-            upgrade_url: null,
-            ...(version !== null ? { version } : {}),
-            ...contentOut(contentFields(origin, existingId, content.sidecar)),
-          },
-        };
-      }
-
-      if (typeof update_token === "string" && existingId === undefined) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: "When providing update_token, you must also provide the page id.",
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      // Create path
-      const pageId = generateId();
-      const token = generateToken();
-      const tokenHash = await hashToken(token);
-      const isPermanent = permanent === true;
-      const ttlSeconds = isPermanent
-        ? null
-        : typeof ttl_seconds === "number" && ttl_seconds > 0
-          ? Math.floor(ttl_seconds)
-          : DEFAULT_TTL;
-
-      const now = new Date();
-      const expiresAt =
-        ttlSeconds !== null
-          ? new Date(now.getTime() + ttlSeconds * 1000).toISOString()
-          : null;
-
-      const metadata: PageMetadata = {
-        id: pageId,
-        title: resolvedTitle,
-        size: new TextEncoder().encode(pageHtml).byteLength,
-        tokenHash,
-        // Stored as a salted PBKDF2 hash (lib/pin-hash.ts), never as typed.
-        pin: typeof pin === "string" && pin.length > 0 ? await hashPin(pin) : null,
-        reads: null,
-        readCount: 0,
-        permanent: isPermanent,
-        createdAt: now.toISOString(),
-        expiresAt,
-        ownerId: null,
-        // Anonymous (ownerId null) — never owner-indexed or grouped, so always Unsorted.
-        project: null,
-      };
-
-      // D1 row, R2 HTML and KV cache record, or nothing (lib/page-write.ts).
-      let htmlObj: R2Object | null;
-      try {
-        htmlObj = await createPage(env, metadata, pageHtml, now.getTime(), content.sidecar, versionAuthor({ viaToken: false, via: null, userAgent: "aired-mcp", message: message ?? null }));
-      } catch (err) {
-        if (!(err instanceof StorageUnavailable)) throw err;
-        console.error("MCP publish storage write failed", { id: pageId, err: err.message });
-        return {
-          content: [{ type: "text" as const, text: "Service temporarily unavailable. Try again later." }],
-          isError: true,
-        };
-      }
-
-      // Link-preview screenshot, after the response (lib/og-render.ts).
-      background(refreshShot(env, pageId, metadata, pageHtml, htmlObj?.etag ?? null, { replacing: false }));
-
-      // Increment publish counter (best effort)
-      try {
-        const stats = await loadStats(env.PAGES_KV);
-        stats.publishes += 1;
-        await saveStats(env.PAGES_KV, stats);
-      } catch {
-        // ignore
-      }
-
-      const lines: string[] = [
-        `Published to ${origin}/p/${pageId}`,
-        `Update token: ${token}`,
-        expiresAt
-          ? `Expires: ${new Date(expiresAt).toISOString().split("T")[0]}`
-          : "Expires: never (permanent)",
-        "",
-        "Pass update_token and id to update the same URL.",
-        `To keep this page in an aired account, open: ${claimUrl(origin, pageId, token)}`,
-      ];
-      if (content.sidecar?.kind === "deck") lines.push(`Slides: ${content.sidecar.slides}. Speaker notes stay out of the public page; the owner sees them at ${origin}/p/${pageId}/presenter once the page is in their account.`);
-
-      return {
-        content: [{ type: "text" as const, text: lines.join("\n") }],
-        structuredContent: {
-          id: pageId,
-          url: `${origin}/p/${pageId}`,
-          updated: false,
-          update_token: token,
-          expires_at: expiresAt,
-          owner: null,
-          claim_url: claimUrl(origin, pageId, token),
-          upgrade_url: null,
-          version: 1,
-          ...contentOut(contentFields(origin, pageId, content.sidecar)),
-        },
-      };
+      const isTokenUpdate = typeof update_token === "string";
+      const res = await callApi("POST", "/api/publish", {
+        ...body,
+        title,
+        pin,
+        ...(typeof ttl_seconds === "number" ? { ttl: ttl_seconds } : {}),
+        ...(typeof permanent === "boolean" ? { permanent } : {}),
+        ...(isTokenUpdate ? { update_token, id: existingId } : {}),
+      });
+      if (res.status !== 200) return apiErrorResult(res.status, res.body, origin);
+      // A token update may be of a page the caller doesn't own: don't claim it's theirs.
+      if (isTokenUpdate) return signedIn !== null ? publishUpdateResult(res.body, null) : anonymousUpdateResult(res.body);
+      return signedIn !== null ? publishResult(res.body, signedIn.login) : anonymousPublishResult(res.body, origin);
     }, (args, out) => ({
       action: out.updated === true ? "updated" : "published",
       title: cardTitle(args),
@@ -541,7 +320,7 @@ export function createAiredMcpServer(
       });
       if (res.status === 200) return { content: checkContent(res.body, withImage), structuredContent: checkOut(res.body) };
       // Not "wait before publishing again": a busy browser or a spent budget isn't about publishing.
-      if (res.status === 429 || res.status === 503) return errorText(String((res.body as { error?: unknown } | null)?.error ?? `The aired API answered ${res.status}.`));
+      if (res.status === 429 || res.status === 503) return errorText(apiErrorMessage(res.status, res.body));
       return apiErrorResult(res.status, res.body, origin);
     },
   );
@@ -570,7 +349,7 @@ export function createAiredMcpServer(
         return { content: [{ type: "text" as const, text: exportPdfText(out) }], structuredContent: out };
       }
       // A busy browser or a spent budget isn't about publishing.
-      if (res.status === 429 || res.status === 503) return errorText(String((res.body as { error?: unknown } | null)?.error ?? `The aired API answered ${res.status}.`));
+      if (res.status === 429 || res.status === 503) return errorText(apiErrorMessage(res.status, res.body));
       return apiErrorResult(res.status, res.body, origin);
     },
   );
@@ -774,7 +553,7 @@ export async function handleMcp(c: Context<AppBindings>, appFetch: AppFetch, rou
     );
     return { status: res.status, body: await res.json().catch(() => null) };
   };
-  const server = createAiredMcpServer(c.env, signedIn, callApi, (work) => c.executionCtx.waitUntil(work));
+  const server = createAiredMcpServer(c.env, signedIn, callApi);
   const handler = createMcpHandler(server, { route });
   return handler(c.req.raw, c.env, c.executionCtx);
 }

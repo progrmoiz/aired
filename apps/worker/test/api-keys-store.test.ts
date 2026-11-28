@@ -106,8 +106,9 @@ test("wiring: keys are checked before sessions; keys can't manage keys, billing 
   assert.match(billing, /billing\.post\('\/checkout', requireWebSession,/);
   assert.match(billing, /billing\.post\('\/portal', requireWebSession,/);
   assert.match(src("lib/billing/forget.ts"), /DELETE FROM api_keys WHERE user_id = \?/);
-  const index = src("index.ts");
-  assert.ok(index.indexOf('app.route("/api/me/keys", keys)') < index.indexOf('app.route("/api/me", me)'));
+  const table = src("routes/api-table.ts");
+  assert.ok(table.indexOf('["/api/me/keys", keys]') > 0);
+  assert.ok(table.indexOf('["/api/me/keys", keys]') < table.indexOf('["/api/me", me]'));
 });
 
 test("Bearer parsing is case-insensitive and tolerates spacing, so a key is never dropped to anonymous", () => {

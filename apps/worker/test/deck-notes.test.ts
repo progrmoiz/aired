@@ -228,7 +228,7 @@ test("Markdown docs publish, keep their source, and need html or markdown", asyn
   assert.match(String(src.source), /^# Weekly notes/);
   // Neither field: the same 400 as before.
   const none = await s.send("POST", "/api/publish", { title: "x" });
-  assert.deepEqual(await none.json(), { error: "html is required and must be a string", code: "invalid_input", field: "html" });
+  assert.deepEqual(await none.json(), { error: { code: "invalid_input", message: "html is required and must be a string", field: "html" } });
   // A plain HTML page says nothing new.
   const plain = (await (await s.send("POST", "/api/publish", { html: "<h1>x</h1>" })).json()) as Record<string, unknown>;
   assert.equal(plain.kind, undefined);

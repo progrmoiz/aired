@@ -65,9 +65,9 @@ test("the PIN cookie is an HMAC token for one page, not the PIN, and it expires"
 
 test("publish, MCP and the viewer store hashes and check cookie tokens", () => {
   const src = (f: string) => readFileSync(new URL(`../src/routes/${f}`, import.meta.url), "utf8");
-  for (const f of ["api.ts", "mcp.ts"]) {
-    assert.match(src(f), /pin: typeof pin === "string" && pin\.length > 0 \? await hashPin\(pin\) : null/, f);
-  }
+  // Every publish, the MCP's included, goes through the pages service.
+  assert.match(src("../lib/pages-service.ts"), /pin: typeof pin === "string" && pin\.length > 0 \? await hashPin\(pin\) : null/);
+  assert.doesNotMatch(src("mcp.ts"), /hashPin/);
   const viewer = src("viewer.ts");
   assert.match(viewer, /await verifyPinCookie\(\s*c\.env\.SESSION_SECRET,\s*id,\s*getCookie\(c, `pin_\$\{id\}`\)/);
   assert.match(viewer, /const check = await verifyPin\(pin, metadata\.pin\);/);

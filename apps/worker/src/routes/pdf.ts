@@ -38,7 +38,7 @@ import {
   type PdfVariant,
 } from "../lib/pdf-export.ts";
 import { accessGate } from "./access.ts";
-import { ownerAccess, pageFor, sentUpdateToken } from "./api.ts";
+import { ownerAccess, pageFor, sentUpdateToken } from "../lib/pages-service.ts";
 
 /**
  * PDF export (rules in lib/pdf-export.ts, the browser in lib/og-render.ts):

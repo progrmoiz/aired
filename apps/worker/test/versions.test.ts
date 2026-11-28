@@ -134,10 +134,10 @@ test("restoring makes the old content a new version and rewrites nothing", async
   assert.equal(s.r2.get(`pages/${id}/index.html`), page(3));
 
   // The live version, a missing one and a bad number.
-  assert.equal((await s.send("POST", `/api/pages/${id}/versions/5/restore`, {}, kim)).body.code, "already_current");
+  assert.equal((await s.send("POST", `/api/pages/${id}/versions/5/restore`, {}, kim)).body.error.code, "already_current");
   const missing = await s.send("POST", `/api/pages/${id}/versions/99/restore`, {}, kim);
   assert.equal(missing.status, 404);
-  assert.equal(missing.body.code, "version_not_found");
+  assert.equal(missing.body.error.code, "version_not_found");
   assert.equal((await s.send("POST", `/api/pages/${id}/versions/0/restore`, {}, kim)).status, 404);
   assert.equal((await s.send("POST", `/api/pages/${id}/versions/1/restore`, { message: "x".repeat(201) }, kim)).status, 400);
 });
@@ -197,11 +197,11 @@ test("only the owner or the page's token: another account, a wrong token and nob
     const go = (headers: Record<string, string>, body: unknown = {}) => (method === "GET" ? s.get(path, headers) : s.send(method, path, body, headers));
     const other = await go(ana);
     assert.equal(other.status, 403, `${path}: another account`);
-    assert.equal(other.body.code, "not_owner");
+    assert.equal(other.body.error.code, "not_owner");
     assert.ok(!JSON.stringify(other.body).includes("Draft"), "nothing of the page leaks");
     const wrong = await go({ "X-Update-Token": "wrong" }, { update_token: "wrong" });
     assert.equal(wrong.status, 403, `${path}: wrong token`);
-    assert.equal(wrong.body.code, "invalid_token");
+    assert.equal(wrong.body.error.code, "invalid_token");
     // Another account with a wrong token: still refused.
     assert.equal((await go({ ...ana, "X-Update-Token": "wrong" }, { update_token: "wrong" })).status, 403);
     const nobody = await go({});
@@ -227,7 +227,7 @@ test("a page with collected responses is restored only by its signed-in owner", 
     .run("r1", id);
   const byToken = await s.send("POST", `/api/pages/${id}/versions/1/restore`, { update_token: token });
   assert.equal(byToken.status, 403);
-  assert.equal(byToken.body.code, "owner_required");
+  assert.equal(byToken.body.error.code, "owner_required");
   assert.equal(s.r2.get(`pages/${id}/index.html`), page(2), "unchanged");
   // Listing by token still works: it changes nothing.
   assert.equal((await s.get(`/api/pages/${id}/versions`, { "X-Update-Token": token })).status, 200);
@@ -367,7 +367,7 @@ test("wiring: every content write goes through updatePage, and housekeeping and 
   const del = write.slice(write.indexOf("export async function deletePage"));
   assert.match(del.slice(0, del.indexOf("\n}\n")), /await deletePageVersions\(env, row\.id\)/);
   assert.match(src("../src/index.ts"), /const versions = await pruneVersions\(env, now\);/);
-  assert.match(src("../src/index.ts"), /app\.route\("\/api", versions\);\s*app\.route\("\/api", api\);/);
+  assert.match(src("../src/routes/api-table.ts"), /\["\/api", versions\],\s*\["\/api", openapi\],\s*\["\/api", api\],/);
   // Restore checks the owner, then the responses rule, before reading or writing.
   const v = src("../src/routes/versions.ts");
   const restore = v.slice(v.indexOf('versions.post("/pages/:id/versions/:n/restore"'));

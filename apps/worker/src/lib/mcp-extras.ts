@@ -85,7 +85,9 @@ export async function readPageResource(deps: Pick<ExtrasDeps, "signedIn" | "get"
   if (!PAGE_ID.test(id)) throw new ResourceError("That isn't a page id.");
   const res = await deps.get(`/api/pages/${encodeURIComponent(id)}/source`);
   if (res.status !== 200) {
-    const reason = str(obj(res.body).error);
+    // { error: { code, message } } (lib/errors.ts); a flat { error } reads the same.
+    const err = obj(res.body).error;
+    const reason = str(typeof err === "object" && err !== null ? (err as Record<string, unknown>).message : err);
     // Someone else's page answers 403 and a missing one 404; neither says more than that.
     throw new ResourceError(res.status === 403 ? "That page isn't in your account." : res.status === 404 ? "Page not found." : reason ?? `aired answered ${res.status}`);
   }

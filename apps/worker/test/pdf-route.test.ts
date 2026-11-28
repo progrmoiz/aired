@@ -278,7 +278,7 @@ test("POST: notes need the signed-in owner; an update token isn't enough", async
   const t = await setup();
   const byToken = await t.call("POST", "/api/pages/deck/pdf", { body: { update_token: TOKEN, notes: true } });
   assert.equal(byToken.status, 403);
-  assert.equal(((await byToken.json()) as { code: string }).code, "owner_required");
+  assert.equal(((await byToken.json()) as { error: { code: string } }).error.code, "owner_required");
   const plain = await t.call("POST", "/api/pages/deck/pdf", { body: { update_token: TOKEN } });
   assert.equal(plain.status, 200);
   assert.equal(((await plain.json()) as { notes: boolean }).notes, false);
@@ -385,9 +385,9 @@ test("budget: a spent PDF budget refuses new renders with 429 and never launches
   await addSpent(t.db as never, DEFAULT_PDF_BUDGET_MS, Date.now(), "pdf");
   const fresh = await t.call("POST", "/api/pages/closed/pdf", { body: {} });
   assert.equal(fresh.status, 429);
-  const body = (await fresh.json()) as { code: string; error: string };
+  const body = ((await fresh.json()) as { error: { code: string; message: string } }).error;
   assert.equal(body.code, "pdf_budget");
-  assert.match(body.error, /00:00 UTC/);
+  assert.match(body.message, /00:00 UTC/);
   assert.ok(Number(fresh.headers.get("Retry-After")) > 0);
   const viewerFresh = await t.call("GET", "/p/deck/pdf");
   assert.equal(viewerFresh.status, 429);
@@ -415,7 +415,7 @@ test("budget: Browser Rendering saying 'too many' holds back PDFs, not link prev
   t.browser.failNext("Unable to create new browser: code: 429: message: Too many browsers");
   const res = await t.call("POST", "/api/pages/open/pdf", { body: {} });
   assert.equal(res.status, 503);
-  assert.equal(((await res.json()) as { code: string }).code, "pdf_busy");
+  assert.equal(((await res.json()) as { error: { code: string } }).error.code, "pdf_busy");
   const shared = await readBudget(t.db as never);
   assert.ok(shared === null || shared.blockedUntil <= Date.now(), "screenshots aren't blocked");
   assert.ok((await readBudget(t.db as never, "pdf"))!.blockedUntil > Date.now());
@@ -426,7 +426,7 @@ test("rate limits: the per-minute guard stops new renders before any browser sta
   const t = await setup({ user: kim, burst: false });
   const res = await t.call("POST", "/api/pages/open/pdf", { body: {} });
   assert.equal(res.status, 503);
-  assert.equal(((await res.json()) as { code: string }).code, "pdf_busy");
+  assert.equal(((await res.json()) as { error: { code: string } }).error.code, "pdf_busy");
   assert.equal(res.headers.get("Retry-After"), "60");
   assert.equal(t.browser.runs.length, 0);
   assert.equal(await readBudget(t.db as never, "pdf"), null, "no time was charged");

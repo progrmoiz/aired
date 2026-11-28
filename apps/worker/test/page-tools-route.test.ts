@@ -106,7 +106,7 @@ test("check: the owner (account or update token) gets through to the browser", a
   const signedIn = await setup({ user: kim });
   const res = await signedIn.call("POST", "/api/pages/mine/check", {}, ip());
   assert.equal(res.status, 503, "no BROWSER binding here");
-  assert.equal(((await res.json()) as { code: string }).code, "check_unavailable");
+  assert.equal(((await res.json()) as { error: { code: string } }).error.code, "check_unavailable");
   const byToken = await setup({});
   assert.equal((await byToken.call("POST", "/api/pages/anon/check", { update_token: TOKEN }, ip())).status, 503);
 });
@@ -117,9 +117,9 @@ test("check: a spent daily budget answers 429 with Retry-After and never launche
   await addSpent(db as never, 10 * 60 * 1000, Date.now(), "check");
   const res = await call("POST", "/api/pages/mine/check", {}, ip());
   assert.equal(res.status, 429);
-  const body = (await res.json()) as { code: string; error: string };
+  const body = ((await res.json()) as { error: { code: string; message: string } }).error;
   assert.equal(body.code, "check_budget");
-  assert.match(body.error, /00:00 UTC/);
+  assert.match(body.message, /00:00 UTC/);
   assert.ok(Number(res.headers.get("Retry-After")) > 0);
   assert.equal(launched, 0);
 });
@@ -128,7 +128,7 @@ test("check: Browser Rendering saying 'too many' holds back checks for a minute,
   const { call, db } = await setup({ user: kim, browser: { launch: async () => { throw new Error("Unable to create new browser: code: 429: message: Too many browsers"); } } });
   const res = await call("POST", "/api/pages/mine/check", {}, ip());
   assert.equal(res.status, 503);
-  assert.equal(((await res.json()) as { code: string }).code, "check_busy");
+  assert.equal(((await res.json()) as { error: { code: string } }).error.code, "check_busy");
   const shared = await readBudget(db as never);
   assert.ok(shared === null || shared.blockedUntil <= Date.now(), "screenshots aren't blocked by a check's launch");
   assert.ok((await readBudget(db as never, "check"))!.blockedUntil > Date.now());
@@ -143,7 +143,7 @@ test("check: the account's daily Browser Rendering limit is 'budget' until midni
   const { call, db } = await setup({ user: kim, browser: { launch: async () => { throw new Error("Browser time limit exceeded for today"); } } });
   const res = await call("POST", "/api/pages/mine/check", {}, ip());
   assert.equal(res.status, 429);
-  assert.equal(((await res.json()) as { code: string }).code, "check_budget");
+  assert.equal(((await res.json()) as { error: { code: string } }).error.code, "check_budget");
   assert.ok((await readBudget(db as never))!.blockedUntil > Date.now() + 60_000);
 });
 

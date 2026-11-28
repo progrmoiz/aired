@@ -1,5 +1,4 @@
 import "./worker-loader.ts";
-import { register } from "node:module";
 import { fakeD1 } from "./d1.ts";
 
 /**
@@ -8,30 +7,7 @@ import { fakeD1 } from "./d1.ts";
  * over an in-memory transport. Import this before any Worker module.
  */
 
-// routes/mcp.ts bundles the skill as text (wrangler [[rules]]): load .md the
-// same way here. Its MCP library (agents) imports two Workers-only modules:
-// stand-ins with the classes it names.
-const workersStub =
-  "data:text/javascript," +
-  encodeURIComponent(
-    "class Base { constructor(ctx, env) { this.ctx = ctx; this.env = env; } } export class WorkerEntrypoint extends Base {} export class DurableObject extends Base {} export class WorkflowEntrypoint extends Base {} export class RpcTarget {} export const env = {};",
-  );
-const emailStub = "data:text/javascript," + encodeURIComponent("export class EmailMessage {}");
-register(
-  "data:text/javascript," +
-    encodeURIComponent(`
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-export async function resolve(spec, ctx, next) {
-  if (spec === "cloudflare:workers") return { url: ${JSON.stringify(workersStub)}, shortCircuit: true };
-  if (spec === "cloudflare:email") return { url: ${JSON.stringify(emailStub)}, shortCircuit: true };
-  return next(spec, ctx);
-}
-export async function load(url, ctx, next) {
-  if (url.endsWith(".md")) return { format: "module", source: "export default " + JSON.stringify(readFileSync(fileURLToPath(url), "utf8")), shortCircuit: true };
-  return next(url, ctx);
-}`),
-);
+import "./worker-stubs.ts";
 
 // Page history end to end: the real API, history routes and both kinds of
 // MCP call, on fake bindings (D1 is real SQLite with the real migrations).
@@ -122,7 +98,7 @@ function setup() {
       const res = await call(path, { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
       return { status: res.status, body: await res.json().catch(() => null) };
     };
-    const server = createAiredMcpServer(env as never, user === undefined ? null : { login: `u${user}`, origin: "https://aired.sh" }, callApi as never, () => {});
+    const server = createAiredMcpServer(env as never, user === undefined ? null : { login: `u${user}`, origin: "https://aired.sh" }, callApi as never);
     const [a, b] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: "test", version: "1" }, { capabilities });
     await Promise.all([server.connect(a), client.connect(b)]);

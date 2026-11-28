@@ -18,7 +18,7 @@ import {
   type PageVersion,
 } from "../lib/page-versions.ts";
 import { ALWAYS_KEEP, MESSAGE_MAX, retentionText, VERSION_LIMITS } from "../lib/version-limits.ts";
-import { authorOf, ownerAccess, pageFor, replaceRefusal, sentUpdateToken } from "./api.ts";
+import { authorOf, ownerAccess, pageFor, replaceRefusal, sentUpdateToken } from "../lib/pages-service.ts";
 
 /**
  * Page history, beside the page routes in api.ts (lib/page-versions.ts):
