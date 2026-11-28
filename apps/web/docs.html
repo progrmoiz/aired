@@ -368,7 +368,7 @@ aired.data.subscribe((d) =&gt; { if (d) mrr.textContent = "$" + d.mrr.toLocaleSt
       <!-- ─── API ─── -->
       <section id="api">
         <h2>HTTP API</h2>
-        <p>No SDK, no auth. POST your HTML and get a URL back.</p>
+        <p>No SDK, no auth. POST your HTML and get a URL back. The whole API is described as an <a href="/api/openapi.json">OpenAPI 3.1 document</a> at <code>/api/openapi.json</code>, for generating clients and for agents.</p>
 <pre><code>curl -X POST https://aired.sh/api/publish \
   -H "Content-Type: application/json" \
   -d '{"html": "&lt;h1&gt;Hello&lt;/h1&gt;"}'</code></pre>
@@ -433,6 +433,12 @@ aired.data.subscribe((d) =&gt; { if (d) mrr.textContent = "$" + d.mrr.toLocaleSt
   "update_token": "at_..."
 }</code></pre>
         <p>A field of the wrong type is ignored, as it always was. A value past its bound is refused with <code>400</code>, <code>code: "invalid_input"</code> and the <code>field</code>.</p>
+        <h3 id="idempotency">Retrying a publish safely</h3>
+        <p>Send an <code>Idempotency-Key</code> header (any string up to 255 characters, a new one per publish, such as a UUID) and you can retry <code>POST /api/publish</code> after a timeout without making a second page. A repeat with the same key and the same body within 24 hours answers the first response again, with <code>Idempotent-Replayed: true</code>. The same key with a different body is a <code>422</code> (<code>idempotency_key_reused</code>); while the first request is still running, a repeat gets <code>409</code> (<code>idempotency_in_progress</code>). Keys belong to your account, or to your network when you publish anonymously. A request that failed doesn't keep its key, so fix it and retry with the same one. The CLI sends a key on every publish and retries for you.</p>
+<pre><code>curl -X POST https://aired.sh/api/publish \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -d '{"html": "&lt;h1&gt;Hello&lt;/h1&gt;"}'</code></pre>
 
         <h3>Request body — <code>PUT /api/pages/:id</code></h3>
 <pre><code>{
@@ -500,19 +506,22 @@ aired.data.subscribe((d) =&gt; { if (d) mrr.textContent = "$" + d.mrr.toLocaleSt
       <!-- ─── Errors ─── -->
       <section id="errors">
         <h2>Errors</h2>
-        <p>All errors from <code>/api/*</code> and <code>/auth/*</code> are JSON: <code>{ "error": "&lt;message&gt;", "code": "&lt;code&gt;" }</code>. <code>error</code> is for people and may change; <code>code</code> is stable, for programs. Some errors add fields: <code>field</code> on <code>invalid_input</code>, <code>limit</code> and <code>upgrade_url</code> on <code>plan_limit</code>.</p>
+        <p>Every error from <code>/api/*</code> is JSON in one shape, with the HTTP status that fits:</p>
+<pre><code>{ "error": { "code": "not_found", "message": "Page not found" } }</code></pre>
+        <p><code>code</code> is stable and snake_case, for programs to branch on; <code>message</code> is a sentence for people and may change. Some errors add fields inside <code>error</code>: <code>field</code> on <code>invalid_input</code>, <code>limit</code> and <code>upgrade_url</code> on <code>plan_limit</code>. An unknown <code>/api</code> path is a JSON <code>404</code>, and a known path with the wrong method a <code>405</code> with an <code>Allow</code> header. <code>/auth/*</code> errors keep the flat <code>{ "error": "&lt;code or message&gt;", "code": "&lt;code&gt;" }</code> that OAuth and the device sign-in use, and so do <code>/api</code> errors sent to aired CLI and MCP versions 1.10.0 and older, which read that shape.</p>
         <div class="table-wrap"><table>
           <thead><tr><th>Status</th><th>When</th></tr></thead>
           <tbody>
-            <tr><td><code>400</code></td><td><code>invalid_json</code> (the body isn't JSON), <code>invalid_input</code> (missing <code>html</code>, or a value past its bound, with <code>field</code>), or <code>invalid_html</code> (empty, relative asset paths, or too large: over 2 MB anonymously or whenever billing is off, over 10 MB on any plan).</td></tr>
+            <tr><td><code>400</code></td><td><code>invalid_json</code> (the body isn't JSON), <code>invalid_input</code> (missing <code>html</code>, or a value past its bound, with <code>field</code>), <code>invalid_idempotency_key</code> (blank, or over 255 characters), or <code>invalid_html</code> (empty, relative asset paths, or too large: over 2 MB anonymously or whenever billing is off, over 10 MB on any plan).</td></tr>
             <tr><td><code>401</code></td><td><code>token_required</code>: no credential where one is needed. Also an API key that's invalid or revoked (a bad key is never treated as anonymous).</td></tr>
             <tr><td><code>402</code></td><td><code>code: "plan_limit"</code>: signed in on Free with billing on, and the request needs Pro (a page of 2–10 MB, or more publishes than Free allows). Includes <code>limit</code> and an <code>upgrade_url</code> for a person to open.</td></tr>
             <tr><td><code>403</code></td><td><code>invalid_token</code> (<code>update_token</code> does not match the page), <code>not_owner</code> (signed in, but the page isn't in your account), <code>forbidden</code> (a signed-in browser request without <code>X-Aired-Request: 1</code>), <code>owner_required</code> (speaker notes in a PDF, or restoring a page with responses, without the signed-in owner), or the action needs the website (API keys, billing and account deletion can't be done with a CLI token, an API key or a connected app).</td></tr>
             <tr><td><code>404</code></td><td><code>not_found</code>: page id does not exist, the page expired, or the API path doesn't exist.</td></tr>
-            <tr><td><code>409</code></td><td>Conflict, with a <code>code</code>: <code>key_limit</code> (already 5 API keys), or billing state such as <code>already_pro</code>.</td></tr>
+            <tr><td><code>405</code></td><td><code>method_not_allowed</code>: the API path exists, with other methods (listed in <code>Allow</code>).</td></tr>
+            <tr><td><code>409</code></td><td>Conflict, with a <code>code</code>: <code>key_limit</code> (already 5 API keys), <code>idempotency_in_progress</code> (a publish with the same <code>Idempotency-Key</code> is still running), or billing state such as <code>already_pro</code>.</td></tr>
             <tr><td><code>410</code></td><td>Page reached its view limit (<code>reads</code>).</td></tr>
-            <tr><td><code>413</code></td><td><code>payload_too_large</code>: the request body is over 21 MB (publish, PUT and the MCP endpoint) or 1 MB (everything else). <code>too_large</code>: the page is too big to turn into a PDF.</td></tr>
-            <tr><td><code>422</code></td><td><code>spam_rejected</code>: the page looks like spam or phishing and wasn't published.</td></tr>
+            <tr><td><code>413</code></td><td><code>payload_too_large</code>: the request body is over 21 MB (publish, PUT and the MCP endpoint) or 1 MB (every other request that sends one). <code>too_large</code>: the page is too big to turn into a PDF.</td></tr>
+            <tr><td><code>422</code></td><td><code>spam_rejected</code>: the page looks like spam or phishing and wasn't published. <code>idempotency_key_reused</code>: the <code>Idempotency-Key</code> was already used with a different body.</td></tr>
             <tr><td><code>429</code></td><td><code>rate_limited</code>: 5 publishes an hour per IP anonymously, 30 an hour signed in on Free (402 when billing is on), 500 a day on Pro. The window starts at your first publish and the full quota is back one window later. <code>check_budget</code>: today's browser time for page checks (yours or everyone's) is spent until 00:00 UTC; see <code>Retry-After</code>. <code>pdf_budget</code>: the same for new PDFs (PDFs made before still download).</td></tr>
             <tr><td><code>500</code> / <code>502</code></td><td><code>internal_error</code> / <code>bad_gateway</code>: something failed on our side or at the payment provider. Retry, and report it if it persists. <code>check_failed</code> (502): a page check didn't finish; retry, and if it keeps happening the page may hang the browser. <code>pdf_failed</code> (502): a PDF didn't finish; retry.</td></tr>
             <tr><td><code>503</code></td><td><code>unavailable</code> or <code>storage_unavailable</code>: a dependency is briefly unavailable (storage, the database, or a sign-in provider). Retry shortly. <code>check_busy</code>: the page-check browser is busy, retry after <code>Retry-After</code>; <code>check_unavailable</code>: checks can't run right now or on this server. <code>pdf_busy</code> and <code>pdf_unavailable</code> mean the same for PDFs.</td></tr>

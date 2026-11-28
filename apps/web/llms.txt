@@ -100,7 +100,9 @@ A page published from an aired account can save what viewers enter and show live
 - No custom domains and no team accounts. The dashboard shows view counts per page, not detailed analytics.
 
 ## Error recovery
-- API errors are JSON: `{ "error": "<message>", "code": "<code>" }`. Branch on `code`; `error` is for people.
+- API errors are JSON: `{ "error": { "code": "<code>", "message": "<sentence>" } }`. Branch on `code`; `message` is for people.
+- The API as OpenAPI 3.1: https://aired.sh/api/openapi.json
+- Retrying a publish: send `Idempotency-Key: <uuid>`; a repeat with the same key and body within 24 hours answers the first response instead of making a second page.
 - 400: `invalid_json`, `invalid_input` (with `field`: missing html, or a value past its bound), or `invalid_html` (empty, relative asset paths, or too large: over 2 MB anonymously or when billing is off, over 10 MB on any plan). Make it smaller.
 - 401 `token_required`: no credential where one is needed. Also an invalid or revoked API key.
 - 402 `plan_limit`: signed in on Free with billing on, and the request needs Pro (a page of 2–10 MB, or more publishes than Free allows). Pass the `upgrade_url` to a person; agents can't pay.

@@ -1,6 +1,6 @@
 # When something goes wrong
 
-API errors are JSON: `{ "error": "...", "code": "..." }`. Act on `code`; `error` is for people.
+API errors are JSON: `{ "error": { "code": "...", "message": "..." } }`. Act on `code`; `message` is for people.
 
 | Status and code | What it means | What to do |
 |---|---|---|
