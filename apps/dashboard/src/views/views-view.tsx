@@ -1,6 +1,7 @@
 // #views: views over time, countries and where people came from, for all
 // pages or one (#views/<id>). Pro only; Free sees the same page, blurred,
 // drawn from fixed sample numbers, plus the total view count it keeps.
+// A deck's page also gets its slides (components/slide-chart.tsx).
 import { useState } from 'react'
 import {
   ArrowDownIcon, ArrowLeftIcon, ArrowUpIcon, ChartColumnIcon, ChevronLeftIcon, ChevronRightIcon, ExternalLinkIcon, GlobeIcon, LockIcon,
@@ -13,6 +14,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { ViewHeader } from '@/components/common'
 import { AreaChart } from '@/components/area-chart'
 import { RankedCard } from '@/components/ranked-card'
+import { SlideCard } from '@/components/slide-chart'
 import { CountryFlag, SourceIcon } from '@/components/source-icon'
 import type { PagesState } from '@/App'
 import {
@@ -70,7 +72,10 @@ export function ViewsView({ pageId, pages }: { pageId: string; pages: PagesState
         </Card>
       )}
       {state.status === 'loading' && <LoadingReport />}
-      {state.status === 'ready' && <ReportBody report={state.report} allTime={allTime} perPage={!!pageId} />}
+      {state.status === 'ready' && (
+        <ReportBody report={state.report} allTime={allTime} perPage={!!pageId}
+          slides={pageId ? <SlideCard pageId={pageId} range={range} offset={offset} /> : null} />
+      )}
       {state.status === 'locked' && <LockedPreview range={range} allTime={allTime} perPage={!!pageId} />}
       {state.status === 'missing' && (
         <Card className="flex-row flex-wrap items-center justify-between gap-3 px-5 py-4">
@@ -90,11 +95,12 @@ export function ViewsView({ pageId, pages }: { pageId: string; pages: PagesState
           <Button variant="outline" onClick={retry}>Try again</Button>
         </Card>
       )}
+      {pageId && state.status !== 'ready' && state.status !== 'loading' && state.status !== 'missing' && <SlideCard pageId={pageId} range={range} offset={offset} />}
     </div>
   )
 }
 
-function ReportBody({ report, allTime, perPage }: { report: Report; allTime: number | null; perPage: boolean }) {
+function ReportBody({ report, allTime, perPage, slides }: { report: Report; allTime: number | null; perPage: boolean; slides?: React.ReactNode }) {
   const topCountry = report.countries[0]
   const topSource = report.referrers[0]
   const change = changePercent(report.total, report.previousTotal)
@@ -119,6 +125,7 @@ function ReportBody({ report, allTime, perPage }: { report: Report; allTime: num
           <AreaChart days={report.days} peak={report.peak} icon={report.peak ? report.icons?.[report.peak.host] : undefined} current={report.offset === 0} />
         </div>
       </Card>
+      {slides}
 
       <div className="grid gap-5 md:grid-cols-2">
         <div className="grid content-start gap-2">
