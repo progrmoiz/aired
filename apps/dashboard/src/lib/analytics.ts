@@ -2,6 +2,7 @@
 // /api/me/analytics/pages/:id (one page). Free accounts get a 402.
 import { useEffect, useState } from 'react'
 import { sourceOf } from '@/lib/sources'
+import { readJson } from '@/lib/api'
 
 export type Range = 7 | 30 | 90
 export const RANGES: Range[] = [7, 30, 90]
@@ -47,8 +48,8 @@ async function load(pageId: string, range: Range, offset: number): Promise<Analy
   if (res.status === 402) return { status: 'locked' }
   if (res.status === 404) return { status: 'missing' }
   if (res.status === 503) {
-    const body = await res.json().catch(() => ({}))
-    return body && body.code === 'analytics_unavailable' ? { status: 'unavailable' } : { status: 'error' }
+    const body = await readJson(res)
+    return body.code === 'analytics_unavailable' ? { status: 'unavailable' } : { status: 'error' }
   }
   if (!res.ok) return { status: 'error' }
   const report = (await res.json()) as Report

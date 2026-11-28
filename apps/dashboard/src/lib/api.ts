@@ -65,10 +65,24 @@ export async function getJson<T>(path: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
+/**
+ * An API error body, flat: the API answers `{ error: { code, message, ...extra } }`
+ * (older servers sent `{ error: "<message>", code }`); views read `error` as the
+ * message, `code`, and extras such as `limit` at the top level.
+ */
+export function flatError(data: Record<string, unknown>): Record<string, unknown> {
+  const e = data.error
+  if (!e || typeof e !== 'object' || Array.isArray(e)) return data
+  const { message, ...rest } = e as Record<string, unknown>
+  return { ...rest, error: message }
+}
+
+/** A response's JSON object, {} when there is none. Error bodies come back flat (flatError). */
 export async function readJson(res: Response): Promise<Record<string, unknown>> {
   try {
     const data = await res.json()
-    return data && typeof data === 'object' ? data : {}
+    if (!data || typeof data !== 'object') return {}
+    return res.ok ? data : flatError(data)
   } catch {
     return {}
   }

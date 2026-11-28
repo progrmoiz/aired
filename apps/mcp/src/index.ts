@@ -3,6 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { readFileSync, statSync, accessSync, constants } from "node:fs";
 import { readFile, access } from "node:fs/promises";
 import { join, dirname } from "node:path";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { AUTH_HEADER, CSRF_HEADER } from "@aired/core";
 import { readCliSession } from "./session.js";
@@ -105,29 +106,62 @@ function authHeaders(): Record<string, string> {
   return headers;
 }
 
-/** One aired API call. Throws with the API's error message on a non-2xx answer. */
-async function api<T>(method: string, path: string, body?: unknown, extra: Record<string, string> = {}): Promise<T> {
+/**
+ * An API error's message and code, from either shape: `{ error: { code, message } }`,
+ * or the flat `{ error: "<message>", code }` older servers answer.
+ */
+function apiErrorOf(body: unknown): { message: string | null; code: string | null } {
+  if (typeof body !== "object" || body === null) return { message: null, code: null };
+  const b = body as Record<string, unknown>;
+  const text = (v: unknown): string | null => (typeof v === "string" && v !== "" ? v : null);
+  if (typeof b["error"] === "object" && b["error"] !== null) {
+    const e = b["error"] as Record<string, unknown>;
+    return { message: text(e["message"]), code: text(e["code"]) };
+  }
+  return { message: text(b["error"]), code: text(b["code"]) };
+}
+
+/** Waits between publish retries: 1 s, then 3 s. */
+const RETRY_DELAYS_MS = [1000, 3000];
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * One aired API call. Throws with the API's error message on a non-2xx answer.
+ * With `retry` (publishes, which send an Idempotency-Key), a dropped
+ * connection, a 502/503/504 or a 409 for the same key still running is
+ * tried again with the same key and body, so a retry can't make a second page.
+ */
+async function api<T>(method: string, path: string, body?: unknown, extra: Record<string, string> = {}, retry = false): Promise<T> {
   const headers: Record<string, string> = {
     "User-Agent": `aired-mcp/${typeof __AIRED_VERSION__ === "string" ? __AIRED_VERSION__ : "dev"}`,
     ...authHeaders(),
     ...extra,
   };
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  const resp = await fetch(`${apiBase()}${path}`, {
-    method,
-    headers,
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-  });
+  const sent = body !== undefined ? JSON.stringify(body) : undefined;
+  let resp: Response;
   let parsed: unknown = null;
-  try {
-    parsed = await resp.json();
-  } catch {
-    // handled below
+  for (let attempt = 0; ; attempt++) {
+    const last = !retry || attempt >= RETRY_DELAYS_MS.length;
+    try {
+      resp = await fetch(`${apiBase()}${path}`, { method, headers, ...(sent !== undefined ? { body: sent } : {}) });
+    } catch (err) {
+      if (last) throw err;
+      await sleep(RETRY_DELAYS_MS[attempt]!);
+      continue;
+    }
+    parsed = null;
+    try {
+      parsed = await resp.json();
+    } catch {
+      // handled below
+    }
+    const again = resp.status === 502 || resp.status === 503 || resp.status === 504 || (resp.status === 409 && apiErrorOf(parsed).code === "idempotency_in_progress");
+    if (last || !again) break;
+    await sleep(RETRY_DELAYS_MS[attempt]!);
   }
   if (!resp.ok) {
-    const message = typeof (parsed as Record<string, unknown> | null)?.["error"] === "string"
-      ? String((parsed as Record<string, unknown>)["error"])
-      : `aired answered ${resp.status}`;
+    const message = apiErrorOf(parsed).message ?? `aired answered ${resp.status}`;
     throw new Error(resp.status === 429 ? `Rate limited: ${message}` : message);
   }
   if (parsed === null) throw new Error("aired: unexpected response format");
@@ -171,7 +205,8 @@ async function publishHTML(
   if (options.id !== undefined) body["id"] = options.id;
   if (options.message !== undefined) body["message"] = options.message;
 
-  return api<PublishResult>("POST", "/api/publish", body);
+  // A new key per publish, kept across its retries.
+  return api<PublishResult>("POST", "/api/publish", body, { "Idempotency-Key": randomUUID() }, true);
 }
 
 const PAGE_ID = /^[A-Za-z0-9_-]{1,64}$/;

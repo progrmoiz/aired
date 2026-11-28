@@ -159,7 +159,9 @@
       const data = await res.json();
 
       if (!res.ok) {
-        showError(data.error || `Error ${res.status}`);
+        // { error: { code, message } }; older servers sent { error: "<message>" }.
+        const message = data.error && typeof data.error === "object" ? data.error.message : data.error;
+        showError(message || `Error ${res.status}`);
         return;
       }
 

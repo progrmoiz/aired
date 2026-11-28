@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { USER_AGENT } from '../lib/constants.js'
 import { AUTH_HEADER, CSRF_HEADER } from '@aired/core'
 import type { User } from '@aired/core'
@@ -90,14 +91,31 @@ export interface AuthTokenResult {
   user: User
 }
 
+/**
+ * An API error's message and code, from either shape the server answers:
+ * `{ error: { code, message } }` (servers after 1.10.0), or the flat
+ * `{ error: "<message>", code }` (older servers, /auth, and what servers send
+ * clients that identify as 1.10.0 or older).
+ */
+export function apiErrorOf(body: unknown): { message: string | null; code: string | null } {
+  if (typeof body !== 'object' || body === null) return { message: null, code: null }
+  const b = body as Record<string, unknown>
+  const text = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null)
+  if (typeof b['error'] === 'object' && b['error'] !== null) {
+    const e = b['error'] as Record<string, unknown>
+    return { message: text(e['message']), code: text(e['code']) }
+  }
+  return { message: text(b['error']), code: text(b['code']) }
+}
+
 async function handleResponse<T>(resp: Response, action: string): Promise<T> {
   if (resp.status === 429) {
     // Publishes keep their familiar message; other limits (set, feedback) say their own.
     let message = 'Rate limited: too many uploads. Try again in an hour.'
     if (action !== 'Publish' && action !== 'Update') {
       try {
-        const body = (await resp.json()) as Record<string, unknown>
-        if (typeof body['error'] === 'string') message = `Rate limited: ${body['error']}`
+        const { message: said } = apiErrorOf(await resp.json())
+        if (said !== null) message = `Rate limited: ${said}`
       } catch {
         // keep the default
       }
@@ -109,16 +127,17 @@ async function handleResponse<T>(resp: Response, action: string): Promise<T> {
 
   if (!resp.ok) {
     let message = `${action} failed (${resp.status})`
+    let apiCode: string | null = null
     try {
-      const body = (await resp.json()) as Record<string, unknown>
-      if (typeof body['error'] === 'string') {
-        message = body['error']
-      }
+      const found = apiErrorOf(await resp.json())
+      if (found.message !== null) message = found.message
+      apiCode = found.code
     } catch {
       // ignore
     }
-    // The status lets a command tell "try later" (502/503) from "no access" (401/403/404).
-    throw Object.assign(new Error(message), { status: resp.status })
+    // The status lets a command tell "try later" (502/503) from "no access" (401/403/404);
+    // apiCode is the API's own code (not_found, invalid_token, ...).
+    throw Object.assign(new Error(message), { status: resp.status, apiCode })
   }
 
   try {
@@ -127,6 +146,45 @@ async function handleResponse<T>(resp: Response, action: string): Promise<T> {
     throw new Error(`${action}: unexpected response format`)
   }
 }
+
+/** Waits between publish retries: 1 s, then 3 s. */
+const PUBLISH_RETRY_DELAYS_MS = [1000, 3000]
+
+/** A publish answer worth retrying with the same Idempotency-Key: still running, or a passing server failure. */
+async function retryablePublish(resp: Response): Promise<boolean> {
+  if (resp.status === 502 || resp.status === 503 || resp.status === 504) return true
+  if (resp.status !== 409) return false
+  try {
+    return apiErrorOf(await resp.clone().json()).code === 'idempotency_in_progress'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * POST /api/publish with an Idempotency-Key, retried on a dropped connection,
+ * a 502/503/504, or a 409 for the same key still running. Every attempt
+ * sends the same key and body, so the server answers a retry with the first
+ * publish's page instead of making a second one.
+ */
+async function postPublish(url: string, headers: Record<string, string>, body: string): Promise<Response> {
+  const withKey = { ...headers, 'Idempotency-Key': randomUUID() }
+  for (let attempt = 0; ; attempt++) {
+    const last = attempt >= PUBLISH_RETRY_DELAYS_MS.length
+    let resp: Response
+    try {
+      resp = await fetch(url, { method: 'POST', headers: withKey, body })
+    } catch (err) {
+      if (last) throw err
+      await sleep(PUBLISH_RETRY_DELAYS_MS[attempt]!)
+      continue
+    }
+    if (last || !(await retryablePublish(resp))) return resp
+    await sleep(PUBLISH_RETRY_DELAYS_MS[attempt]!)
+  }
+}
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 export type { PageContent }
 
@@ -158,12 +216,7 @@ export async function publishHTML(
   }
 
   addApiKey(headers)
-  const resp = await fetch(`${baseUrl}/api/publish`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-  })
-
+  const resp = await postPublish(`${baseUrl}/api/publish`, headers, JSON.stringify(body))
   return handleResponse<PublishResponse>(resp, 'Publish')
 }
 
@@ -439,10 +492,10 @@ export async function pollDeviceToken(
 
   let errorData: { error: string } = { error: `Poll failed (${resp.status})` }
   try {
-    const body = (await resp.json()) as Record<string, unknown>
-    if (typeof body['error'] === 'string') {
-      errorData = { error: body['error'] }
-    }
+    // /auth answers flat, and the device flow's `error` is a code (RFC 8628): max_attempts, device_code_expired.
+    const { message, code } = apiErrorOf(await resp.json())
+    const said = message ?? code
+    if (said !== null) errorData = { error: said }
   } catch {
     // ignore
   }

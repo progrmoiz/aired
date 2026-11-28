@@ -132,7 +132,8 @@
               syncCategory();
               status.textContent = 'Thanks. We got your report and will review it.';
             } else {
-              status.textContent = data.error || 'Could not send the report. Try again.';
+              var said = data.error && typeof data.error === 'object' ? data.error.message : data.error;
+              status.textContent = said || 'Could not send the report. Try again.';
             }
           });
         }).catch(function () {
