@@ -16,7 +16,7 @@ import { ClaudeMark, ChatGPTMark, CursorMark } from '@/components/brand'
 import { CopyButton, CopyRow, ViewHeader } from '@/components/common'
 import { type ApiKey, mutate, readJson } from '@/lib/api'
 
-const CONNECTOR = 'https://aired.sh/mcp/account'
+export const CONNECTOR = 'https://aired.sh/mcp/account'
 
 type Tool = { key: string; name: string; sub: string; icon: React.ReactNode; steps: React.ReactNode[]; rows: { text: string; label: string }[]; ask: string }
 
@@ -160,7 +160,7 @@ function DeveloperKeys() {
                   {full && <p className="text-[13px] text-subtle">You have {state.max} keys. Revoke one to add another.</p>}
                 </div>
                 {state.keys.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No keys yet.</p>
+                  <p className="text-sm text-muted-foreground">No keys yet. A key lets a script or agent publish to this account without signing in. Make one when a tool asks for it.</p>
                 ) : (
                   <ul className="divide-y divide-border rounded-lg border border-border" aria-label="Your keys">
                     {state.keys.map((k) => (

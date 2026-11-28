@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
-import { CheckIcon, CopyIcon, FileTextIcon, Gamepad2Icon, GlobeIcon, LockIcon, PresentationIcon, ChartColumnIcon } from 'lucide-react'
+import { CheckIcon, CopyIcon, FileTextIcon, Gamepad2Icon, GlobeIcon, LockIcon, PresentationIcon, ChartColumnIcon, WifiOffIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { copyText, type Page } from '@/lib/api'
 import { kindOf } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -65,6 +66,20 @@ export function KindIcon({ page, className }: { page: Pick<Page, 'title' | 'hasP
         </span>
       )}
     </span>
+  )
+}
+
+/** A load that failed: what didn't load, that nothing is lost, and a retry. */
+export function LoadError({ what, onRetry }: { what: string; onRetry: () => void }) {
+  return (
+    <Card className="flex-row flex-wrap items-center gap-x-4 gap-y-3 px-5 py-4" role="alert">
+      <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-input bg-background text-muted-foreground" aria-hidden="true"><WifiOffIcon className="size-[18px]" /></span>
+      <div className="min-w-[200px] flex-1">
+        <p className="text-[15px] font-medium">We couldn’t load {what}</p>
+        <p className="text-[13px] text-subtle">Nothing is lost. Check your internet connection, then try again.</p>
+      </div>
+      <Button variant="outline" onClick={onRetry}>Try again</Button>
+    </Card>
   )
 }
 

@@ -79,7 +79,7 @@ export default function App() {
           />
         </>}
       />
-      <main id="main" className="mx-auto w-full max-w-(--aired-page-max) min-w-0 flex-1 px-5 pt-8 pb-20 sm:px-8 sm:pt-10">
+      <main id="main" className="mx-auto w-full max-w-(--aired-page-max) min-w-0 flex-1 px-6 pt-8 pb-20 sm:pt-10">
         {view === 'pages' && <PagesView pages={pages} reload={reloadPages} removePage={removePage} isPro={plan.loaded && plan.isPro} />}
         {view === 'views' && <Suspense fallback={<div aria-busy="true" className="min-h-[60vh]" />}><ViewsView pageId={sub} pages={pages} /></Suspense>}
         {view === 'responses' && <ResponsesView pageId={sub} pages={pages} />}

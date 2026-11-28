@@ -21,7 +21,9 @@ import {
 import {
   AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { CopyButton, KindIcon } from '@/components/common'
+import { CopyButton, CopyRow, KindIcon, LoadError } from '@/components/common'
+import { ChatGPTMark, ClaudeMark } from '@/components/brand'
+import { CONNECTOR } from '@/views/connect-view'
 import { CopyLinkAction } from '@/components/icon-action'
 import { forgetPreview } from '@/components/live-preview'
 import { PageThumb, forgetTile } from '@/components/page-thumb'
@@ -92,10 +94,7 @@ export function PagesView({ pages, reload, removePage, isPro = false }: {
       {pages.status === 'loading' && <LoadingGrid />}
 
       {pages.status === 'error' && (
-        <Card className="flex-row flex-wrap items-center justify-between gap-3 px-5 py-4">
-          <p className="text-sm text-muted-foreground">Could not load your pages.</p>
-          <Button variant="outline" onClick={reload}>Try again</Button>
-        </Card>
+        <LoadError what="your pages" onRetry={reload} />
       )}
 
       {ready && all.length === 0 && <EmptyPages onPublished={reload} />}
@@ -132,7 +131,7 @@ export function PagesView({ pages, reload, removePage, isPro = false }: {
             </div>
 
             {ready.projects.length > 0 && (
-              <nav aria-label="Projects" className="-mx-5 flex gap-2 overflow-x-auto px-5 sm:mx-0 sm:flex-wrap sm:px-0 [scrollbar-width:none]">
+              <nav aria-label="Projects" className="-mx-6 flex gap-2 overflow-x-auto px-6 sm:mx-0 sm:flex-wrap sm:px-0 [scrollbar-width:none]">
                 {[null, ...ready.projects, UNSORTED].map((key) => {
                   const n = key === null ? all.length : all.filter((p) => p.group === key).length
                   if (n === 0) return null
@@ -150,7 +149,7 @@ export function PagesView({ pages, reload, removePage, isPro = false }: {
 
             {shown.length === 0 ? (
               <Card className="flex-row flex-wrap items-center justify-between gap-3 px-5 py-4">
-                <p className="text-sm text-muted-foreground">{query.trim() ? `No pages match “${query.trim()}”.` : 'No pages here.'}</p>
+                <p className="text-sm text-muted-foreground">{query.trim() ? `No pages match “${query.trim()}”. Check the spelling, or search for a word from the link.` : 'No pages match this filter.'}</p>
                 <Button variant="outline" onClick={reset}>Show all pages</Button>
               </Card>
             ) : layout === 'grid' ? (
@@ -250,7 +249,8 @@ function ClaimBanner({ claim }: { claim: ReturnType<typeof useClaim> }) {
         <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-input bg-background"><DownloadIcon className="size-[18px]" /></span>
         <div className="min-w-[200px] flex-1">
           <p className="text-[15px] font-medium">{n > 0 ? `${plural(n, 'page')} published in this browser without an account` : 'Some pages could not be added'}</p>
-          {n > 0 && <p className="text-[13px] text-subtle">Add them to your account to manage them here.</p>}
+          {n > 0 ? <p className="text-[13px] text-subtle">Add them to your account to keep them here, see their views and stop them expiring.</p>
+            : <p className="text-[13px] text-subtle">They stay saved in this browser, so you can try again.</p>}
         </div>
         <div className="flex gap-2">
           {n > 0 && (
@@ -483,7 +483,7 @@ function DeleteDialog({ page, onClose, onDeleted }: { page: Page | null; onClose
       toast.success('Deleted “' + name + '”')
       onDeleted(page)
     } catch {
-      setError('Could not delete. Try again.')
+      setError('That didn’t delete, so the page is still live. Check your connection and try again.')
     } finally {
       setBusy(false)
     }
@@ -514,11 +514,46 @@ const EXAMPLES = [
   { kind: 'slides', title: 'Parents’ evening slides', id: 'parents-evening', facts: '7 views · yesterday' },
 ] as const
 
+function Way({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+  return (
+    <Card className="gap-3 px-5 py-5">
+      <div className="flex items-center gap-2.5">
+        <span className="grid size-[26px] shrink-0 place-items-center rounded-lg border border-input bg-background text-[13px] font-medium" aria-hidden="true">{n}</span>
+        <h3 className="text-[15px] font-medium">{title}</h3>
+      </div>
+      {children}
+    </Card>
+  )
+}
+
 function EmptyPages({ onPublished }: { onPublished: () => void }) {
   return (
     <>
       <h1 tabIndex={-1} className="sr-only">Your pages</h1>
       <PublishZone size="hero" title="Put your first page online" description="Drop the file Claude or ChatGPT made for you, or paste the code. You get a link anyone can open, on any phone or laptop." onPublished={onPublished} />
+
+      <section aria-labelledby="ways-title" className="grid gap-4">
+        <div>
+          <h2 id="ways-title" className="text-subheading font-medium tracking-tight">Three ways to publish</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Pick whichever fits how you work. Every page lands here, in your account.</p>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Way n={1} title="Drop the file here">
+            <p className="text-sm text-muted-foreground">Saved a page from Claude, ChatGPT or Gemini? Drag the .html file into the box above, or paste its code. Nothing to set up.</p>
+          </Way>
+          <Way n={2} title="Ask your chat app">
+            <p className="text-sm text-muted-foreground">Add aired to Claude or ChatGPT once, by pasting this link into its settings as a connector. Then just ask: “Publish this as a link.”</p>
+            <CopyRow text={CONNECTOR} label="Copy the link for your chat app" />
+            <a href="#connect" className="inline-flex items-center gap-2 text-[13px] text-subtle hover:text-foreground"><ClaudeMark className="size-3.5" /><ChatGPTMark className="size-3.5" />Step by step for each app →</a>
+          </Way>
+          <Way n={3} title="Ask your coding agent">
+            <p className="text-sm text-muted-foreground">Using Claude Code, Cursor or Codex? Run this once in your terminal to teach it to publish, then sign it in with <code className="font-mono text-[13px] text-foreground">npx aired login</code>.</p>
+            <CopyRow text="npx skills add progrmoiz/aired -g" label="Copy the setup command" />
+            <a href="/docs#install" className="text-[13px] text-subtle hover:text-foreground">Other ways to set it up →</a>
+          </Way>
+        </div>
+      </section>
+
       <section aria-label="Example of how pages look here">
         <h2 className="text-center text-sm font-medium text-subtle">Your pages will show up here, like this</h2>
         <div className="mt-6 grid grid-cols-1 gap-x-6 gap-y-9 opacity-50 sm:grid-cols-2 lg:grid-cols-3" aria-hidden="true">
