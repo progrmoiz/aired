@@ -9,6 +9,7 @@ import { me } from "./me.js";
 import { pageTools } from "./page-tools.ts";
 import { responses } from "./responses.ts";
 import { versions } from "./versions.ts";
+import { slides } from "./slides.ts";
 import { openapi } from "./openapi.ts";
 import { api } from "./api.js";
 import { report } from "./report.js";
@@ -34,6 +35,7 @@ const API_MOUNTS: ReadonlyArray<readonly [string, Router]> = [
   ["/api/favicon", favicon],
   ["/api/me", me],
   ["/api", pageTools],
+  ["/api", slides],
   ["/api", responses],
   ["/api", versions],
   ["/api", openapi],

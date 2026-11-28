@@ -86,6 +86,16 @@ migrations_dir = "migrations"
 binding = "VIEWS"
 dataset = "aired_views"
 
+# Per-slide analytics for Pro decks (src/lib/slide-event.ts writes, read by
+# GET /api/pages/:id/slides through the same SQL API secrets as views). One
+# data point per slide beacon: page, day, slide number, seconds on it (in
+# buckets) and whether it was that load's first look; never the IP or a
+# viewer id. Its own dataset so slide rows never count as views. At most
+# 20,000 beacons per deck per day (lib/collect-limits.ts SLIDE_EVENT_LIMIT).
+[[analytics_engine_datasets]]
+binding = "SLIDES"
+dataset = "aired_slides"
+
 # Clicks on the agent menu at the top of each guide and the docs (POST
 # /api/site-event, src/lib/site-event.ts): page, menu item and day, nothing
 # about the visitor. GET /api/admin/site-events reads the totals.
@@ -190,6 +200,15 @@ simple = { limit = 120, period = 60 }
 name = "LIVE_BURST"
 namespace_id = "1021"
 simple = { limit = 600, period = 60 }
+
+# Slide beacons from decks (routes/collect.ts /c/:id/slide): one per slide
+# a viewer leaves after a second or more, so a fast reader sends maybe 20 a
+# minute. 300 a minute per network leaves room for a room full of viewers;
+# the per-deck daily cap is in D1 (lib/collect-limits.ts SLIDE_EVENT_LIMIT).
+[[ratelimits]]
+name = "SLIDE_BURST"
+namespace_id = "1022"
+simple = { limit = 300, period = 60 }
 
 # Email for "only these people" codes (lib/email-sender.ts): Cloudflare Email
 # Service. Off until the sending domain is onboarded (Compute > Email Service >

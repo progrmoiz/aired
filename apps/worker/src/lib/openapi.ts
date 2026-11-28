@@ -77,7 +77,7 @@ const ERROR_TEXT: Record<number, string> = {
   409: "A conflict, with a code: idempotency_in_progress, already_current, key_limit, already_pro.",
   410: "The page or version is gone (view limit reached, version_gone).",
   413: "payload_too_large: the body is over 21 MB (publish, PUT) or 1 MB (everything else).",
-  422: "spam_rejected, or idempotency_key_reused (the same Idempotency-Key with a different body).",
+  422: "spam_rejected, idempotency_key_reused (the same Idempotency-Key with a different body), or not_a_deck (per-slide numbers for a page that isn't a deck).",
   429: "rate_limited, check_budget or pdf_budget. See Retry-After when present.",
   502: "bad_gateway, check_failed or pdf_failed: something upstream failed. Retry.",
   503: "unavailable, storage_unavailable, check_busy, pdf_busy and the like: retry shortly.",
@@ -422,6 +422,48 @@ const OPERATIONS: Record<string, Op> = {
     ],
     ok: { description: "The report.", schema: looseObject("Views per day, countries and referrers.") },
     errors: [401, 402, 404],
+  },
+  "GET /api/pages/:id/slides": {
+    summary: "How far people get through one of your decks (Pro)",
+    description:
+      "For each slide: how many page loads showed it for at least a second (reached), the median seconds a visit to it lasts, and how many fewer reached the next slide (drop_off; null on the last). Signed-in owner only. 422 not_a_deck for a page that isn't a deck; the owner's own views aren't counted.",
+    tags: ["Analytics"],
+    auth: ["apiKey", "cliSession", "session"],
+    query: [
+      { name: "days", schema: { type: "integer", enum: [7, 30, 90] }, description: "Days (default 30)." },
+      { name: "offset", schema: int(), description: "Whole windows back, within the last 90 days." },
+    ],
+    ok: {
+      description: "The deck's numbers.",
+      schema: obj(
+        {
+          id: str(),
+          title: nullable(str()),
+          days: int(),
+          offset: int(),
+          from: str("The window's first UTC day, YYYY-MM-DD."),
+          to: str("The window's last UTC day."),
+          slide_count: int("Slides in the deck now."),
+          viewers: int("The most people who reached any one slide."),
+          finished: int("How many reached the last slide."),
+          biggest_drop: nullable(int("The slide after which the most people stopped.")),
+          slides: arr(
+            obj(
+              {
+                slide: int(),
+                title: nullable(str("The slide's first heading.")),
+                reached: int(),
+                median_seconds: nullable({ type: "number" }),
+                drop_off: nullable(int()),
+              },
+              ["slide", "title", "reached", "median_seconds", "drop_off"],
+            ),
+          ),
+        },
+        ["id", "days", "slide_count", "viewers", "finished", "biggest_drop", "slides"],
+      ),
+    },
+    errors: [400, 401, 402, 404, 422, 503],
   },
   "GET /api/billing/status": {
     summary: "Whether billing is on, and your plan",

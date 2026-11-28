@@ -89,6 +89,8 @@ export type Env = {
   COLLECT_BURST?: RateLimit;
   /** Live-reload polls from open pages (routes/collect.ts /c/:id/live), per network. */
   LIVE_BURST?: RateLimit;
+  /** Slide beacons from decks (routes/collect.ts /c/:id/slide), per network. */
+  SLIDE_BURST?: RateLimit;
   /** Workers Rate Limiting binding: page checks per caller per minute (routes/page-tools.ts). */
   CHECK_BURST?: { limit(options: { key: string }): Promise<{ success: boolean }> };
   /**
@@ -103,6 +105,12 @@ export type Env = {
    * so tests and local dev run without it.
    */
   SITE_EVENTS?: AnalyticsEngineDataset;
+  /**
+   * Analytics Engine dataset `aired_slides` (wrangler.toml): one data point
+   * per slide beacon from a Pro owner's deck (lib/slide-event.ts), read by
+   * GET /api/pages/:id/slides. Optional so tests and local dev run without it.
+   */
+  SLIDES?: AnalyticsEngineDataset;
   /**
    * Secret: a Cloudflare API token with Account Analytics Read, for the
    * Analytics Engine SQL API that Pro analytics reads (lib/analytics.ts).

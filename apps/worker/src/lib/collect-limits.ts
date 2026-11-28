@@ -88,3 +88,16 @@ export const VIEWER_COOKIE_SECONDS = 365 * 24 * 3600;
 export const READ_PAGE_MAX = 200;
 /** Rows the CSV export holds at most. */
 export const CSV_MAX_ROWS = 50_000;
+
+/**
+ * Per-slide analytics for decks (lib/slide-beacon.ts, POST /c/:id/slide).
+ * Each beacon is one Analytics Engine data point, so a page takes at most
+ * this many a day (durable, in D1 rate_limits; the window starts at the
+ * day's first beacon). 20,000 is a few hundred people going through a
+ * 30-slide deck; past it the day's numbers stop growing. Per network the
+ * SLIDE_BURST binding (wrangler.toml) allows 300 a minute.
+ */
+export const SLIDE_EVENT_LIMIT = { limit: 20_000, windowSeconds: 24 * 3600 } as const;
+
+/** How long a deck's slide token lasts. A reload gets a new one. */
+export const SLIDE_TOKEN_SECONDS = 24 * 3600;

@@ -54,7 +54,7 @@ export function entitlementsFor(state: SubscriptionState | null, now: Date): Ent
 
 /** Body of the 402 a signed-in user gets when a free-plan limit blocks the request. */
 export function planLimitError(
-  limit: 'page_size' | 'publish_rate' | 'analytics' | 'responses' | 'live_data' | 'access_people' | 'access_domains',
+  limit: 'page_size' | 'publish_rate' | 'analytics' | 'slide_analytics' | 'responses' | 'live_data' | 'access_people' | 'access_domains',
   origin: string,
   ref?: string,
 ): { error: string; code: 'plan_limit'; limit: string; upgrade_url: string } {

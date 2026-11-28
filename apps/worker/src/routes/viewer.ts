@@ -23,6 +23,7 @@ import { accessGate, logVisit } from "./access.ts";
 import { gateMaterial } from "../lib/access-list.ts";
 import { viewerPdfHref } from "../lib/pdf-export.ts";
 import { liveReloadFor } from "../lib/live-reload.ts";
+import { slideBeaconFor } from "../lib/slide-beacon.ts";
 
 /** A page that has used up its view limit. */
 function viewLimitReached(): Response {
@@ -148,9 +149,12 @@ viewer.get("/p/:id", async (c) => {
   // Pro owners get no badge. Anonymous pages skip the lookup; if it fails,
   // show the badge rather than break the page.
   let badge = true;
+  let plan: "free" | "pro" = "free";
   if (metadata.ownerId !== null) {
     try {
-      badge = (await getEntitlements(c.env, metadata.ownerId)).badge;
+      const ent = await getEntitlements(c.env, metadata.ownerId);
+      badge = ent.badge;
+      plan = ent.plan;
     } catch {
       badge = true;
     }
@@ -185,6 +189,20 @@ viewer.get("/p/:id", async (c) => {
     return "";
   });
 
+  // Per-slide analytics (lib/slide-beacon.ts): a Pro owner's deck, opened
+  // by anyone but its signed-in owner, reports which slides were seen and
+  // for how long. A page-scoped token, tied to the gate; no viewer id.
+  const viewerUser = c.get("user");
+  const slideBeacon = await slideBeaconFor({
+    secret: c.env.SESSION_SECRET, origin: siteOrigin(c.env), id, html, ownerId: metadata.ownerId,
+    viewerId: viewerUser ? viewerUser.id : null, plan, gate: gateMaterial(metadata.pin, metadata.access, entries), nowMs: now,
+  }).catch((err) => {
+    console.error("slide beacon token failed", { id, err });
+    return "";
+  });
+  // Different for the owner than for everyone else: no shared cache keeps it.
+  if (slideBeacon !== "") headers.set("Cache-Control", "private, no-store");
+
   // The shim must run before page scripts, so it goes in after the bar's
   // own <head> injection.
   const wrappedHtml = injectEarlyScript(
@@ -198,7 +216,7 @@ viewer.get("/p/:id", async (c) => {
       imageVersion: versionFromEtag(obj.etag),
       pdfHref,
     }),
-    SANDBOX_SHIM + (dataLayer?.script ?? "") + liveReload,
+    SANDBOX_SHIM + (dataLayer?.script ?? "") + liveReload + slideBeacon,
   );
 
   return new Response(wrappedHtml, { status: 200, headers });

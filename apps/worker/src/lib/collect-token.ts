@@ -154,3 +154,31 @@ export async function verifyWatchToken(secret: string, pageId: string, token: un
   if (Number(exp) <= nowSec) return { ok: false, reason: "expired" };
   return { ok: true, gate };
 }
+
+/**
+ * A slide token: what a deck's viewer sends with each slide beacon to POST
+ * /c/:id/slide (lib/slide-beacon.ts). Like a watch token it names one page
+ * and its gate and expires, and names no viewer; it is signed for its own
+ * purpose, so it can't watch, save or read anything, and a watch token
+ * can't send slide beacons. Only decks get one. Format: s1.<page>.<exp>.<gate>.<sig>.
+ */
+export async function mintSlideToken(secret: string, pageId: string, expSec: number, gate: string): Promise<string> {
+  const body = `s1.${pageId}.${expSec}.${gate}`;
+  return `${body}.${b64url(await mac(secret, "slides", body))}`;
+}
+
+/** Check a slide token sent to /c/:pageId/slide: signed, for this page, not expired. */
+export async function verifySlideToken(secret: string, pageId: string, token: unknown, nowSec: number): Promise<WatchCheck> {
+  if (typeof token !== "string" || token.length > 200) return { ok: false, reason: "malformed" };
+  const parts = token.split(".");
+  if (parts.length !== 5 || parts[0] !== "s1") return { ok: false, reason: "malformed" };
+  const [, tokenPage, exp, gate, sig] = parts as [string, string, string, string, string];
+  if (!PAGE_ID.test(tokenPage) || !/^\d{1,12}$/.test(exp) || !/^[A-Za-z0-9_-]{11}$/.test(gate)) return { ok: false, reason: "malformed" };
+  const given = fromB64url(sig);
+  if (given === null) return { ok: false, reason: "malformed" };
+  const want = await mac(secret, "slides", `s1.${tokenPage}.${exp}.${gate}`);
+  if (!sameBytes(given, want)) return { ok: false, reason: "bad_signature" };
+  if (tokenPage !== pageId) return { ok: false, reason: "wrong_page" };
+  if (Number(exp) <= nowSec) return { ok: false, reason: "expired" };
+  return { ok: true, gate };
+}

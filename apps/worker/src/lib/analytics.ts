@@ -104,7 +104,7 @@ export function dayList(range: Range, nowMs: number): string[] {
   return windowDays({ range, offset: 0 }, nowMs);
 }
 
-function checkWindow(w: Window) {
+export function checkWindow(w: Window) {
   if (!(RANGES as readonly number[]).includes(w.range)) throw new Error('invalid range');
   if (!Number.isSafeInteger(w.offset) || w.offset < 0 || (w.offset + 1) * w.range > MAX_DAYS) throw new Error('invalid offset');
 }

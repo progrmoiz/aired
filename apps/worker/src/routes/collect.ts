@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
 import type { AppBindings } from "../types.js";
 import { hashToHex } from "@aired/core";
-import { pageGate, usableSecret, verifyViewerToken, verifyWatchToken } from "../lib/collect-token.ts";
+import { pageGate, usableSecret, verifySlideToken, verifyViewerToken, verifyWatchToken } from "../lib/collect-token.ts";
 import { gateMaterial } from "../lib/access-list.ts";
 import { getAccessEntries } from "../lib/access-store.ts";
 
@@ -17,7 +17,8 @@ import {
   saveEntry,
   type Entry,
 } from "../lib/collect-store.ts";
-import { COLLECT_WRITE_LIMITS, READ_PAGE_MAX } from "../lib/collect-limits.ts";
+import { COLLECT_WRITE_LIMITS, READ_PAGE_MAX, SLIDE_EVENT_LIMIT } from "../lib/collect-limits.ts";
+import { parseBeacon, slideEvent } from "../lib/slide-event.ts";
 import { takeDurableSlot } from "../lib/durable-limit.ts";
 import { getEntitlements } from "../lib/entitlements.js";
 import { loadPage } from "../lib/page-write.ts";
@@ -52,6 +53,8 @@ async function currentGate(c: Context<AppBindings>, id: string, pin: string | nu
  *   results public, and without viewer ids. remove: one of this viewer's own.
  * - data: the live data an owner pushed with update_data, or "unchanged"
  *   when the page already has this version.
+ * - live: whether the page was updated (live reload), with a watch token.
+ * - slide: a deck's per-slide beacon (lib/slide-beacon.ts), with a slide token.
  *
  * Answers carry Access-Control-Allow-Origin: * and never credentials.
  */
@@ -309,6 +312,55 @@ collect.post("/c/:id/live", async (c) => {
   }
   if (head === null) return problem(c, { status: 410, code: "gone", error: "This page is gone." });
   return c.json({ changed: head.etag !== etag });
+});
+
+// Slide beacons from a deck (lib/slide-beacon.ts): one slide's number and
+// how long it was on screen. Body: { token, slide, ms, first } with the
+// slide token only decks get. Cheapest checks first: the per-network guard
+// (SLIDE_BURST), the token, the fields, then the page (KV) and its gate,
+// then the page's daily cap (D1), and only then the Analytics Engine write.
+// Answers 204; sendBeacon never reads it. No cookies, and the address is
+// only hashed into the limiter's key.
+collect.post("/c/:id/slide", async (c) => {
+  const id = c.req.param("id") ?? "";
+  if (!PAGE_ID.test(id)) return problem(c, { status: 404, code: "not_found", error: "Page not found" });
+  const network = await hashToHex(visitorNetwork(c.req.header("CF-Connecting-IP") ?? "unknown"), 16);
+  if (!(await underBurstLimit(c.env.SLIDE_BURST, network))) {
+    c.header("Retry-After", "60");
+    return problem(c, { status: 429, code: "rate_limited", error: "Too many requests. Wait a minute and try again." });
+  }
+  if (!usableSecret(c.env.SESSION_SECRET)) return problem(c, { status: 503, code: "unavailable", error: "Slide analytics isn't set up on this server." });
+  const read = await readBody(c);
+  if (!read.ok) return problem(c, read.problem);
+  const check = await verifySlideToken(c.env.SESSION_SECRET, id, read.body.token, Math.floor(Date.now() / 1000));
+  if (!check.ok) return problem(c, TOKEN_PROBLEMS[check.reason] ?? TOKEN_PROBLEMS.default!);
+  const fields = parseBeacon(read.body);
+  if (!fields.ok) return problem(c, { status: 422, code: "invalid_input", error: fields.error });
+  const raw = await c.env.PAGES_KV.get(`page:${id}`);
+  const live = raw === null ? null : parseMetadata(raw);
+  if (live === null || (live.expiresAt !== null && Date.parse(live.expiresAt) <= Date.now())) return problem(c, { status: 410, code: "gone", error: "This page is gone." });
+  let gate: string;
+  try {
+    gate = await currentGate(c, id, live.pin, live.access);
+  } catch {
+    return problem(c, { status: 503, code: "unavailable", error: "Couldn't reach storage. Try again." });
+  }
+  if (gate !== check.gate) return problem(c, PIN_CHANGED);
+  const now = Date.now();
+  try {
+    if (!(await takeDurableSlot(c.env.DB, `slides:p:${id}`, SLIDE_EVENT_LIMIT, now))) {
+      c.header("Retry-After", "3600");
+      return problem(c, { status: 429, code: "rate_limited", error: "This deck has counted all it can for today." });
+    }
+  } catch {
+    return problem(c, { status: 503, code: "unavailable", error: "Couldn't count that right now." });
+  }
+  try {
+    c.env.SLIDES?.writeDataPoint(slideEvent({ pageId: id, beacon: fields.beacon, nowMs: now }));
+  } catch (err) {
+    console.error("slide event write failed", { id, err: String(err) });
+  }
+  return c.body(null, 204);
 });
 
 collect.on(["GET", "PUT", "PATCH", "DELETE"], "/c/:id/:op", (c) =>
