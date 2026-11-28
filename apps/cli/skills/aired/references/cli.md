@@ -17,7 +17,7 @@ Run it with `npx aired` (no install) or install it with `npm install -g aired`.
 | `aired set <id>` | Change who can open it, its expiry, view limit or title without uploading again |
 | `aired check <id>` | Open the page in a real browser and report errors (exits 1 if broken) |
 | `aired pdf <id>` | Download the page as a PDF (a deck: one slide per page) |
-| `aired info <id>` | Title, size, views and expiry |
+| `aired info <id>` | Title, size, views and expiry; `--slides` (your own deck, Pro, signed in) adds per slide how many reached it, the typical time and where people stopped (`--days 7\|30\|90`) |
 | `aired delete <id>` | Delete a page |
 | `aired feedback` | Report a bug, friction or idea in aired itself |
 | `aired tokens` | List stored update tokens (`aired tokens prune` removes ones for pages that are gone) |

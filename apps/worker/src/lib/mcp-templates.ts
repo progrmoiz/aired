@@ -29,7 +29,7 @@ export const MISSING_CONTENT = "Send html or markdown.";
 
 /** get_page, the same on both servers. */
 export const GET_PAGE_DESCRIPTION =
-  "A page's details: title, URL, size, views, view limit, expiry, project, whether a PIN is on (never the PIN), and whether it's a doc or a deck. With include_source, also what was published: the Markdown (or HTML) before rendering, and a deck's speaker notes. For your own pages, or any page whose update_token you pass.";
+  "A page's details: title, URL, size, views, view limit, expiry, project, whether a PIN is on (never the PIN), and whether it's a doc or a deck. With include_source, also what was published: the Markdown (or HTML) before rendering, and a deck's speaker notes. For your own deck (signed in, Pro), also how far people get through it: per slide, how many reached it, the median time on it and where they stopped (last 30 days). For your own pages, or any page whose update_token you pass.";
 
 export const getPageInput = {
   id: z.string().describe("Page id, from publish_html or list_pages"),

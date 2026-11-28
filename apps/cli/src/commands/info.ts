@@ -1,10 +1,13 @@
-import { Command } from 'commander'
+import { Command, InvalidArgumentError } from 'commander'
 import pc from 'picocolors'
 import type { GlobalOpts } from '../lib/config.js'
 import { resolveApiUrl } from '../lib/config.js'
 import { shouldOutputJson, outputError, ExitCode } from '../lib/output.js'
 import { withSpinner } from '../lib/spinner.js'
-import { getPage } from '../core/client.js'
+import { getPage, getSlideStats, type SlideStats } from '../core/client.js'
+import { getSession } from '../core/session.js'
+import { apiKeyConfigured } from '../lib/api-key-env.js'
+import { renderTable } from '../lib/table.js'
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -19,13 +22,73 @@ function formatExpiry(expiresAt: string | null): string {
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
+function parseDays(v: string): number {
+  if (v !== '7' && v !== '30' && v !== '90') throw new InvalidArgumentError('Use 7, 30 or 90.')
+  return Number(v)
+}
+
+/** "8s", "1m 20s". */
+function seconds(s: number | null): string {
+  if (s === null) return '-'
+  const r = Math.round(s)
+  return r < 60 ? `${r}s` : `${Math.floor(r / 60)}m${r % 60 ? ` ${r % 60}s` : ''}`
+}
+
+/** A deck's per-slide numbers as lines for the terminal. */
+export function slideLines(st: SlideStats): string {
+  if (st.viewers === 0) return `Nobody has gone through this deck in the last ${st.days} days. A slide counts once someone keeps it on screen for a second; your own views don't count.\n`
+  const pct = Math.round((st.finished / st.viewers) * 100)
+  const out = [pc.bold(`Slides, last ${st.days} days`) + pc.dim(`  (${st.from} to ${st.to}, UTC)`), `${st.viewers} started, ${st.finished} reached the end (${pct}%)`]
+  if (st.biggest_drop !== null) out.push(`Most people stopped after slide ${st.biggest_drop}`)
+  out.push('')
+  out.push(
+    renderTable(
+      st.slides.map((s) => ({
+        slide: String(s.slide),
+        title: (s.title ?? '').slice(0, 40),
+        reached: String(s.reached),
+        typical: seconds(s.median_seconds),
+        stopped: s.drop_off ? String(s.drop_off) + (s.slide === st.biggest_drop ? ' <' : '') : '',
+      })),
+      [
+        { key: 'slide', header: '#' },
+        { key: 'title', header: 'Title' },
+        { key: 'reached', header: 'Reached' },
+        { key: 'typical', header: 'Typical' },
+        { key: 'stopped', header: 'Stopped here' },
+      ],
+    ),
+  )
+  return out.join('\n') + '\n'
+}
+
 export function makeInfoCommand(globalOpts: () => GlobalOpts): Command {
   return new Command('info')
-    .description('Show page metadata (title, size, reads, expiry)')
+    .description('Show page metadata (title, size, reads, expiry); --slides adds how far people get through your deck (Pro)')
     .argument('<id>', 'Page ID')
-    .action(async (id) => {
+    .option('--slides', "For your own deck: per slide, how many people reached it, the typical time on it and where they stopped (Pro; needs 'aired login' or AIRED_API_KEY)")
+    .option('--days <n>', 'With --slides: 7, 30 or 90 days (default 30)', parseDays, 30)
+    .action(async (id: string, cmdOpts: { slides?: boolean; days: number }) => {
       const opts = globalOpts()
       const baseUrl = resolveApiUrl(opts)
+
+      if (cmdOpts.slides === true) {
+        const session = getSession()
+        if (session === null && !apiKeyConfigured(opts)) {
+          outputError({ code: 'VALIDATION', message: "Per-slide numbers are for your own decks. Sign in with 'aired login' (or set AIRED_API_KEY) first." }, opts)
+          process.exit(ExitCode.VALIDATION_ERROR)
+        }
+        try {
+          const st = await withSpinner('Fetching...', () => getSlideStats(baseUrl, id, cmdOpts.days, session?.jwt), opts)
+          process.stdout.write(shouldOutputJson(opts) ? JSON.stringify(st, null, 2) + '\n' : '\n' + slideLines(st))
+        } catch (err) {
+          const e = err as Error & { apiCode?: string | null }
+          const message = e.apiCode === 'plan_limit' ? `${e.message} See ${baseUrl}/pricing?ref=cli-slides` : e.message
+          outputError({ code: 'API', message }, opts)
+          process.exit(ExitCode.API_ERROR)
+        }
+        return
+      }
 
       try {
         const page = await withSpinner('Fetching...', () => getPage(baseUrl, id), opts)

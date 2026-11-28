@@ -49,6 +49,21 @@ const sourceShape = {
   notes: z.array(z.string()).optional().describe("Deck only: speaker notes, one per slide (\"\" for none). Owner only"),
 };
 
+/** get_page on a signed-in owner's deck (Pro): GET /api/pages/:id/slides for the last 30 days. */
+const slideStatsShape = z.object({
+  days: z.number().describe("The window, in days"),
+  viewers: z.number().describe("The most people who reached any one slide"),
+  finished: z.number().describe("How many reached the last slide"),
+  biggest_drop: z.number().nullable().describe("The slide after which the most people stopped; null when nobody stopped early"),
+  slides: z.array(z.object({
+    slide: z.number(),
+    title: nullableString,
+    reached: z.number().describe("Page loads that showed this slide for at least a second"),
+    median_seconds: z.number().nullable().describe("The median time on this slide, in seconds"),
+    drop_off: z.number().nullable().describe("How many fewer reached the next slide; null on the last"),
+  })),
+});
+
 /** One version in a page's history (list_versions). */
 const versionShape = z.object({
   version: z.number(),
@@ -91,6 +106,8 @@ export const outputShapes = {
     slides: contentShape.slides,
     version: z.number().optional().describe("The live version's number"),
     versions: z.number().optional().describe("Versions in its history, the live one included; list_versions lists them"),
+    slide_stats: slideStatsShape.optional().describe("Deck only, for its signed-in owner on Pro: how far people get through it in the last 30 days. Your own views aren't counted"),
+    slide_stats_upgrade_url: z.string().optional().describe("Deck only, on Free: per-slide numbers need Pro; a link for a person to open"),
     ...sourceShape,
   },
   set_options: {
@@ -267,7 +284,25 @@ export function pageOut(body: unknown, origin: string): PageOut {
  * get_page: the details (GET /api/pages/:id/details), plus what was
  * published when `source` (GET /api/pages/:id/source) is given.
  */
-export function getPageOut(details: unknown, origin: string, source?: unknown): GetPageOut {
+/** What get_page adds for a deck: its per-slide numbers (GET /api/pages/:id/slides), or the upgrade link on Free. */
+export type SlideStatsInput = { stats: unknown } | { upgradeUrl: string };
+
+function slideStatsOut(v: unknown): NonNullable<GetPageOut["slide_stats"]> {
+  const b = obj(v);
+  const n = (x: unknown) => num(x) ?? 0;
+  return {
+    days: n(b.days),
+    viewers: n(b.viewers),
+    finished: n(b.finished),
+    biggest_drop: num(b.biggest_drop),
+    slides: (Array.isArray(b.slides) ? b.slides : []).map((r) => {
+      const s = obj(r);
+      return { slide: n(s.slide), title: typeof s.title === "string" ? s.title : null, reached: n(s.reached), median_seconds: num(s.median_seconds), drop_off: num(s.drop_off) };
+    }),
+  };
+}
+
+export function getPageOut(details: unknown, origin: string, source?: unknown, slideStats?: SlideStatsInput): GetPageOut {
   const d = obj(details);
   const { kind, slides } = contentOut(d);
   const out: GetPageOut = {
@@ -276,6 +311,8 @@ export function getPageOut(details: unknown, origin: string, source?: unknown): 
     ...(slides !== undefined ? { slides } : {}),
     ...(num(d.version) !== null ? { version: num(d.version)! } : {}),
     ...(num(d.versions) !== null ? { versions: num(d.versions)! } : {}),
+    ...(slideStats !== undefined && "stats" in slideStats ? { slide_stats: slideStatsOut(slideStats.stats) } : {}),
+    ...(slideStats !== undefined && "upgradeUrl" in slideStats ? { slide_stats_upgrade_url: slideStats.upgradeUrl } : {}),
   };
   if (source === undefined) return out;
   const s = obj(source);
@@ -297,12 +334,29 @@ export function getPageText(p: GetPageOut): string {
     const earlier = Math.max((p.versions ?? 1) - 1, 0);
     lines.push(`Version: ${p.version} (${earlier === 0 ? "no earlier versions kept" : `${earlier} earlier version${earlier === 1 ? "" : "s"} kept; list_versions shows them`})`);
   }
+  if (p.slide_stats !== undefined) lines.push(...slideStatsText(p.slide_stats));
+  if (p.slide_stats_upgrade_url !== undefined) lines.push(`Per-slide numbers (how many people reach each slide and where they stop) need Pro: ${p.slide_stats_upgrade_url}`);
   if (p.notes !== undefined) {
     const n = p.notes.map((t, i) => (t !== "" ? `Slide ${i + 1}: ${t}` : null)).filter((t) => t !== null);
     lines.push("", n.length > 0 ? `Speaker notes (owner only):\n${n.join("\n")}` : "No speaker notes.");
   }
   if (p.source !== undefined) lines.push("", `Source (${p.source_format}):`, p.source);
   return lines.join("\n");
+}
+
+/** A deck's per-slide numbers as lines: one per slide, the biggest drop named. */
+export function slideStatsText(st: NonNullable<GetPageOut["slide_stats"]>): string[] {
+  if (st.viewers === 0) return [`Slides, last ${st.days} days: nobody has gone through the deck yet.`];
+  const pct = Math.round((st.finished / st.viewers) * 100);
+  const lines = [`Slides, last ${st.days} days: ${st.viewers} started, ${st.finished} reached the end (${pct}%).`];
+  if (st.biggest_drop !== null) lines.push(`Most people stopped after slide ${st.biggest_drop}.`);
+  for (const s of st.slides) {
+    const bits = [`${s.reached} reached`];
+    if (s.median_seconds !== null) bits.push(`median ${s.median_seconds}s`);
+    if (s.drop_off) bits.push(`${s.drop_off} stopped here`);
+    lines.push(`  ${s.slide}. ${s.title ?? "(untitled)"}: ${bits.join(", ")}`);
+  }
+  return lines;
 }
 
 export function setOptionsOut(body: unknown, origin: string): SetOptionsOut {

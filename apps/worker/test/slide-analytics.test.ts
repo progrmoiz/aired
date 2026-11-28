@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import "./helpers/worker-loader.ts";
+import "./helpers/worker-stubs.ts";
 import { fakeD1 } from "./helpers/d1.ts";
 
 // Per-slide analytics for decks: the beacon a deck's viewer sends
@@ -457,4 +458,67 @@ test("reading: ANALYTICS_DEMO=1 answers made-up numbers for local dev, shaped th
   const body = await json(res);
   assert.equal(body.slides.length, 3);
   assert.ok(body.slides[0].reached >= body.slides[2].reached);
+});
+
+// --- Agents: the hosted MCP's get_page --------------------------------------
+
+const { createAiredMcpServer } = await import("../src/routes/mcp.ts");
+const { pageResult } = await import("../src/lib/mcp-account.ts");
+const { outputShapes } = await import("../src/lib/mcp-shapes.ts");
+const { z } = await import("zod");
+const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");
+
+const DETAILS = {
+  id: "deck", url: "https://aired.sh/p/deck", title: "Pitch", size: 10, views: 3, view_limit: null, has_pin: false, access: "public",
+  permanent: true, created_at: null, expires_at: null, project: null, kind: "deck", slides: 3,
+};
+const STATS = {
+  id: "deck", title: "Pitch", days: 30, offset: 0, from: "2026-10-30", to: "2026-11-28", slide_count: 3, viewers: 10, finished: 3, biggest_drop: 2,
+  slides: [
+    { slide: 1, title: "Hello", reached: 10, median_seconds: 4, drop_off: 2 },
+    { slide: 2, title: "Problem", reached: 8, median_seconds: 20, drop_off: 5 },
+    { slide: 3, title: null, reached: 3, median_seconds: 30, drop_off: null },
+  ],
+};
+
+test("get_page's answer carries a deck's slide numbers, valid against its output schema", () => {
+  const r = pageResult(DETAILS, "https://aired.sh", undefined, { stats: STATS });
+  const parsed = z.object(outputShapes.get_page).strict().safeParse(r.structuredContent);
+  assert.ok(parsed.success, parsed.success ? "" : parsed.error.message);
+  assert.deepEqual((r.structuredContent as any).slide_stats.slides[1], STATS.slides[1]);
+  const text = r.content[0]!.text;
+  assert.match(text, /10 started, 3 reached the end \(30%\)/);
+  assert.match(text, /Most people stopped after slide 2/);
+  assert.match(text, /2\. Problem: 8 reached, median 20s, 5 stopped here/);
+  const locked = pageResult(DETAILS, "https://aired.sh", undefined, { upgradeUrl: "https://aired.sh/pricing?ref=slides" });
+  assert.ok(z.object(outputShapes.get_page).strict().safeParse(locked.structuredContent).success);
+  assert.match(locked.content[0]!.text, /need Pro: https:\/\/aired\.sh\/pricing\?ref=slides/);
+});
+
+async function mcpWith(signedIn: boolean, slidesAnswer: { status: number; body: unknown }) {
+  const calls: string[] = [];
+  const server = createAiredMcpServer({ SITE_ORIGIN: "https://aired.sh", BILLING_ENABLED: "1" }, signedIn ? { login: "me", origin: "https://aired.sh" } : null, async (_m, path) => {
+    calls.push(path);
+    return path.includes("/slides") ? slidesAnswer : { status: 200, body: DETAILS };
+  });
+  const client = new Client({ name: "t", version: "1" });
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await Promise.all([server.connect(a), client.connect(b)]);
+  return { calls, call: async (args: Record<string, unknown>) => (await client.callTool({ name: "get_page", arguments: args })) as { structuredContent?: Record<string, any>; content: Array<{ text: string }> } };
+}
+
+test("hosted MCP get_page: the signed-in owner's deck gets its slide numbers; a token caller doesn't ask", async () => {
+  const owner = await mcpWith(true, { status: 200, body: STATS });
+  const got = await owner.call({ id: "deck" });
+  assert.deepEqual(owner.calls, ["/api/pages/deck/details", "/api/pages/deck/slides?days=30"]);
+  assert.equal(got.structuredContent?.slide_stats.viewers, 10);
+  const free = await mcpWith(true, { status: 402, body: { error: { code: "plan_limit", message: "x" } } });
+  const locked = await free.call({ id: "deck" });
+  assert.equal(locked.structuredContent?.slide_stats, undefined);
+  assert.equal(locked.structuredContent?.slide_stats_upgrade_url, "https://aired.sh/pricing?ref=slides");
+  const anon = await mcpWith(false, { status: 200, body: STATS });
+  const viaToken = await anon.call({ id: "deck", update_token: "at_x" });
+  assert.deepEqual(anon.calls, ["/api/pages/deck/details"]);
+  assert.equal(viaToken.structuredContent?.slide_stats, undefined);
 });

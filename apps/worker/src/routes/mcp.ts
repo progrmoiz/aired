@@ -58,6 +58,7 @@ import {
   restoreVersionInput,
   versionsOut,
   versionsText,
+  type SlideStatsInput,
 } from "../lib/mcp-shapes.ts";
 import { registerPrompts, registerResources } from "../lib/mcp-extras.ts";
 import { carded, cardTitle, cardToolMeta, registerCard } from "../lib/mcp-card.ts";
@@ -206,9 +207,16 @@ export function createAiredMcpServer(
       const headers: Record<string, string> = update_token ? { "X-Update-Token": update_token } : {};
       const res = await callApi("GET", `/api/pages/${encodeURIComponent(id)}/details`, undefined, headers);
       if (res.status !== 200) return apiErrorResult(res.status, res.body, origin);
-      if (include_source !== true) return pageResult(res.body, origin);
+      // A deck, for its signed-in owner: its per-slide numbers (Pro), or the upgrade link.
+      let slideStats: SlideStatsInput | undefined;
+      if (signedIn !== null && update_token === undefined && (res.body as { kind?: unknown } | null)?.kind === "deck") {
+        const st = await callApi("GET", `/api/pages/${encodeURIComponent(id)}/slides?days=30`);
+        if (st.status === 200) slideStats = { stats: st.body };
+        else if (st.status === 402) slideStats = { upgradeUrl: upgradeUrl(origin, "slides") };
+      }
+      if (include_source !== true) return pageResult(res.body, origin, undefined, slideStats);
       const src = await callApi("GET", `/api/pages/${encodeURIComponent(id)}/source`, undefined, headers);
-      return src.status === 200 ? pageResult(res.body, origin, src.body) : apiErrorResult(src.status, src.body, origin);
+      return src.status === 200 ? pageResult(res.body, origin, src.body, slideStats) : apiErrorResult(src.status, src.body, origin);
     }, (args, out) => ({
       action: "page",
       title: typeof out.title === "string" ? out.title : null,

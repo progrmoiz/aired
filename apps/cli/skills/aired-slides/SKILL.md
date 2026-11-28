@@ -107,6 +107,16 @@ Over MCP: `export_pdf` with `{ "id": "<id>" }`, or `{ "id": "<id>", "notes": tru
 - Free PDFs carry a small "Made with aired" mark in the corner of each slide; Pro PDFs don't.
 - Printing from the browser (Save as PDF) also gives one slide per page.
 
+## See how far people get (Pro)
+
+For your own decks, aired counts per slide how many people reached it (on screen for a second or more), the typical time on it, and where they stopped. Your own views don't count, and nothing about viewers is kept (no cookies, IP or viewer id).
+
+```bash
+aired info <id> --slides            # last 30 days; --days 7 or 90
+```
+
+Over MCP: `get_page` on your deck, signed in, has `slide_stats`. In the dashboard: the deck's Views page. Use the biggest drop to suggest which slide to fix. On Free you get an upgrade link instead, and nothing is collected.
+
 ## Check before sharing
 
 ```bash

@@ -678,3 +678,38 @@ export async function getPageSource(baseUrl: string, id: string, token: string, 
   const resp = await fetch(`${baseUrl}/api/pages/${encodeURIComponent(id)}/source`, { headers })
   return handleResponse<PageSource>(resp, 'Pull')
 }
+
+/** One slide's numbers (GET /api/pages/:id/slides). */
+export interface SlideStat {
+  slide: number
+  title: string | null
+  /** Page loads that showed the slide for at least a second. */
+  reached: number
+  median_seconds: number | null
+  /** How many fewer reached the next slide; null on the last. */
+  drop_off: number | null
+}
+
+export interface SlideStats {
+  id: string
+  title: string | null
+  days: number
+  offset: number
+  from: string
+  to: string
+  slide_count: number
+  viewers: number
+  finished: number
+  biggest_drop: number | null
+  slides: SlideStat[]
+}
+
+/**
+ * How far people get through one of your decks (Pro): per slide, how many
+ * reached it, the median time on it and where they stopped. Signed in by
+ * `jwt`, else by AIRED_API_KEY.
+ */
+export async function getSlideStats(baseUrl: string, id: string, days: number, jwt?: string): Promise<SlideStats> {
+  const resp = await fetch(`${baseUrl}/api/pages/${encodeURIComponent(id)}/slides?days=${days}`, { headers: callerHeaders(jwt) })
+  return handleResponse<SlideStats>(resp, 'Slide numbers')
+}

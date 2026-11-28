@@ -19,6 +19,7 @@ import {
   publishOut,
   setOptionsOut,
   updateOut,
+  type SlideStatsInput,
 } from './mcp-shapes.ts';
 
 export type ToolResult = {
@@ -157,8 +158,8 @@ export function deleteResult(id: string): ToolResult {
 }
 
 /** get_page: GET /api/pages/:id/details, and /source when include_source was asked for. */
-export function pageResult(body: unknown, origin: string, source?: unknown): ToolResult {
-  const p = getPageOut(body, origin, source);
+export function pageResult(body: unknown, origin: string, source?: unknown, slideStats?: SlideStatsInput): ToolResult {
+  const p = getPageOut(body, origin, source, slideStats);
   return withData(text([getPageText(p)]), p);
 }
 
