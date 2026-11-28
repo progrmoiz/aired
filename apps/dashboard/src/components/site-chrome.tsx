@@ -9,7 +9,7 @@ const FOOTER = [
 export function SiteFooter() {
   return (
     <footer className="mt-auto border-t border-hairline">
-      <div className="mx-auto flex max-w-(--aired-page-max) flex-wrap justify-between gap-x-6 gap-y-2 px-5 py-7 text-[13px] text-subtle sm:px-8">
+      <div className="mx-auto flex max-w-(--aired-page-max) flex-wrap justify-between gap-x-6 gap-y-2 px-6 py-7 text-[13px] text-subtle">
         <span>aired</span>
         <nav aria-label="Footer" className="flex flex-wrap gap-x-[18px] gap-y-1.5">
           {FOOTER.map(([label, href]) => (

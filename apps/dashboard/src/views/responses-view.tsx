@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import {
   AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { CopyRow, ViewHeader } from '@/components/common'
+import { CopyRow, LoadError, ViewHeader } from '@/components/common'
 import type { PagesState } from '@/App'
 import { getJson, mutate, readJson } from '@/lib/api'
 import { plural, relativeAge, sizeWords } from '@/lib/format'
@@ -30,6 +30,7 @@ type Report = {
 type State = { status: 'loading' } | { status: 'missing' } | { status: 'error' } | { status: 'ready'; report: Report; more: boolean }
 
 const SNIPPET = `aired.collect.save({ answer: "B" })`
+const ASK_AI = 'Make this page save what visitors enter with aired.collect, and show a short notice that it does.'
 const MAX_COLUMNS = 6
 
 export function ResponsesView({ pageId, pages }: { pageId: string; pages: PagesState }) {
@@ -129,10 +130,7 @@ export function ResponsesView({ pageId, pages }: { pageId: string; pages: PagesS
         </Card>
       )}
       {state.status === 'error' && (
-        <Card className="flex-row flex-wrap items-center justify-between gap-3 px-5 py-4">
-          <p className="text-sm text-muted-foreground">Could not load the responses.</p>
-          <Button variant="outline" onClick={load}>Try again</Button>
-        </Card>
+        <LoadError what="the responses" onRetry={load} />
       )}
       {report && (
         <>
@@ -307,10 +305,12 @@ function HowTo() {
         <div className="grid gap-1">
           <h2 className="text-[15px] font-medium">No responses yet</h2>
           <p className="max-w-[52em] text-sm text-muted-foreground">
-            A page saves what visitors enter when its script calls <code className="font-mono text-[13px]">aired.collect.save()</code>. Ask your AI tool to add it, or paste it in yourself. Responses show up here, and visitors can read back their own with <code className="font-mono text-[13px]">aired.collect.mine()</code>.
+            Pages like a quiz, a sign-up sheet or a feedback form can save what visitors type, and it shows up here. To turn it on, ask the AI tool that made the page:
           </p>
         </div>
       </div>
+      <CopyRow text={ASK_AI} label="Copy what to ask your AI tool" />
+      <p className="text-xs text-subtle">Editing the code yourself? The page saves an entry when its script calls <code className="font-mono">aired.collect.save()</code>, and visitors read back their own with <code className="font-mono">aired.collect.mine()</code>.</p>
       <CopyRow text={SNIPPET} label="Copy the save call" />
       <p className="text-xs text-subtle">Add <code className="font-mono">&lt;p data-aired-notice&gt;&lt;/p&gt;</code> to tell visitors the page saves what they enter. <a className="underline underline-offset-4 hover:text-foreground" href="/docs#data">How it works</a></p>
     </Card>

@@ -263,7 +263,7 @@ h2 { font-size: clamp(26px, 3.4vw, 36px); font-weight: 500; letter-spacing: -0.0
 
 /* Closing CTA, side by side: text left, logo wall right */
 .cta4s { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 24px; border-radius: 24px; background: var(--surface); border: 1px solid var(--aired-hairline); overflow: hidden; box-shadow: 0 -20px 80px -20px var(--aired-glow) inset; min-height: 340px; }
-@media (max-width: 860px) { .cta4s { grid-template-columns: 1fr; } .cta4s .wall { order: -1; } }
+@media (max-width: 860px) { .cta4s { grid-template-columns: minmax(0, 1fr); } .cta4s .wall { order: -1; } }
 .cta4s > div:first-child { padding: 48px 0 48px 48px; }
 @media (max-width: 860px) { .cta4s > div:first-child { padding: 0 24px 40px; text-align: center; } .cta4s .btns, .cta4s .ticks { justify-content: center; } }
 .cta4s h2 { margin-top: 8px; font-size: clamp(28px, 3.6vw, 40px); }
@@ -990,3 +990,73 @@ select.field option { background: var(--surface); }
 .cx-ic svg { width: 18px; height: 18px; }
 .cx-nm { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .cx-nm span { font-size: 13px; color: var(--text-3); }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Wide layout everywhere: docs start, phone contents, legal pages, device.
+   ─────────────────────────────────────────────────────────────────────────── */
+/* Docs: "Pick your path" cards under the hero */
+.ptop h2.pick { margin-top: 40px; font-size: 13px; font-weight: 500; letter-spacing: 0; color: var(--text-3); }
+.docs-start { margin-top: 12px; }
+.docs-start .gcard b { font-size: 16px; }
+.prose .gcards { margin-top: 18px; }
+.prose .gcard, .prose .gcard:hover { color: var(--text-1); text-decoration: none; }
+.prose .gcard span { line-height: 1.55; }
+.prose .docs-paths { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 560px) { .prose .docs-paths { grid-template-columns: minmax(0, 1fr); } }
+.prose .flow { padding: 0; margin-top: 20px; }
+.prose .flow li { margin: 0; line-height: 1.6; }
+.words { display: grid; gap: 1px; margin-top: 18px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--border); }
+.words div { display: grid; grid-template-columns: 9em minmax(0, 1fr); gap: 16px; padding: 12px 16px; background: var(--bg); }
+.words dt { color: var(--text-1); font-weight: 500; }
+.words dd { margin: 0; font-size: 14px; }
+@media (max-width: 520px) { .words div { grid-template-columns: minmax(0, 1fr); gap: 2px; } }
+
+/* Phones: the side contents become a "On this page" drop-down (app.js builds it from .toc) */
+.toc-m { display: none; }
+@media (max-width: 900px) {
+  .toc-m { display: block; margin: 0 0 28px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+  .toc-m summary { list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; font-size: 14px; font-weight: 500; cursor: pointer; }
+  .toc-m summary::-webkit-details-marker { display: none; }
+  .toc-m summary::after { content: ''; width: 7px; height: 7px; margin: -4px 4px 0 0; border-right: 1.5px solid var(--text-2); border-bottom: 1.5px solid var(--text-2); transform: rotate(45deg); transition: transform .15s; }
+  .toc-m[open] summary::after { margin-top: 4px; transform: rotate(-135deg); }
+  .toc-m nav { display: grid; gap: 1px; padding: 0 6px 8px; font-size: 14px; max-height: 60vh; overflow-y: auto; }
+  .toc-m nav p { padding: 10px 8px 4px; font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+  .toc-m nav p { margin: 0; }
+  .toc-m nav a, .prose .toc-m nav a, .legal .toc-m nav a { padding: 7px 8px; border-radius: 6px; color: var(--text-2); text-decoration: none; }
+  .toc-m nav a:hover { color: var(--text-1); background: var(--surface-2); }
+}
+
+/* Legal pages (terms, privacy, refunds): contents on the left, the text on the right */
+.legal-top { padding-top: 64px; }
+@media (max-width: 880px) { .legal-top { padding-top: 40px; } }
+.legal-top h1 { margin-top: 8px; }
+.legal-top .lede { max-width: 38em; }
+.legal-meta { margin-top: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; font-size: 13px; color: var(--text-3); }
+.legal-tabs { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); }
+.legal-tabs a { padding: 5px 12px; border-radius: 999px; font-size: 13px; font-weight: 500; color: var(--text-2); }
+.legal-tabs a:hover { color: var(--text-1); }
+.legal-tabs a[aria-current="page"] { background: var(--surface-2); color: var(--text-1); box-shadow: inset 0 0 0 1px var(--border-2); }
+.legal { max-width: 720px; min-width: 0; color: var(--text-2); font-size: 15px; line-height: 1.7; }
+.legal > :first-child { margin-top: 0; }
+.legal h2 { font-size: 22px; line-height: 1.3; letter-spacing: -0.015em; color: var(--text-1); margin-top: 48px; scroll-margin-top: 24px; }
+.legal h3 { font-size: 15px; font-weight: 600; color: var(--text-1); margin-top: 24px; }
+.legal p, .legal ul, .legal .tablewrap { margin-top: 12px; }
+.legal ul { padding-left: 20px; }
+.legal li + li { margin-top: 6px; }
+.legal li::marker { color: var(--text-3); }
+.legal strong { color: var(--text-1); font-weight: 600; }
+.legal a { color: var(--text-1); text-decoration: underline; text-decoration-color: var(--border-2); text-underline-offset: 3px; }
+.legal a:hover { text-decoration-color: var(--text-1); }
+.legal code { font-family: var(--mono); font-size: 13px; color: var(--text-1); }
+.legal .tablewrap { overflow-x: auto; }
+.legal table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.legal th, .legal td { text-align: left; vertical-align: top; padding: 10px 14px 10px 0; border-bottom: 1px solid var(--border); }
+.legal th { color: var(--text-1); font-weight: 500; }
+.legal .attr { margin-top: 56px; font-size: 13px; color: var(--text-3); }
+
+/* Device sign-in (/device) */
+.device-box { max-width: 30rem; }
+.device-code { margin-top: 8px; font: 500 18px/1.5 var(--mono); letter-spacing: .15em; text-transform: uppercase; }
+.device-code::placeholder { letter-spacing: .15em; }
+@media (pointer: coarse) { .device-code, .device-box .btn { min-height: 44px; } }
+.prose > section:first-of-type > h2:first-child { margin-top: 0; }

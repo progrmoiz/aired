@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import {
   AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { ViewHeader } from '@/components/common'
+import { LoadError, ViewHeader } from '@/components/common'
 import { NeutralPlaceholder, forgetPreview } from '@/components/live-preview'
 import { forgetTile } from '@/components/page-thumb'
 import { PagePreview } from '@/components/page-preview'
@@ -140,10 +140,7 @@ export function HistoryView({ pageId, pages, onRestored }: { pageId: string; pag
         </Card>
       )}
       {state.status === 'error' && (
-        <Card className="flex-row flex-wrap items-center justify-between gap-3 px-5 py-4">
-          <p className="text-sm text-muted-foreground">Could not load the history.</p>
-          <Button variant="outline" onClick={load}>Try again</Button>
-        </Card>
+        <LoadError what="this page’s history" onRetry={load} />
       )}
       {history && (
         <>

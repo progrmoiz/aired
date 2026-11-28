@@ -11,7 +11,7 @@ export type TopBarLink = { label: string; href: string; current?: boolean; onCli
 export function TopBar({ links, right, label, switcher, className }: { links?: TopBarLink[]; right?: ReactNode; label?: string; switcher?: ReactNode; className?: string }) {
   return (
     <header className={cn('sticky top-0 z-20 border-b border-hairline bg-background/85 backdrop-blur-md', className)}>
-      <div className="mx-auto flex h-16 max-w-(--aired-page-max) items-center gap-6 px-5 sm:px-8">
+      <div className="mx-auto flex h-16 max-w-(--aired-page-max) items-center gap-6 px-6">
         {switcher ? <span className="flex min-w-0 items-center gap-2"><span className="hidden sm:contents"><Logo /></span><span aria-hidden="true" className="hidden text-hairline-strong sm:inline">/</span>{switcher}</span> : <Logo />}
         {label && <span className="hidden border-l border-hairline pl-4 text-sm text-muted-foreground sm:block">{label}</span>}
         {links && (

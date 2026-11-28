@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { GlobeIcon, KeyRoundIcon, UsersIcon, XIcon } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { LoadError } from '@/components/common'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -137,10 +138,7 @@ export function AccessCard({ pageId, isPro, onSaved }: { pageId: string; isPro: 
         </Card>
       )}
       {state.status === 'error' && (
-        <Card className="flex-row flex-wrap items-center justify-between gap-3 px-5 py-4">
-          <p className="text-sm text-muted-foreground">Could not load who can open this page.</p>
-          <Button variant="outline" onClick={load}>Try again</Button>
-        </Card>
+        <LoadError what="who can open this page" onRetry={load} />
       )}
       {access && (
         <>
